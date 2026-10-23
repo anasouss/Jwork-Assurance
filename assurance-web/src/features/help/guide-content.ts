@@ -1148,7 +1148,7 @@ export const guideModules: GuideModule[] = [
           { title: "Définir la destination", description: "Choisissez le compte à créditer, la banque et la date du bordereau." },
           { title: "Contrôler", description: "Vérifiez les instruments et le montant total, puis prévisualisez le PDF." },
           { title: "Créer le provisoire", description: "Confirmez pour enregistrer le bordereau provisoire." },
-          { title: "Remettre à la banque", description: "Ouvrez le détail, cliquez sur Remettre à la banque et renseignez la date effective." },
+          { title: "Remettre à la banque", description: "Sur un bordereau provisoire, ouvrez Actions puis Remettre à la banque, ou utilisez le même bouton dans le détail. Renseignez la date effective et le N° bordereau banque." },
           { title: "Supprimer si nécessaire", description: "Seul un bordereau provisoire peut être supprimé." },
         ],
         errors: [

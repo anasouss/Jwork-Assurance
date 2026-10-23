@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, FileDown, MoreHorizontal, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Download, Eye, FileDown, MoreHorizontal, RotateCcw, Search, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import {
@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,7 +32,7 @@ import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import type { RemittanceSlip, RemittanceSlipStatus, RemittanceSlipType } from "../types";
-import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./treasury-format";
+import { formatTreasuryDate, formatTreasuryMoney, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type TypeFilter = RemittanceSlipType | "ALL";
 type StatusFilter = RemittanceSlipStatus | "ALL";
@@ -63,6 +64,9 @@ export default function InstrumentsTresoreriePage() {
   const page = parsePage(searchParams.get("page"));
   const [search, setSearch] = useState(appliedSearch);
   const [deleteTarget, setDeleteTarget] = useState<RemittanceSlip>();
+  const [depositTarget, setDepositTarget] = useState<RemittanceSlip>();
+  const [depositDate, setDepositDate] = useState(TODAY);
+  const [depositReference, setDepositReference] = useState("");
   const [pdfAction, setPdfAction] = useState<{ id: string; type: "preview" | "download" }>();
 
   useEffect(() => {
@@ -89,6 +93,28 @@ export default function InstrumentsTresoreriePage() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Suppression impossible"),
   });
+  const deposit = useMutation({
+    mutationFn: (slip: RemittanceSlip) => comptaApi.depositRemittanceSlip(slip.id, {
+      dateDepot: depositDate,
+      referenceBancaire: depositReference.trim(),
+    }),
+    onSuccess: async () => {
+      setDepositTarget(undefined);
+      toast.success("Bordereau remis à la banque");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
+      ]);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Remise à la banque impossible"),
+  });
+
+  function openDeposit(slip: RemittanceSlip) {
+    setDepositDate(TODAY);
+    setDepositReference(slip.referenceBancaire ?? "");
+    setDepositTarget(slip);
+  }
 
   function applyFilters() {
     updateFilter("search", search.trim());
@@ -205,6 +231,11 @@ export default function InstrumentsTresoreriePage() {
                         <Eye className="size-4" /> Voir le détail
                       </Link>
                     </DropdownMenuItem>
+                    {slip.statut === "BROUILLON" && canManage ? (
+                      <DropdownMenuItem onSelect={() => openDeposit(slip)}>
+                        <Send className="size-4" /> Remettre à la banque
+                      </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void previewPdf(slip)}>
                       <FileDown className="size-4" />
                       {pdfAction?.id === slip.id && pdfAction.type === "preview" ? "Ouverture..." : "Prévisualiser le PDF"}
@@ -232,6 +263,42 @@ export default function InstrumentsTresoreriePage() {
         </table></div>
         {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={(nextPage) => updateFilter("page", String(nextPage), false)} />}
       </section>
+
+      <Dialog open={Boolean(depositTarget)} onOpenChange={(open) => !open && setDepositTarget(undefined)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmer la remise à la banque</DialogTitle>
+            <DialogDescription>
+              {depositTarget?.type === "VERSEMENT_ESPECES"
+                ? "Le transfert de la caisse vers la banque sera enregistré."
+                : "Les instruments passeront au statut remis en banque."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Date de remise</Label>
+              <DatePicker date={depositDate} onSelect={(value) => setDepositDate(toDateOnly(value) ?? "")} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="list-deposit-reference">N° bordereau banque *</Label>
+              <Input
+                id="list-deposit-reference"
+                value={depositReference}
+                onChange={(event) => setDepositReference(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={deposit.isPending} onClick={() => setDepositTarget(undefined)}>Annuler</Button>
+            <Button
+              disabled={!depositTarget || !depositDate || !depositReference.trim() || deposit.isPending}
+              onClick={() => depositTarget && deposit.mutate(depositTarget)}
+            >
+              {deposit.isPending ? "Remise en cours..." : "Confirmer la remise"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(undefined)}>
         <AlertDialogContent>

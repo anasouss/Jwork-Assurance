@@ -6,6 +6,8 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import {
+  ChevronDown,
+  ChevronRight,
   Eye,
   FileText,
   MoreHorizontal,
@@ -88,6 +90,14 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
   PRELEVEMENT: "Prélèvement",
 };
 
+const INSTRUMENT_STATUS_LABELS: Record<PaymentInstrument["statut"], string> = {
+  EN_ATTENTE: "En instance",
+  REMIS_EN_BANQUE: "Remis en banque",
+  CONFIRME: "Encaissé",
+  REJETE: "Retourné / impayé",
+  REMPLACE: "Remplacé",
+};
+
 export default function ReglementsEnregistresPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get("search")?.trim() ?? "";
@@ -122,6 +132,7 @@ export default function ReglementsEnregistresPage() {
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
+  const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const journalView = searchParams.get("vue") === "journal" || searchParams.get("journal") === "1";
   const [journalDateFrom, setJournalDateFrom] = useState(TODAY);
   const [journalDateTo, setJournalDateTo] = useState(TODAY);
@@ -296,6 +307,15 @@ export default function ReglementsEnregistresPage() {
     setPage(0);
   }
 
+  function togglePaymentDetails(paymentId: string) {
+    setExpandedPayments((current) => {
+      const next = new Set(current);
+      if (next.has(paymentId)) next.delete(paymentId);
+      else next.add(paymentId);
+      return next;
+    });
+  }
+
   async function previewPayment(payment: ClientPayment) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
@@ -459,24 +479,40 @@ export default function ReglementsEnregistresPage() {
             <tbody className="divide-y">
               {payments.isLoading ? (
                 <TableRowsSkeleton colSpan={12} rows={8} />
-              ) : (payments.data?.rows ?? []).flatMap((payment) => visibleInstruments(
-                payment,
-                appliedPaymentMode,
-                appliedInstrumentStatus
-              ).map((instrument) => (
-                <tr key={instrument.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3 font-semibold">{payment.numero}</td>
+              ) : (payments.data?.rows ?? []).flatMap((payment) => {
+                const expanded = expandedPayments.has(payment.id);
+                return [
+                <tr key={payment.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3 font-semibold">
+                    <div className="flex items-center gap-1.5">
+                      {payment.instruments.length > 1 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? "Masquer" : "Afficher"} les moyens du règlement ${payment.numero}`}
+                          title={expanded ? "Masquer les moyens" : "Afficher les moyens"}
+                          onClick={() => togglePaymentDetails(payment.id)}
+                        >
+                          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                        </Button>
+                      ) : <span className="inline-block w-7" />}
+                      {payment.numero}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">{formatDate(payment.dateReglement)}</td>
                   <td className="px-4 py-3">
-                    <div className="max-w-64">{instrumentPayerLabel(payment, instrument)}</div>
+                    <div className="max-w-64">{payment.payeurNom}</div>
                   </td>
                   <td className="px-4 py-3">{payment.deposantNom || "-"}</td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)}</td>
-                  <td className="px-4 py-3"><Badge variant="outline">{MODE_LABELS[instrument.mode]}</Badge></td>
-                  <td className="px-4 py-3 font-medium">{instrument.referenceInstrument || "-"}</td>
-                  <td className="px-4 py-3">{formatDate(instrument.dateEcheance)}</td>
-                  <td className="px-4 py-3">{formatDate(instrument.dateStatut)}</td>
-                  <td className="px-4 py-3 text-center"><InstrumentStatusBadge value={instrument.statut} /></td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(payment.montantTotal)}</td>
+                  <td className="px-4 py-3"><InstrumentModesSummary instruments={payment.instruments} /></td>
+                  <td className="px-4 py-3 font-medium">{instrumentReferencesSummary(payment.instruments)}</td>
+                  <td className="px-4 py-3">{instrumentDatesSummary(payment.instruments, "dateEcheance")}</td>
+                  <td className="px-4 py-3">{instrumentDatesSummary(payment.instruments, "dateStatut")}</td>
+                  <td className="px-4 py-3 text-center"><InstrumentStatusesSummary instruments={payment.instruments} /></td>
                   <td className="px-4 py-3 text-center">
                     <PaymentStatusBadge value={payment.statut} />
                   </td>
@@ -498,8 +534,16 @@ export default function ReglementsEnregistresPage() {
                       />
                     </div>
                   </td>
-                </tr>
-              ))) }
+                </tr>,
+                expanded ? (
+                  <tr key={`${payment.id}-details`} className="bg-muted/20">
+                    <td colSpan={12} className="px-10 py-3">
+                      <PaymentInstrumentDetails payment={payment} />
+                    </td>
+                  </tr>
+                ) : null,
+                ];
+              }) }
               {!payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
                   <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
@@ -927,19 +971,108 @@ function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
 }
 
 function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {
-  const labels: Record<PaymentInstrument["statut"], string> = {
-    EN_ATTENTE: "En instance",
-    REMIS_EN_BANQUE: "Remis en banque",
-    CONFIRME: "Encaissé",
-    REJETE: "Retourné / impayé",
-    REMPLACE: "Remplacé",
-  };
   const variant = value === "REJETE"
     ? "destructive"
     : value === "CONFIRME"
       ? "default"
       : "secondary";
-  return <Badge variant={variant}>{labels[value]}</Badge>;
+  return <Badge variant={variant}>{INSTRUMENT_STATUS_LABELS[value]}</Badge>;
+}
+
+function InstrumentModesSummary({ instruments }: { instruments: PaymentInstrument[] }) {
+  const counts = countBy(instruments.map((instrument) => instrument.mode));
+  return (
+    <div className="flex flex-wrap gap-1">
+      {Array.from(counts.entries()).map(([mode, count]) => (
+        <Badge key={mode} variant="outline">
+          {count > 1 ? `${count} ` : ""}{MODE_LABELS[mode as ClientPaymentMode]}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function InstrumentStatusesSummary({ instruments }: { instruments: PaymentInstrument[] }) {
+  const counts = countBy(instruments.map((instrument) => instrument.statut));
+  if (counts.size === 1) {
+    const [status, count] = Array.from(counts.entries())[0];
+    return (
+      <span className="inline-flex items-center gap-1">
+        {count > 1 ? <span className="text-xs font-medium">{count}</span> : null}
+        <InstrumentStatusBadge value={status as PaymentInstrument["statut"]} />
+      </span>
+    );
+  }
+  return <Badge variant="secondary">États mixtes</Badge>;
+}
+
+function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
+  return (
+    <div className="overflow-hidden rounded-md border bg-card">
+      <div className="border-b px-3 py-2 text-sm font-semibold">
+        Moyens du règlement {payment.numero}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-sm">
+          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 text-left">Payeur</th>
+              <th className="px-3 py-2 text-left">Moyen</th>
+              <th className="px-3 py-2 text-left">Référence</th>
+              <th className="px-3 py-2 text-left">Échéance</th>
+              <th className="px-3 py-2 text-left">Date de valeur</th>
+              <th className="px-3 py-2 text-center">État</th>
+              <th className="px-3 py-2 text-right">Montant</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {payment.instruments.map((instrument) => (
+              <tr key={instrument.id}>
+                <td className="px-3 py-2">{instrumentPayerLabel(payment, instrument)}</td>
+                <td className="px-3 py-2">{MODE_LABELS[instrument.mode]}</td>
+                <td className="px-3 py-2 font-medium">{instrument.referenceInstrument || "-"}</td>
+                <td className="px-3 py-2">{formatDate(instrument.dateEcheance)}</td>
+                <td className="px-3 py-2">{formatDate(instrument.dateStatut)}</td>
+                <td className="px-3 py-2 text-center"><InstrumentStatusBadge value={instrument.statut} /></td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums">
+                  {formatAccountingAmount(instrument.montant)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function instrumentReferencesSummary(instruments: PaymentInstrument[]) {
+  const references = instruments
+    .map((instrument) => instrument.referenceInstrument?.trim())
+    .filter((reference): reference is string => Boolean(reference));
+  if (references.length === 0) return "-";
+  if (instruments.length === 1) return references[0];
+  return `${references.length} référence${references.length > 1 ? "s" : ""}`;
+}
+
+function instrumentDatesSummary(
+  instruments: PaymentInstrument[],
+  field: "dateEcheance" | "dateStatut"
+) {
+  const dates = Array.from(new Set(
+    instruments
+      .map((instrument) => instrument[field])
+      .filter((date): date is string => Boolean(date))
+  )).sort();
+  if (dates.length === 0) return "-";
+  if (dates.length === 1) return formatDate(dates[0]);
+  return `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}`;
+}
+
+function countBy(values: string[]) {
+  const counts = new Map<string, number>();
+  values.forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
+  return counts;
 }
 
 function newReplacement(): InstrumentDraft {
@@ -983,17 +1116,6 @@ function instrumentPayerLabel(payment: ClientPayment, instrument: PaymentInstrum
       .filter((name): name is string => Boolean(name))
   ));
   return names.length > 0 ? names.join(", ") : payment.payeurNom;
-}
-
-function visibleInstruments(
-  payment: ClientPayment,
-  mode: ClientPaymentMode | "ALL",
-  status: PaymentInstrument["statut"] | "ALL"
-) {
-  return payment.instruments.filter((instrument) =>
-    (mode === "ALL" || instrument.mode === mode)
-      && (status === "ALL" || instrument.statut === status)
-  );
 }
 
 function PaymentSortHeader(props: {

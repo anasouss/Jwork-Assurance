@@ -51,7 +51,12 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
             "lignes",
             "lignes.instrument",
             "lignes.instrument.banqueEmettriceReference",
-            "lignes.instrument.reglement"
+            "lignes.instrument.reglement",
+            "lignesEspeces",
+            "lignesEspeces.mouvementTresorerie",
+            "lignesEspeces.mouvementTresorerie.compteTresorerie",
+            "lignesEspeces.mouvementTresorerie.compteTresorerie.utilisateurTitulaire",
+            "lignesEspeces.operationTresorerie"
     })
     Optional<BordereauRemise> findByIdAndAgenceId(Long id, Long agenceId);
 
@@ -63,7 +68,12 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
             "lignes",
             "lignes.instrument",
             "lignes.instrument.banqueEmettriceReference",
-            "lignes.instrument.reglement"
+            "lignes.instrument.reglement",
+            "lignesEspeces",
+            "lignesEspeces.mouvementTresorerie",
+            "lignesEspeces.mouvementTresorerie.compteTresorerie",
+            "lignesEspeces.mouvementTresorerie.compteTresorerie.utilisateurTitulaire",
+            "lignesEspeces.operationTresorerie"
     })
     @Query("""
             select b

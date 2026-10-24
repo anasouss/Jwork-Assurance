@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ArrowRightLeft, Banknote, Ban, CircleAlert, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
+import { ArrowRight, Banknote, Ban, CircleAlert, Eye, Landmark, MoreHorizontal, Plus, RotateCcw, Search, UserRound } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -31,7 +31,7 @@ import { SortIcon } from "@/components/ui/sort-icon";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import type { ClientPaymentMode, PaymentInstrument } from "../types";
+import type { ClientPaymentMode, EligibleCashDay, PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type ModeFilter = Extract<ClientPaymentMode, "ESPECES" | "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
@@ -48,6 +48,7 @@ export default function EncaissementsEnAttentePage() {
   const { mode, search: appliedSearch, dateFrom, dateTo, page, sortBy, sortDirection } = urlState;
   const [search, setSearch] = useState(appliedSearch);
   const [selectedInstruments, setSelectedInstruments] = useState<PaymentInstrument[]>([]);
+  const [selectedCashDays, setSelectedCashDays] = useState<EligibleCashDay[]>([]);
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacementDate, setReplacementDate] = useState(TODAY);
   const [replacementReason, setReplacementReason] = useState("");
@@ -91,11 +92,10 @@ export default function EncaissementsEnAttentePage() {
     queryKey: ["compta", "treasury-accounts"],
     queryFn: comptaApi.treasuryAccounts,
   });
-  const overviewAccounts = useQuery({
-    queryKey: ["compta", "treasury-accounts", { administration: canManage }],
-    queryFn: canManage
-      ? comptaApi.treasuryAdministrationAccounts
-      : comptaApi.treasuryAccounts,
+  const eligibleCashDays = useQuery({
+    queryKey: ["compta", "treasury", "eligible-cash-days"],
+    queryFn: comptaApi.eligibleCashRemittanceDays,
+    enabled: mode === "ALL" || mode === "ESPECES",
   });
   const bankAccounts = useMemo(
     () => (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE"),
@@ -217,11 +217,12 @@ export default function EncaissementsEnAttentePage() {
   function resetFilters() {
     setSearch("");
     setSelectedInstruments([]);
+    setSelectedCashDays([]);
     setSearchParams(new URLSearchParams(), { replace: true });
   }
 
   function changeMode(nextMode: ModeFilter) {
-    const supportsDueDate = nextMode === "CHEQUE" || nextMode === "EFFET";
+    const supportsDueDate = nextMode === "CHEQUE" || nextMode === "EFFET" || nextMode === "ESPECES";
     updateUrl({
       mode: nextMode,
       search: appliedSearch,
@@ -240,18 +241,16 @@ export default function EncaissementsEnAttentePage() {
   }
 
   const cashSearch = appliedSearch.toLocaleLowerCase("fr");
-  const cashAccounts = (overviewAccounts.data ?? []).filter((account) => {
-    if (!account.actif || account.typeCompte !== "CAISSE" || account.soldeCourant <= 0) return false;
+  const cashDays = (eligibleCashDays.data ?? []).filter((day) => {
+    if (dateFrom && day.dateJournee < dateFrom) return false;
+    if (dateTo && day.dateJournee > dateTo) return false;
     if (!cashSearch) return true;
-    return [account.code, account.libelle, account.utilisateurTitulaire]
+    return [day.compteTresorerie, day.caissier, day.dateJournee]
       .some((value) => value?.toLocaleLowerCase("fr").includes(cashSearch));
   });
-  const centralCashAccount = (accounts.data ?? []).find((account) =>
-    account.actif && account.typeCompte === "CAISSE" && account.natureCaisse === "CENTRALE"
-  );
   const showCashWorkflow = mode === "ALL" || mode === "ESPECES";
   const showInstrumentWorkflow = mode !== "ESPECES";
-  const showDueDateFilters = mode === "CHEQUE" || mode === "EFFET";
+  const showDueDateFilters = mode === "CHEQUE" || mode === "EFFET" || mode === "ESPECES";
   const rows = instruments.data?.rows ?? [];
   const selectedMode = selectedInstruments[0]?.mode;
   const pageSelectable = rows.filter((instrument) => isSelectableForSlip(instrument)
@@ -263,6 +262,13 @@ export default function EncaissementsEnAttentePage() {
   const allPageSelected = canSelectPage
     && selectedOnPage === pageSelectable.length;
   const selectedTotal = selectedInstruments.reduce((sum, instrument) => sum + instrument.montant, 0);
+  const selectedCashTotal = selectedCashDays.reduce((sum, day) => sum + day.montantAVerser, 0);
+
+  function toggleCashDay(day: EligibleCashDay, checked: boolean) {
+    setSelectedCashDays((current) => checked
+      ? current.some((row) => row.cle === day.cle) ? current : [...current, day]
+      : current.filter((row) => row.cle !== day.cle));
+  }
 
   function toggleInstrument(instrument: PaymentInstrument, checked: boolean) {
     if (checked) {
@@ -334,7 +340,7 @@ export default function EncaissementsEnAttentePage() {
         {showDueDateFilters && (
           <>
             <div className="grid gap-2">
-              <Label>Échéance du</Label>
+              <Label>{mode === "ESPECES" ? "Journée du" : "Échéance du"}</Label>
               <DatePicker
                 date={dateFrom}
                 maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
@@ -342,7 +348,7 @@ export default function EncaissementsEnAttentePage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Échéance au</Label>
+              <Label>{mode === "ESPECES" ? "Journée au" : "Échéance au"}</Label>
               <DatePicker
                 date={dateTo}
                 minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
@@ -358,59 +364,57 @@ export default function EncaissementsEnAttentePage() {
       </section>
 
       {showCashWorkflow && <section className="overflow-hidden rounded-md border bg-card">
-        <div className="border-b px-4 py-3">
-          <h2 className="font-semibold">Espèces en caisse</h2>
-          <p className="text-sm text-muted-foreground">Espèces détenues en caisse et pas encore versées en banque.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div>
+            <h2 className="font-semibold">Journées de caisse à verser</h2>
+            <p className="text-sm text-muted-foreground">Encaissements en espèces regroupés par caisse et date, non encore affectés à un bordereau.</p>
+          </div>
+          {selectedCashDays.length > 0 ? (
+            <div className="flex items-center gap-3">
+              <div className="text-right text-sm">
+                <div className="font-medium">{selectedCashDays.length} journée(s)</div>
+                <div className="text-muted-foreground">{formatTreasuryMoney(selectedCashTotal)}</div>
+              </div>
+              <Button asChild disabled={!canManage}>
+                <Link to={cashRemittancePath(selectedCashDays)}>
+                  <Landmark className="size-4" /> Préparer le bordereau d’espèces
+                </Link>
+              </Button>
+            </div>
+          ) : null}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-emerald-700 text-xs uppercase text-white"><tr>
+              <th className="w-12 px-3 py-3 text-center" />
+              <th className="px-4 py-3 text-left">Journée</th>
               <th className="px-4 py-3 text-left">Caisse</th>
-              <th className="px-4 py-3 text-left">Responsable</th>
-              <th className="px-4 py-3 text-left">Situation</th>
-              <th className="px-4 py-3 text-right">Solde</th>
-              <th className="w-64 px-4 py-3 text-right">Action suivante</th>
+              <th className="px-4 py-3 text-left">Caissier</th>
+              <th className="px-4 py-3 text-center">Encaissements</th>
+              <th className="px-4 py-3 text-right">Montant à verser</th>
             </tr></thead>
             <tbody className="divide-y">
-              {overviewAccounts.isLoading ? <TableRowsSkeleton colSpan={5} rows={2} /> : cashAccounts.map((account) => {
-                const central = account.natureCaisse === "CENTRALE";
-                const canOperateAccount = (accounts.data ?? []).some((visible) => visible.id === account.id);
-                return <tr key={account.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-2.5 font-semibold">{account.libelle}</td>
-                  <td className="px-4 py-2.5">{account.utilisateurTitulaire || (central ? "Caisse centrale" : "-")}</td>
-                  <td className="px-4 py-2.5">
-                    <Badge className={central
-                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200"
-                      : "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200"}
-                    >{central ? "À verser en banque" : "À remettre à la caisse centrale"}</Badge>
+              {eligibleCashDays.isLoading ? <TableRowsSkeleton colSpan={6} rows={3} /> : cashDays.map((day) => (
+                <tr key={day.cle} className="hover:bg-muted/30">
+                  <td className="px-3 py-2.5 text-center">
+                    <Checkbox
+                      checked={selectedCashDays.some((row) => row.cle === day.cle)}
+                      aria-label={`Sélectionner la journée ${formatTreasuryDate(day.dateJournee)} de ${day.compteTresorerie}`}
+                      onCheckedChange={(value) => toggleCashDay(day, value === true)}
+                    />
                   </td>
-                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatTreasuryMoney(account.soldeCourant)}</td>
-                  <td className="px-4 py-2.5 text-right">
-                    {central ? (
-                      canManage ? (
-                        <Button asChild size="sm">
-                          <Link to={`/app/compta/tresorerie/bordereaux-remise/nouveau?type=VERSEMENT_ESPECES&sourceId=${account.id}`}>
-                            <Landmark className="size-4" /> Préparer le versement
-                          </Link>
-                        </Button>
-                      ) : <Button size="sm" disabled><Landmark className="size-4" /> Préparer le versement</Button>
-                    ) : centralCashAccount ? (
-                      canManage && canOperateAccount ? (
-                        <Button asChild size="sm" variant="outline">
-                          <Link to={`/app/compta/tresorerie/operations?compteId=${account.id}&destinationType=CAISSE&destinationId=${centralCashAccount.id}`}>
-                            <ArrowRightLeft className="size-4" /> Remettre à la caisse centrale
-                          </Link>
-                        </Button>
-                      ) : <Button size="sm" variant="outline" disabled><ArrowRightLeft className="size-4" /> Remettre à la caisse centrale</Button>
-                    ) : <span className="text-sm text-destructive">Caisse centrale non configurée</span>}
-                  </td>
-                </tr>;
-              })}
-              {!overviewAccounts.isLoading && !overviewAccounts.isError && cashAccounts.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">Aucune espèce en caisse.</td></tr>
+                  <td className="px-4 py-2.5 font-semibold">{formatTreasuryDate(day.dateJournee)}</td>
+                  <td className="px-4 py-2.5">{day.compteTresorerie}</td>
+                  <td className="px-4 py-2.5">{day.caissier || "-"}</td>
+                  <td className="px-4 py-2.5 text-center">{day.nombreEncaissements}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatTreasuryMoney(day.montantAVerser)}</td>
+                </tr>
+              ))}
+              {!eligibleCashDays.isLoading && !eligibleCashDays.isError && cashDays.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Aucune journée de caisse à verser.</td></tr>
               )}
-              {overviewAccounts.isError && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-destructive">Chargement des caisses impossible.</td></tr>
+              {eligibleCashDays.isError && (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-destructive">Chargement des journées de caisse impossible.</td></tr>
               )}
             </tbody>
           </table>
@@ -740,6 +744,15 @@ function isSelectableForSlip(instrument: PaymentInstrument) {
     && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET");
 }
 
+function cashRemittancePath(days: EligibleCashDay[]) {
+  const movementIds = Array.from(new Set(days.flatMap((day) => day.mouvementIds)));
+  const params = new URLSearchParams({
+    type: "VERSEMENT_ESPECES",
+    cashMovementIds: movementIds.join(","),
+  });
+  return `/app/compta/tresorerie/bordereaux-remise/nouveau?${params.toString()}`;
+}
+
 type CollectionQueueUrlState = {
   mode: ModeFilter;
   search: string;
@@ -752,7 +765,7 @@ type CollectionQueueUrlState = {
 
 function collectionQueueStateFromParams(params: URLSearchParams): CollectionQueueUrlState {
   const mode = isModeFilter(params.get("mode")) ? params.get("mode") as ModeFilter : "ALL";
-  const supportsDueDate = mode === "CHEQUE" || mode === "EFFET";
+  const supportsDueDate = mode === "CHEQUE" || mode === "EFFET" || mode === "ESPECES";
   return {
     mode,
     search: params.get("search")?.trim() ?? "",

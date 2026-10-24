@@ -8,6 +8,7 @@ import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.BordereauRemisePageResponse;
 import com.assurance.dto.response.BordereauRemiseResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
+import com.assurance.dto.response.JourneeCaisseVersementResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.TypeBordereauRemise;
@@ -197,4 +198,14 @@ public class BordereauRemiseController {
         bordereauRemiseService.deleteDraft(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Bordereau provisoire supprimé"));
     }
+
+    @GetMapping("/journees-caisse-eligibles")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<ApiResponse<List<JourneeCaisseVersementResponse>>> eligibleCashDays() {
+        return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.eligibleCashDays(
+                TenantContext.getCurrentAgence()
+        )));
+    }
+
 }
+

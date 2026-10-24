@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import type { CashRemittanceLine } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY } from "./treasury-format";
 
 const STATUS_LABELS = {
@@ -117,6 +118,7 @@ export default function BordereauRemiseDetailPage() {
 
   const data = slip.data;
   const instrumentSlip = data.type !== "VERSEMENT_ESPECES";
+  const cashDays = groupCashLines(data.lignesEspeces);
   const statusTone: SummaryTone = data.statut === "ANNULE"
     ? "danger"
     : data.statut === "CLOTURE"
@@ -155,7 +157,7 @@ export default function BordereauRemiseDetailPage() {
               setDepositOpen(true);
             }}><Send className="size-4" /> Remettre à la banque</Button>
           </>}
-          {data.operationTresorerieId && <Button asChild variant="outline"><Link to={`/app/compta/tresorerie/operations?search=${data.numero}`}><Landmark className="size-4" /> Voir l’opération</Link></Button>}
+          {(data.operationTresorerieId || data.lignesEspeces.some((line) => line.operationTresorerieId)) && <Button asChild variant="outline"><Link to={`/app/compta/tresorerie/operations?search=${data.numero}`}><Landmark className="size-4" /> Voir les opérations</Link></Button>}
         </div>
       </header>
 
@@ -190,13 +192,28 @@ export default function BordereauRemiseDetailPage() {
         </table></div>
       </section>}
 
-      {!instrumentSlip && <section className="rounded-md border bg-card p-4">
-        <h2 className="font-semibold">Transfert de trésorerie</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      {!instrumentSlip && <section className="overflow-hidden rounded-md border bg-card">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
+          <div><h2 className="font-semibold">Journées de caisse</h2><p className="text-sm text-muted-foreground">Encaissements inclus dans ce versement bancaire.</p></div>
+          <div className="text-right"><div className="text-xs uppercase text-muted-foreground">Destination</div><div className="font-medium">{data.compteDestination}</div></div>
+        </div>
+        {cashDays.length > 0 ? <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-emerald-700 text-xs uppercase text-white"><tr>
+            <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Caisse</th>
+            <th className="px-4 py-3 text-left">Caissier</th><th className="px-4 py-3 text-center">Encaissements</th>
+            <th className="px-4 py-3 text-right">Montant</th><th className="px-4 py-3 text-left">Transfert</th>
+          </tr></thead>
+          <tbody className="divide-y">{cashDays.map((day) => <tr key={day.key}>
+            <td className="px-4 py-3 font-medium">{formatTreasuryDate(day.dateJournee)}</td>
+            <td className="px-4 py-3">{day.compteSource}</td><td className="px-4 py-3">{day.caissier || "-"}</td>
+            <td className="px-4 py-3 text-center">{day.count}</td><td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(day.montant)}</td>
+            <td className="px-4 py-3">{day.operationTresorerieId ? "Enregistré" : "À remettre"}</td>
+          </tr>)}</tbody>
+        </table></div> : <div className="grid gap-3 p-4 sm:grid-cols-3">
           <Summary label="Caisse source" value={data.compteSource || "-"} />
           <Summary label="Compte bancaire" value={data.compteDestination} />
           <Summary label="N° bordereau banque" value={data.referenceBancaire || "-"} />
-        </div>
+        </div>}
       </section>}
 
       <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
@@ -233,6 +250,41 @@ export default function BordereauRemiseDetailPage() {
 }
 
 type SummaryTone = "default" | "muted" | "info" | "success" | "danger";
+
+function groupCashLines(lines: CashRemittanceLine[]) {
+  const grouped = new Map<string, {
+    key: string;
+    dateJournee: string;
+    compteSource: string;
+    caissier?: string | null;
+    count: number;
+    montant: number;
+    operationTresorerieId?: string | null;
+  }>();
+  lines.forEach((line) => {
+    const key = `${line.compteSourceId}:${line.dateJournee}`;
+    const current = grouped.get(key);
+    if (current) {
+      current.count += 1;
+      current.montant += line.montant;
+      current.operationTresorerieId ??= line.operationTresorerieId;
+    } else {
+      grouped.set(key, {
+        key,
+        dateJournee: line.dateJournee,
+        compteSource: line.compteSource,
+        caissier: line.caissier,
+        count: 1,
+        montant: line.montant,
+        operationTresorerieId: line.operationTresorerieId,
+      });
+    }
+  });
+  return [...grouped.values()].sort((left, right) =>
+    right.dateJournee.localeCompare(left.dateJournee)
+      || left.compteSource.localeCompare(right.compteSource)
+  );
+}
 
 const SUMMARY_TONE_CLASSES: Record<SummaryTone, string> = {
   default: "",

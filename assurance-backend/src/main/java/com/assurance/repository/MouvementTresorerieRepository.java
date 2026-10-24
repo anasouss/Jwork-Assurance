@@ -101,6 +101,40 @@ public interface MouvementTresorerieRepository extends JpaRepository<MouvementTr
             """)
     BigDecimal netForSession(@Param("sessionId") Long sessionId);
 
+    @EntityGraph(attributePaths = {"compteTresorerie", "compteTresorerie.utilisateurTitulaire"})
+    @Query("""
+            select m
+            from MouvementTresorerie m
+            where m.agence.id = :agenceId
+              and m.sens = com.assurance.enums.SensMouvementTresorerie.ENTREE
+              and m.nature = com.assurance.enums.NatureMouvementTresorerie.REGLEMENT_CLIENT
+              and m.compteTresorerie.typeCompte = com.assurance.enums.TypeCompteTresorerie.CAISSE
+              and m.compteTresorerie.natureCaisse = com.assurance.enums.NatureCaisseTresorerie.INDIVIDUELLE
+              and not exists (
+                  select reversed.id from MouvementTresorerie reversed
+                  where reversed.mouvementExtourneId = m.id
+              )
+              and not exists (
+                  select cashLine.id from LigneBordereauEspeces cashLine
+                  where cashLine.mouvementTresorerie = m
+              )
+            order by m.dateOperation desc, m.compteTresorerie.libelle asc, m.id asc
+            """)
+    List<MouvementTresorerie> findEligibleCashEntries(
+            @Param("agenceId") Long agenceId
+    );
+
+    @EntityGraph(attributePaths = {"compteTresorerie", "compteTresorerie.utilisateurTitulaire"})
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select m from MouvementTresorerie m
+            where m.agence.id = :agenceId and m.id in :ids
+            """)
+    List<MouvementTresorerie> findAllByAgenceIdAndIdInForUpdate(
+            @Param("agenceId") Long agenceId,
+            @Param("ids") java.util.Collection<Long> ids
+    );
+
     List<MouvementTresorerie> findByAgenceIdAndOperationTresorerieIdOrderByIdAsc(
             Long agenceId,
             Long operationId

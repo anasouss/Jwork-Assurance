@@ -49,6 +49,7 @@ import type {
   RemittanceSlipStatus,
   RemittanceSlipType,
   CreateRemittanceSlipRequest,
+  EligibleCashDay,
   ReplacePaymentInstrumentRequest,
   ReviseClientDocumentRequest,
   TreasuryAccount,
@@ -740,6 +741,16 @@ export const comptaApi = {
     )).map(normalizePaymentInstrument);
   },
 
+  async eligibleCashRemittanceDays() {
+    return unwrap(await apiFetch<ApiResponse<EligibleCashDay[]>>(
+      "/api/v1/compta/tresorerie/bordereaux-remise/journees-caisse-eligibles"
+    )).map((day) => ({
+      ...day,
+      compteTresorerieId: String(day.compteTresorerieId),
+      mouvementIds: day.mouvementIds.map(String),
+    }));
+  },
+
   async remittanceSlips(params: {
     type?: RemittanceSlipType;
     statut?: RemittanceSlipStatus;
@@ -1322,6 +1333,15 @@ function normalizeRemittanceSlip(slip: RemittanceSlip): RemittanceSlip {
       id: String(line.id),
       instrumentId: String(line.instrumentId),
       reglementId: String(line.reglementId),
+    })),
+    lignesEspeces: (slip.lignesEspeces ?? []).map((line) => ({
+      ...line,
+      id: String(line.id),
+      mouvementTresorerieId: String(line.mouvementTresorerieId),
+      compteSourceId: String(line.compteSourceId),
+      operationTresorerieId: line.operationTresorerieId == null
+        ? null
+        : String(line.operationTresorerieId),
     })),
   };
 }

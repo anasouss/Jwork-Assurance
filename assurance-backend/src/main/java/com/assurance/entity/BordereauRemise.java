@@ -23,7 +23,9 @@ import lombok.Setter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(
@@ -88,4 +90,8 @@ public class BordereauRemise extends AuditedEntity {
     @OneToMany(mappedBy = "bordereau", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<LigneBordereauRemise> lignes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "bordereau", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<LigneBordereauEspeces> lignesEspeces = new HashSet<>();
 }

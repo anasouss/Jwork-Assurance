@@ -5,6 +5,7 @@ import com.assurance.entity.BordereauRemise;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneBordereauRemise;
+import com.assurance.entity.LigneBordereauEspeces;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.TypeBordereauRemise;
 import com.assurance.exception.BadRequestException;
@@ -47,7 +48,11 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -225,19 +230,60 @@ public class BordereauRemisePdfService {
     }
 
     private void writeCashTransfer(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
-        document.add(new Paragraph("Détail du versement")
+        document.add(new Paragraph("Journées de caisse versées")
                 .setFont(bold)
                 .setFontSize(11)
                 .setMarginBottom(7));
-        Table transfer = new Table(new float[]{1, 0.28f, 1})
-                .setWidth(UnitValue.createPercentValue(100));
-        transfer.addCell(infoCell("CAISSE SOURCE", slip.getCompteSource() == null
-                ? "-" : slip.getCompteSource().getLibelle(), regular, bold).setMinHeight(60));
-        transfer.addCell(cell().add(new Paragraph("VERS").setFont(bold).setFontSize(8)
-                .setTextAlignment(TextAlignment.CENTER)).setVerticalAlignment(VerticalAlignment.MIDDLE));
-        transfer.addCell(infoCell("COMPTE BANCAIRE DESTINATAIRE",
-                slip.getCompteDestination().getLibelle(), regular, bold).setMinHeight(60));
-        document.add(transfer);
+
+        if (slip.getLignesEspeces().isEmpty()) {
+            Table legacyTransfer = new Table(new float[]{1, 0.28f, 1})
+                    .setWidth(UnitValue.createPercentValue(100));
+            legacyTransfer.addCell(infoCell("CAISSE SOURCE", slip.getCompteSource() == null
+                    ? "-" : slip.getCompteSource().getLibelle(), regular, bold).setMinHeight(60));
+            legacyTransfer.addCell(cell().add(new Paragraph("VERS").setFont(bold).setFontSize(8)
+                    .setTextAlignment(TextAlignment.CENTER)).setVerticalAlignment(VerticalAlignment.MIDDLE));
+            legacyTransfer.addCell(infoCell("COMPTE BANCAIRE DESTINATAIRE",
+                    slip.getCompteDestination().getLibelle(), regular, bold).setMinHeight(60));
+            document.add(legacyTransfer);
+        } else {
+            Map<String, List<LigneBordereauEspeces>> byDay = slip.getLignesEspeces().stream()
+                    .sorted(Comparator
+                            .comparing((LigneBordereauEspeces line) ->
+                                    line.getMouvementTresorerie().getDateOperation())
+                            .thenComparing(line -> line.getMouvementTresorerie()
+                                    .getCompteTresorerie().getLibelle()))
+                    .collect(Collectors.groupingBy(
+                            line -> line.getMouvementTresorerie().getCompteTresorerie().getId()
+                                    + ":" + line.getMouvementTresorerie().getDateOperation(),
+                            LinkedHashMap::new,
+                            Collectors.toList()
+                    ));
+            Table days = new Table(new float[]{1.1f, 2.2f, 2.1f, 0.8f, 1.2f})
+                    .setWidth(UnitValue.createPercentValue(100));
+            addHeader(days, "DATE", bold, TextAlignment.LEFT);
+            addHeader(days, "CAISSE", bold, TextAlignment.LEFT);
+            addHeader(days, "CAISSIER", bold, TextAlignment.LEFT);
+            addHeader(days, "ENCAISS.", bold, TextAlignment.CENTER);
+            addHeader(days, "MONTANT", bold, TextAlignment.RIGHT);
+            byDay.values().forEach(lines -> {
+                LigneBordereauEspeces first = lines.get(0);
+                CompteTresorerie source = first.getMouvementTresorerie().getCompteTresorerie();
+                BigDecimal dayTotal = lines.stream()
+                        .map(LigneBordereauEspeces::getMontant)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                addBody(days, date(first.getMouvementTresorerie().getDateOperation()), regular,
+                        TextAlignment.LEFT, null);
+                addBody(days, source.getLibelle(), regular, TextAlignment.LEFT, null);
+                addBody(days, source.getUtilisateurTitulaire() == null
+                        ? "-" : source.getUtilisateurTitulaire().getFullName(), regular,
+                        TextAlignment.LEFT, null);
+                addBody(days, String.valueOf(lines.size()), regular, TextAlignment.CENTER, null);
+                addBody(days, amount(dayTotal), bold, TextAlignment.RIGHT, null);
+            });
+            document.add(days);
+            document.add(new Paragraph("Destination : " + slip.getCompteDestination().getLibelle())
+                    .setFont(regular).setFontSize(8.5f).setMarginTop(6));
+        }
 
         Table amountTable = new Table(new float[]{1, 1})
                 .setWidth(UnitValue.createPercentValue(55))

@@ -36,6 +36,7 @@ public class BordereauRemiseResponse {
     private int nombreLignes;
     private LocalDateTime createdAt;
     private List<Ligne> lignes;
+    private List<LigneEspeces> lignesEspeces;
 
     @Getter
     @Builder
@@ -56,5 +57,21 @@ public class BordereauRemiseResponse {
         private StatutLigneBordereauRemise statut;
         private LocalDate dateTraitement;
         private String motifRejet;
+    }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class LigneEspeces {
+        private Long id;
+        private Long mouvementTresorerieId;
+        private Long compteSourceId;
+        private String compteSource;
+        private String caissier;
+        private LocalDate dateJournee;
+        private String reference;
+        private BigDecimal montant;
+        private Long operationTresorerieId;
     }
 }

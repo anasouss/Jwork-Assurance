@@ -329,7 +329,7 @@ export default function TresorerieComptesPage() {
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     {cashNature === "CENTRALE"
-                      ? "La caisse centrale reçoit les remises des caisses individuelles."
+                      ? "La caisse centrale peut servir aux transferts internes lorsque l’agence choisit de centraliser les espèces."
                       : "Cette caisse est gérée automatiquement avec son utilisateur."}
                   </p>
                 </div>

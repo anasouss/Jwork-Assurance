@@ -24,11 +24,13 @@ export function ClientPaymentsWorkspaceHeader({
   title,
   description,
   canCreate = false,
+  showViewSelector = true,
   actions,
 }: {
   title: string;
   description: string;
   canCreate?: boolean;
+  showViewSelector?: boolean;
   actions?: ReactNode;
 }) {
   const location = useLocation();
@@ -45,7 +47,7 @@ export function ClientPaymentsWorkspaceHeader({
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <div className="flex flex-wrap items-end gap-2">
-        <div className="grid min-w-60 gap-1.5">
+        {showViewSelector ? <div className="grid min-w-60 gap-1.5">
           <Label htmlFor="client-payments-view" className="text-xs text-muted-foreground">
             Vue
           </Label>
@@ -60,7 +62,7 @@ export function ClientPaymentsWorkspaceHeader({
               <SelectItem value="journal">Journal des règlements</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </div> : null}
         {canCreate ? (
           <Button asChild>
             <Link to="/app/compta/reglements/versement-multi-clients">

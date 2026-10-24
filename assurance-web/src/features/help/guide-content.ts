@@ -1124,13 +1124,14 @@ export const guideModules: GuideModule[] = [
         permissions: ["tresorerie:view", "tresorerie:manage", "reglement-client:manage"],
         steps: [
           { title: "Filtrer", description: "Recherchez par mode, statut, référence, compte ou dates." },
-          { title: "Traiter les espèces", description: "Dans Espèces en caisse, préparez le versement vers un compte bancaire ou créez l’opération proposée selon votre permission." },
+          { title: "Choisir les journées de caisse", description: "Dans Journées de caisse à verser, filtrez par date, caisse ou caissier puis cochez une ou plusieurs journées. La sélection peut regrouper plusieurs caisses et plusieurs dates." },
+          { title: "Préparer le versement d’espèces", description: "Cliquez sur Préparer le bordereau d’espèces, contrôlez les journées, le nombre d’encaissements et le total calculé, puis choisissez le compte bancaire de destination et la date du bordereau." },
           { title: "Créer un bordereau", description: "Dans Moyens de paiement en attente, sélectionnez des chèques ou effets de même type et destination puis créez le bordereau provisoire. Prévisualisez le PDF avant confirmation." },
           { title: "Préparer un virement", description: "Sur un virement éligible, choisissez le compte de destination puis confirmez sa préparation." },
           { title: "Déclarer un impayé", description: "Dans Actions, choisissez l’impayé, renseignez sa date et son motif puis confirmez." },
           { title: "Remplacer par espèces", description: "Avec la permission de gestion des règlements, utilisez Remplacer par espèces et justifiez l’opération." },
         ],
-        warnings: ["Les instruments sélectionnés pour un bordereau doivent partager un type et une destination compatibles."],
+        warnings: ["Les montants des espèces sont calculés depuis les encaissements confirmés; ils ne sont pas saisis manuellement.", "Les instruments sélectionnés pour un bordereau doivent partager un type et une destination compatibles."],
         errors: [{ message: "Autorisez les fenêtres contextuelles", resolution: "Autorisez les pop-ups pour ouvrir la prévisualisation du bordereau avant sa création." }],
       },
       {
@@ -1154,12 +1155,12 @@ export const guideModules: GuideModule[] = [
         routePrefixes: ["/app/compta/tresorerie/bordereaux-remise/"],
         permissions: ["tresorerie:view", "tresorerie:manage"],
         steps: [
-          { title: "Créer", description: "Cliquez sur Nouveau bordereau ou sélectionnez des instruments depuis Encaissements en attente." },
+          { title: "Créer", description: "Pour les chèques et effets, sélectionnez les instruments depuis Encaissements en attente. Pour les espèces, sélectionnez d’abord une ou plusieurs journées de caisse." },
           { title: "Choisir le type", description: "Sélectionnez Chèques, Effets ou Versement d’espèces." },
-          { title: "Définir la destination", description: "Choisissez le compte à créditer, la banque et la date du bordereau." },
-          { title: "Contrôler", description: "Vérifiez les instruments et le montant total, puis prévisualisez le PDF." },
+          { title: "Définir la destination", description: "Choisissez le compte bancaire à créditer et la date du bordereau. Un versement d’espèces peut réunir plusieurs caisses individuelles sans passer par la caisse centrale." },
+          { title: "Contrôler", description: "Vérifiez les instruments ou les journées de caisse, le montant total calculé et la destination, puis prévisualisez le PDF." },
           { title: "Créer le provisoire", description: "Confirmez pour enregistrer le bordereau provisoire." },
-          { title: "Remettre à la banque", description: "Sur un bordereau provisoire, ouvrez Actions puis Remettre à la banque, ou utilisez le même bouton dans le détail. Renseignez la date effective et le N° bordereau banque." },
+          { title: "Remettre à la banque", description: "Sur un bordereau provisoire, ouvrez Actions puis Remettre à la banque, ou utilisez le même bouton dans le détail. Renseignez la date effective et le N° bordereau banque. Pour les espèces, une opération est créée depuis chaque caisse source vers le même compte bancaire." },
           { title: "Supprimer si nécessaire", description: "Seul un bordereau provisoire peut être supprimé." },
         ],
         errors: [

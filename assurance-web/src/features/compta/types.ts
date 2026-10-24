@@ -530,6 +530,29 @@ export type RemittanceSlipLine = {
   motifRejet?: string | null;
 };
 
+export type CashRemittanceLine = {
+  id: string;
+  mouvementTresorerieId: string;
+  compteSourceId: string;
+  compteSource: string;
+  caissier?: string | null;
+  dateJournee: string;
+  reference?: string | null;
+  montant: number;
+  operationTresorerieId?: string | null;
+};
+
+export type EligibleCashDay = {
+  cle: string;
+  compteTresorerieId: string;
+  compteTresorerie: string;
+  caissier?: string | null;
+  dateJournee: string;
+  nombreEncaissements: number;
+  montantAVerser: number;
+  mouvementIds: string[];
+};
+
 export type RemittanceSlip = {
   id: string;
   numero: string;
@@ -548,6 +571,7 @@ export type RemittanceSlip = {
   nombreLignes: number;
   createdAt: string;
   lignes: RemittanceSlipLine[];
+  lignesEspeces: CashRemittanceLine[];
 };
 
 export type RemittanceSlipPage = {
@@ -559,11 +583,10 @@ export type CreateRemittanceSlipRequest = {
   type: RemittanceSlipType;
   dateBordereau: string;
   compteDestinationId: string;
-  compteSourceId?: string;
-  montantEspeces?: number;
   referenceBancaire?: string;
   notes?: string;
   instrumentIds: string[];
+  mouvementEspecesIds?: string[];
 };
 
 export type ClientPayment = {

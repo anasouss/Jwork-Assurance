@@ -17,7 +17,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MoneyInput } from "@/features/production/components/MoneyInput";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
@@ -35,10 +34,11 @@ export default function NouveauBordereauRemisePage() {
   const selectedIds = useMemo(() => [...new Set(
     (searchParams.get("instrumentIds") ?? "").split(",").filter((id) => /^\d+$/.test(id))
   )], [searchParams]);
+  const selectedCashMovementIds = useMemo(() => [...new Set(
+    (searchParams.get("cashMovementIds") ?? "").split(",").filter((id) => /^\d+$/.test(id))
+  )], [searchParams]);
   const [type, setType] = useState<RemittanceSlipType | "">(initialType);
-  const [sourceId, setSourceId] = useState(searchParams.get("sourceId") || "");
   const [destinationId, setDestinationId] = useState("");
-  const [cashAmount, setCashAmount] = useState<number>();
   const [slipDate, setSlipDate] = useState(TODAY);
   const [notes, setNotes] = useState("");
   const [creationDialogOpen, setCreationDialogOpen] = useState(false);
@@ -57,20 +57,28 @@ export default function NouveauBordereauRemisePage() {
     ),
     enabled: instrumentType && selectedIds.length > 0,
   });
+  const eligibleCashDays = useQuery({
+    queryKey: ["compta", "treasury", "eligible-cash-days"],
+    queryFn: comptaApi.eligibleCashRemittanceDays,
+    enabled: type === "VERSEMENT_ESPECES" && selectedCashMovementIds.length > 0,
+  });
 
   const bankAccounts = useMemo(() => (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   ), [accounts.data]);
-  const cashAccounts = useMemo(() => (accounts.data ?? []).filter(
-    (account) => account.actif
-      && account.typeCompte === "CAISSE"
-      && account.natureCaisse === "CENTRALE"
-  ), [accounts.data]);
+  const selectedCashDays = (eligibleCashDays.data ?? []).filter((day) =>
+    day.mouvementIds.some((id) => selectedCashMovementIds.includes(id))
+  );
   const selectedTotal = (selectedInstruments.data ?? [])
     .reduce((sum, instrument) => sum + instrument.montant, 0);
   const selectionValid = instrumentType
     && selectedIds.length > 0
     && selectedInstruments.data?.length === selectedIds.length;
+  const selectedCashIdsFound = new Set(selectedCashDays.flatMap((day) => day.mouvementIds));
+  const cashSelectionValid = selectedCashMovementIds.length > 0
+    && selectedCashIdsFound.size === selectedCashMovementIds.length
+    && selectedCashMovementIds.every((id) => selectedCashIdsFound.has(id));
+  const selectedCashTotal = selectedCashDays.reduce((sum, day) => sum + day.montantAVerser, 0);
 
   useEffect(() => {
     if (bankAccounts.length === 1) {
@@ -82,17 +90,6 @@ export default function NouveauBordereauRemisePage() {
     }
   }, [bankAccounts, destinationId]);
 
-  useEffect(() => {
-    if (accounts.isLoading) return;
-    if (cashAccounts.length === 1) {
-      setSourceId(cashAccounts[0].id);
-      return;
-    }
-    if (sourceId && !cashAccounts.some((account) => account.id === sourceId)) {
-      setSourceId("");
-    }
-  }, [accounts.isLoading, cashAccounts, sourceId]);
-
   const createSlip = useMutation({
     mutationFn: () => {
       if (!type) throw new Error("Choisissez un type de bordereau");
@@ -101,14 +98,13 @@ export default function NouveauBordereauRemisePage() {
         throw new Error("Sélectionnez les instruments depuis les encaissements en attente");
       }
       return type === "VERSEMENT_ESPECES"
-        ? comptaApi.createRemittanceSlip({
+        ? comptaApi.createCashRemittance({
             type,
             dateBordereau: slipDate,
-            compteSourceId: sourceId,
             compteDestinationId: destinationId,
-            montantEspeces: cashAmount,
             notes: notes.trim() || undefined,
             instrumentIds: [],
+            mouvementEspecesIds: selectedCashMovementIds,
           })
         : comptaApi.createRemittanceSlip({
             type,
@@ -168,7 +164,7 @@ export default function NouveauBordereauRemisePage() {
 
   const returnUrl = instrumentType
     ? `/app/compta/tresorerie/encaissements-en-attente?mode=${type}`
-    : "/app/compta/tresorerie/bordereaux-remise";
+    : "/app/compta/tresorerie/encaissements-en-attente?mode=ESPECES";
 
   return (
     <div className="mx-auto grid w-full max-w-7xl gap-5">
@@ -197,40 +193,66 @@ export default function NouveauBordereauRemisePage() {
         </div>
       </header>
 
-      {instrumentType && selectedIds.length === 0 ? (
+      {(instrumentType && selectedIds.length === 0)
+        || (type === "VERSEMENT_ESPECES" && selectedCashMovementIds.length === 0) ? (
         <section className="rounded-md border bg-card p-8 text-center">
-          <h2 className="font-semibold">Aucun instrument sélectionné</h2>
+          <h2 className="font-semibold">Aucune sélection</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sélectionnez les {type === "CHEQUE" ? "chèques" : "effets"} à regrouper depuis les encaissements en attente.
+            {type === "VERSEMENT_ESPECES"
+              ? "Sélectionnez les journées de caisse à verser depuis les encaissements en attente."
+              : `Sélectionnez les ${type === "CHEQUE" ? "chèques" : "effets"} à regrouper depuis les encaissements en attente.`}
           </p>
-          <Button asChild className="mt-4"><Link to={returnUrl}>Sélectionner les instruments</Link></Button>
+          <Button asChild className="mt-4"><Link to={returnUrl}>{type === "VERSEMENT_ESPECES" ? "Sélectionner les journées" : "Sélectionner les instruments"}</Link></Button>
         </section>
       ) : type ? (
         <section className="overflow-hidden rounded-md border bg-card">
           {type === "VERSEMENT_ESPECES" && (
-            <div className="border-b p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="h-5 w-1 rounded-sm bg-emerald-500" />
-                <h2 className="font-semibold">Détails du versement</h2>
+            <>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+              <div>
+                <h2 className="font-semibold">Journées de caisse sélectionnées</h2>
+                <p className="text-sm text-muted-foreground">
+                  {selectedCashDays.length} journée(s) · {selectedCashMovementIds.length} encaissement(s) · {formatTreasuryMoney(selectedCashTotal)}
+                </p>
               </div>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="grid gap-2">
-                  <Label>Caisse source</Label>
-                  <Select value={sourceId} onValueChange={setSourceId}>
-                    <SelectTrigger><SelectValue placeholder="Choisir une caisse" /></SelectTrigger>
-                    <SelectContent>{cashAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
+              <Button asChild variant="outline"><Link to={returnUrl}>Modifier la sélection</Link></Button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="bg-emerald-700 text-xs uppercase text-white"><tr>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Caisse</th>
+                  <th className="px-4 py-3 text-left">Caissier</th>
+                  <th className="px-4 py-3 text-center">Encaissements</th>
+                  <th className="px-4 py-3 text-right">Montant</th>
+                </tr></thead>
+                <tbody className="divide-y">
+                  {eligibleCashDays.isLoading && <TableRowsSkeleton colSpan={5} rows={3} />}
+                  {!eligibleCashDays.isLoading && selectedCashDays.map((day) => (
+                    <tr key={day.cle}>
+                      <td className="px-4 py-3 font-medium">{formatTreasuryDate(day.dateJournee)}</td>
+                      <td className="px-4 py-3">{day.compteTresorerie}</td>
+                      <td className="px-4 py-3">{day.caissier || "-"}</td>
+                      <td className="px-4 py-3 text-center">{day.nombreEncaissements}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(day.montantAVerser)}</td>
+                    </tr>
+                  ))}
+                  {eligibleCashDays.isError && <tr><td colSpan={5} className="px-4 py-10 text-center text-destructive">
+                    {eligibleCashDays.error instanceof Error ? eligibleCashDays.error.message : "Sélection invalide"}
+                  </td></tr>}
+                  {!eligibleCashDays.isLoading && !eligibleCashDays.isError && !cashSelectionValid && <tr><td colSpan={5} className="px-4 py-10 text-center text-destructive">
+                    Une ou plusieurs journées ne sont plus disponibles. Modifiez la sélection avant de continuer.
+                  </td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="grid gap-3 border-t bg-muted/10 p-4 md:grid-cols-2 xl:grid-cols-3">
                 <DestinationAccountField
                   accounts={bankAccounts}
                   loading={accounts.isLoading}
                   value={destinationId}
                   onChange={setDestinationId}
                 />
-                <div className="grid gap-2">
-                  <Label htmlFor="cash-amount">Montant</Label>
-                  <MoneyInput id="cash-amount" value={cashAmount} onValueChange={setCashAmount} />
-                </div>
                 <div className="grid gap-2">
                   <Label>Date du bordereau</Label>
                   <DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} />
@@ -239,8 +261,8 @@ export default function NouveauBordereauRemisePage() {
                   <Label htmlFor="slip-notes">Notes <span className="font-normal text-muted-foreground">(facultatif)</span></Label>
                   <Input id="slip-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
                 </div>
-              </div>
             </div>
+            </>
           )}
 
           {instrumentType && (
@@ -291,7 +313,7 @@ export default function NouveauBordereauRemisePage() {
 
           {type === "VERSEMENT_ESPECES" && (
             <div className="flex justify-end bg-emerald-50/50 p-4 dark:bg-emerald-950/20">
-              <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !sourceId || !destinationId || !cashAmount || cashAmount <= 0 || !slipDate || createSlip.isPending} onClick={submitSlip}>
+              <Button className="bg-emerald-700 text-white hover:bg-emerald-800" disabled={!canManage || !cashSelectionValid || !destinationId || !slipDate || createSlip.isPending} onClick={submitSlip}>
                 <Banknote className="size-4" /> Créer le bordereau provisoire
               </Button>
             </div>

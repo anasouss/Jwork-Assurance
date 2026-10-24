@@ -151,6 +151,57 @@ public class OperationTresorerieService {
     }
 
     @Transactional
+    public OperationTresorerieResponse createCashDepositTransfer(
+            Long agenceId,
+            CreerTransfertTresorerieRequest request
+    ) {
+        if (request.getCompteSourceId().equals(request.getCompteDestinationId())) {
+            throw new BadRequestException("Les comptes source et destination doivent être différents");
+        }
+        CompteTresorerie source = requireActiveAccount(agenceId, request.getCompteSourceId());
+        CompteTresorerie destination = requireActiveAccount(agenceId, request.getCompteDestinationId());
+        if (source.getTypeCompte() != com.assurance.enums.TypeCompteTresorerie.CAISSE
+                || source.getNatureCaisse() != NatureCaisseTresorerie.INDIVIDUELLE
+                || destination.getTypeCompte() != com.assurance.enums.TypeCompteTresorerie.BANQUE) {
+            throw new BadRequestException("Le versement doit transférer une caisse individuelle vers une banque");
+        }
+        if (!source.getDevise().equals(destination.getDevise())) {
+            throw new BadRequestException("Les comptes source et destination doivent avoir la même devise");
+        }
+        BigDecimal amount = positiveMoney(request.getMontant());
+        requireSufficientBalance(source, amount);
+        OperationTresorerie operation = buildOperation(
+                agenceId,
+                TypeOperationTresorerie.TRANSFERT,
+                source,
+                destination,
+                null,
+                amount,
+                request.getDateOperation(),
+                request.getDateValeur(),
+                request.getReference(),
+                request.getMotif(),
+                null
+        );
+        operation = operationRepository.save(operation);
+        mouvementRepository.save(buildMovement(
+                operation,
+                source,
+                SensMouvementTresorerie.SORTIE,
+                "Versement espèces vers " + destination.getLibelle(),
+                null
+        ));
+        mouvementRepository.save(buildMovement(
+                operation,
+                destination,
+                SensMouvementTresorerie.ENTREE,
+                "Versement espèces depuis " + source.getLibelle(),
+                null
+        ));
+        return toResponse(operation);
+    }
+
+    @Transactional
     public OperationTresorerieResponse createAdjustment(
             Long agenceId,
             CreerAjustementTresorerieRequest request

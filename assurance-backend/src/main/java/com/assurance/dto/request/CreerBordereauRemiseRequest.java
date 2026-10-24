@@ -38,4 +38,7 @@ public class CreerBordereauRemiseRequest {
 
     @Size(max = 200)
     private List<Long> instrumentIds = new ArrayList<>();
+
+    @Size(max = 2000)
+    private List<Long> mouvementEspecesIds = new ArrayList<>();
 }

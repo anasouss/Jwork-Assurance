@@ -7,6 +7,7 @@ import com.assurance.dto.request.TraiterLigneBordereauRemiseRequest;
 import com.assurance.dto.response.BordereauRemisePageResponse;
 import com.assurance.dto.response.BordereauRemiseResponse;
 import com.assurance.dto.response.InstrumentReglementPageResponse;
+import com.assurance.dto.response.JourneeCaisseVersementResponse;
 import com.assurance.dto.response.OperationTresorerieResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
@@ -15,6 +16,9 @@ import com.assurance.entity.BordereauRemise;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneBordereauRemise;
+import com.assurance.entity.LigneBordereauEspeces;
+import com.assurance.entity.MouvementTresorerie;
+import com.assurance.entity.OperationTresorerie;
 import com.assurance.entity.SequenceBordereauRemise;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.NatureCaisseTresorerie;
@@ -29,6 +33,9 @@ import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.BordereauRemiseRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
+import com.assurance.repository.LigneBordereauEspecesRepository;
+import com.assurance.repository.MouvementTresorerieRepository;
+import com.assurance.repository.OperationTresorerieRepository;
 import com.assurance.repository.SequenceBordereauRemiseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -61,12 +68,44 @@ public class BordereauRemiseService {
 
     private final BordereauRemiseRepository bordereauRepository;
     private final LigneBordereauRemiseRepository lineRepository;
+    private final LigneBordereauEspecesRepository cashLineRepository;
+    private final MouvementTresorerieRepository mouvementRepository;
+    private final OperationTresorerieRepository operationRepository;
     private final SequenceBordereauRemiseRepository sequenceRepository;
     private final InstrumentReglementClientRepository instrumentRepository;
     private final AgenceRepository agenceRepository;
     private final TresorerieService tresorerieService;
     private final OperationTresorerieService operationTresorerieService;
     private final ReglementClientService reglementClientService;
+
+    @Transactional(readOnly = true)
+    public List<JourneeCaisseVersementResponse> eligibleCashDays(Long agenceId) {
+        List<MouvementTresorerie> movements = mouvementRepository.findEligibleCashEntries(agenceId);
+        Map<String, List<MouvementTresorerie>> byDay = movements.stream().collect(Collectors.groupingBy(
+                movement -> movement.getCompteTresorerie().getId() + ":" + movement.getDateOperation(),
+                java.util.LinkedHashMap::new,
+                Collectors.toList()
+        ));
+        return byDay.entrySet().stream().map(entry -> {
+            List<MouvementTresorerie> rows = entry.getValue();
+            CompteTresorerie account = rows.get(0).getCompteTresorerie();
+            BigDecimal total = rows.stream()
+                    .map(MouvementTresorerie::getMontant)
+                    .map(this::money)
+                    .reduce(ZERO, BigDecimal::add);
+            return JourneeCaisseVersementResponse.builder()
+                    .cle(entry.getKey())
+                    .compteTresorerieId(account.getId())
+                    .compteTresorerie(account.getLibelle())
+                    .caissier(account.getUtilisateurTitulaire() == null
+                            ? null : account.getUtilisateurTitulaire().getFullName())
+                    .dateJournee(rows.get(0).getDateOperation())
+                    .nombreEncaissements(rows.size())
+                    .montantAVerser(total)
+                    .mouvementIds(rows.stream().map(MouvementTresorerie::getId).toList())
+                    .build();
+        }).toList();
+    }
 
     @Transactional(readOnly = true)
     public InstrumentReglementPageResponse eligibleInstruments(
@@ -300,25 +339,70 @@ public class BordereauRemiseService {
             BordereauRemise slip,
             CreerBordereauRemiseRequest request
     ) {
-        if (request.getCompteSourceId() == null || request.getMontantEspeces() == null) {
-            throw new BadRequestException("La caisse source et le montant sont obligatoires");
-        }
         if (request.getInstrumentIds() != null && !request.getInstrumentIds().isEmpty()) {
             throw new BadRequestException("Un versement d'espèces ne contient pas d'instruments");
         }
-        CompteTresorerie source = requireAccount(
-                agenceId,
-                request.getCompteSourceId(),
-                TypeCompteTresorerie.CAISSE
-        );
-        if (source.getNatureCaisse() != NatureCaisseTresorerie.CENTRALE) {
-            throw new BadRequestException("Un versement bancaire d'espèces doit provenir de la caisse centrale");
+        List<Long> ids = request.getMouvementEspecesIds() == null
+                ? List.of()
+                : new ArrayList<>(new LinkedHashSet<>(request.getMouvementEspecesIds()));
+        if (ids.isEmpty()) {
+            throw new BadRequestException("Sélectionnez au moins une journée de caisse");
         }
-        if (!source.getDevise().equals(slip.getCompteDestination().getDevise())) {
-            throw new BadRequestException("Les comptes source et destination doivent avoir la même devise");
+        ids.sort(Long::compareTo);
+        List<MouvementTresorerie> movements = mouvementRepository
+                .findAllByAgenceIdAndIdInForUpdate(agenceId, ids);
+        if (movements.size() != ids.size()) {
+            throw new BadRequestException("Un encaissement en espèces sélectionné est introuvable");
         }
-        slip.setCompteSource(source);
-        slip.setMontantTotal(positiveMoney(request.getMontantEspeces()));
+        if (cashLineRepository.existsByMouvementTresorerieIdIn(ids)) {
+            throw new BadRequestException("Une journée sélectionnée appartient déjà à un bordereau");
+        }
+        BigDecimal total = ZERO;
+        Set<Long> sourceIds = new LinkedHashSet<>();
+        Map<Long, BigDecimal> totalsBySource = new java.util.LinkedHashMap<>();
+        for (MouvementTresorerie movement : movements) {
+            CompteTresorerie source = movement.getCompteTresorerie();
+            boolean eligible = movement.getSens() == com.assurance.enums.SensMouvementTresorerie.ENTREE
+                    && movement.getNature() == com.assurance.enums.NatureMouvementTresorerie.REGLEMENT_CLIENT
+                    && source.getTypeCompte() == TypeCompteTresorerie.CAISSE
+                    && source.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE
+                    && !mouvementRepository.existsByMouvementExtourneId(movement.getId());
+            if (!eligible) {
+                throw new BadRequestException("Un encaissement sélectionné n'est plus éligible au versement");
+            }
+            if (!source.getDevise().equals(slip.getCompteDestination().getDevise())) {
+                throw new BadRequestException("Toutes les caisses doivent utiliser la devise du compte bancaire");
+            }
+            if (movement.getDateOperation().isAfter(slip.getDateBordereau())) {
+                throw new BadRequestException("La date du bordereau ne peut pas précéder une journée sélectionnée");
+            }
+            BigDecimal amount = positiveMoney(movement.getMontant());
+            slip.getLignesEspeces().add(LigneBordereauEspeces.builder()
+                    .bordereau(slip)
+                    .mouvementTresorerie(movement)
+                    .montant(amount)
+                    .build());
+            sourceIds.add(source.getId());
+            totalsBySource.merge(source.getId(), amount, BigDecimal::add);
+            total = total.add(amount);
+        }
+        movements.stream()
+                .map(MouvementTresorerie::getCompteTresorerie)
+                .distinct()
+                .forEach(source -> {
+                    BigDecimal available = money(source.getSoldeInitial())
+                            .add(money(mouvementRepository.balanceForAccount(source.getId())));
+                    if (available.compareTo(totalsBySource.get(source.getId())) < 0) {
+                        throw new BadRequestException(
+                                "Le solde disponible de la caisse " + source.getLibelle()
+                                        + " ne couvre plus la sélection"
+                        );
+                    }
+                });
+        if (sourceIds.size() == 1) {
+            slip.setCompteSource(movements.get(0).getCompteTresorerie());
+        }
+        slip.setMontantTotal(total);
     }
 
     private void configureInstrumentSlip(
@@ -361,6 +445,44 @@ public class BordereauRemiseService {
     }
 
     private void depositCash(Long agenceId, BordereauRemise slip) {
+        if (slip.getLignesEspeces().isEmpty()) {
+            depositLegacyCash(agenceId, slip);
+            return;
+        }
+        if (slip.getLignesEspeces().stream().anyMatch(line ->
+                line.getMouvementTresorerie().getDateOperation().isAfter(slip.getDateDepot()))) {
+            throw new BadRequestException("La date de remise ne peut pas précéder une journée de caisse");
+        }
+        Map<CompteTresorerie, List<LigneBordereauEspeces>> bySource = slip.getLignesEspeces().stream()
+                .collect(Collectors.groupingBy(line ->
+                        line.getMouvementTresorerie().getCompteTresorerie()));
+        List<Long> operationIds = new ArrayList<>();
+        bySource.forEach((source, lines) -> {
+            BigDecimal sourceTotal = lines.stream()
+                    .map(LigneBordereauEspeces::getMontant)
+                    .reduce(ZERO, BigDecimal::add);
+            CreerTransfertTresorerieRequest transfer = new CreerTransfertTresorerieRequest();
+            transfer.setCompteSourceId(source.getId());
+            transfer.setCompteDestinationId(slip.getCompteDestination().getId());
+            transfer.setMontant(sourceTotal);
+            transfer.setDateOperation(slip.getDateDepot());
+            transfer.setDateValeur(slip.getDateDepot());
+            transfer.setReference(slip.getReferenceBancaire());
+            transfer.setMotif("Versement espèces " + slip.getNumero());
+            OperationTresorerieResponse operation = operationTresorerieService
+                    .createCashDepositTransfer(agenceId, transfer);
+            operationIds.add(operation.getId());
+            OperationTresorerie operationEntity = operationRepository.getReferenceById(operation.getId());
+            lines.forEach(line -> line.setOperationTresorerie(operationEntity));
+        });
+        slip.setOperationTresorerieId(operationIds.size() == 1 ? operationIds.get(0) : null);
+        slip.setStatut(StatutBordereauRemise.CLOTURE);
+    }
+
+    private void depositLegacyCash(Long agenceId, BordereauRemise slip) {
+        if (slip.getCompteSource() == null || money(slip.getMontantTotal()).compareTo(ZERO) <= 0) {
+            throw new BadRequestException("Le bordereau ne contient aucune journée de caisse");
+        }
         CreerTransfertTresorerieRequest transfer = new CreerTransfertTresorerieRequest();
         transfer.setCompteSourceId(slip.getCompteSource().getId());
         transfer.setCompteDestinationId(slip.getCompteDestination().getId());
@@ -369,10 +491,7 @@ public class BordereauRemiseService {
         transfer.setDateValeur(slip.getDateDepot());
         transfer.setReference(slip.getReferenceBancaire());
         transfer.setMotif("Versement espèces " + slip.getNumero());
-        OperationTresorerieResponse operation = operationTresorerieService.createTransfer(
-                agenceId,
-                transfer
-        );
+        OperationTresorerieResponse operation = operationTresorerieService.createTransfer(agenceId, transfer);
         slip.setOperationTresorerieId(operation.getId());
         slip.setStatut(StatutBordereauRemise.CLOTURE);
     }
@@ -455,6 +574,17 @@ public class BordereauRemiseService {
         List<BordereauRemiseResponse.Ligne> lines = includeLines
                 ? slip.getLignes().stream().map(this::toLineResponse).toList()
                 : List.of();
+        List<BordereauRemiseResponse.LigneEspeces> cashLines = includeLines
+                ? slip.getLignesEspeces().stream()
+                        .sorted(java.util.Comparator
+                                .comparing((LigneBordereauEspeces line) ->
+                                        line.getMouvementTresorerie().getDateOperation())
+                                .thenComparing(line -> line.getMouvementTresorerie()
+                                        .getCompteTresorerie().getLibelle())
+                                .thenComparing(LigneBordereauEspeces::getId))
+                        .map(this::toCashLineResponse)
+                        .toList()
+                : List.of();
         return BordereauRemiseResponse.builder()
                 .id(slip.getId())
                 .numero(slip.getNumero())
@@ -470,9 +600,10 @@ public class BordereauRemiseService {
                 .referenceBancaire(slip.getReferenceBancaire())
                 .notes(slip.getNotes())
                 .operationTresorerieId(slip.getOperationTresorerieId())
-                .nombreLignes(slip.getLignes().size())
+                .nombreLignes(slip.getLignes().size() + slip.getLignesEspeces().size())
                 .createdAt(slip.getCreatedAt())
                 .lignes(lines)
+                .lignesEspeces(cashLines)
                 .build();
     }
 
@@ -503,6 +634,24 @@ public class BordereauRemiseService {
                 .statut(line.getStatut())
                 .dateTraitement(line.getDateTraitement())
                 .motifRejet(line.getMotifRejet())
+                .build();
+    }
+
+    private BordereauRemiseResponse.LigneEspeces toCashLineResponse(LigneBordereauEspeces line) {
+        MouvementTresorerie movement = line.getMouvementTresorerie();
+        CompteTresorerie source = movement.getCompteTresorerie();
+        return BordereauRemiseResponse.LigneEspeces.builder()
+                .id(line.getId())
+                .mouvementTresorerieId(movement.getId())
+                .compteSourceId(source.getId())
+                .compteSource(source.getLibelle())
+                .caissier(source.getUtilisateurTitulaire() == null
+                        ? null : source.getUtilisateurTitulaire().getFullName())
+                .dateJournee(movement.getDateOperation())
+                .reference(movement.getReference())
+                .montant(line.getMontant())
+                .operationTresorerieId(line.getOperationTresorerie() == null
+                        ? null : line.getOperationTresorerie().getId())
                 .build();
     }
 

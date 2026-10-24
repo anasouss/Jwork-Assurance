@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   Banknote,
+  ChevronDown,
+  ChevronRight,
   Eye,
   Landmark,
   RotateCcw,
   Search,
   Trash2,
 } from "lucide-react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -361,6 +364,15 @@ export default function ReglementsClientsPage() {
           ? "Recherchez plusieurs clients, conservez leurs créances dans la sélection puis enregistrez le bordereau bancaire."
           : "Montants à encaisser, paiements partiels et moyens de règlement."}
         canCreate={canCreate && !multiClientDeposit}
+        showViewSelector={!multiClientDeposit}
+        actions={multiClientDeposit ? (
+          <Button asChild variant="outline">
+            <Link to="/app/compta/reglements">
+              <ArrowLeft className="size-4" />
+              Retour aux encaissements
+            </Link>
+          </Button>
+        ) : undefined}
       />
 
       <section className="grid gap-4 rounded-md border bg-card p-4">
@@ -633,14 +645,23 @@ function MultiClientSelection({
   canContinue: boolean;
 }) {
   const groups = groupSelectedReceivables(rows);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+  function toggleGroup(key: string) {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   return (
     <section className="overflow-hidden rounded-md border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2.5">
         <div>
           <h2 className="font-semibold">Sélection du versement</h2>
-          <p className="text-sm text-muted-foreground">
-            Cette sélection reste visible lorsque vous recherchez un autre client.
-          </p>
+          <p className="text-xs text-muted-foreground">Conservée pendant la recherche d’autres clients.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -654,47 +675,95 @@ function MultiClientSelection({
         </div>
       </div>
       {rows.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+        <div className="px-4 py-5 text-center text-sm text-muted-foreground">
           Recherchez un client puis cochez les créances couvertes par le bordereau bancaire.
         </div>
       ) : (
-        <div className="divide-y">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="w-10 px-3 py-2" aria-label="Afficher le détail" />
+                <th className="px-3 py-2 text-left">Payeur</th>
+                <th className="px-3 py-2 text-left">Éléments</th>
+                <th className="px-3 py-2 text-right">Sous-total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
           {groups.map((group) => (
-            <div key={group.key} className="grid gap-2 px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <strong>{group.name}</strong>
-                <span className="text-sm font-semibold tabular-nums">{money(group.total)}</span>
-              </div>
-              <div className="grid gap-1">
-                {group.rows.map((row) => (
-                  <div
-                    key={receivableTargetKey(row)}
-                    className="flex items-center justify-between gap-3 rounded-sm bg-muted/35 px-3 py-2 text-sm"
-                  >
-                    <span className="min-w-0 truncate">
-                      {receivableDocumentReference(row)} · {receivableCoverageReference(row)}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <span className="font-medium tabular-nums">{money(row.soldeOuvert)}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        title="Retirer de la sélection"
-                        aria-label={`Retirer ${receivableDocumentReference(row)} de la sélection`}
-                        onClick={() => onRemove(row)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SelectedPayerGroup
+              key={group.key}
+              group={group}
+              expanded={expandedGroups.has(group.key)}
+              onToggle={() => toggleGroup(group.key)}
+              onRemove={onRemove}
+            />
           ))}
+            </tbody>
+          </table>
         </div>
       )}
     </section>
+  );
+}
+
+function SelectedPayerGroup({
+  group,
+  expanded,
+  onToggle,
+  onRemove,
+}: {
+  group: ReturnType<typeof groupSelectedReceivables>[number];
+  expanded: boolean;
+  onToggle: () => void;
+  onRemove: (row: ClientReceivable) => void;
+}) {
+  return (
+    <>
+      <tr className="hover:bg-muted/25">
+        <td className="px-3 py-1.5 text-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? "Masquer" : "Afficher"} les créances de ${group.name}`}
+            onClick={onToggle}
+          >
+            {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+          </Button>
+        </td>
+        <td className="px-3 py-2 font-semibold">{group.name}</td>
+        <td className="px-3 py-2 text-muted-foreground">{selectedItemCount(group.rows.length)}</td>
+        <td className="px-3 py-2 text-right font-semibold tabular-nums">{money(group.total)}</td>
+      </tr>
+      {expanded ? group.rows.map((row) => (
+        <tr key={receivableTargetKey(row)} className="bg-muted/20">
+          <td />
+          <td className="px-3 py-1.5 pl-6 text-muted-foreground">
+            {receivableDocumentReference(row)}
+          </td>
+          <td className="px-3 py-1.5">{receivableCoverageReference(row)}</td>
+          <td className="px-3 py-1.5">
+            <div className="flex items-center justify-end gap-2">
+              <span className="font-medium tabular-nums">{money(row.soldeOuvert)}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                title="Retirer de la sélection"
+                aria-label={`Retirer ${receivableDocumentReference(row)} de la sélection`}
+                onClick={() => onRemove(row)}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          </td>
+        </tr>
+      )) : null}
+    </>
   );
 }
 

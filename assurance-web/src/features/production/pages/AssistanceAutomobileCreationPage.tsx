@@ -16,6 +16,7 @@ import { clientApi } from "../api/clients";
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ClientSection, emptyClient } from "../components/ClientSection";
+import { CreationSuccessDialog } from "../components/CreationSuccessDialog";
 import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
 import { VehicleRegistrationLookupInput } from "../components/VehicleRegistrationLookupInput";
@@ -24,6 +25,7 @@ import type { ContratSectionKey } from "../contrat-creation/useContratCreationFo
 import type {
   ClientInput,
   ContratSummary,
+  AssistanceAutomobileCreationResponse,
   CreateAssistanceAutomobileRequest,
   ReferenceOption,
   VehiculeInput,
@@ -57,6 +59,7 @@ export default function AssistanceAutomobileCreationPage() {
   const [payerSearch, setPayerSearch] = useState("");
   const [openSection, setOpenSection] = useState<ContratSectionKey>("souscripteur");
   const [validatedSections, setValidatedSections] = useState<Partial<Record<AssistanceSection, boolean>>>({});
+  const [creationSuccess, setCreationSuccess] = useState<AssistanceAutomobileCreationResponse | null>(null);
   const hydratedRef = useRef<string | null>(null);
 
   const existingContract = useQuery({
@@ -309,16 +312,12 @@ export default function AssistanceAutomobileCreationPage() {
     },
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      toast.success(renewing
-        ? `Dossier ${saved.numeroDossier} renouvelé`
-        : draftMode
-          ? `Brouillon finalisé sous le dossier ${saved.numeroDossier}`
-          : editing
-          ? `Dossier ${saved.numeroDossier} modifié`
-          : `Dossier ${saved.numeroDossier} créé`);
-      navigate(editing
-        ? "/app/production/contrats"
-        : `/app/production/contrats/${saved.contratId}/pieces-jointes`);
+      if (editing && !draftMode) {
+        toast.success(`Dossier ${saved.numeroDossier} modifié`);
+        navigate("/app/production/contrats");
+        return;
+      }
+      setCreationSuccess(saved);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
@@ -615,6 +614,18 @@ export default function AssistanceAutomobileCreationPage() {
           </Button>
         </div>
       </SectionCard>
+      <CreationSuccessDialog
+        open={Boolean(creationSuccess)}
+        title={renewing ? "Assistance automobile renouvelée" : "Assistance automobile créée"}
+        description="Le dossier a été enregistré. Vérifiez les références générées avant de continuer."
+        references={[
+          { label: "Code client", value: creationSuccess?.codeClient },
+          { label: "N° dossier", value: creationSuccess?.numeroDossier },
+          { label: "N° contrat d’assistance", value: creationSuccess?.numeroContrat },
+        ]}
+        onPrimary={() => creationSuccess && navigate(`/app/production/contrats/${creationSuccess.contratId}/pieces-jointes`)}
+        onSecondary={() => navigate("/app/production/contrats")}
+      />
     </div>
   );
 }

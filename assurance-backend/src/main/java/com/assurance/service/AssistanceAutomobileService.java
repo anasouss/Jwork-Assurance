@@ -291,7 +291,7 @@ public class AssistanceAutomobileService {
             source.setStatut(StatutContrat.RENEWED);
             contratRepository.save(source);
         }
-        return toCreationResponse(contrat, assistance, pricing);
+        return toCreationResponse(contrat, assistance, souscripteur, pricing);
     }
 
     @Transactional
@@ -364,7 +364,7 @@ public class AssistanceAutomobileService {
                 assistance, request, pricing, null
         );
         saveBillableElement(contrat, mouvement, assistance, element, produit, pricing);
-        return toCreationResponse(contrat, assistance, pricing);
+        return toCreationResponse(contrat, assistance, souscripteur, pricing);
     }
 
     private Pricing price(
@@ -934,11 +934,13 @@ public class AssistanceAutomobileService {
     private AssistanceAutomobileCreationResponse toCreationResponse(
             Contrat contrat,
             AssistanceContrat assistance,
+            Client souscripteur,
             Pricing pricing
     ) {
         return AssistanceAutomobileCreationResponse.builder()
                 .contratId(contrat.getId())
                 .assistanceId(assistance.getId())
+                .codeClient(souscripteur.getCodeClient())
                 .numeroDossier(contrat.getNumeroDossier())
                 .numeroContrat(contrat.getNumeroContrat())
                 .dateEffet(contrat.getDateEffet())

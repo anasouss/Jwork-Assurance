@@ -14,11 +14,13 @@ import { assistanceVoyageApi } from "../api/assistance-voyage";
 import { clientApi } from "../api/clients";
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
+import { CreationSuccessDialog } from "../components/CreationSuccessDialog";
 import { Field } from "../components/Field";
 import { SectionCard } from "../components/SectionCard";
 import { toDateOnly } from "../date";
 import type {
   AssistanceVoyagePersonRequest,
+  AssistanceVoyageCreationResponse,
   ClientResponse,
   ReferenceOption,
 } from "../types";
@@ -75,6 +77,7 @@ export default function AssistanceVoyageCreationPage() {
   const [payerSearch, setPayerSearch] = useState("");
   const [openSection, setOpenSection] = useState<VoyageSection>("souscripteur");
   const [validatedSections, setValidatedSections] = useState<Partial<Record<VoyageSection, boolean>>>({});
+  const [creationSuccess, setCreationSuccess] = useState<AssistanceVoyageCreationResponse | null>(null);
   const hydratedContractRef = useRef<string | null>(null);
 
   const existingContract = useQuery({
@@ -274,16 +277,12 @@ export default function AssistanceVoyageCreationPage() {
     },
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: contractKeys.all });
-      toast.success(renewing
-        ? `Dossier ${saved.numeroDossier} renouvelé`
-        : draftMode
-          ? `Brouillon finalisé sous le dossier ${saved.numeroDossier}`
-          : editing
-          ? `Dossier ${saved.numeroDossier} modifié`
-          : `Dossier ${saved.numeroDossier} créé`);
-      navigate(editing
-        ? `/app/production/contrats/${saved.contratId}`
-        : `/app/production/contrats/${saved.contratId}/pieces-jointes`);
+      if (editing && !draftMode) {
+        toast.success(`Dossier ${saved.numeroDossier} modifié`);
+        navigate(`/app/production/contrats/${saved.contratId}`);
+        return;
+      }
+      setCreationSuccess(saved);
     },
     onError: (error) => toast.error(
       error instanceof Error
@@ -608,6 +607,18 @@ export default function AssistanceVoyageCreationPage() {
           </Button>
         </div>
       </SectionCard>
+      <CreationSuccessDialog
+        open={Boolean(creationSuccess)}
+        title={renewing ? "Assistance voyage renouvelée" : "Assistance voyage créée"}
+        description="Le dossier a été enregistré. Vérifiez les références générées avant de continuer."
+        references={[
+          { label: "Code client", value: creationSuccess?.codeClient },
+          { label: "N° dossier", value: creationSuccess?.numeroDossier },
+          { label: "N° contrat d’assistance", value: creationSuccess?.numeroContrat },
+        ]}
+        onPrimary={() => creationSuccess && navigate(`/app/production/contrats/${creationSuccess.contratId}/pieces-jointes`)}
+        onSecondary={() => navigate("/app/production/contrats")}
+      />
     </div>
   );
 }

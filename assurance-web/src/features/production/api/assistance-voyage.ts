@@ -44,39 +44,47 @@ export const assistanceVoyageApi = {
   },
 
   async create(request: CreateAssistanceVoyageRequest) {
-    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+    return normalizeCreationResponse(unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
       "/api/v1/contrats/assistance-voyage",
       {
         method: "POST",
         body: JSON.stringify(request),
       }
-    ));
+    )));
   },
 
   async finalizeDraft(contratId: string, request: CreateAssistanceVoyageRequest) {
-    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+    return normalizeCreationResponse(unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
       `/api/v1/contrats/drafts/${contratId}/assistance-voyage/finaliser`,
       { method: "POST", body: JSON.stringify(request) },
-    ));
+    )));
   },
 
   async update(contratId: string, request: CreateAssistanceVoyageRequest) {
-    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+    return normalizeCreationResponse(unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
       `/api/v1/contrats/${contratId}/assistance-voyage`,
       {
         method: "PUT",
         body: JSON.stringify(request),
       }
-    ));
+    )));
   },
 
   async renew(contratId: string, request: CreateAssistanceVoyageRequest) {
-    return unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
+    return normalizeCreationResponse(unwrap(await apiFetch<ApiResponse<AssistanceVoyageCreationResponse>>(
       `/api/v1/contrats/${contratId}/assistance-voyage/renouvellements`,
       {
         method: "POST",
         body: JSON.stringify(request),
       }
-    ));
+    )));
   },
 };
+
+function normalizeCreationResponse(response: AssistanceVoyageCreationResponse): AssistanceVoyageCreationResponse {
+  return {
+    ...response,
+    contratId: String(response.contratId),
+    assistanceId: String(response.assistanceId),
+  };
+}

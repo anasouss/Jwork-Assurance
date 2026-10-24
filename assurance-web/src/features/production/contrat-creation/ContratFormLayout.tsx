@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ClientSection } from "../components/ClientSection";
+import { CreationSuccessDialog } from "../components/CreationSuccessDialog";
 import { GarantieSection } from "../components/GarantieSection";
 import { ManualQuittanceSection } from "../components/ManualQuittanceSection";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
@@ -528,6 +529,22 @@ export function ContratFormLayout({
             : form.correctionMode ? "Enregistrer" : form.renewalMode ? "Enregistrer le brouillon" : form.prospectionMode ? "Créer devis" : "Créer contrat"}
         </Button>
       </div>
+
+      <CreationSuccessDialog
+        open={Boolean(form.creationSuccess)}
+        title="Contrat créé"
+        description="Le contrat a été enregistré. Vérifiez les références générées avant de continuer."
+        references={[
+          {
+            label: "Code client",
+            value: form.creationSuccess?.clients?.find((client) => client.role === "SOUSCRIPTEUR")?.client?.codeClient,
+          },
+          { label: "N° dossier", value: form.creationSuccess?.numeroDossier },
+          { label: "N° police", value: form.creationSuccess?.numeroPolice },
+        ]}
+        onPrimary={form.continueAfterCreation}
+        onSecondary={form.returnAfterCreation}
+      />
 
     </div>
   );

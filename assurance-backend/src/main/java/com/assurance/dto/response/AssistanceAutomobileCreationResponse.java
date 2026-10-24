@@ -11,6 +11,7 @@ import java.time.LocalDate;
 public class AssistanceAutomobileCreationResponse {
     private Long contratId;
     private Long assistanceId;
+    private String codeClient;
     private String numeroDossier;
     private String numeroContrat;
     private LocalDate dateEffet;

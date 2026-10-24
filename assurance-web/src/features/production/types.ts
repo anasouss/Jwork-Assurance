@@ -504,6 +504,7 @@ export type CreateAssistanceVoyageRequest = {
 export type AssistanceVoyageCreationResponse = {
   contratId: string;
   assistanceId: string;
+  codeClient?: string | null;
   numeroDossier: string;
   numeroContrat: string;
   dateEffet: string;
@@ -1069,6 +1070,9 @@ export type CreateContratRequest = {
 };
 
 export type QuittancePreview = {
+  contratId?: string | null;
+  mouvementContratId?: string | null;
+  numeroMouvement?: string | null;
   numeroContrat?: string;
   type?: string;
   primeNette: number;

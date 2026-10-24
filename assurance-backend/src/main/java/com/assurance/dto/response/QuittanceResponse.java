@@ -14,6 +14,7 @@ public class QuittanceResponse {
     private Long contratId;
     private String numeroContrat;
     private Long mouvementContratId;
+    private String numeroMouvement;
     private String codeMouvement;
     private String typeImpactMouvement;
     private Long elementFacturableId;

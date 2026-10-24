@@ -89,6 +89,7 @@ export function useContratCreationForm(
   const [quittances, setQuittances] = useState<QuittanceInput[]>(defaultQuittanceLines());
   const [preview, setPreview] = useState<QuittancePreview | null>(null);
   const [targetPreview, setTargetPreview] = useState<QuittancePreview | null>(null);
+  const [creationSuccess, setCreationSuccess] = useState<ContratSummary | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [savedSections, setSavedSections] = useState<Partial<Record<SavableContratSectionKey, boolean>>>({});
   const [hydratedDraftId, setHydratedDraftId] = useState<string | null>(null);
@@ -607,8 +608,7 @@ export function useContratCreationForm(
         navigate(renewalReturnPath(searchParams.get("returnTo")));
         return;
       }
-      toast.success("Contrat créé");
-      navigate(`/app/production/contrats/${contrat.id}/pieces-jointes`);
+      setCreationSuccess(contrat);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.code === "CONTRACT_INITIAL_MOVEMENT_CORRECTION_BLOCKED") {
@@ -1428,6 +1428,13 @@ export function useContratCreationForm(
     targetPreviewMutation,
     autoPreviewMutation,
     createMutation,
+    creationSuccess,
+    continueAfterCreation: () => {
+      if (creationSuccess) {
+        navigate(`/app/production/contrats/${creationSuccess.id}/pieces-jointes`);
+      }
+    },
+    returnAfterCreation: () => navigate("/app/production/contrats"),
     saveDraftMutation,
     saveTargetDraftMutation,
     tariffRecalculationPreviewQuery,

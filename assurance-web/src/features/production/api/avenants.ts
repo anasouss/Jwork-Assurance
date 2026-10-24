@@ -46,21 +46,21 @@ export const avenantApi = {
   },
 
   async previewAvenant(contratId: string, request: AvenantRequest, mouvementId?: string | null) {
-    return unwrap(
+    return normalizeQuittanceResponse(unwrap(
       await apiFetch<ApiResponse<QuittancePreview>>(
         `/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}/preview${buildQueryString({ mouvementId })}`,
         { method: "POST", body: JSON.stringify(request) }
       )
-    );
+    ));
   },
 
   async createAvenant(contratId: string, request: AvenantRequest) {
-    return unwrap(
+    return normalizeQuittanceResponse(unwrap(
       await apiFetch<ApiResponse<QuittancePreview>>(
         `/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}`,
         { method: "POST", body: JSON.stringify(request) }
       )
-    );
+    ));
   },
 
   async getAvenantRectification(contratId: string, mouvementId: string) {
@@ -72,11 +72,19 @@ export const avenantApi = {
   },
 
   async rectifyAvenant(contratId: string, mouvementId: string, request: AvenantRequest) {
-    return unwrap(
+    return normalizeQuittanceResponse(unwrap(
       await apiFetch<ApiResponse<QuittancePreview>>(
         `/api/v1/contrats/${contratId}/avenants/${mouvementId}/${encodeURIComponent(request.codeTypeMouvement)}/rectification`,
         { method: "PUT", body: JSON.stringify(request) }
       )
-    );
+    ));
   },
 };
+
+function normalizeQuittanceResponse(response: QuittancePreview): QuittancePreview {
+  return {
+    ...response,
+    contratId: response.contratId == null ? null : String(response.contratId),
+    mouvementContratId: response.mouvementContratId == null ? null : String(response.mouvementContratId),
+  };
+}

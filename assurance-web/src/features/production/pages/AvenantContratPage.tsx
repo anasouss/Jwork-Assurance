@@ -50,12 +50,13 @@ import {
   normalizeAmendmentCode,
 } from "../avenants/amendment-policy";
 import { AvenantSelectionTargets } from "../components/AvenantSelectionTargets";
+import { CreationSuccessDialog } from "../components/CreationSuccessDialog";
 import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
 import { AvenantTargetsSection } from "../components/AvenantTargetsSections";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { toDateOnly } from "../date";
-import type { AssistanceDraft, AvenantRequest, GarantieInput, RemorqueInput, VehiculeInput } from "../types";
+import type { AssistanceDraft, AvenantRequest, GarantieInput, QuittancePreview, RemorqueInput, VehiculeInput } from "../types";
 
 export default function AvenantContratPage() {
   const { contratId = "", code = "INC_F" } = useParams();
@@ -75,6 +76,7 @@ export default function AvenantContratPage() {
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
   const [targetPreview, setTargetPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
+  const [creationSuccess, setCreationSuccess] = useState<QuittancePreview | null>(null);
   const [grilleConfiguratorOpen, setGrilleConfiguratorOpen] = useState(false);
   const [hydratedSourceKey, setHydratedSourceKey] = useState("");
   const autoPreviewKeyRef = useRef("");
@@ -455,15 +457,14 @@ export default function AvenantContratPage() {
       await avenantApi.saveAvenantDraft(contratId, request);
       return avenantApi.createAvenant(contratId, request);
     },
-    onSuccess: async () => {
+    onSuccess: async (saved) => {
       queryClient.removeQueries({ queryKey: amendmentKeys.draft(contratId, movementCode), exact: true });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: contractKeys.all }),
         queryClient.invalidateQueries({ queryKey: amendmentKeys.context(contratId) }),
         queryClient.invalidateQueries({ queryKey: attestationStockKeys.all }),
       ]);
-      toast.success(validatedMovementId ? "Avenant modifié" : "Avenant enregistré");
-      navigate("/app/production/contrats");
+      setCreationSuccess(saved);
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -1165,6 +1166,28 @@ export default function AvenantContratPage() {
           </div>
         </SheetContent>
       </Sheet>
+      <CreationSuccessDialog
+        open={Boolean(creationSuccess)}
+        title={validatedMovementId ? "Avenant rectifié" : "Avenant créé"}
+        description="L’avenant a été enregistré. Vérifiez les références générées avant de continuer."
+        references={[
+          {
+            label: "Code client",
+            value: contrat?.clients?.find((client) => client.role === "SOUSCRIPTEUR")?.client?.codeClient,
+          },
+          { label: "N° dossier", value: contrat?.numeroDossier },
+          { label: "N° police", value: contrat?.numeroPolice },
+          { label: "N° avenant", value: creationSuccess?.numeroMouvement },
+        ]}
+        onPrimary={() => {
+          if (!creationSuccess) return;
+          const params = creationSuccess.mouvementContratId
+            ? `?mouvementId=${encodeURIComponent(creationSuccess.mouvementContratId)}`
+            : "";
+          navigate(`/app/production/contrats/${contratId}/pieces-jointes${params}`);
+        }}
+        onSecondary={() => navigate("/app/production/contrats")}
+      />
     </div>
   );
 }

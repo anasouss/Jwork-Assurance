@@ -330,7 +330,12 @@ public class MouvementContratService {
             contrat.setStatut(StatutContrat.CANCELLED);
             contratRepository.save(contrat);
         }
-        return quittance == null ? toPreviewResponse(contrat, typeMouvement, request, montants, garanties, vehicules, remorques) : toResponse(quittance);
+        QuittanceResponse response = quittance == null
+                ? toPreviewResponse(contrat, typeMouvement, request, montants, garanties, vehicules, remorques)
+                : toResponse(quittance);
+        response.setMouvementContratId(mouvement.getId());
+        response.setNumeroMouvement(mouvement.getNumeroMouvement());
+        return response;
     }
 
     @Transactional
@@ -459,7 +464,12 @@ public class MouvementContratService {
             contrat.setStatut(StatutContrat.CANCELLED);
             contratRepository.save(contrat);
         }
-        return quittance == null ? toPreviewResponse(contrat, typeMouvement, request, montants, garantiesActives, vehiculesActifs, remorquesActives) : toResponse(quittance);
+        QuittanceResponse response = quittance == null
+                ? toPreviewResponse(contrat, typeMouvement, request, montants, garantiesActives, vehiculesActifs, remorquesActives)
+                : toResponse(quittance);
+        response.setMouvementContratId(mouvement.getId());
+        response.setNumeroMouvement(mouvement.getNumeroMouvement());
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -863,6 +873,7 @@ public class MouvementContratService {
                 .contratId(quittance.getContrat() != null ? quittance.getContrat().getId() : null)
                 .numeroContrat(quittance.getContrat() != null ? quittance.getContrat().getNumeroContrat() : null)
                 .mouvementContratId(quittance.getMouvementContrat() != null ? quittance.getMouvementContrat().getId() : null)
+                .numeroMouvement(quittance.getMouvementContrat() != null ? quittance.getMouvementContrat().getNumeroMouvement() : null)
                 .codeMouvement(quittance.getMouvementContrat() != null && quittance.getMouvementContrat().getTypeMouvement() != null ? quittance.getMouvementContrat().getTypeMouvement().getCode() : null)
                 .typeImpactMouvement(quittance.getMouvementContrat() != null && quittance.getMouvementContrat().getTypeMouvement() != null && quittance.getMouvementContrat().getTypeMouvement().getTypeImpact() != null ? quittance.getMouvementContrat().getTypeMouvement().getTypeImpact().name() : null)
                 .elementFacturableId(quittance.getElementFacturable() != null ? quittance.getElementFacturable().getId() : null)

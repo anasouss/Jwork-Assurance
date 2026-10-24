@@ -949,7 +949,7 @@ function DocumentActionsMenu(props: {
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
             <FileDown className="size-4 text-sky-700 dark:text-sky-400" />
-            {pdf.loading ? "Ouverture..." : "Prévisualiser le PDF"}
+            {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (
             <DropdownMenuItem
@@ -1015,7 +1015,7 @@ function SourceActionsMenu(props: {
         <DropdownMenuItem asChild>
           <Link to={contractPdfUrl} target="_blank" rel="noopener noreferrer">
             <FileDown className="size-4" />
-            Prévisualiser la police
+            Imprimer la police
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -1944,7 +1944,7 @@ function useDocumentPdfPreview(document: DocumentPdfTarget) {
   async function preview(withSignature: boolean) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
       return;
     }
     previewWindow.opener = null;
@@ -1957,7 +1957,7 @@ function useDocumentPdfPreview(document: DocumentPdfTarget) {
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       previewWindow.close();
-      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
+      toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
     } finally {
       setLoading(false);
     }
@@ -1980,10 +1980,10 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
         size={props.withLabel ? "default" : "icon"}
         onClick={pdf.open}
         disabled={pdf.loading}
-        title="Prévisualiser le PDF"
+        title="Imprimer le PDF"
       >
         <FileDown className="size-4" />
-        {props.withLabel ? (pdf.loading ? "Ouverture..." : "Prévisualiser le PDF") : null}
+        {props.withLabel ? (pdf.loading ? "Ouverture..." : "Imprimer le PDF") : null}
       </Button>
       <DocumentPdfOptionsDialog
         open={pdf.optionsOpen}
@@ -2082,7 +2082,7 @@ function SourceDocumentActionsMenu(props: {
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
             <FileDown className="size-4 text-sky-700 dark:text-sky-400" />
-            {pdf.loading ? "Ouverture..." : "Prévisualiser le PDF"}
+            {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (
             <DropdownMenuItem

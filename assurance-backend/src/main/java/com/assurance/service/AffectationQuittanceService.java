@@ -7,6 +7,7 @@ import com.assurance.dto.response.AffectationQuittancePageResponse;
 import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
 import com.assurance.dto.response.LotAffectationQuittanceResponse;
+import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.entity.AffectationQuittanceCompagnie;
@@ -100,6 +101,20 @@ public class AffectationQuittanceService {
     private final RegleAffectationQuittanceRepository regleRepository;
     private final AgenceRepository agenceRepository;
     private final CompagnieAssuranceRepository compagnieRepository;
+
+    @Transactional(readOnly = true)
+    public List<ReferenceOptionResponse> listAvailableCompanies(Long agenceId, Long brancheId) {
+        validateTenant(agenceId);
+        return quittanceRepository.findAvailableCompaniesForAffectation(agenceId, brancheId)
+                .stream()
+                .map(compagnie -> ReferenceOptionResponse.builder()
+                        .id(compagnie.getId())
+                        .code(compagnie.getCode())
+                        .libelle(compagnie.getNom())
+                        .actif(compagnie.getActif())
+                        .build())
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public AffectationQuittancePageResponse search(

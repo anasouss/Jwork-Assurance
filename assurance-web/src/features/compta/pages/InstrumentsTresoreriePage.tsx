@@ -136,7 +136,7 @@ export default function InstrumentsTresoreriePage() {
   async function previewPdf(slip: RemittanceSlip) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
       return;
     }
     previewWindow.opener = null;
@@ -148,7 +148,7 @@ export default function InstrumentsTresoreriePage() {
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       previewWindow.close();
-      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
+      toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
     } finally {
       setPdfAction(undefined);
     }
@@ -238,7 +238,7 @@ export default function InstrumentsTresoreriePage() {
                     ) : null}
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void previewPdf(slip)}>
                       <FileDown className="size-4" />
-                      {pdfAction?.id === slip.id && pdfAction.type === "preview" ? "Ouverture..." : "Prévisualiser le PDF"}
+                      {pdfAction?.id === slip.id && pdfAction.type === "preview" ? "Ouverture..." : "Imprimer le PDF"}
                     </DropdownMenuItem>
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void downloadPdf(slip)}>
                       <Download className="size-4" />

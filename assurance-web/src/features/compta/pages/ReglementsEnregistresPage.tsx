@@ -319,7 +319,7 @@ export default function ReglementsEnregistresPage() {
   async function previewPayment(payment: ClientPayment) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
       return;
     }
     previewWindow.opener = null;
@@ -331,7 +331,7 @@ export default function ReglementsEnregistresPage() {
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       previewWindow.close();
-      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
+      toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
     } finally {
       setOpeningPaymentId(undefined);
     }
@@ -348,7 +348,7 @@ export default function ReglementsEnregistresPage() {
     }
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
       return;
     }
     previewWindow.opener = null;
@@ -644,7 +644,7 @@ export default function ReglementsEnregistresPage() {
               onClick={() => void previewJournal()}
             >
               <FileText className="size-4" />
-              {journalLoading ? "Génération..." : "Prévisualiser le journal PDF"}
+              {journalLoading ? "Génération..." : "Imprimer le journal PDF"}
             </Button>
           </div>
         </section>
@@ -925,7 +925,7 @@ function PaymentActionsMenu({
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuItem disabled={pdfLoading} onSelect={onPreview}>
           <Eye className="size-4" />
-          {pdfLoading ? "Ouverture..." : "Prévisualiser le PDF"}
+          {pdfLoading ? "Ouverture..." : "Imprimer le PDF"}
         </DropdownMenuItem>
         {canModifyPayment && (
           <DropdownMenuItem asChild>

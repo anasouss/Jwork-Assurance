@@ -91,7 +91,7 @@ export default function BordereauRemiseDetailPage() {
   async function previewPdf() {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
       return;
     }
     previewWindow.opener = null;
@@ -141,7 +141,7 @@ export default function BordereauRemiseDetailPage() {
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" disabled={pdfLoading} onClick={previewPdf}>
             <FileDown className="size-4" />
-            {pdfLoading ? "Génération..." : "Prévisualiser le PDF"}
+            {pdfLoading ? "Génération..." : "Imprimer le PDF"}
           </Button>
           {data.statut === "BROUILLON" && <>
             <Button

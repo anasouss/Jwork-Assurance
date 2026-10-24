@@ -662,7 +662,7 @@ function AccountingDocumentsSection({ rows, totalElements, loading, error, allow
   async function preview(document: ClientDocument) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour prévisualiser le PDF");
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
       return;
     }
     previewWindow.opener = null;
@@ -674,7 +674,7 @@ function AccountingDocumentsSection({ rows, totalElements, loading, error, allow
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       previewWindow.close();
-      toast.error(error instanceof Error ? error.message : "Prévisualisation impossible");
+      toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
     } finally {
       setOpeningId(undefined);
     }
@@ -712,8 +712,8 @@ function AccountingDocumentsSection({ rows, totalElements, loading, error, allow
                 variant="ghost"
                 size="icon"
                 disabled={openingId === document.id}
-                title={`Prévisualiser ${document.numero}`}
-                aria-label={`Prévisualiser ${document.numero}`}
+                title={`Imprimer ${document.numero}`}
+                aria-label={`Imprimer ${document.numero}`}
                 onClick={() => void preview(document)}
               >
                 <Eye className="size-4" />

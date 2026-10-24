@@ -1,6 +1,7 @@
 package com.assurance.repository;
 
 import com.assurance.entity.Quittance;
+import com.assurance.entity.CompagnieAssurance;
 import com.assurance.enums.TypeContrat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -192,6 +193,31 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             "compagnieAssurance"
     })
     Optional<Quittance> findByContratAgenceIdAndIdAndGlobaleTrue(Long agenceId, Long id);
+
+    @Query("""
+            select distinct ca
+            from Quittance q
+            join q.contrat c
+            join q.compagnieAssurance ca
+            left join q.mouvementContrat m
+            where c.agence.id = :agenceId
+              and q.globale = true
+              and q.alternative = false
+              and c.prospection = false
+              and ca.actif = true
+              and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
+              and (
+                    q.elementFacturable is null
+                    or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+              )
+              and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
+              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+            order by ca.nom
+            """)
+    List<CompagnieAssurance> findAvailableCompaniesForAffectation(
+            @Param("agenceId") Long agenceId,
+            @Param("brancheId") Long brancheId
+    );
 
     @EntityGraph(attributePaths = {
             "contrat",

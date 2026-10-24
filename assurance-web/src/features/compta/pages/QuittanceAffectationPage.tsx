@@ -78,10 +78,6 @@ export default function QuittanceAffectationPage() {
     rule?: Rule | null;
   }>();
 
-  const companies = useQuery({
-    queryKey: referenceKeys.list("compagnies-assurance"),
-    queryFn: comptaApi.companies,
-  });
   const branches = useQuery({
     queryKey: referenceKeys.list("branches-assurance"),
     queryFn: comptaApi.insuranceBranches,
@@ -89,6 +85,11 @@ export default function QuittanceAffectationPage() {
   const insuranceBranches = (branches.data ?? []).filter(
     (branch) => branch.code?.trim().toUpperCase() !== "ASSISTANCE"
   );
+  const selectedBranchId = filters.brancheId === "ALL" ? undefined : filters.brancheId;
+  const companies = useQuery({
+    queryKey: ["compta", "quittances", "compagnies-disponibles", selectedBranchId ?? "ALL"],
+    queryFn: () => comptaApi.availableQuittanceCompanies(selectedBranchId),
+  });
   const params = useMemo(
     () => !searched ? null : ({
       brancheId: appliedFilters.brancheId === "ALL" ? undefined : appliedFilters.brancheId,
@@ -233,27 +234,37 @@ export default function QuittanceAffectationPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_1.4fr_auto]">
-            <FilterField label="Compagnie">
-              <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Toutes</SelectItem>
-                  {(companies.data ?? []).map((company) => (
-                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
             <FilterField label="Branche">
               <Select
                 value={filters.brancheId}
-                onValueChange={(value) => setFilters((current) => ({ ...current, brancheId: value }))}
+                onValueChange={(value) => setFilters((current) => ({
+                  ...current,
+                  brancheId: value,
+                  compagnieId: "ALL",
+                }))}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Toutes les branches</SelectItem>
                   {insuranceBranches.map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Compagnie">
+              <Select
+                value={filters.compagnieId}
+                disabled={companies.isLoading}
+                onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={companies.isLoading ? "Chargement..." : "Toutes"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Toutes les compagnies</SelectItem>
+                  {(companies.data ?? []).map((company) => (
+                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

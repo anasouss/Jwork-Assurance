@@ -188,7 +188,7 @@ export default function EncaissementsEnAttentePage() {
         if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
           pdfWindowRef.current.location.href = `/app/compta/tresorerie/bordereaux-remise/${created.id}`;
         }
-        toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
+        toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
       } finally {
         pdfWindowRef.current = null;
       }
@@ -237,7 +237,7 @@ export default function EncaissementsEnAttentePage() {
         if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
           pdfWindowRef.current.location.href = `/app/compta/tresorerie/bordereaux-remise/${created.id}`;
         }
-        toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
+        toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
       } finally {
         pdfWindowRef.current = null;
       }

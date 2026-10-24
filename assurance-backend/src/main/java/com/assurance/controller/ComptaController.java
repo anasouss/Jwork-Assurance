@@ -21,6 +21,7 @@ import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
 import com.assurance.dto.response.LotAffectationQuittanceResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
+import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.PropositionEcheanceDocumentClientResponse;
 import com.assurance.enums.StatutDocumentClient;
@@ -97,6 +98,17 @@ public class ComptaController {
                 search,
                 page,
                 size
+        )));
+    }
+
+    @GetMapping("/quittances/compagnies-disponibles")
+    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> compagniesQuittancesDisponibles(
+            @RequestParam(required = false) Long brancheId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(affectationQuittanceService.listAvailableCompanies(
+                TenantContext.getCurrentAgence(),
+                brancheId
         )));
     }
 

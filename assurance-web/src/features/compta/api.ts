@@ -106,6 +106,14 @@ export const comptaApi = {
     ).map(normalizeReference);
   },
 
+  async availableQuittanceCompanies(brancheId?: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<ReferenceOption[]>>(
+        `/api/v1/compta/quittances/compagnies-disponibles${buildQueryString({ brancheId })}`
+      )
+    ).map(normalizeReference);
+  },
+
   async conventionBillingInstallments(params: {
     statut?: ConventionBillingStatus;
     dateDu?: string;

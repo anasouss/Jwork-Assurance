@@ -138,6 +138,19 @@ public class BordereauRemiseController {
         ), "Bordereau provisoire créé"));
     }
 
+    @PostMapping("/{id}/instruments")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    public ResponseEntity<ApiResponse<BordereauRemiseResponse>> addInstruments(
+            @PathVariable Long id,
+            @Valid @RequestBody SelectionInstrumentsBordereauRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.addInstruments(
+                TenantContext.getCurrentAgence(),
+                id,
+                request.getInstrumentIds()
+        ), "Instrument ajouté au bordereau provisoire"));
+    }
+
     @PostMapping("/versements-especes")
     @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> createCashDeposit(
@@ -197,6 +210,19 @@ public class BordereauRemiseController {
     public ResponseEntity<ApiResponse<Void>> deleteDraft(@PathVariable Long id) {
         bordereauRemiseService.deleteDraft(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Bordereau provisoire supprimé"));
+    }
+
+    @DeleteMapping("/{bordereauId}/lignes/{lineId}")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    public ResponseEntity<ApiResponse<BordereauRemiseResponse>> removeDraftLine(
+            @PathVariable Long bordereauId,
+            @PathVariable Long lineId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.removeDraftLine(
+                TenantContext.getCurrentAgence(),
+                bordereauId,
+                lineId
+        ), "Instrument retiré du bordereau provisoire"));
     }
 
     @GetMapping("/journees-caisse-eligibles")

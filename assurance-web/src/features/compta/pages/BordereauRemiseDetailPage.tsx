@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import type { CashRemittanceLine } from "../types";
+import type { CashRemittanceLine, RemittanceSlipLine } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY } from "./treasury-format";
 
 const STATUS_LABELS = {
@@ -50,6 +50,7 @@ export default function BordereauRemiseDetailPage() {
   const [depositReference, setDepositReference] = useState("");
   const [pdfLoading, setPdfLoading] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [lineToRemove, setLineToRemove] = useState<RemittanceSlipLine>();
 
   const slip = useQuery({
     queryKey: ["compta", "treasury", "remittance-slip", bordereauId],
@@ -75,6 +76,15 @@ export default function BordereauRemiseDetailPage() {
       toast.success("Bordereau provisoire supprimé");
       setDeleteOpen(false);
       navigate("/app/compta/tresorerie/bordereaux-remise", { replace: true });
+      await invalidate();
+    },
+    onError: showError,
+  });
+  const removeLine = useMutation({
+    mutationFn: () => comptaApi.removeRemittanceSlipLine(bordereauId, lineToRemove!.id),
+    onSuccess: async () => {
+      toast.success("Instrument retiré du bordereau provisoire");
+      setLineToRemove(undefined);
       await invalidate();
     },
     onError: showError,
@@ -152,7 +162,7 @@ export default function BordereauRemiseDetailPage() {
             >
               <Trash2 className="size-4" /> Supprimer
             </Button>
-            <Button disabled={!canManage} onClick={() => {
+            <Button disabled={!canManage || (instrumentSlip && data.lignes.length === 0)} onClick={() => {
               setDepositReference(data.referenceBancaire ?? "");
               setDepositOpen(true);
             }}><Send className="size-4" /> Remettre à la banque</Button>
@@ -180,15 +190,33 @@ export default function BordereauRemiseDetailPage() {
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
             <th className="px-4 py-3 text-left">Référence</th><th className="px-4 py-3 text-left">Payeur</th>
             <th className="px-4 py-3 text-left">Règlement</th><th className="px-4 py-3 text-left">Mode</th>
-            <th className="px-4 py-3 text-left">Échéance</th><th className="px-4 py-3 text-right">Montant</th>
-            <th className="px-4 py-3 text-left">Statut</th>
+            <th className="px-4 py-3 text-left">{data.type === "CHEQUE" ? "Date portée" : "Échéance"}</th><th className="px-4 py-3 text-right">Montant</th>
+            <th className="px-4 py-3 text-left">Statut</th><th className="px-4 py-3 text-right">Action</th>
           </tr></thead>
           <tbody className="divide-y">{data.lignes.map((line) => <tr key={line.id} className="hover:bg-muted/30">
             <td className="px-4 py-3 font-semibold">{line.referenceInstrument || "-"}</td><td className="px-4 py-3">{line.payeur}</td>
             <td className="px-4 py-3">{line.numeroReglement}</td><td className="px-4 py-3">{paymentModeLabel(line.mode)}</td>
             <td className="px-4 py-3">{formatTreasuryDate(line.dateEcheance)}</td><td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(line.montant)}</td>
             <td className="px-4 py-3"><div>{LINE_STATUS_LABELS[line.statut]}</div>{line.motifRejet && <div className="text-xs text-red-600">{line.motifRejet}</div>}</td>
-          </tr>)}</tbody>
+            <td className="px-4 py-3 text-right">
+              {data.statut === "BROUILLON" && line.statut === "PREPAREE" && canManage ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  title="Retirer du bordereau"
+                  aria-label={`Retirer ${line.referenceInstrument || "l'instrument"} du bordereau`}
+                  onClick={() => setLineToRemove(line)}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              ) : "-"}
+            </td>
+          </tr>)}
+          {data.lignes.length === 0 && (
+            <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">Aucun instrument dans ce bordereau provisoire.</td></tr>
+          )}</tbody>
         </table></div>
       </section>}
 
@@ -240,6 +268,27 @@ export default function BordereauRemiseDetailPage() {
               onClick={() => deleteDraft.mutate()}
             >
               Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(lineToRemove)} onOpenChange={(open) => !open && setLineToRemove(undefined)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirer cet instrument du bordereau ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le bordereau restera provisoire et l’instrument redeviendra disponible pour une autre remise.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeLine.isPending}>Retour</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={removeLine.isPending}
+              onClick={() => removeLine.mutate()}
+            >
+              Retirer du bordereau
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

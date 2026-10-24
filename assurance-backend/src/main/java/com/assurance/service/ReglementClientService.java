@@ -365,6 +365,12 @@ public class ReglementClientService {
                                     default -> "dateReglement";
                                 }).and(Sort.by(Sort.Direction.DESC, "id")))
         );
+        Map<Long, LigneBordereauRemise> remittanceLines = remittanceLinesWithHistory(
+                result.getContent().stream()
+                        .flatMap(payment -> payment.getInstruments().stream())
+                        .map(InstrumentReglementClient::getId)
+                        .toList()
+        );
         return ReglementClientPageResponse.builder()
                 .page(SourceDocumentClientPageResponse.PageInfo.builder()
                         .number(result.getNumber())
@@ -374,7 +380,9 @@ public class ReglementClientService {
                         .first(result.isFirst())
                         .last(result.isLast())
                         .build())
-                .rows(result.getContent().stream().map(this::toResponse).toList())
+                .rows(result.getContent().stream()
+                        .map(payment -> toResponse(payment, remittanceLines))
+                        .toList())
                 .build();
     }
 
@@ -1101,19 +1109,14 @@ public class ReglementClientService {
         boolean pendingReplacement = replaced.getStatut() == StatutInstrumentReglement.EN_ATTENTE;
         if (!pendingReplacement && replaced.getStatut() != StatutInstrumentReglement.REJETE) {
             throw new BadRequestException(
-                    "Seul un instrument au bureau ou rejeté peut être remplacé"
+                    "Seul un instrument en attente ou rejeté peut être remplacé"
             );
         }
         if (pendingReplacement) {
-            if (!Boolean.TRUE.equals(replaced.getReglementBureau())) {
-                throw new BadRequestException(
-                        "Seul un règlement marqué au bureau peut être remplacé avant remise"
-                );
-            }
             ensureNotReservedByDraftRemittance(replaced);
-            if (trimToNull(request.getMotif()) == null) {
-                throw new BadRequestException("Le motif du remplacement est obligatoire");
-            }
+        }
+        if (trimToNull(request.getMotif()) == null) {
+            throw new BadRequestException("Le motif du remplacement est obligatoire");
         }
         if (money(request.getMontant()).compareTo(money(replaced.getMontant())) != 0) {
             throw new BadRequestException(
@@ -1176,9 +1179,7 @@ public class ReglementClientService {
         String replacementReason = trimToNull(request.getMotif());
         replaced.setStatut(StatutInstrumentReglement.REMPLACE);
         replaced.setDateStatut(replacementDate);
-        replaced.setMotifStatut(replacementReason == null
-                ? "Remplacé par un règlement " + request.getMode().name().toLowerCase(Locale.ROOT)
-                : replacementReason);
+        replaced.setMotifStatut(replacementReason);
         replaced.getReglement().getInstruments().add(replacement);
         ReglementClient payment = reglementRepository.saveAndFlush(replaced.getReglement());
         if (replacement.getStatut() == StatutInstrumentReglement.CONFIRME) {
@@ -2507,6 +2508,15 @@ public class ReglementClientService {
     }
 
     private ReglementClientResponse toResponse(ReglementClient payment) {
+        return toResponse(payment, remittanceLinesWithHistory(payment.getInstruments().stream()
+                .map(InstrumentReglementClient::getId)
+                .toList()));
+    }
+
+    private ReglementClientResponse toResponse(
+            ReglementClient payment,
+            Map<Long, LigneBordereauRemise> remittanceLines
+    ) {
         return ReglementClientResponse.builder()
                 .id(payment.getId())
                 .numero(payment.getNumero())
@@ -2528,11 +2538,19 @@ public class ReglementClientService {
                 .valideParId(payment.getValidePar() == null ? null : payment.getValidePar().getId())
                 .validePar(payment.getValidePar() == null ? null : payment.getValidePar().getFullName())
                 .dateValidation(payment.getDateValidation())
-                .instruments(payment.getInstruments().stream().map(this::toInstrumentResponse).toList())
+                .instruments(payment.getInstruments().stream()
+                        .map(instrument -> toInstrumentResponse(
+                                instrument,
+                                remittanceLines.get(instrument.getId())
+                        ))
+                        .toList())
                 .build();
     }
 
-    private ReglementClientResponse.Instrument toInstrumentResponse(InstrumentReglementClient instrument) {
+    private ReglementClientResponse.Instrument toInstrumentResponse(
+            InstrumentReglementClient instrument,
+            LigneBordereauRemise remittanceLine
+    ) {
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
@@ -2565,6 +2583,12 @@ public class ReglementClientService {
                         ? null : instrument.getCompteTresorerie().getId())
                 .compteTresorerie(instrument.getCompteTresorerie() == null
                         ? null : instrument.getCompteTresorerie().getLibelle())
+                .bordereauRemiseId(remittanceLine == null
+                        ? null : remittanceLine.getBordereau().getId())
+                .numeroBordereauRemise(remittanceLine == null
+                        ? null : remittanceLine.getBordereau().getNumero())
+                .statutBordereauRemise(remittanceLine == null
+                        ? null : remittanceLine.getBordereau().getStatut())
                 .affectations(instrument.getAffectations().stream()
                         .map(allocation -> ReglementClientResponse.Affectation.builder()
                                 .id(allocation.getId())
@@ -2584,6 +2608,15 @@ public class ReglementClientService {
                                 .build())
                         .toList())
                 .build();
+    }
+
+    private Map<Long, LigneBordereauRemise> remittanceLinesWithHistory(List<Long> instrumentIds) {
+        Map<Long, LigneBordereauRemise> lines = activeRemittanceLines(instrumentIds);
+        if (!instrumentIds.isEmpty()) {
+            remittanceLineRepository.findHistoryByInstrumentIds(instrumentIds)
+                    .forEach(line -> lines.putIfAbsent(line.getInstrument().getId(), line));
+        }
+        return lines;
     }
 
     private String allocationDestination(AffectationReglementClient allocation) {

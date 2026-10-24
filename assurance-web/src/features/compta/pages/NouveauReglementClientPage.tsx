@@ -687,7 +687,7 @@ export default function NouveauReglementClientPage() {
                   </div>
                   {method.mode === "EFFET" || method.mode === "CHEQUE" ? (
                     <div className="grid gap-1.5">
-                      <Label>Date d’échéance</Label>
+                      <Label>{method.mode === "CHEQUE" ? "Date portée sur le chèque" : "Date d’échéance"}</Label>
                       <DatePicker
                         date={method.dateEcheance}
                         onSelect={(value) => updateMethod(method.key, {
@@ -1117,7 +1117,7 @@ function PaymentMethodSummaryRow(props: {
       <InstrumentSummaryValue label="Référence" value={props.method.referenceInstrument || "-"} />
       <InstrumentSummaryValue label="Montant" value={money(numeric(props.method.montant))} align="right" />
       <InstrumentSummaryValue
-        label="Échéance"
+        label={props.method.mode === "CHEQUE" ? "Date portée" : "Échéance"}
         value={formatDateOnly(props.method.dateEcheance)}
       />
       <InstrumentSummaryValue

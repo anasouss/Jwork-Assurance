@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Download, Pencil } from "lucide-react";
+import { ArrowLeft, Download, Landmark, Pencil } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { AddInstrumentToRemittanceDialog } from "../components/AddInstrumentToRemittanceDialog";
 import { formatAccountingAmount } from "../format";
 import type {
   ClientPayment,
@@ -43,6 +45,8 @@ export default function ReglementClientDetailPage() {
   const user = useAuthStore((state) => state.user);
   const canEdit = user?.permissions.includes("reglement-client:create")
     || user?.permissions.includes("reglement-client:manage");
+  const canManageTreasury = user?.permissions.includes("tresorerie:manage") ?? false;
+  const [instrumentToRemit, setInstrumentToRemit] = useState<ClientPayment["instruments"][number]>();
   const payment = useQuery({
     queryKey: ["compta", "client-payment", reglementId],
     queryFn: () => comptaApi.clientPayment(reglementId),
@@ -152,6 +156,7 @@ export default function ReglementClientDetailPage() {
                 <th className="px-4 py-3 text-left">Banque / compte</th>
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3 text-center">Statut</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -162,7 +167,7 @@ export default function ReglementClientDetailPage() {
                     <div>{formatDate(instrument.dateInstrument)}</div>
                     {instrument.dateEcheance && (
                       <div className="text-xs text-muted-foreground">
-                        {instrument.mode === "CHEQUE" ? "Remise prévue" : "Échéance"} {formatDate(instrument.dateEcheance)}
+                        {instrument.mode === "CHEQUE" ? "Date portée sur le chèque" : "Échéance"} {formatDate(instrument.dateEcheance)}
                       </div>
                     )}
                   </td>
@@ -195,6 +200,22 @@ export default function ReglementClientDetailPage() {
                         {instrument.motifStatut}
                       </div>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {instrument.bordereauRemiseId ? (
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>
+                          <Landmark className="size-4" /> {instrument.numeroBordereauRemise || "Voir le bordereau"}
+                        </Link>
+                      </Button>
+                    ) : data.statut === "VALIDE"
+                      && instrument.statut === "EN_ATTENTE"
+                      && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET")
+                      && canManageTreasury ? (
+                        <Button variant="outline" size="sm" onClick={() => setInstrumentToRemit(instrument)}>
+                          <Landmark className="size-4" /> Ajouter au bordereau
+                        </Button>
+                      ) : "-"}
                   </td>
                 </tr>
               ))}
@@ -252,6 +273,12 @@ export default function ReglementClientDetailPage() {
           </table>
         </div>
       </section>
+
+      <AddInstrumentToRemittanceDialog
+        instrument={instrumentToRemit}
+        open={Boolean(instrumentToRemit)}
+        onOpenChange={(open) => !open && setInstrumentToRemit(undefined)}
+      />
     </div>
   );
 }

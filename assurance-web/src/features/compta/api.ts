@@ -798,6 +798,13 @@ export const comptaApi = {
     )));
   },
 
+  async addInstrumentsToRemittanceSlip(id: string, instrumentIds: string[]) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/instruments`,
+      { method: "POST", body: JSON.stringify({ instrumentIds }) }
+    )));
+  },
+
   async createCashRemittance(request: CreateRemittanceSlipRequest) {
     return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
       "/api/v1/compta/tresorerie/bordereaux-remise/versements-especes",
@@ -838,6 +845,13 @@ export const comptaApi = {
       `/api/v1/compta/tresorerie/bordereaux-remise/${id}`,
       { method: "DELETE" }
     ));
+  },
+
+  async removeRemittanceSlipLine(id: string, lineId: string) {
+    return normalizeRemittanceSlip(unwrap(await apiFetch<ApiResponse<RemittanceSlip>>(
+      `/api/v1/compta/tresorerie/bordereaux-remise/${id}/lignes/${lineId}`,
+      { method: "DELETE" }
+    )));
   },
 
   async companyBordereauSources(params: {

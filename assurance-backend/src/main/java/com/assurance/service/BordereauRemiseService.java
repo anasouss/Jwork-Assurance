@@ -25,6 +25,7 @@ import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutLigneBordereauRemise;
+import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.TypeBordereauRemise;
 import com.assurance.enums.TypeCompteTresorerie;
 import com.assurance.exception.BadRequestException;
@@ -235,6 +236,19 @@ public class BordereauRemiseService {
     }
 
     @Transactional
+    public BordereauRemiseResponse addInstruments(
+            Long agenceId,
+            Long bordereauId,
+            List<Long> instrumentIds
+    ) {
+        BordereauRemise slip = findForUpdate(agenceId, bordereauId);
+        requireDraftInstrumentSlip(slip);
+        appendInstrumentLines(agenceId, slip, instrumentIds);
+        recalculateInstrumentTotal(slip);
+        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+    }
+
+    @Transactional
     public BordereauRemiseResponse createCashDeposit(
             Long agenceId,
             CreerBordereauRemiseRequest request
@@ -334,6 +348,23 @@ public class BordereauRemiseService {
         bordereauRepository.flush();
     }
 
+    @Transactional
+    public BordereauRemiseResponse removeDraftLine(
+            Long agenceId,
+            Long bordereauId,
+            Long lineId
+    ) {
+        BordereauRemise slip = findForUpdate(agenceId, bordereauId);
+        requireDraftInstrumentSlip(slip);
+        LigneBordereauRemise line = findLine(slip, lineId);
+        if (line.getStatut() != StatutLigneBordereauRemise.PREPAREE) {
+            throw new BadRequestException("Seul un instrument préparé peut être retiré");
+        }
+        slip.getLignes().remove(line);
+        recalculateInstrumentTotal(slip);
+        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+    }
+
     private void configureCashSlip(
             Long agenceId,
             BordereauRemise slip,
@@ -410,11 +441,23 @@ public class BordereauRemiseService {
             BordereauRemise slip,
             CreerBordereauRemiseRequest request
     ) {
-        List<Long> ids = request.getInstrumentIds() == null
+        appendInstrumentLines(agenceId, slip, request.getInstrumentIds());
+        recalculateInstrumentTotal(slip);
+    }
+
+    private void appendInstrumentLines(
+            Long agenceId,
+            BordereauRemise slip,
+            List<Long> requestedIds
+    ) {
+        List<Long> ids = requestedIds == null
                 ? List.of()
-                : new ArrayList<>(new LinkedHashSet<>(request.getInstrumentIds()));
+                : new ArrayList<>(new LinkedHashSet<>(requestedIds));
         if (ids.isEmpty()) {
             throw new BadRequestException("Sélectionnez au moins un instrument");
+        }
+        if (slip.getLignes().size() + ids.size() > 200) {
+            throw new BadRequestException("Un bordereau ne peut pas contenir plus de 200 instruments");
         }
         ids.sort(Long::compareTo);
         List<InstrumentReglementClient> instruments = instrumentRepository
@@ -425,11 +468,11 @@ public class BordereauRemiseService {
         if (lineRepository.existsActiveByInstrumentIds(ids, ACTIVE_STATUSES)) {
             throw new BadRequestException("Un instrument appartient déjà à un bordereau actif");
         }
-        ModeReglementClient expectedMode = modeFor(request.getType());
-        BigDecimal total = ZERO;
+        ModeReglementClient expectedMode = modeFor(slip.getType());
         for (InstrumentReglementClient instrument : instruments) {
             if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
-                    || instrument.getMode() != expectedMode) {
+                    || instrument.getMode() != expectedMode
+                    || instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
                 throw new BadRequestException("Tous les instruments doivent être en attente et du même type");
             }
             LigneBordereauRemise line = LigneBordereauRemise.builder()
@@ -439,9 +482,23 @@ public class BordereauRemiseService {
                     .statut(StatutLigneBordereauRemise.PREPAREE)
                     .build();
             slip.getLignes().add(line);
-            total = total.add(line.getMontant());
         }
-        slip.setMontantTotal(total);
+    }
+
+    private void recalculateInstrumentTotal(BordereauRemise slip) {
+        slip.setMontantTotal(slip.getLignes().stream()
+                .map(LigneBordereauRemise::getMontant)
+                .map(this::money)
+                .reduce(ZERO, BigDecimal::add));
+    }
+
+    private void requireDraftInstrumentSlip(BordereauRemise slip) {
+        if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
+            throw new BadRequestException("Seul un bordereau provisoire peut être modifié");
+        }
+        if (slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES) {
+            throw new BadRequestException("Ce bordereau ne contient pas de chèques ou d'effets");
+        }
     }
 
     private void depositCash(Long agenceId, BordereauRemise slip) {

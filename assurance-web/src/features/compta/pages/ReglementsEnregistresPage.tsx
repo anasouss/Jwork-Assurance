@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Eye,
   FileText,
+  Landmark,
   MoreHorizontal,
   Pencil,
   RotateCcw,
@@ -53,6 +54,7 @@ import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { BankSelect } from "../components/BankSelect";
+import { AddInstrumentToRemittanceDialog } from "../components/AddInstrumentToRemittanceDialog";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import {
   requiresBankAccountAtEntry,
@@ -104,6 +106,7 @@ export default function ReglementsEnregistresPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const currentUserId = useAuthStore((state) => state.user?.id);
   const canManage = permissions.includes("reglement-client:manage");
+  const canManageTreasury = permissions.includes("tresorerie:manage");
   const canCreate = permissions.includes("reglement-client:create") || canManage;
   const canIssueInvoice = permissions.includes("quittance:create")
     || permissions.includes("quittance:manage");
@@ -142,7 +145,9 @@ export default function ReglementsEnregistresPage() {
   const [journalLoading, setJournalLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
+  const [instrumentToRemit, setInstrumentToRemit] = useState<PaymentInstrument>();
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
+  const [replacementReason, setReplacementReason] = useState("");
   const replacementTargetId = searchParams.get("remplacer");
   const payments = useQuery({
     queryKey: [
@@ -182,6 +187,7 @@ export default function ReglementsEnregistresPage() {
     if (!target) return;
     setInstrumentToReplace(target);
     setReplacement(newReplacement());
+    setReplacementReason("");
     const next = new URLSearchParams(searchParams);
     next.delete("remplacer");
     setSearchParams(next, { replace: true });
@@ -238,6 +244,7 @@ export default function ReglementsEnregistresPage() {
       compteTresorerieId: replacement.mode === "ESPECES"
         ? undefined
         : replacement.compteTresorerieId || undefined,
+      motif: replacementReason.trim(),
     }),
     onSuccess: async () => {
       toast.success("Instrument remplacé");
@@ -257,6 +264,7 @@ export default function ReglementsEnregistresPage() {
   function closeReplacement() {
     setInstrumentToReplace(undefined);
     setReplacement(newReplacement());
+    setReplacementReason("");
   }
 
   function resetFilters() {
@@ -469,7 +477,7 @@ export default function ReglementsEnregistresPage() {
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3 text-left">Moyen</th>
                 <th className="px-4 py-3 text-left">Référence</th>
-                <th className="px-4 py-3 text-left">Échéance</th>
+                <th className="px-4 py-3 text-left">Date portée / échéance</th>
                 <th className="px-4 py-3 text-left">Date de valeur</th>
                 <th className="px-4 py-3 text-center">État de valeur</th>
                 <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Règlement</PaymentSortHeader>
@@ -522,6 +530,7 @@ export default function ReglementsEnregistresPage() {
                         payment={payment}
                         canEdit={canCreate && payment.creeParId === currentUserId}
                         canManage={canManage}
+                        canManageTreasury={canManageTreasury}
                         canIssueInvoice={canIssueInvoice}
                         pdfLoading={openingPaymentId === payment.id}
                         onPreview={() => void previewPayment(payment)}
@@ -530,7 +539,9 @@ export default function ReglementsEnregistresPage() {
                         onReplace={(instrument) => {
                           setInstrumentToReplace(instrument);
                           setReplacement(newReplacement());
+                          setReplacementReason("");
                         }}
+                        onAddToRemittance={setInstrumentToRemit}
                       />
                     </div>
                   </td>
@@ -564,6 +575,12 @@ export default function ReglementsEnregistresPage() {
           />
         )}
       </section>
+
+      <AddInstrumentToRemittanceDialog
+        instrument={instrumentToRemit}
+        open={Boolean(instrumentToRemit)}
+        onOpenChange={(open) => !open && setInstrumentToRemit(undefined)}
+      />
 
       </> : null}
 
@@ -737,7 +754,7 @@ export default function ReglementsEnregistresPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remplacer le moyen de paiement impayé</DialogTitle>
+            <DialogTitle>Remplacer le moyen de paiement</DialogTitle>
             <DialogDescription>
               Le montant et les affectations sont conservés :{" "}
               {formatAccountingAmount(instrumentToReplace?.montant)}
@@ -774,7 +791,7 @@ export default function ReglementsEnregistresPage() {
             </div>
             {(replacement.mode === "EFFET" || replacement.mode === "CHEQUE") && (
               <div className="grid gap-2">
-                <Label>Date d’échéance</Label>
+                <Label>{replacement.mode === "CHEQUE" ? "Date portée sur le chèque" : "Date d’échéance"}</Label>
                 <DatePicker
                   date={replacement.dateEcheance}
                   onSelect={(value) => setReplacement((current) => ({
@@ -824,11 +841,21 @@ export default function ReglementsEnregistresPage() {
                 )}
               </>
             ) : null}
+            <div className="grid gap-2 sm:col-span-2">
+              <Label htmlFor="replacement-reason">Motif du remplacement *</Label>
+              <Textarea
+                id="replacement-reason"
+                value={replacementReason}
+                onChange={(event) => setReplacementReason(event.target.value)}
+                placeholder="Ex. chèque repris et remplacé par un paiement en espèces"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeReplacement}>Annuler</Button>
             <Button
               disabled={replaceInstrument.isPending
+                || !replacementReason.trim()
                 || !replacementValid(replacement, accounts.data ?? [])}
               onClick={() => replaceInstrument.mutate()}
             >
@@ -881,31 +908,42 @@ function PaymentActionsMenu({
   payment,
   canEdit,
   canManage,
+  canManageTreasury,
   canIssueInvoice,
   pdfLoading,
   onPreview,
   onInvoice,
   onCancel,
   onReplace,
+  onAddToRemittance,
 }: {
   payment: ClientPayment;
   canEdit: boolean;
   canManage: boolean;
+  canManageTreasury: boolean;
   canIssueInvoice: boolean;
   pdfLoading: boolean;
   onPreview: () => void;
   onInvoice: () => void;
   onCancel: () => void;
   onReplace: (instrument: PaymentInstrument) => void;
+  onAddToRemittance: (instrument: PaymentInstrument) => void;
 }) {
-  const rejectedInstruments = canManage && !payment.multiPayeur
-    ? payment.instruments.filter((instrument) => instrument.statut === "REJETE")
+  const replaceableInstruments = canManage && payment.statut === "VALIDE" && !payment.multiPayeur
+    ? payment.instruments.filter((instrument) => (instrument.statut === "REJETE"
+      || (instrument.statut === "EN_ATTENTE" && !instrument.bordereauRemiseId))
+      && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET"))
     : [];
   const canCreateInvoice = payment.statut === "VALIDE"
     && canIssueInvoice
     && !payment.multiPayeur
     && hasDirectActiveAllocations(payment);
-  const canReplaceInstrument = rejectedInstruments.length > 0;
+  const canReplaceInstrument = replaceableInstruments.length > 0;
+  const remittableInstruments = canManageTreasury && payment.statut === "VALIDE"
+    ? payment.instruments.filter((instrument) => instrument.statut === "EN_ATTENTE"
+      && !instrument.bordereauRemiseId
+      && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET"))
+    : [];
   const canModifyPayment = payment.statut === "A_VALIDER" && canEdit;
   const canCancelPayment = payment.statut !== "ANNULE" && canManage;
 
@@ -941,8 +979,19 @@ function PaymentActionsMenu({
             Créer la facture
           </DropdownMenuItem>
         )}
+        {remittableInstruments.length > 0 && <DropdownMenuSeparator />}
+        {remittableInstruments.map((instrument) => (
+          <DropdownMenuItem
+            key={instrument.id}
+            onSelect={() => onAddToRemittance(instrument)}
+          >
+            <Landmark className="size-4" />
+            Ajouter {MODE_LABELS[instrument.mode].toLowerCase()}
+            {instrument.referenceInstrument ? ` ${instrument.referenceInstrument}` : ""} au bordereau
+          </DropdownMenuItem>
+        ))}
         {canReplaceInstrument && <DropdownMenuSeparator />}
-        {rejectedInstruments.map((instrument) => (
+        {replaceableInstruments.map((instrument) => (
           <DropdownMenuItem
             key={instrument.id}
             onSelect={() => onReplace(instrument)}
@@ -1019,7 +1068,7 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
               <th className="px-3 py-2 text-left">Payeur</th>
               <th className="px-3 py-2 text-left">Moyen</th>
               <th className="px-3 py-2 text-left">Référence</th>
-              <th className="px-3 py-2 text-left">Échéance</th>
+              <th className="px-3 py-2 text-left">Date portée / échéance</th>
               <th className="px-3 py-2 text-left">Date de valeur</th>
               <th className="px-3 py-2 text-center">État</th>
               <th className="px-3 py-2 text-right">Montant</th>

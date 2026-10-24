@@ -401,7 +401,7 @@ export default function EncaissementsEnAttentePage() {
         {showDueDateFilters && (
           <>
             <div className="grid gap-2">
-              <Label>{mode === "ESPECES" ? "Journée du" : "Échéance du"}</Label>
+              <Label>{mode === "ESPECES" ? "Journée du" : mode === "CHEQUE" ? "Date portée du" : "Échéance du"}</Label>
               <DatePicker
                 date={dateFrom}
                 maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
@@ -409,7 +409,7 @@ export default function EncaissementsEnAttentePage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>{mode === "ESPECES" ? "Journée au" : "Échéance au"}</Label>
+              <Label>{mode === "ESPECES" ? "Journée au" : mode === "CHEQUE" ? "Date portée au" : "Échéance au"}</Label>
               <DatePicker
                 date={dateTo}
                 minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
@@ -521,7 +521,7 @@ export default function EncaissementsEnAttentePage() {
               <CollectionSortHeader column="PAYMENT" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Règlement</CollectionSortHeader>
               <CollectionSortHeader column="MODE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Mode</CollectionSortHeader>
               <CollectionSortHeader column="RECEIVED" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Reçu le</CollectionSortHeader>
-              <CollectionSortHeader column="DUE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Échéance</CollectionSortHeader>
+              <CollectionSortHeader column="DUE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Date portée / échéance</CollectionSortHeader>
               <th className="px-4 py-3 text-left">Traitement</th>
               <CollectionSortHeader column="AMOUNT" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="right">Montant</CollectionSortHeader>
               <th className="w-44 px-4 py-3 text-right">Action</th>
@@ -787,13 +787,7 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
     return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Bordereau provisoire {instrument.numeroBordereauRemise}</Badge>;
   }
   if (instrument.mode === "CHEQUE" || instrument.mode === "EFFET") {
-    if (instrument.reglementBureau && instrument.dateEcheance && instrument.dateEcheance < TODAY) {
-      return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-950 dark:text-red-200">Échu au bureau</Badge>;
-    }
-    if (instrument.reglementBureau && instrument.dateEcheance === TODAY) {
-      return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-200">À traiter aujourd’hui</Badge>;
-    }
-    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">{instrument.reglementBureau ? "Règlement au bureau" : "À remettre"}</Badge>;
+    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">À remettre</Badge>;
   }
   return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">À rapprocher</Badge>;
 }

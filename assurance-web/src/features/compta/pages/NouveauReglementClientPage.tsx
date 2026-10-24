@@ -188,6 +188,9 @@ export default function NouveauReglementClientPage() {
   const activeBankAccounts = (accounts.data ?? []).filter(
     (account) => account.actif && account.typeCompte === "BANQUE"
   );
+  const soleActiveBankAccountId = activeBankAccounts.length === 1
+    ? activeBankAccounts[0]?.id
+    : undefined;
   const selectedPaymentModes = paymentModes.filter((option) =>
     methods.some((method) => method.mode === option.value)
   );
@@ -228,6 +231,21 @@ export default function NouveauReglementClientPage() {
       setActivePaymentMode("VERSEMENT_BANCAIRE");
     }
   }, [editing, methods.length, requestedMultiClientDeposit]);
+
+  useEffect(() => {
+    if (!soleActiveBankAccountId) return;
+    setMethods((current) => {
+      let changed = false;
+      const next = current.map((method) => {
+        if (!requiresBankAccountAtEntry(method.mode) || method.compteTresorerieId) {
+          return method;
+        }
+        changed = true;
+        return { ...method, compteTresorerieId: soleActiveBankAccountId };
+      });
+      return changed ? next : current;
+    });
+  }, [methods, soleActiveBankAccountId]);
 
   useEffect(() => {
     if (!editing
@@ -1009,7 +1027,7 @@ function AccountSelect(props: {
       <Select
         value={props.value}
         onValueChange={props.onChange}
-        disabled={options.length === 0}
+        disabled={options.length <= 1}
       >
         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
         <SelectContent>

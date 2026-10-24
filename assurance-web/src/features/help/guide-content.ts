@@ -682,16 +682,17 @@ export const guideModules: GuideModule[] = [
       {
         id: "pieces-jointes-production",
         title: "Types de pièces jointes",
-        summary: "Définir les justificatifs attendus selon le contrat, le client et le mouvement.",
+        summary: "Définir les justificatifs attendus selon la branche, le parcours, le contrat, le client et le mouvement.",
         route: "/app/production/parametres/pieces-jointes",
         permissions: ["referentiel:view", "referentiel:manage"],
         steps: [
-          { title: "Ajouter un type", description: "Cliquez sur Ajouter puis renseignez Libellé et Ordre d’affichage." },
-          { title: "Définir la portée", description: "Choisissez Contrat, Client et Mouvement. Tous signifie que le critère ne limite pas ce type de document." },
+          { title: "Ajouter un type", description: "Cliquez sur Ajouter un type puis renseignez le Libellé et l’Ordre d’affichage." },
+          { title: "Choisir la branche", description: "Sélectionnez Automobile, Assistance ou Toutes les branches. Pour Assistance, précisez Voyage, Automobile ou les deux parcours." },
+          { title: "Définir la portée", description: "Choisissez ensuite le Type de contrat hors assistance, le Client et le Mouvement. Tous signifie que le critère ne limite pas le document." },
           { title: "Rendre obligatoire", description: "Cochez Obligatoire lorsque le document doit être fourni dans cette portée, puis laissez Actif pour les nouveaux dossiers." },
-          { title: "Enregistrer", description: "Cliquez sur Ajouter ou Modifier. Utilisez ensuite l’icône d’activation/désactivation de la liste sans supprimer l’historique." },
+          { title: "Enregistrer", description: "Cliquez sur Ajouter ou Modifier. La modification d’un type Système crée un réglage propre à votre agence sans modifier les autres agences." },
         ],
-        warnings: ["Un type obligatoire mal ciblé peut bloquer ou surcharger plusieurs parcours; vérifiez ensemble Contrat, Client et Mouvement."],
+        warnings: ["Un type obligatoire mal ciblé peut surcharger plusieurs parcours; vérifiez ensemble Branche, Parcours, Contrat, Client et Mouvement."],
       },
       {
         id: "regles-fiscales",

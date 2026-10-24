@@ -1,9 +1,11 @@
 package com.assurance.seeder;
 
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.TypePieceJointe;
 import com.assurance.enums.TypeClient;
 import com.assurance.enums.TypeContrat;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import com.assurance.repository.TypePieceJointeRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,8 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
 
     private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final TypePieceJointeRepository typePieceJointeRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
+    private BrancheAssurance automobileBranch;
 
     @Override
     @Transactional
@@ -26,6 +30,9 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
         if (typePieceJointeRepository.count() > 0) {
             return;
         }
+
+        automobileBranch = brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
+                .orElseThrow(() -> new IllegalStateException("Branche AUTOMOBILE absente"));
 
         TypeMouvementContrat affaireNouvelle = movement("AN");
         TypeMouvementContrat renouvellement = movement("REN");
@@ -136,6 +143,7 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
     ) {
         typePieceJointeRepository.save(TypePieceJointe.builder()
                 .libelle(libelle)
+                .brancheAssurance(typeMouvement == null ? null : automobileBranch)
                 .typeContrat(typeContrat)
                 .typeClient(typeClient)
                 .typeMouvement(typeMouvement)

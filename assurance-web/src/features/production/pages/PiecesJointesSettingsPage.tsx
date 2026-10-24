@@ -1,8 +1,9 @@
 import type React from "react";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit2, Plus, Power, PowerOff } from "lucide-react";
+import { Edit2, Plus, Power, PowerOff, Search } from "lucide-react";
 import { toast } from "sonner";
+import { referenceKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { attachmentSettingsApi } from "../api/attachment-settings";
+import { referenceApi } from "../api/references";
 import type { TypeClient, TypeContrat, TypePieceJointe, UpsertTypePieceJointeRequest } from "../types";
 
 const ALL = "__ALL__";
@@ -34,6 +36,8 @@ const TYPE_CLIENTS: TypeClient[] = ["PERSONNE_PHYSIQUE", "PERSONNE_MORALE"];
 
 const EMPTY_FORM: FormState = {
   libelle: "",
+  brancheAssuranceId: ALL,
+  typeAssistance: ALL,
   typeContrat: ALL,
   typeClient: ALL,
   typeMouvementId: ALL,
@@ -44,6 +48,8 @@ const EMPTY_FORM: FormState = {
 
 type FormState = {
   libelle: string;
+  brancheAssuranceId: string;
+  typeAssistance: string;
   typeContrat: string;
   typeClient: string;
   typeMouvementId: string;
@@ -58,6 +64,9 @@ export default function PiecesJointesSettingsPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [modalOpen, setModalOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [branchFilter, setBranchFilter] = useState(ALL);
+  const [assistanceFilter, setAssistanceFilter] = useState(ALL);
 
   const typesQuery = useQuery({
     queryKey: ["pieces-jointes-types", true],
@@ -67,15 +76,33 @@ export default function PiecesJointesSettingsPage() {
     queryKey: ["pieces-jointes-types-mouvements"],
     queryFn: attachmentSettingsApi.listMovementTypes,
   });
+  const branchesQuery = useQuery({
+    queryKey: referenceKeys.list("branches-assurance"),
+    queryFn: () => referenceApi.list("branches-assurance"),
+  });
 
   const mouvementMap = useMemo(() => new Map((mouvementsQuery.data ?? []).map((item) => [item.id, item])), [mouvementsQuery.data]);
   const types = useMemo(() => typesQuery.data ?? [], [typesQuery.data]);
-  const totalPages = Math.max(1, Math.ceil(types.length / PAGE_SIZE));
+  const branchMap = useMemo(() => new Map((branchesQuery.data ?? []).map((item) => [item.id, item])), [branchesQuery.data]);
+  const assistanceBranchId = (branchesQuery.data ?? []).find((item) => item.code?.toUpperCase() === "ASSISTANCE")?.id;
+  const selectedFormBranch = branchMap.get(form.brancheAssuranceId);
+  const assistanceForm = selectedFormBranch?.code?.toUpperCase() === "ASSISTANCE";
+  const filteredTypes = useMemo(() => {
+    const needle = search.trim().toLocaleLowerCase("fr");
+    return types.filter((type) => {
+      if (branchFilter !== ALL && type.brancheAssuranceId !== branchFilter) return false;
+      if (assistanceFilter !== ALL && type.typeAssistance != null && type.typeAssistance !== assistanceFilter) return false;
+      if (!needle) return true;
+      return [type.libelle, type.brancheAssuranceLibelle, type.typeMouvementLibelle]
+        .some((value) => value?.toLocaleLowerCase("fr").includes(needle));
+    });
+  }, [assistanceFilter, branchFilter, search, types]);
+  const totalPages = Math.max(1, Math.ceil(filteredTypes.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedTypes = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE;
-    return types.slice(start, start + PAGE_SIZE);
-  }, [safePage, types]);
+    return filteredTypes.slice(start, start + PAGE_SIZE);
+  }, [filteredTypes, safePage]);
 
   const saveMutation = useMutation({
     mutationFn: (payload: UpsertTypePieceJointeRequest) =>
@@ -126,7 +153,7 @@ export default function PiecesJointesSettingsPage() {
         <div>
           <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Production</p>
           <h1 className="text-xl font-semibold tracking-tight">Types de pièces jointes</h1>
-          <p className="text-sm text-muted-foreground">Définissez les documents attendus selon le mouvement, le contrat et le client.</p>
+          <p className="text-sm text-muted-foreground">Définissez les documents attendus selon la branche, le parcours, le mouvement et le client.</p>
         </div>
         <Button type="button" onClick={openCreate}>
           <Plus className="size-4" />
@@ -138,14 +165,65 @@ export default function PiecesJointesSettingsPage() {
         <CardHeader className="flex flex-row items-center justify-between border-b bg-emerald-50/70 py-3 dark:bg-emerald-950/30">
           <CardTitle className="text-sm">Configuration</CardTitle>
           <span className="text-xs text-muted-foreground">
-            {types.length} type{types.length > 1 ? "s" : ""}
+            {filteredTypes.length} sur {types.length} type{types.length > 1 ? "s" : ""}
           </span>
         </CardHeader>
         <CardContent className="p-0">
+          <div className="grid gap-3 border-b p-3 md:grid-cols-[minmax(220px,1fr)_220px_220px]">
+            <label className="grid gap-1.5 text-xs font-semibold uppercase text-muted-foreground">
+              <span>Rechercher</span>
+              <span className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  value={search}
+                  placeholder="Libellé ou mouvement"
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                />
+              </span>
+            </label>
+            <Field label="Branche">
+              <Select value={branchFilter} onValueChange={(value) => {
+                setBranchFilter(value);
+                setAssistanceFilter(ALL);
+                setPage(1);
+              }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Toutes les branches</SelectItem>
+                  {(branchesQuery.data ?? []).map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Parcours assistance">
+              <Select
+                value={assistanceFilter}
+                disabled={branchFilter !== assistanceBranchId}
+                onValueChange={(value) => {
+                  setAssistanceFilter(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Tous les parcours</SelectItem>
+                  <SelectItem value="VOYAGE">Assistance voyage</SelectItem>
+                  <SelectItem value="AUTOMOBILE">Assistance automobile</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
           <Table>
             <TableHeader className="bg-emerald-50/70 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-50">
               <TableRow>
                 <TableHead>Libellé</TableHead>
+                <TableHead>Branche</TableHead>
+                <TableHead>Parcours</TableHead>
                 <TableHead>Contrat</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Mouvement</TableHead>
@@ -156,23 +234,30 @@ export default function PiecesJointesSettingsPage() {
             <TableBody>
               {typesQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">Chargement...</TableCell>
+                  <TableCell colSpan={8} className="text-muted-foreground">Chargement...</TableCell>
                 </TableRow>
               ) : pagedTypes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">Aucun type configuré.</TableCell>
+                  <TableCell colSpan={8} className="text-muted-foreground">Aucun type ne correspond aux filtres.</TableCell>
                 </TableRow>
               ) : (
                 pagedTypes.map((type) => (
                   <TableRow key={type.id} className={type.actif === false ? "bg-muted/30 text-muted-foreground" : undefined}>
                     <TableCell className="font-medium">{type.libelle}</TableCell>
-                    <TableCell>{type.typeContrat ?? "Tous"}</TableCell>
+                    <TableCell>{type.brancheAssuranceLibelle ?? "Toutes"}</TableCell>
+                    <TableCell>{type.brancheAssuranceCode?.toUpperCase() === "ASSISTANCE"
+                      ? assistanceTypeLabel(type.typeAssistance)
+                      : "-"}</TableCell>
+                    <TableCell>{type.brancheAssuranceCode?.toUpperCase() === "ASSISTANCE"
+                      ? "-"
+                      : type.typeContrat ? contractTypeLabel(type.typeContrat) : "Tous"}</TableCell>
                     <TableCell>{type.typeClient ? clientLabel(type.typeClient) : "Tous"}</TableCell>
                     <TableCell>{type.typeMouvementId ? mouvementMap.get(type.typeMouvementId)?.libelle ?? type.typeMouvementLibelle : "Tous"}</TableCell>
                     <TableCell>
                       <span className="flex flex-wrap gap-1">
                         {type.obligatoire ? <Badge>Obligatoire</Badge> : <Badge variant="secondary">Optionnel</Badge>}
                         {type.actif === false ? <Badge variant="destructive">Inactif</Badge> : <Badge variant="success">Actif</Badge>}
+                        {type.systeme ? <Badge variant="outline">Système</Badge> : null}
                       </span>
                     </TableCell>
                     <TableCell className="text-right">
@@ -249,15 +334,48 @@ export default function PiecesJointesSettingsPage() {
               <Field label="Ordre">
                 <Input value={form.ordreAffichage} inputMode="numeric" onChange={(event) => setForm((current) => ({ ...current, ordreAffichage: event.target.value }))} />
               </Field>
-              <Field label="Contrat">
-                <Select value={form.typeContrat} onValueChange={(value) => setForm((current) => ({ ...current, typeContrat: value }))}>
+              <Field label="Branche">
+                <Select value={form.brancheAssuranceId} onValueChange={(value) => {
+                  const branch = branchMap.get(value);
+                  const assistance = branch?.code?.toUpperCase() === "ASSISTANCE";
+                  setForm((current) => ({
+                    ...current,
+                    brancheAssuranceId: value,
+                    typeAssistance: ALL,
+                    typeContrat: assistance ? ALL : current.typeContrat,
+                  }));
+                }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ALL}>Tous</SelectItem>
-                    {TYPE_CONTRATS.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                    <SelectItem value={ALL}>Toutes les branches</SelectItem>
+                    {(branchesQuery.data ?? []).map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>
+              {assistanceForm ? (
+                <Field label="Parcours assistance">
+                  <Select value={form.typeAssistance} onValueChange={(value) => setForm((current) => ({ ...current, typeAssistance: value }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Voyage et automobile</SelectItem>
+                      <SelectItem value="VOYAGE">Assistance voyage</SelectItem>
+                      <SelectItem value="AUTOMOBILE">Assistance automobile</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              ) : (
+                <Field label="Type de contrat">
+                  <Select value={form.typeContrat} onValueChange={(value) => setForm((current) => ({ ...current, typeContrat: value }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL}>Tous les types</SelectItem>
+                      {TYPE_CONTRATS.map((type) => <SelectItem key={type} value={type}>{contractTypeLabel(type)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              )}
               <Field label="Client">
                 <Select value={form.typeClient} onValueChange={(value) => setForm((current) => ({ ...current, typeClient: value }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -318,6 +436,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function typeToForm(type: TypePieceJointe): FormState {
   return {
     libelle: type.libelle,
+    brancheAssuranceId: type.brancheAssuranceId ?? ALL,
+    typeAssistance: type.typeAssistance ?? ALL,
     typeContrat: type.typeContrat ?? ALL,
     typeClient: type.typeClient ?? ALL,
     typeMouvementId: type.typeMouvementId ?? ALL,
@@ -330,6 +450,8 @@ function typeToForm(type: TypePieceJointe): FormState {
 function typeToPayload(type: TypePieceJointe, actif: boolean): UpsertTypePieceJointeRequest {
   return {
     libelle: type.libelle,
+    brancheAssuranceId: type.brancheAssuranceId ?? null,
+    typeAssistance: type.typeAssistance ?? null,
     typeContrat: type.typeContrat ?? null,
     typeClient: type.typeClient ?? null,
     typeMouvementId: type.typeMouvementId ?? null,
@@ -342,6 +464,10 @@ function typeToPayload(type: TypePieceJointe, actif: boolean): UpsertTypePieceJo
 function toPayload(form: FormState): UpsertTypePieceJointeRequest {
   return {
     libelle: form.libelle.trim(),
+    brancheAssuranceId: form.brancheAssuranceId === ALL ? null : form.brancheAssuranceId,
+    typeAssistance: form.typeAssistance === ALL
+      ? null
+      : form.typeAssistance as "VOYAGE" | "AUTOMOBILE",
     typeContrat: form.typeContrat === ALL ? null : form.typeContrat as TypeContrat,
     typeClient: form.typeClient === ALL ? null : form.typeClient as TypeClient,
     typeMouvementId: form.typeMouvementId === ALL ? null : form.typeMouvementId,
@@ -353,4 +479,16 @@ function toPayload(form: FormState): UpsertTypePieceJointeRequest {
 
 function clientLabel(type: TypeClient) {
   return type === "PERSONNE_MORALE" ? "Personne morale" : "Personne physique";
+}
+
+function contractTypeLabel(type: TypeContrat) {
+  if (type === "PARTICULIER") return "Mono";
+  if (type === "CONVENTION") return "Convention";
+  return "Flotte";
+}
+
+function assistanceTypeLabel(type?: "VOYAGE" | "AUTOMOBILE" | null) {
+  if (type === "VOYAGE") return "Voyage";
+  if (type === "AUTOMOBILE") return "Automobile";
+  return "Tous";
 }

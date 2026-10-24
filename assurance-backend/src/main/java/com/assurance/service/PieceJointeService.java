@@ -7,6 +7,8 @@ import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.dto.response.TypePieceJointeResponse;
 import com.assurance.entity.Client;
 import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.BaseEntity;
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.MouvementContrat;
@@ -14,12 +16,14 @@ import com.assurance.entity.PieceJointe;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.TypePieceJointe;
 import com.assurance.enums.RoleClientContrat;
+import com.assurance.enums.TypeAssistance;
 import com.assurance.enums.TypeClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.AssistanceContratRepository;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.PieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
@@ -48,9 +52,11 @@ import java.nio.file.StandardCopyOption;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -64,12 +70,12 @@ public class PieceJointeService {
     private final TypePieceJointeRepository typePieceJointeRepository;
     private final PieceJointeRepository pieceJointeRepository;
     private final AssistanceContratRepository assistanceContratRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final StorageLayoutService storageLayoutService;
 
     @Transactional(readOnly = true)
     public List<TypePieceJointeResponse> listTypes(Long agenceId, boolean includeInactive) {
-        return typePieceJointeRepository.findByAgenceIdOrAgenceIsNullOrderByLibelleAsc(agenceId).stream()
-                .filter(type -> includeInactive || Boolean.TRUE.equals(type.getActif()))
+        return effectiveTypes(agenceId, includeInactive).stream()
                 .sorted(typeComparator())
                 .map(this::toTypeResponse)
                 .toList();
@@ -82,20 +88,32 @@ public class PieceJointeService {
         if (id == null) {
             type.setAgence(agenceRepository.findById(agenceId)
                     .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId)));
+        } else if (type.getAgence() == null) {
+            type = agencyOverride(agenceId, type);
         }
         if (type.getAgence() != null && !agenceId.equals(type.getAgence().getId())) {
             throw new ResourceNotFoundException("TypePieceJointe", id);
         }
+        BrancheAssurance branche = request.getBrancheAssuranceId() == null
+                ? null
+                : brancheAssuranceRepository.findById(request.getBrancheAssuranceId())
+                        .filter(item -> Boolean.TRUE.equals(item.getActif()))
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "BrancheAssurance", request.getBrancheAssuranceId()));
+        validateScope(branche, request);
         TypeMouvementContrat mouvement = request.getTypeMouvementId() == null ? null :
                 typeMouvementContratRepository.findById(request.getTypeMouvementId())
                         .orElseThrow(() -> new ResourceNotFoundException("TypeMouvementContrat", request.getTypeMouvementId()));
         type.setLibelle(requireText(request.getLibelle(), "Le libelle est obligatoire"));
+        type.setBrancheAssurance(branche);
+        type.setTypeAssistance(request.getTypeAssistance());
         type.setTypeContrat(request.getTypeContrat());
         type.setTypeClient(request.getTypeClient());
         type.setTypeMouvement(mouvement);
         type.setObligatoire(Boolean.TRUE.equals(request.getObligatoire()));
         type.setActif(request.getActif() == null || Boolean.TRUE.equals(request.getActif()));
         type.setOrdreAffichage(request.getOrdreAffichage());
+        validateNoDuplicateScope(agenceId, type);
         return toTypeResponse(typePieceJointeRepository.save(type));
     }
 
@@ -103,6 +121,9 @@ public class PieceJointeService {
     public void deactivateType(Long agenceId, Long id) {
         TypePieceJointe type = typePieceJointeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TypePieceJointe", id));
+        if (type.getAgence() == null) {
+            type = agencyOverride(agenceId, type);
+        }
         if (type.getAgence() != null && !agenceId.equals(type.getAgence().getId())) {
             throw new ResourceNotFoundException("TypePieceJointe", id);
         }
@@ -216,7 +237,6 @@ public class PieceJointeService {
                 throw new BadRequestException("Le nom du document ne doit pas depasser 160 caracteres");
             }
             TypePieceJointe existing = eligibleTypes(agenceId, contrat, mouvement, typeClient).stream()
-                    .filter(type -> type.getAgence() != null && agenceId.equals(type.getAgence().getId()))
                     .filter(type -> customLabel.equalsIgnoreCase(type.getLibelle()))
                     .findFirst()
                     .orElse(null);
@@ -226,7 +246,9 @@ public class PieceJointeService {
             return typePieceJointeRepository.save(TypePieceJointe.builder()
                     .agence(contrat.getAgence())
                     .libelle(customLabel)
-                    .typeContrat(contrat.getTypeContrat())
+                    .brancheAssurance(contrat.getBrancheAssurance())
+                    .typeAssistance(resolveAssistanceType(contrat))
+                    .typeContrat(isAssistanceBranch(contrat) ? null : contrat.getTypeContrat())
                     .typeClient(typeClient)
                     .typeMouvement(mouvement == null ? null : mouvement.getTypeMouvement())
                     .obligatoire(false)
@@ -309,14 +331,93 @@ public class PieceJointeService {
 
     private List<TypePieceJointe> eligibleTypes(Long agenceId, Contrat contrat, MouvementContrat mouvement, TypeClient typeClient) {
         TypeMouvementContrat typeMouvement = mouvement == null ? null : mouvement.getTypeMouvement();
-        return typePieceJointeRepository.findByAgenceIdOrAgenceIsNullOrderByLibelleAsc(agenceId).stream()
-                .filter(type -> Boolean.TRUE.equals(type.getActif()))
+        TypeAssistance typeAssistance = resolveAssistanceType(contrat);
+        return effectiveTypes(agenceId, false).stream()
+                .filter(type -> type.getBrancheAssurance() == null
+                        || (contrat.getBrancheAssurance() != null
+                        && type.getBrancheAssurance().getId().equals(contrat.getBrancheAssurance().getId())))
+                .filter(type -> type.getTypeAssistance() == null || type.getTypeAssistance() == typeAssistance)
                 .filter(type -> type.getTypeContrat() == null || type.getTypeContrat() == contrat.getTypeContrat())
                 .filter(type -> type.getTypeClient() == null || type.getTypeClient() == typeClient)
                 .filter(type -> type.getTypeMouvement() == null
                         || (typeMouvement != null && type.getTypeMouvement().getId().equals(typeMouvement.getId())))
                 .sorted(typeComparator())
                 .toList();
+    }
+
+    private List<TypePieceJointe> effectiveTypes(Long agenceId, boolean includeInactive) {
+        List<TypePieceJointe> candidates = typePieceJointeRepository
+                .findByAgenceIdOrAgenceIsNullOrderByLibelleAsc(agenceId);
+        Set<Long> overriddenSystemIds = new HashSet<>();
+        candidates.stream()
+                .filter(type -> type.getAgence() != null && type.getSourceSysteme() != null)
+                .map(type -> type.getSourceSysteme().getId())
+                .forEach(overriddenSystemIds::add);
+        return candidates.stream()
+                .filter(type -> type.getAgence() != null || !overriddenSystemIds.contains(type.getId()))
+                .filter(type -> includeInactive || Boolean.TRUE.equals(type.getActif()))
+                .toList();
+    }
+
+    private TypePieceJointe agencyOverride(Long agenceId, TypePieceJointe systemType) {
+        return typePieceJointeRepository.findByAgenceIdAndSourceSystemeId(agenceId, systemType.getId())
+                .orElseGet(() -> TypePieceJointe.builder()
+                        .agence(agenceRepository.findById(agenceId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId)))
+                        .sourceSysteme(systemType)
+                        .libelle(systemType.getLibelle())
+                        .brancheAssurance(systemType.getBrancheAssurance())
+                        .typeAssistance(systemType.getTypeAssistance())
+                        .typeContrat(systemType.getTypeContrat())
+                        .typeClient(systemType.getTypeClient())
+                        .typeMouvement(systemType.getTypeMouvement())
+                        .obligatoire(systemType.getObligatoire())
+                        .ordreAffichage(systemType.getOrdreAffichage())
+                        .actif(systemType.getActif())
+                        .build());
+    }
+
+    private TypeAssistance resolveAssistanceType(Contrat contrat) {
+        if (!isAssistanceBranch(contrat)) {
+            return null;
+        }
+        return TypeAssistance.fromProductType(resolveStandaloneAssistanceType(contrat));
+    }
+
+    private boolean isAssistanceBranch(Contrat contrat) {
+        return contrat.getBrancheAssurance() != null
+                && "ASSISTANCE".equalsIgnoreCase(contrat.getBrancheAssurance().getCode());
+    }
+
+    private void validateScope(BrancheAssurance branche, UpsertTypePieceJointeRequest request) {
+        boolean assistance = branche != null && "ASSISTANCE".equalsIgnoreCase(branche.getCode());
+        if (request.getTypeAssistance() != null && !assistance) {
+            throw new BadRequestException("Le type d'assistance nécessite la branche Assistance");
+        }
+        if (assistance && request.getTypeContrat() != null) {
+            throw new BadRequestException("Le type de contrat ne s'applique pas à la branche Assistance");
+        }
+    }
+
+    private void validateNoDuplicateScope(Long agenceId, TypePieceJointe candidate) {
+        Long candidateId = candidate.getId();
+        Long sourceId = candidate.getSourceSysteme() == null ? null : candidate.getSourceSysteme().getId();
+        boolean duplicate = effectiveTypes(agenceId, true).stream()
+                .filter(existing -> !Objects.equals(existing.getId(), candidateId))
+                .filter(existing -> !Objects.equals(existing.getId(), sourceId))
+                .anyMatch(existing -> existing.getLibelle().equalsIgnoreCase(candidate.getLibelle())
+                        && Objects.equals(entityId(existing.getBrancheAssurance()), entityId(candidate.getBrancheAssurance()))
+                        && existing.getTypeAssistance() == candidate.getTypeAssistance()
+                        && existing.getTypeContrat() == candidate.getTypeContrat()
+                        && existing.getTypeClient() == candidate.getTypeClient()
+                        && Objects.equals(entityId(existing.getTypeMouvement()), entityId(candidate.getTypeMouvement())));
+        if (duplicate) {
+            throw new BadRequestException("Un type de pièce jointe existe déjà pour cette portée");
+        }
+    }
+
+    private Long entityId(BaseEntity entity) {
+        return entity == null ? null : entity.getId();
     }
 
     private Comparator<TypePieceJointe> typeComparator() {
@@ -483,6 +584,10 @@ public class PieceJointeService {
         return TypePieceJointeResponse.builder()
                 .id(type.getId())
                 .libelle(type.getLibelle())
+                .brancheAssuranceId(type.getBrancheAssurance() == null ? null : type.getBrancheAssurance().getId())
+                .brancheAssuranceCode(type.getBrancheAssurance() == null ? null : type.getBrancheAssurance().getCode())
+                .brancheAssuranceLibelle(type.getBrancheAssurance() == null ? null : type.getBrancheAssurance().getLibelle())
+                .typeAssistance(type.getTypeAssistance())
                 .typeContrat(type.getTypeContrat())
                 .typeClient(type.getTypeClient())
                 .typeMouvementId(type.getTypeMouvement() == null ? null : type.getTypeMouvement().getId())
@@ -491,6 +596,7 @@ public class PieceJointeService {
                 .obligatoire(type.getObligatoire())
                 .actif(type.getActif())
                 .ordreAffichage(type.getOrdreAffichage())
+                .systeme(type.getAgence() == null)
                 .build();
     }
 

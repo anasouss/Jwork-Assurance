@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.TypeAssistance;
 import com.assurance.enums.TypeClient;
 import com.assurance.enums.TypeContrat;
 import lombok.Builder;
@@ -10,6 +11,10 @@ import lombok.Data;
 public class TypePieceJointeResponse {
     private Long id;
     private String libelle;
+    private Long brancheAssuranceId;
+    private String brancheAssuranceCode;
+    private String brancheAssuranceLibelle;
+    private TypeAssistance typeAssistance;
     private TypeContrat typeContrat;
     private TypeClient typeClient;
     private Long typeMouvementId;
@@ -18,4 +23,5 @@ public class TypePieceJointeResponse {
     private Boolean obligatoire;
     private Boolean actif;
     private Integer ordreAffichage;
+    private Boolean systeme;
 }

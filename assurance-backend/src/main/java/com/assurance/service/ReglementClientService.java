@@ -1263,7 +1263,8 @@ public class ReglementClientService {
 
     @Transactional(readOnly = true)
     public List<ReglementClientResponse.Instrument> pendingInstruments(Long agenceId) {
-        return instrumentRepository.findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
+        List<InstrumentReglementClient> instruments = instrumentRepository
+                .findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
                         agenceId,
                         Set.of(
                                 StatutInstrumentReglement.EN_ATTENTE,
@@ -1276,7 +1277,15 @@ public class ReglementClientService {
                         == StatutInstrumentReglement.REMIS_EN_BANQUE
                         || (instrument.getMode() != ModeReglementClient.CHEQUE
                             && instrument.getMode() != ModeReglementClient.EFFET))
-                .map(this::toInstrumentResponse)
+                .toList();
+        Map<Long, LigneBordereauRemise> remittanceLines = activeRemittanceLines(
+                instruments.stream().map(InstrumentReglementClient::getId).toList()
+        );
+        return instruments.stream()
+                .map(instrument -> toInstrumentResponse(
+                        instrument,
+                        remittanceLines.get(instrument.getId())
+                ))
                 .toList();
     }
 

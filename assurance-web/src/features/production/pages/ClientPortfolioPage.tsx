@@ -1,6 +1,6 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, CircleDollarSign, Eye, FileText, FolderOpen, Landmark, Phone, Printer, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, CircleDollarSign, FileText, FolderOpen, Landmark, Phone, Printer, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";

@@ -28,6 +28,7 @@ import {
   GripVertical,
   Landmark,
   Paperclip,
+  Pencil,
   Plus,
   ReceiptText,
   Trash2,
@@ -142,6 +143,7 @@ export default function NouveauReglementClientPage() {
   const [depositorName, setDepositorName] = useState("");
   const [receipt, setReceipt] = useState<File>();
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
+  const [editingMethodKey, setEditingMethodKey] = useState<string>();
   const [activePaymentMode, setActivePaymentMode] = useState<ClientPaymentMode | null>(null);
   const [creditConfirmationOpen, setCreditConfirmationOpen] = useState(false);
   const [orderedRows, setOrderedRows] = useState<ClientReceivable[]>([]);
@@ -223,11 +225,14 @@ export default function NouveauReglementClientPage() {
       compteTresorerieId: instrument.compteTresorerieId ?? "",
       reglementBureau: Boolean(instrument.reglementBureau),
     })));
+    setEditingMethodKey(undefined);
   }, [payment.data]);
 
   useEffect(() => {
     if (!editing && requestedMultiClientDeposit && methods.length === 0) {
-      setMethods([newPaymentMethod("VERSEMENT_BANCAIRE")]);
+      const method = newPaymentMethod("VERSEMENT_BANCAIRE");
+      setMethods([method]);
+      setEditingMethodKey(method.key);
       setActivePaymentMode("VERSEMENT_BANCAIRE");
     }
   }, [editing, methods.length, requestedMultiClientDeposit]);
@@ -345,11 +350,15 @@ export default function NouveauReglementClientPage() {
         ...current.slice(lastModeIndex + 1),
       ];
     });
+    setEditingMethodKey(method.key);
   }
 
   function togglePaymentMode(mode: ClientPaymentMode) {
     if (methods.some((method) => method.mode === mode)) {
       setMethods((current) => current.filter((method) => method.mode !== mode));
+      if (methods.some((method) => method.mode === mode && method.key === editingMethodKey)) {
+        setEditingMethodKey(undefined);
+      }
       return;
     }
     addPaymentMethod(mode);
@@ -358,6 +367,7 @@ export default function NouveauReglementClientPage() {
 
   function removePaymentMethod(key: string) {
     setMethods((current) => current.filter((method) => method.key !== key));
+    if (editingMethodKey === key) setEditingMethodKey(undefined);
   }
 
   function reorderReceivables(event: DragEndEvent) {
@@ -603,17 +613,33 @@ export default function NouveauReglementClientPage() {
 
           {visibleMethods.length > 0 ? (
             <div className="divide-y border-t">
-              {visibleMethods.map((method, index) => (
-                <section key={method.key} className="grid gap-3 px-3 py-3">
+              {visibleMethods.map((method, index) => {
+                const methodNumber = index + 1;
+                if (!multiClientDeposit && method.key !== editingMethodKey) {
+                  return (
+                    <PaymentMethodSummaryRow
+                      key={method.key}
+                      method={method}
+                      number={methodNumber}
+                      complete={methodValid(method, accounts.data ?? [])}
+                      bankLabel={(banks.data ?? []).find((bank) => bank.id === method.banqueEmettriceId)?.libelle}
+                      accountLabel={(accounts.data ?? []).find((account) => account.id === method.compteTresorerieId)?.libelle}
+                      onEdit={() => setEditingMethodKey(method.key)}
+                      onRemove={() => removePaymentMethod(method.key)}
+                    />
+                  );
+                }
+                return (
+                <section key={method.key} className="grid gap-3 bg-orange-50/30 px-3 py-3 dark:bg-orange-950/10">
                   <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(150px,0.65fr)_repeat(4,minmax(0,1fr))_auto]">
                     <div className="flex h-10 items-center gap-2.5 xl:self-end">
                       <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border border-orange-600 bg-orange-500 text-xs font-bold text-white shadow-sm">
-                        {index + 1}
+                        {methodNumber}
                       </span>
                       <span className="truncate text-sm font-bold text-foreground">
                         {paymentModes.find((option) => option.value === method.mode)?.label}
                         {" "}
-                        {index + 1}
+                        {methodNumber}
                       </span>
                     </div>
 
@@ -714,12 +740,13 @@ export default function NouveauReglementClientPage() {
                   ) : null}
 
                     <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
-                      {!multiClientDeposit && index === visibleMethods.length - 1 ? (
+                      {!multiClientDeposit ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="border-orange-300 text-orange-800 hover:bg-orange-50 hover:text-orange-900 dark:border-orange-800 dark:text-orange-200 dark:hover:bg-orange-950/30"
+                          disabled={!methodValid(method, accounts.data ?? [])}
                           onClick={() => addPaymentMethod(method.mode)}
                         >
                           <Plus className="size-4" />
@@ -759,7 +786,16 @@ export default function NouveauReglementClientPage() {
                     </div>
                   ) : null}
                 </section>
-              ))}
+                );
+              })}
+              {!multiClientDeposit && visiblePaymentMode && !visibleMethods.some((method) => method.key === editingMethodKey) ? (
+                <div className="flex justify-end bg-muted/20 px-3 py-3">
+                  <Button type="button" variant="outline" size="sm" onClick={() => addPaymentMethod(visiblePaymentMode)}>
+                    <Plus className="size-4" />
+                    Ajouter
+                  </Button>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -1040,6 +1076,93 @@ function AccountSelect(props: {
       </Select>
     </div>
   );
+}
+
+function PaymentMethodSummaryRow(props: {
+  method: PaymentMethodDraft;
+  number: number;
+  complete: boolean;
+  bankLabel?: string;
+  accountLabel?: string;
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const modeLabel = paymentModes.find((option) => option.value === props.method.mode)?.label
+    ?? props.method.mode;
+  const institution = props.bankLabel ?? props.accountLabel ?? "-";
+  return (
+    <section className={`grid items-center gap-3 px-3 py-3 md:grid-cols-[minmax(150px,0.8fr)_repeat(4,minmax(0,1fr))_auto] ${
+      props.complete
+        ? "bg-emerald-50/40 dark:bg-emerald-950/10"
+        : "bg-amber-50/50 dark:bg-amber-950/10"
+    }`}>
+      <div className="flex items-center gap-2.5">
+        <span className={`flex size-7 shrink-0 items-center justify-center rounded-sm border text-xs font-bold text-white ${
+          props.complete
+            ? "border-emerald-700 bg-emerald-600"
+            : "border-amber-700 bg-amber-600"
+        }`}>
+          {props.number}
+        </span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold">{modeLabel} {props.number}</div>
+          <div className={props.complete
+            ? "text-xs text-emerald-700 dark:text-emerald-300"
+            : "text-xs text-amber-700 dark:text-amber-300"}
+          >
+            {props.complete ? "Ajouté" : "À compléter"}
+          </div>
+        </div>
+      </div>
+      <InstrumentSummaryValue label="Référence" value={props.method.referenceInstrument || "-"} />
+      <InstrumentSummaryValue label="Montant" value={money(numeric(props.method.montant))} align="right" />
+      <InstrumentSummaryValue
+        label="Échéance"
+        value={formatDateOnly(props.method.dateEcheance)}
+      />
+      <InstrumentSummaryValue
+        label={props.method.mode === "CHEQUE" || props.method.mode === "EFFET" ? "Banque émettrice" : "Compte crédité"}
+        value={institution}
+        detail={props.method.reglementBureau ? "Règlement au bureau" : undefined}
+      />
+      <div className="flex justify-end gap-1">
+        <Button type="button" variant="ghost" size="icon" title="Modifier" onClick={props.onEdit}>
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          title="Supprimer"
+          onClick={props.onRemove}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function InstrumentSummaryValue(props: {
+  label: string;
+  value: string;
+  detail?: string;
+  align?: "left" | "right";
+}) {
+  return (
+    <div className={props.align === "right" ? "text-right" : undefined}>
+      <div className="text-[11px] uppercase text-muted-foreground">{props.label}</div>
+      <div className="truncate text-sm font-medium tabular-nums">{props.value}</div>
+      {props.detail ? <div className="text-xs text-muted-foreground">{props.detail}</div> : null}
+    </div>
+  );
+}
+
+function formatDateOnly(value: string) {
+  if (!value) return "-";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
 function SummaryCell(props: {

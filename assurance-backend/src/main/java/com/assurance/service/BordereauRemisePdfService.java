@@ -154,28 +154,35 @@ public class BordereauRemisePdfService {
     }
 
     private void writeOverview(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
-        Table overview = new Table(new float[]{1, 1, 1, 1.15f})
+        Table overview = new Table(new float[]{1.15f, 1.15f, 0.9f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(4);
         overview.addCell(compactInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
         overview.addCell(compactInfoCell("DATE DE REMISE",
                 slip.getDateDepot() == null ? "À confirmer" : date(slip.getDateDepot()), regular, bold));
-        overview.addCell(compactInfoCell("NOMBRE DE PIÈCES",
+        overview.addCell(compactInfoCell(
                 slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
-                        ? "-" : String.valueOf(slip.getLignes().size()), regular, bold));
-        overview.addCell(compactInfoCell("MONTANT TOTAL", amount(slip.getMontantTotal()) + " "
-                + slip.getCompteDestination().getDevise(), bold, bold).setBackgroundColor(SOFT_ACCENT));
+                        ? "ENCAISSEMENTS" : "NOMBRE DE PIÈCES",
+                String.valueOf(slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
+                        ? slip.getLignesEspeces().size() : slip.getLignes().size()),
+                regular,
+                bold
+        ));
         document.add(overview);
 
         CompteTresorerie destination = slip.getCompteDestination();
-        Table bank = new Table(new float[]{1.5f, 1.3f, 1.2f, 2.4f})
+        Table bank = new Table(new float[]{1.5f, 1.3f, 2.4f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(8);
         bank.addCell(compactStackedInfoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
-        bank.addCell(compactStackedInfoCell("COMPTE À CRÉDITER", destination.getLibelle(), regular, bold));
         bank.addCell(compactStackedInfoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
                 ? null : destination.getBanqueReference().getLibelle(), regular, bold));
-        bank.addCell(compactStackedInfoCell("RIB", formatRib(destination.getRib()), regular, bold));
+        bank.addCell(compactStackedInfoCell(
+                "N° DE COMPTE / RIB",
+                formatRib(destination.getRib()),
+                regular,
+                bold
+        ));
         document.add(bank);
     }
 

@@ -1125,7 +1125,7 @@ export const guideModules: GuideModule[] = [
         steps: [
           { title: "Filtrer", description: "Recherchez par mode, statut, référence, compte ou dates." },
           { title: "Choisir les journées de caisse", description: "Dans Journées de caisse à verser, filtrez par date, caisse ou caissier puis cochez une ou plusieurs journées. La sélection peut regrouper plusieurs caisses et plusieurs dates." },
-          { title: "Préparer le versement d’espèces", description: "Cliquez sur Préparer le bordereau d’espèces, contrôlez les journées, le nombre d’encaissements et le total calculé, puis choisissez le compte bancaire de destination et la date du bordereau." },
+          { title: "Préparer le versement d’espèces", description: "Contrôlez dans le tableau les journées, le nombre d’encaissements et le total calculé, puis cliquez sur Préparer le bordereau d’espèces. Dans la fenêtre, choisissez le compte bancaire de destination et la date du bordereau." },
           { title: "Créer un bordereau", description: "Dans Moyens de paiement en attente, sélectionnez des chèques ou effets de même type et destination puis créez le bordereau provisoire. Prévisualisez le PDF avant confirmation." },
           { title: "Préparer un virement", description: "Sur un virement éligible, choisissez le compte de destination puis confirmez sa préparation." },
           { title: "Déclarer un impayé", description: "Dans Actions, choisissez l’impayé, renseignez sa date et son motif puis confirmez." },

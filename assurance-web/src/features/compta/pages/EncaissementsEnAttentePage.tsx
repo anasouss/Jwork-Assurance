@@ -56,6 +56,7 @@ export default function EncaissementsEnAttentePage() {
   const [operationDate, setOperationDate] = useState(TODAY);
   const [rejectionReason, setRejectionReason] = useState("");
   const [slipDialogOpen, setSlipDialogOpen] = useState(false);
+  const [cashSlipDialogOpen, setCashSlipDialogOpen] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [slipDate, setSlipDate] = useState(TODAY);
   const [slipNotes, setSlipNotes] = useState("");
@@ -199,6 +200,55 @@ export default function EncaissementsEnAttentePage() {
     },
   });
 
+  const createCashRemittanceSlip = useMutation({
+    mutationFn: () => {
+      if (!destinationAccountId) {
+        throw new Error("Sélectionnez le compte bancaire de destination");
+      }
+      const movementIds = Array.from(new Set(
+        selectedCashDays.flatMap((day) => day.mouvementIds)
+      ));
+      if (movementIds.length === 0) {
+        throw new Error("Sélectionnez au moins une journée de caisse");
+      }
+      return comptaApi.createCashRemittance({
+        type: "VERSEMENT_ESPECES",
+        dateBordereau: slipDate,
+        compteDestinationId: destinationAccountId,
+        notes: slipNotes.trim() || undefined,
+        instrumentIds: [],
+        mouvementEspecesIds: movementIds,
+      });
+    },
+    onSuccess: async (created) => {
+      setCashSlipDialogOpen(false);
+      setSelectedCashDays([]);
+      setSlipNotes("");
+      toast.success(`Bordereau provisoire ${created.numero} créé`);
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] });
+      try {
+        const pdf = await comptaApi.remittanceSlipPdf(created.id);
+        const url = URL.createObjectURL(pdf);
+        if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
+          pdfWindowRef.current.location.href = url;
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      } catch (error) {
+        if (pdfWindowRef.current && !pdfWindowRef.current.closed) {
+          pdfWindowRef.current.location.href = `/app/compta/tresorerie/bordereaux-remise/${created.id}`;
+        }
+        toast.error(error instanceof Error ? error.message : "Prévisualisation du PDF impossible");
+      } finally {
+        pdfWindowRef.current = null;
+      }
+    },
+    onError: (error) => {
+      pdfWindowRef.current?.close();
+      pdfWindowRef.current = null;
+      toast.error(error instanceof Error ? error.message : "Création du bordereau impossible");
+    },
+  });
+
   function submitRemittanceSlip() {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
@@ -208,6 +258,17 @@ export default function EncaissementsEnAttentePage() {
     previewWindow.opener = null;
     pdfWindowRef.current = previewWindow;
     createRemittanceSlip.mutate();
+  }
+
+  function submitCashRemittanceSlip() {
+    const previewWindow = window.open("about:blank", "_blank");
+    if (!previewWindow) {
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
+      return;
+    }
+    previewWindow.opener = null;
+    pdfWindowRef.current = previewWindow;
+    createCashRemittanceSlip.mutate();
   }
 
   function applyFilters() {
@@ -375,10 +436,12 @@ export default function EncaissementsEnAttentePage() {
                 <div className="font-medium">{selectedCashDays.length} journée(s)</div>
                 <div className="text-muted-foreground">{formatTreasuryMoney(selectedCashTotal)}</div>
               </div>
-              <Button asChild disabled={!canManage}>
-                <Link to={cashRemittancePath(selectedCashDays)}>
-                  <Landmark className="size-4" /> Préparer le bordereau d’espèces
-                </Link>
+              <Button disabled={!canManage} onClick={() => {
+                setSlipDate(TODAY);
+                setSlipNotes("");
+                setCashSlipDialogOpen(true);
+              }}>
+                <Landmark className="size-4" /> Préparer le bordereau d’espèces
               </Button>
             </div>
           ) : null}
@@ -548,6 +611,51 @@ export default function EncaissementsEnAttentePage() {
             >
               <Plus className="size-4" />
               {createRemittanceSlip.isPending ? "Création..." : "Créer le bordereau"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cashSlipDialogOpen} onOpenChange={setCashSlipDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Créer le bordereau d’espèces</DialogTitle>
+            <DialogDescription>
+              {selectedCashDays.length} journée(s), {selectedCashDays.reduce((sum, day) => sum + day.nombreEncaissements, 0)} encaissement(s), pour un total de {formatTreasuryMoney(selectedCashTotal)}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Compte bancaire de destination</Label>
+              {accounts.isLoading ? (
+                <div className="flex min-h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">Chargement...</div>
+              ) : bankAccounts.length === 1 ? (
+                <Input readOnly value={bankAccounts[0].libelle} />
+              ) : (
+                <Select value={destinationAccountId} onValueChange={setDestinationAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Choisir un compte bancaire" /></SelectTrigger>
+                  <SelectContent>{bankAccounts.map((account) => <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+              {!accounts.isLoading && bankAccounts.length === 0 ? <p className="text-sm text-destructive">Aucun compte bancaire actif n’est configuré.</p> : null}
+            </div>
+            <div className="grid gap-2">
+              <Label>Date du bordereau</Label>
+              <DatePicker date={slipDate} onSelect={(value) => setSlipDate(toDateOnly(value) ?? "")} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="cash-remittance-notes">Notes <span className="font-normal text-muted-foreground">(facultatif)</span></Label>
+              <Textarea id="cash-remittance-notes" value={slipNotes} onChange={(event) => setSlipNotes(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" disabled={createCashRemittanceSlip.isPending} onClick={() => setCashSlipDialogOpen(false)}>Annuler</Button>
+            <Button
+              disabled={!destinationAccountId || !slipDate || selectedCashDays.length === 0 || createCashRemittanceSlip.isPending}
+              onClick={submitCashRemittanceSlip}
+            >
+              <Landmark className="size-4" />
+              {createCashRemittanceSlip.isPending ? "Création..." : "Créer le bordereau"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -742,15 +850,6 @@ function isSelectableForSlip(instrument: PaymentInstrument) {
   return instrument.statut === "EN_ATTENTE"
     && !instrument.bordereauRemiseId
     && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET");
-}
-
-function cashRemittancePath(days: EligibleCashDay[]) {
-  const movementIds = Array.from(new Set(days.flatMap((day) => day.mouvementIds)));
-  const params = new URLSearchParams({
-    type: "VERSEMENT_ESPECES",
-    cashMovementIds: movementIds.join(","),
-  });
-  return `/app/compta/tresorerie/bordereaux-remise/nouveau?${params.toString()}`;
 }
 
 type CollectionQueueUrlState = {

@@ -16,6 +16,7 @@ describe("contract filter URL state", () => {
     const params = contractFiltersToSearchParams({
       brancheId: "3",
       typeContrat: "CONVENTION",
+      typeAssistance: "Assistance Voyage",
       typeDate: "ECHEANCE",
       du: "2026-01-01",
       au: "2026-12-31",
@@ -30,6 +31,7 @@ describe("contract filter URL state", () => {
     expect(contractFiltersFromSearchParams(params)).toEqual({
       brancheId: "3",
       typeContrat: "CONVENTION",
+      typeAssistance: "Assistance Voyage",
       typeDate: "ECHEANCE",
       du: "2026-01-01",
       au: "2026-12-31",

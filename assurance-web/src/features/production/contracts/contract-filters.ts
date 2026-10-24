@@ -3,6 +3,7 @@ import type { TypeContrat } from "../types";
 export type ContractFilters = {
   brancheId: "ALL" | string;
   typeContrat: "ALL" | TypeContrat;
+  typeAssistance: "ALL" | "Assistance Voyage" | "Assistance Automobile";
   typeDate: "EFFET" | "ECHEANCE";
   du?: string;
   au?: string;
@@ -17,6 +18,7 @@ export type ContractFilters = {
 export const DEFAULT_CONTRACT_FILTERS: ContractFilters = {
   brancheId: "ALL",
   typeContrat: "ALL",
+  typeAssistance: "ALL",
   typeDate: "EFFET",
   codeClient: "",
   compagnieId: "ALL",
@@ -28,11 +30,15 @@ export const DEFAULT_CONTRACT_FILTERS: ContractFilters = {
 
 export function contractFiltersFromSearchParams(searchParams: URLSearchParams): ContractFilters {
   const typeContrat = searchParams.get("typeContrat");
+  const typeAssistance = searchParams.get("typeAssistance");
   const typeDate = searchParams.get("typeDate");
   return {
     brancheId: searchParams.get("brancheId") ?? "ALL",
     typeContrat: typeContrat === "PARTICULIER" || typeContrat === "CONVENTION" || typeContrat === "FLOTTE"
       ? typeContrat
+      : "ALL",
+    typeAssistance: typeAssistance === "Assistance Voyage" || typeAssistance === "Assistance Automobile"
+      ? typeAssistance
       : "ALL",
     typeDate: typeDate === "ECHEANCE" ? "ECHEANCE" : "EFFET",
     du: searchParams.get("du") || undefined,
@@ -50,6 +56,7 @@ export function contractFiltersToSearchParams(filters: ContractFilters) {
   const params = new URLSearchParams();
   if (filters.brancheId !== "ALL") params.set("brancheId", filters.brancheId);
   if (filters.typeContrat !== "ALL") params.set("typeContrat", filters.typeContrat);
+  if (filters.typeAssistance !== "ALL") params.set("typeAssistance", filters.typeAssistance);
   if (filters.typeDate !== "EFFET") params.set("typeDate", filters.typeDate);
   if (filters.du) params.set("du", filters.du);
   if (filters.au) params.set("au", filters.au);

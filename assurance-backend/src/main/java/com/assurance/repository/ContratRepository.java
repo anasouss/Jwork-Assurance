@@ -113,6 +113,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                           and linkedAssistance.brancheAssurance.id = :brancheId
                           and (:compagnieAssistanceId is null
                                or linkedAssistance.compagnieAssistance.id = :compagnieAssistanceId)
+                          and (:typeAssistance is null
+                               or lower(coalesce(linkedAssistance.produitAssistance.type, '')) = :typeAssistance)
                           and (:produitAssistanceId is null
                                or linkedAssistance.produitAssistance.id = :produitAssistanceId)
                           and (:numeroPolice is null
@@ -134,6 +136,12 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                     where assistance.contrat = c
                       and assistance.actif = true
                       and assistance.compagnieAssistance.id = :compagnieAssistanceId
+              ))
+              and (:typeAssistance is null or exists (
+                    select assistance.id from AssistanceContrat assistance
+                    where assistance.contrat = c
+                      and assistance.actif = true
+                      and lower(coalesce(assistance.produitAssistance.type, '')) = :typeAssistance
               ))
               and (:produitAssistanceId is null or exists (
                     select assistance.id from AssistanceContrat assistance
@@ -225,6 +233,8 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                           and linkedAssistance.brancheAssurance.id = :brancheId
                           and (:compagnieAssistanceId is null
                                or linkedAssistance.compagnieAssistance.id = :compagnieAssistanceId)
+                          and (:typeAssistance is null
+                               or lower(coalesce(linkedAssistance.produitAssistance.type, '')) = :typeAssistance)
                           and (:produitAssistanceId is null
                                or linkedAssistance.produitAssistance.id = :produitAssistanceId)
                           and (:numeroPolice is null
@@ -246,6 +256,12 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
                     where assistance.contrat = c
                       and assistance.actif = true
                       and assistance.compagnieAssistance.id = :compagnieAssistanceId
+              ))
+              and (:typeAssistance is null or exists (
+                    select assistance.id from AssistanceContrat assistance
+                    where assistance.contrat = c
+                      and assistance.actif = true
+                      and lower(coalesce(assistance.produitAssistance.type, '')) = :typeAssistance
               ))
               and (:produitAssistanceId is null or exists (
                     select assistance.id from AssistanceContrat assistance
@@ -325,6 +341,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             @Param("search") String search,
             @Param("compagnieId") Long compagnieId,
             @Param("compagnieAssistanceId") Long compagnieAssistanceId,
+            @Param("typeAssistance") String typeAssistance,
             @Param("produitAssistanceId") Long produitAssistanceId,
             @Param("numeroPolice") String numeroPolice,
             @Param("clientId") Long clientId,

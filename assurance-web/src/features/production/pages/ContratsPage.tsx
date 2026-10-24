@@ -81,15 +81,34 @@ export default function ContratsPage() {
   const selectedAppliedBranch = (branches.data ?? []).find((branch) => branch.id === appliedFilters.brancheId);
   const assistanceBranch = normalize(selectedBranch?.code) === "ASSISTANCE";
   const appliedAssistanceBranch = normalize(selectedAppliedBranch?.code) === "ASSISTANCE";
-  const assistanceProducts = useQuery({
+  const assistanceTypeProducts = useQuery({
     queryKey: referenceKeys.list("produits-assistance", {
-      compagnieAssistanceId: assistanceBranch && filters.compagnieId !== "ALL" ? filters.compagnieId : undefined,
+      type: assistanceBranch && filters.typeAssistance !== "ALL" ? filters.typeAssistance : undefined,
     }),
     queryFn: () => referenceApi.list("produits-assistance", {
-      compagnieAssistanceId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+      type: filters.typeAssistance === "ALL" ? undefined : filters.typeAssistance,
     }),
     enabled: assistanceBranch,
   });
+  const assistanceProducts = useQuery({
+    queryKey: referenceKeys.list("produits-assistance", {
+      compagnieAssistanceId: assistanceBranch && filters.compagnieId !== "ALL" ? filters.compagnieId : undefined,
+      type: assistanceBranch && filters.typeAssistance !== "ALL" ? filters.typeAssistance : undefined,
+    }),
+    queryFn: () => referenceApi.list("produits-assistance", {
+      compagnieAssistanceId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+      type: filters.typeAssistance === "ALL" ? undefined : filters.typeAssistance,
+    }),
+    enabled: assistanceBranch,
+  });
+  const assistanceCompanyIds = new Set(
+    (assistanceTypeProducts.data ?? [])
+      .map((product) => product.compagnieAssistanceId)
+      .filter((id): id is string => Boolean(id))
+  );
+  const availableAssistanceCompanies = filters.typeAssistance === "ALL"
+    ? assistanceCompanies.data ?? []
+    : (assistanceCompanies.data ?? []).filter((company) => assistanceCompanyIds.has(company.id));
   const listParams = useMemo(() => ({
     brancheId: appliedFilters.brancheId === "ALL" ? undefined : appliedFilters.brancheId,
     typeContrat: appliedAssistanceBranch || appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
@@ -99,6 +118,9 @@ export default function ContratsPage() {
     search: appliedFilters.codeClient.trim() || undefined,
     compagnieId: !appliedAssistanceBranch && appliedFilters.compagnieId !== "ALL" ? appliedFilters.compagnieId : undefined,
     compagnieAssistanceId: appliedAssistanceBranch && appliedFilters.compagnieId !== "ALL" ? appliedFilters.compagnieId : undefined,
+    typeAssistance: appliedAssistanceBranch && appliedFilters.typeAssistance !== "ALL"
+      ? appliedFilters.typeAssistance
+      : undefined,
     produitAssistanceId: appliedAssistanceBranch && appliedFilters.produitAssistanceId !== "ALL"
       ? appliedFilters.produitAssistanceId
       : undefined,
@@ -169,6 +191,7 @@ export default function ContratsPage() {
                 ...current,
                 brancheId: value,
                 typeContrat: "ALL",
+                typeAssistance: "ALL",
                 compagnieId: "ALL",
                 produitAssistanceId: "ALL",
               }))}>
@@ -197,6 +220,26 @@ export default function ContratsPage() {
                 </Select>
               </FilterField>
             ) : null}
+            {assistanceBranch ? (
+              <FilterField label="Type d’assistance">
+                <Select
+                  value={filters.typeAssistance}
+                  onValueChange={(value) => setFilters((current) => ({
+                    ...current,
+                    typeAssistance: value as ContractFilters["typeAssistance"],
+                    compagnieId: "ALL",
+                    produitAssistanceId: "ALL",
+                  }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Tous les types</SelectItem>
+                    <SelectItem value="Assistance Voyage">Assistance voyage</SelectItem>
+                    <SelectItem value="Assistance Automobile">Assistance automobile</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            ) : null}
             <FilterField label="Type de date">
               <Select value={filters.typeDate} onValueChange={(value) => setFilters((current) => ({ ...current, typeDate: value as ContractFilters["typeDate"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -218,7 +261,8 @@ export default function ContratsPage() {
             <FilterField label={filters.brancheId === "ALL" ? "Compagnie" : assistanceBranch ? "Compagnie d’assistance" : "Compagnie d’assurance"}>
               <Select
                 value={filters.compagnieId}
-                disabled={filters.brancheId === "ALL"}
+                disabled={filters.brancheId === "ALL"
+                  || (assistanceBranch && filters.typeAssistance !== "ALL" && assistanceTypeProducts.isLoading)}
                 onValueChange={(value) => setFilters((current) => ({
                 ...current,
                 compagnieId: value,
@@ -230,7 +274,7 @@ export default function ContratsPage() {
                   <SelectItem value="ALL">{filters.brancheId === "ALL" ? "Sélectionnez une branche" : "Toutes"}</SelectItem>
                   {(filters.brancheId === "ALL"
                     ? []
-                    : assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? []).map((company) => (
+                    : assistanceBranch ? availableAssistanceCompanies : insuranceCompanies.data ?? []).map((company) => (
                     <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
                   ))}
                 </SelectContent>

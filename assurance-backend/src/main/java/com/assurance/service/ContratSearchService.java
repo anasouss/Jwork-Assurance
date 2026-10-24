@@ -71,6 +71,7 @@ public class ContratSearchService {
             String search,
             Long compagnieId,
             Long compagnieAssistanceId,
+            String typeAssistance,
             Long produitAssistanceId,
             String numeroPolice,
             Long clientId,
@@ -82,6 +83,7 @@ public class ContratSearchService {
         boolean assistanceView = assistanceBranch != null;
         AssistanceDisplayFilter assistanceFilter = new AssistanceDisplayFilter(
                 compagnieAssistanceId,
+                normalize(typeAssistance),
                 produitAssistanceId,
                 normalize(numeroPolice),
                 normalizeDateType(typeDate),
@@ -101,6 +103,7 @@ public class ContratSearchService {
                 normalize(search),
                 compagnieId,
                 compagnieAssistanceId,
+                normalize(typeAssistance),
                 produitAssistanceId,
                 normalize(numeroPolice),
                 clientId,
@@ -491,6 +494,7 @@ public class ContratSearchService {
 
     private record AssistanceDisplayFilter(
             Long compagnieId,
+            String type,
             Long produitId,
             String numero,
             String typeDate,
@@ -499,12 +503,17 @@ public class ContratSearchService {
             boolean coverageFilters
     ) {
         private static AssistanceDisplayFilter none() {
-            return new AssistanceDisplayFilter(null, null, null, "EFFET", null, null, false);
+            return new AssistanceDisplayFilter(null, null, null, null, "EFFET", null, null, false);
         }
 
         private boolean matches(AssistanceContrat assistance) {
             if (compagnieId != null && (assistance.getCompagnieAssistance() == null
                     || !compagnieId.equals(assistance.getCompagnieAssistance().getId()))) {
+                return false;
+            }
+            if (type != null && (assistance.getProduitAssistance() == null
+                    || assistance.getProduitAssistance().getType() == null
+                    || !type.equals(assistance.getProduitAssistance().getType().trim().toLowerCase(Locale.ROOT)))) {
                 return false;
             }
             if (produitId != null && (assistance.getProduitAssistance() == null

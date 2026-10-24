@@ -479,9 +479,9 @@ public class VehiculeImportService {
         input.setPuissanceFiscale(optionalText(row, columns, "puissancefiscale", formatter));
         input.setCylindree(optionalText(row, columns, "cylindree", formatter));
         input.setPtc(optionalText(row, columns, "ptc", formatter));
-        input.setValeurNeuf(decimal(row, columns, "valeuraneuf", formatter, "Valeur à neuf", errors));
-        input.setValeurVenale(decimal(row, columns, "valeurvenale", formatter, "Valeur vénale", errors));
-        input.setValeurGlace(decimal(row, columns, "valeurglace", formatter, "Valeur glace", errors));
+        input.setValeurNeuf(decimal(row, columns, "valeuraneuf", "Valeur à neuf", errors));
+        input.setValeurVenale(decimal(row, columns, "valeurvenale", "Valeur vénale", errors));
+        input.setValeurGlace(decimal(row, columns, "valeurglace", "Valeur glace", errors));
         input.setDatePremiereCirculation(date(row, columns, "datemiseencirculation", formatter,
                 "Date mise en circulation", errors));
         input.setDateExpirationCarteGrise(date(row, columns, "datevaliditecg", formatter,
@@ -722,16 +722,89 @@ public class VehiculeImportService {
         return null;
     }
 
-    private BigDecimal decimal(Row row, Map<String, Integer> columns, String key, DataFormatter formatter,
+    private BigDecimal decimal(Row row, Map<String, Integer> columns, String key,
                                String label, List<String> errors) {
-        String value = optionalText(row, columns, key, formatter);
-        if (value == null) return null;
+        Integer index = columns.get(key);
+        if (index == null) return null;
+        Cell cell = row.getCell(index, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return null;
         try {
-            return new BigDecimal(value.replace(" ", "").replace("\u00a0", "").replace(',', '.'));
+            return parseDecimalCell(cell);
         } catch (NumberFormatException exception) {
             errors.add(label + " invalide");
             return null;
         }
+    }
+
+    static BigDecimal parseDecimalCell(Cell cell) {
+        CellType type = cell.getCellType() == CellType.FORMULA
+                ? cell.getCachedFormulaResultType()
+                : cell.getCellType();
+        if (type == CellType.BLANK) return null;
+        if (type == CellType.NUMERIC) {
+            if (DateUtil.isCellDateFormatted(cell)) {
+                throw new NumberFormatException("Date cell is not a monetary amount");
+            }
+            double value = cell.getNumericCellValue();
+            if (!Double.isFinite(value)) {
+                throw new NumberFormatException("Non-finite monetary amount");
+            }
+            return BigDecimal.valueOf(value);
+        }
+        if (type != CellType.STRING) {
+            throw new NumberFormatException("Unsupported monetary cell type");
+        }
+        return parseDecimalText(cell.getStringCellValue());
+    }
+
+    static BigDecimal parseDecimalText(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) return null;
+        String value = rawValue.trim()
+                .replaceAll("[\\s\\p{Zs}]", "")
+                .replace("'", "");
+        if (value.isBlank()) return null;
+
+        int comma = value.lastIndexOf(',');
+        int dot = value.lastIndexOf('.');
+        if (comma >= 0 && dot >= 0) {
+            char decimalSeparator = comma > dot ? ',' : '.';
+            char groupingSeparator = decimalSeparator == ',' ? '.' : ',';
+            value = value.replace(String.valueOf(groupingSeparator), "")
+                    .replace(decimalSeparator, '.');
+        } else if (comma >= 0) {
+            value = normalizeSingleSeparator(value, ',');
+        } else if (dot >= 0) {
+            value = normalizeSingleSeparator(value, '.');
+        }
+        return new BigDecimal(value);
+    }
+
+    private static String normalizeSingleSeparator(String value, char separator) {
+        int first = value.indexOf(separator);
+        int last = value.lastIndexOf(separator);
+        int fractionDigits = value.length() - last - 1;
+        int integerDigits = first;
+        if (value.startsWith("+") || value.startsWith("-")) {
+            integerDigits--;
+        }
+        if (first == last && fractionDigits == 3 && integerDigits > 0 && integerDigits <= 3) {
+            return value.replace(String.valueOf(separator), "");
+        }
+        if (first != last && hasOnlyThreeDigitGroups(value, separator)) {
+            return value.replace(String.valueOf(separator), "");
+        }
+        String integerPart = value.substring(0, last).replace(String.valueOf(separator), "");
+        return integerPart + "." + value.substring(last + 1);
+    }
+
+    private static boolean hasOnlyThreeDigitGroups(String value, char separator) {
+        String unsigned = value.startsWith("+") || value.startsWith("-") ? value.substring(1) : value;
+        String[] groups = unsigned.split(java.util.regex.Pattern.quote(String.valueOf(separator)), -1);
+        if (groups.length < 2 || groups[0].isEmpty() || groups[0].length() > 3) return false;
+        for (int index = 1; index < groups.length; index++) {
+            if (groups[index].length() != 3) return false;
+        }
+        return true;
     }
 
     private boolean isBlank(Row row, DataFormatter formatter) {

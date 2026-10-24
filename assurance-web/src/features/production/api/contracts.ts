@@ -23,6 +23,7 @@ export type ContractListParams = {
   search?: string;
   compagnieId?: string;
   compagnieAssistanceId?: string;
+  typeAssistance?: string;
   produitAssistanceId?: string;
   numeroPolice?: string;
   clientId?: string;

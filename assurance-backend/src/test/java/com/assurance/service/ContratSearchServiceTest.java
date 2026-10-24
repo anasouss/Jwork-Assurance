@@ -73,7 +73,8 @@ class ContratSearchServiceTest {
         when(contratRepository.searchCurrentContractIds(
                 eq(7L), eq(5L), eq(false), eq(TypeContrat.CONVENTION), eq("EFFET"),
                 eq(LocalDate.of(2026, 1, 1)), eq(LocalDate.of(2026, 12, 31)),
-                eq("client"), eq(4L), eq(6L), eq(8L), eq("p-1"), eq(9L), eq(2L), any(Pageable.class)
+                eq("client"), eq(4L), eq(6L), eq("assistance voyage"), eq(8L), eq("p-1"), eq(9L), eq(2L),
+                any(Pageable.class)
         )).thenReturn(new PageImpl<>(List.of(2L)));
         when(contratRepository.findByAgenceIdAndIdIn(7L, List.of(2L))).thenReturn(List.of(renewal));
         when(contratRepository.findByAgenceIdAndIdIn(7L, List.of(1L))).thenReturn(List.of(original));
@@ -89,6 +90,7 @@ class ContratSearchServiceTest {
                 " Client ",
                 4L,
                 6L,
+                " Assistance Voyage ",
                 8L,
                 " P-1 ",
                 9L,

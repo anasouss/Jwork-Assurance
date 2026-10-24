@@ -9,11 +9,11 @@ import {
   Eye,
   FileCheck2,
   FileClock,
-  FileDown,
   FilePlus2,
   FileText,
   MoreHorizontal,
   Pencil,
+  Printer,
   ReceiptText,
   RotateCcw,
   Search,
@@ -948,7 +948,7 @@ function DocumentActionsMenu(props: {
             Voir le détail
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
-            <FileDown className="size-4 text-sky-700 dark:text-sky-400" />
+            <Printer className="size-4 text-sky-700 dark:text-sky-400" />
             {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (
@@ -1014,7 +1014,7 @@ function SourceActionsMenu(props: {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to={contractPdfUrl} target="_blank" rel="noopener noreferrer">
-            <FileDown className="size-4" />
+            <Printer className="size-4" />
             Imprimer la police
           </Link>
         </DropdownMenuItem>
@@ -1982,7 +1982,7 @@ function PdfButton(props: { document: ClientDocument; withLabel?: boolean }) {
         disabled={pdf.loading}
         title="Imprimer le PDF"
       >
-        <FileDown className="size-4" />
+        <Printer className="size-4" />
         {props.withLabel ? (pdf.loading ? "Ouverture..." : "Imprimer le PDF") : null}
       </Button>
       <DocumentPdfOptionsDialog
@@ -2081,7 +2081,7 @@ function SourceDocumentActionsMenu(props: {
             Voir le document
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
-            <FileDown className="size-4 text-sky-700 dark:text-sky-400" />
+            <Printer className="size-4 text-sky-700 dark:text-sky-400" />
             {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (

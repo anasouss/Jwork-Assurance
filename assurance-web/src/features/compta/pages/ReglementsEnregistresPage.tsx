@@ -8,11 +8,11 @@ import {
 import {
   ChevronDown,
   ChevronRight,
-  Eye,
   FileText,
   Landmark,
   MoreHorizontal,
   Pencil,
+  Printer,
   RotateCcw,
   Search,
   XCircle,
@@ -88,8 +88,6 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
   EFFET: "Effet",
   VIREMENT: "Virement",
   VERSEMENT_BANCAIRE: "Versement bancaire",
-  CARTE: "Carte",
-  PRELEVEMENT: "Prélèvement",
 };
 
 const INSTRUMENT_STATUS_LABELS: Record<PaymentInstrument["statut"], string> = {
@@ -660,7 +658,7 @@ export default function ReglementsEnregistresPage() {
               disabled={journalLoading || !journalDateFrom || !journalDateTo}
               onClick={() => void previewJournal()}
             >
-              <FileText className="size-4" />
+              <Printer className="size-4" />
               {journalLoading ? "Génération..." : "Imprimer le journal PDF"}
             </Button>
           </div>
@@ -962,7 +960,7 @@ function PaymentActionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuItem disabled={pdfLoading} onSelect={onPreview}>
-          <Eye className="size-4" />
+          <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Imprimer le PDF"}
         </DropdownMenuItem>
         {canModifyPayment && (

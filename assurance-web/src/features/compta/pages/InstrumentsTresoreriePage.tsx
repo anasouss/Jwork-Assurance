@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, FileDown, MoreHorizontal, RotateCcw, Search, Send, Trash2 } from "lucide-react";
+import { Download, Eye, MoreHorizontal, Printer, RotateCcw, Search, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import {
@@ -237,7 +237,7 @@ export default function InstrumentsTresoreriePage() {
                       </DropdownMenuItem>
                     ) : null}
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void previewPdf(slip)}>
-                      <FileDown className="size-4" />
+                      <Printer className="size-4" />
                       {pdfAction?.id === slip.id && pdfAction.type === "preview" ? "Ouverture..." : "Imprimer le PDF"}
                     </DropdownMenuItem>
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void downloadPdf(slip)}>

@@ -219,8 +219,6 @@ function paymentModeLabel(mode: TreasuryMovement["modePaiement"]) {
     EFFET: "Effet",
     VIREMENT: "Virement",
     VERSEMENT_BANCAIRE: "Versement bancaire",
-    CARTE: "Carte",
-    PRELEVEMENT: "Prélèvement",
     COMPENSATION: "Compensation",
   } satisfies Record<NonNullable<TreasuryMovement["modePaiement"]>, string>;
   return labels[mode];

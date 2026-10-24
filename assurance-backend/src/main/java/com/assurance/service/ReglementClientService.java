@@ -113,9 +113,7 @@ public class ReglementClientService {
     );
     private static final Set<ModeReglementClient> BANK_ACCOUNT_REQUIRED_MODES = Set.of(
             ModeReglementClient.VIREMENT,
-            ModeReglementClient.VERSEMENT_BANCAIRE,
-            ModeReglementClient.CARTE,
-            ModeReglementClient.PRELEVEMENT
+            ModeReglementClient.VERSEMENT_BANCAIRE
     );
     private static final Set<ModeReglementClient> ORIGINATING_BANK_MODES = Set.of(
             ModeReglementClient.CHEQUE,

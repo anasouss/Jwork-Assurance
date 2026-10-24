@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FileDown, Landmark, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Landmark, Printer, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -150,7 +150,7 @@ export default function BordereauRemiseDetailPage() {
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outline" disabled={pdfLoading} onClick={previewPdf}>
-            <FileDown className="size-4" />
+            <Printer className="size-4" />
             {pdfLoading ? "Génération..." : "Imprimer le PDF"}
           </Button>
           {data.statut === "BROUILLON" && <>

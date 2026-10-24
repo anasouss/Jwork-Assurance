@@ -302,8 +302,6 @@ function modeLabel(mode: ClientPayment["instruments"][number]["mode"]) {
     EFFET: "Effet",
     VIREMENT: "Virement",
     VERSEMENT_BANCAIRE: "Versement",
-    CARTE: "Carte",
-    PRELEVEMENT: "Prélèvement",
   }[mode];
 }
 

@@ -22,8 +22,6 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
   EFFET: "Effet",
   VIREMENT: "Virement",
   VERSEMENT_BANCAIRE: "Versement bancaire",
-  CARTE: "Carte",
-  PRELEVEMENT: "Prélèvement",
 };
 
 const INSTRUMENT_STATUS_LABELS: Record<PaymentInstrumentStatus, string> = {

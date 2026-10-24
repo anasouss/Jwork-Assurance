@@ -5,7 +5,5 @@ public enum ModeReglementClient {
     CHEQUE,
     EFFET,
     VIREMENT,
-    VERSEMENT_BANCAIRE,
-    CARTE,
-    PRELEVEMENT
+    VERSEMENT_BANCAIRE
 }

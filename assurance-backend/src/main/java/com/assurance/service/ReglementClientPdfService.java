@@ -483,8 +483,6 @@ public class ReglementClientPdfService {
             case EFFET -> "Effet";
             case VIREMENT -> "Virement";
             case VERSEMENT_BANCAIRE -> "Versement bancaire";
-            case CARTE -> "Carte";
-            case PRELEVEMENT -> "Prélèvement";
         };
     }
 

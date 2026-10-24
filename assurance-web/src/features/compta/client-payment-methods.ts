@@ -3,8 +3,6 @@ import type { ClientPaymentMode } from "./types";
 const BANK_ACCOUNT_AT_ENTRY_MODES = new Set<ClientPaymentMode>([
   "VIREMENT",
   "VERSEMENT_BANCAIRE",
-  "CARTE",
-  "PRELEVEMENT",
 ]);
 
 const ORIGINATING_BANK_MODES = new Set<ClientPaymentMode>([

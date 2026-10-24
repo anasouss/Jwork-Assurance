@@ -19,8 +19,6 @@ export function paymentModeLabel(value: PaymentInstrument["mode"]) {
     EFFET: "Effet",
     VIREMENT: "Virement",
     VERSEMENT_BANCAIRE: "Versement bancaire",
-    CARTE: "Carte",
-    PRELEVEMENT: "Prélèvement",
   } as const;
 
   return labels[value];

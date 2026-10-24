@@ -425,9 +425,7 @@ export type ClientPaymentMode =
   | "CHEQUE"
   | "EFFET"
   | "VIREMENT"
-  | "VERSEMENT_BANCAIRE"
-  | "CARTE"
-  | "PRELEVEMENT";
+  | "VERSEMENT_BANCAIRE";
 
 export type ClientPaymentStatus = "A_VALIDER" | "VALIDE" | "ANNULE";
 export type PaymentInstrumentStatus =

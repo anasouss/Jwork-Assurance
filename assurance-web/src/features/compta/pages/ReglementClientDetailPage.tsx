@@ -38,6 +38,26 @@ const ALLOCATION_STATUS_LABELS: Record<PaymentAllocationStatus, string> = {
   ANNULEE: "Annulée",
 };
 
+const INSTRUMENT_STATUS_BADGE_VARIANTS: Record<
+  PaymentInstrumentStatus,
+  "warning" | "info" | "success" | "red" | "gray"
+> = {
+  EN_ATTENTE: "warning",
+  REMIS_EN_BANQUE: "info",
+  CONFIRME: "success",
+  REJETE: "red",
+  REMPLACE: "gray",
+};
+
+const ALLOCATION_STATUS_BADGE_VARIANTS: Record<
+  PaymentAllocationStatus,
+  "warning" | "success" | "red"
+> = {
+  EN_ATTENTE: "warning",
+  CONFIRMEE: "success",
+  ANNULEE: "red",
+};
+
 export default function ReglementClientDetailPage() {
   const { reglementId = "" } = useParams();
   const user = useAuthStore((state) => state.user);
@@ -110,8 +130,8 @@ export default function ReglementClientDetailPage() {
             </Button>
           )}
           <Badge variant={data.statut === "VALIDE"
-            ? "default"
-            : data.statut === "ANNULE" ? "destructive" : "secondary"}
+            ? "success"
+            : data.statut === "ANNULE" ? "red" : "warning"}
           >
             {data.statut === "VALIDE" ? "Validé" : data.statut === "ANNULE" ? "Annulé" : "À valider"}
           </Badge>
@@ -186,7 +206,12 @@ export default function ReglementClientDetailPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(instrument.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant={instrument.statut === "REJETE" ? "destructive" : "outline"}>
+                    <Badge variant={data.statut === "A_VALIDER"
+                      ? "warning"
+                      : data.statut === "ANNULE"
+                        ? "red"
+                        : INSTRUMENT_STATUS_BADGE_VARIANTS[instrument.statut]}
+                    >
                       {data.statut === "A_VALIDER"
                         ? "À valider"
                         : data.statut === "ANNULE"
@@ -252,7 +277,12 @@ export default function ReglementClientDetailPage() {
                   <td className="px-4 py-3 text-center">{allocation.instrumentCount}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(allocation.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant="outline">
+                    <Badge variant={data.statut === "A_VALIDER"
+                      ? "warning"
+                      : data.statut === "ANNULE"
+                        ? "red"
+                        : ALLOCATION_STATUS_BADGE_VARIANTS[allocation.statut]}
+                    >
                       {data.statut === "A_VALIDER"
                         ? "Réservée"
                         : data.statut === "ANNULE"

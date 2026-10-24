@@ -90,12 +90,31 @@ const MODE_LABELS: Record<ClientPaymentMode, string> = {
   VERSEMENT_BANCAIRE: "Versement bancaire",
 };
 
+const MODE_BADGE_VARIANTS: Record<ClientPaymentMode, "success" | "info" | "purple" | "accent" | "gray"> = {
+  ESPECES: "success",
+  CHEQUE: "info",
+  EFFET: "purple",
+  VIREMENT: "accent",
+  VERSEMENT_BANCAIRE: "gray",
+};
+
 const INSTRUMENT_STATUS_LABELS: Record<PaymentInstrument["statut"], string> = {
   EN_ATTENTE: "En instance",
   REMIS_EN_BANQUE: "Remis en banque",
   CONFIRME: "Encaissé",
   REJETE: "Retourné / impayé",
   REMPLACE: "Remplacé",
+};
+
+const INSTRUMENT_STATUS_BADGE_VARIANTS: Record<
+  PaymentInstrument["statut"],
+  "warning" | "info" | "success" | "red" | "gray"
+> = {
+  EN_ATTENTE: "warning",
+  REMIS_EN_BANQUE: "info",
+  CONFIRME: "success",
+  REJETE: "red",
+  REMPLACE: "gray",
 };
 
 export default function ReglementsEnregistresPage() {
@@ -1012,18 +1031,17 @@ function PaymentActionsMenu({
 }
 
 function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
-  if (value === "A_VALIDER") return <Badge variant="secondary">À valider</Badge>;
-  if (value === "VALIDE") return <Badge variant="default">Validé</Badge>;
-  return <Badge variant="destructive">Annulé</Badge>;
+  if (value === "A_VALIDER") return <Badge variant="warning">À valider</Badge>;
+  if (value === "VALIDE") return <Badge variant="success">Validé</Badge>;
+  return <Badge variant="red">Annulé</Badge>;
 }
 
 function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {
-  const variant = value === "REJETE"
-    ? "destructive"
-    : value === "CONFIRME"
-      ? "default"
-      : "secondary";
-  return <Badge variant={variant}>{INSTRUMENT_STATUS_LABELS[value]}</Badge>;
+  return (
+    <Badge variant={INSTRUMENT_STATUS_BADGE_VARIANTS[value]}>
+      {INSTRUMENT_STATUS_LABELS[value]}
+    </Badge>
+  );
 }
 
 function InstrumentModesSummary({ instruments }: { instruments: PaymentInstrument[] }) {
@@ -1031,7 +1049,7 @@ function InstrumentModesSummary({ instruments }: { instruments: PaymentInstrumen
   return (
     <div className="flex flex-wrap gap-1">
       {Array.from(counts.entries()).map(([mode, count]) => (
-        <Badge key={mode} variant="outline">
+        <Badge key={mode} variant={MODE_BADGE_VARIANTS[mode as ClientPaymentMode]}>
           {count > 1 ? `${count} ` : ""}{MODE_LABELS[mode as ClientPaymentMode]}
         </Badge>
       ))}
@@ -1050,7 +1068,7 @@ function InstrumentStatusesSummary({ instruments }: { instruments: PaymentInstru
       </span>
     );
   }
-  return <Badge variant="secondary">États mixtes</Badge>;
+  return <Badge variant="purple">États mixtes</Badge>;
 }
 
 function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {

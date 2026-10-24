@@ -30,6 +30,17 @@ import type { ClientPayment } from "../types";
 const TODAY = toDateOnly(new Date())!;
 const PAGE_SIZE = 25;
 
+const MODE_BADGE_VARIANTS: Record<
+  ClientPayment["instruments"][number]["mode"],
+  "success" | "info" | "purple" | "accent" | "gray"
+> = {
+  ESPECES: "success",
+  CHEQUE: "info",
+  EFFET: "purple",
+  VIREMENT: "accent",
+  VERSEMENT_BANCAIRE: "gray",
+};
+
 export default function ValidationReglementsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
@@ -161,7 +172,7 @@ export default function ValidationReglementsPage() {
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap gap-1">
                         {payment.instruments.map((instrument) => (
-                          <Badge key={instrument.id} variant="outline">
+                          <Badge key={instrument.id} variant={MODE_BADGE_VARIANTS[instrument.mode]}>
                             {modeLabel(instrument.mode)} · {formatAccountingAmount(instrument.montant)}
                           </Badge>
                         ))}

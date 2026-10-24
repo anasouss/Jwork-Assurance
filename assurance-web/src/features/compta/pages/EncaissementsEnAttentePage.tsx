@@ -68,6 +68,7 @@ export default function EncaissementsEnAttentePage() {
 
   useEffect(() => {
     setSelectedInstruments([]);
+    setSelectedCashDays([]);
   }, [mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection]);
 
   function updateUrl(patch: Partial<CollectionQueueUrlState>) {
@@ -283,12 +284,11 @@ export default function EncaissementsEnAttentePage() {
   }
 
   function changeMode(nextMode: ModeFilter) {
-    const supportsDueDate = nextMode === "CHEQUE" || nextMode === "EFFET" || nextMode === "ESPECES";
     updateUrl({
       mode: nextMode,
       search: appliedSearch,
-      dateFrom: supportsDueDate ? dateFrom : "",
-      dateTo: supportsDueDate ? dateTo : "",
+      dateFrom,
+      dateTo,
       page: 0,
     });
   }
@@ -311,7 +311,15 @@ export default function EncaissementsEnAttentePage() {
   });
   const showCashWorkflow = mode === "ALL" || mode === "ESPECES";
   const showInstrumentWorkflow = mode !== "ESPECES";
-  const showDueDateFilters = mode === "CHEQUE" || mode === "EFFET" || mode === "ESPECES";
+  const dateFilterLabel = mode === "ESPECES"
+    ? "Journée"
+    : mode === "CHEQUE"
+      ? "Date portée"
+      : mode === "EFFET"
+        ? "Échéance"
+        : mode === "ALL"
+          ? "Date de référence"
+          : "Date de réception";
   const rows = instruments.data?.rows ?? [];
   const selectedMode = selectedInstruments[0]?.mode;
   const pageSelectable = rows.filter((instrument) => isSelectableForSlip(instrument)
@@ -322,6 +330,10 @@ export default function EncaissementsEnAttentePage() {
     selectedInstruments.some((row) => row.id === instrument.id)).length;
   const allPageSelected = canSelectPage
     && selectedOnPage === pageSelectable.length;
+  const selectedCashDaysOnPage = cashDays.filter((day) =>
+    selectedCashDays.some((row) => row.cle === day.cle)).length;
+  const allCashDaysSelected = cashDays.length > 0
+    && selectedCashDaysOnPage === cashDays.length;
   const selectedTotal = selectedInstruments.reduce((sum, instrument) => sum + instrument.montant, 0);
   const selectedCashTotal = selectedCashDays.reduce((sum, day) => sum + day.montantAVerser, 0);
 
@@ -329,6 +341,10 @@ export default function EncaissementsEnAttentePage() {
     setSelectedCashDays((current) => checked
       ? current.some((row) => row.cle === day.cle) ? current : [...current, day]
       : current.filter((row) => row.cle !== day.cle));
+  }
+
+  function toggleCashDays(checked: boolean) {
+    setSelectedCashDays(checked ? cashDays : []);
   }
 
   function toggleInstrument(instrument: PaymentInstrument, checked: boolean) {
@@ -377,9 +393,7 @@ export default function EncaissementsEnAttentePage() {
         </div>
       </header>
 
-      <section className={`grid gap-3 rounded-md border bg-card p-4 ${showDueDateFilters
-        ? "xl:grid-cols-[210px_1fr_170px_170px_auto]"
-        : "xl:grid-cols-[210px_1fr_auto]"}`}>
+      <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[210px_1fr_170px_170px_auto]">
         <div className="grid gap-2">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => changeMode(value as ModeFilter)}>
@@ -398,26 +412,22 @@ export default function EncaissementsEnAttentePage() {
           <Label htmlFor="collection-search">Payeur, règlement, caisse, banque ou référence</Label>
           <Input id="collection-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} />
         </div>
-        {showDueDateFilters && (
-          <>
-            <div className="grid gap-2">
-              <Label>{mode === "ESPECES" ? "Journée du" : mode === "CHEQUE" ? "Date portée du" : "Échéance du"}</Label>
-              <DatePicker
-                date={dateFrom}
-                maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
-                onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>{mode === "ESPECES" ? "Journée au" : mode === "CHEQUE" ? "Date portée au" : "Échéance au"}</Label>
-              <DatePicker
-                date={dateTo}
-                minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
-                onSelect={(value) => updateUrl({ dateTo: toDateOnly(value) ?? "", page: 0 })}
-              />
-            </div>
-          </>
-        )}
+        <div className="grid gap-2">
+          <Label>{dateFilterLabel} du</Label>
+          <DatePicker
+            date={dateFrom}
+            maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined}
+            onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label>{dateFilterLabel} au</Label>
+          <DatePicker
+            date={dateTo}
+            minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined}
+            onSelect={(value) => updateUrl({ dateTo: toDateOnly(value) ?? "", page: 0 })}
+          />
+        </div>
         <div className="flex items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button>
@@ -449,7 +459,14 @@ export default function EncaissementsEnAttentePage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-emerald-700 text-xs uppercase text-white"><tr>
-              <th className="w-12 px-3 py-3 text-center" />
+              <th className="w-12 px-3 py-3 text-center">
+                <Checkbox
+                  checked={allCashDaysSelected ? true : selectedCashDaysOnPage > 0 ? "indeterminate" : false}
+                  disabled={cashDays.length === 0}
+                  onCheckedChange={(checked) => toggleCashDays(checked === true)}
+                  aria-label="Sélectionner toutes les journées de caisse affichées"
+                />
+              </th>
               <th className="px-4 py-3 text-left">Journée</th>
               <th className="px-4 py-3 text-left">Caisse</th>
               <th className="px-4 py-3 text-left">Caissier</th>
@@ -858,12 +875,11 @@ type CollectionQueueUrlState = {
 
 function collectionQueueStateFromParams(params: URLSearchParams): CollectionQueueUrlState {
   const mode = isModeFilter(params.get("mode")) ? params.get("mode") as ModeFilter : "ALL";
-  const supportsDueDate = mode === "CHEQUE" || mode === "EFFET" || mode === "ESPECES";
   return {
     mode,
     search: params.get("search")?.trim() ?? "",
-    dateFrom: supportsDueDate ? validQueueDate(params.get("dateDu")) : "",
-    dateTo: supportsDueDate ? validQueueDate(params.get("dateAu")) : "",
+    dateFrom: validQueueDate(params.get("dateDu")),
+    dateTo: validQueueDate(params.get("dateAu")),
     page: queuePageFromParam(params.get("page")),
     sortBy: isInstrumentSort(params.get("tri")) ? params.get("tri") as InstrumentSortBy : "DUE",
     sortDirection: params.get("ordre") === "DESC" ? "DESC" : "ASC",

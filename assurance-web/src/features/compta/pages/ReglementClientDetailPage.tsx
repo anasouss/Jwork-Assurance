@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import type {
+  ClientPayment,
   ClientPaymentMode,
   PaymentAllocationStatus,
   PaymentInstrumentStatus,
@@ -56,9 +57,10 @@ export default function ReglementClientDetailPage() {
   }
 
   const data = payment.data;
-  const allocations = data.instruments.flatMap((instrument) =>
-    instrument.affectations.map((allocation) => ({ instrument, allocation }))
-  );
+  const allocations = groupAllocations(data);
+  const allocatedInstrumentCount = new Set(
+    allocations.flatMap((allocation) => Array.from(allocation.instrumentIds))
+  ).size;
 
   async function downloadReceipt() {
     try {
@@ -204,31 +206,31 @@ export default function ReglementClientDetailPage() {
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="border-b px-4 py-3">
           <h2 className="font-semibold">Affectations</h2>
-          <p className="text-sm text-muted-foreground">Répartition du règlement sur les créances et documents clients.</p>
+          <p className="text-sm text-muted-foreground">
+            {allocations.length > 0
+              ? `${allocatedInstrumentCount} moyen${allocatedInstrumentCount > 1 ? "s" : ""} de paiement · ${allocations.length} destination${allocations.length > 1 ? "s" : ""} affectée${allocations.length > 1 ? "s" : ""}`
+              : "Répartition du règlement sur les créances et documents clients."}
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
-                <th className="px-4 py-3 text-left">Moyen</th>
                 <th className="px-4 py-3 text-left">Destination</th>
                 <th className="px-4 py-3 text-left">Client / groupe</th>
-                <th className="px-4 py-3 text-right">Montant</th>
+                <th className="px-4 py-3 text-center">Moyens</th>
+                <th className="px-4 py-3 text-right">Montant affecté</th>
                 <th className="px-4 py-3 text-center">Statut</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {allocations.map(({ instrument, allocation }) => (
-                <tr key={allocation.id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3">{MODE_LABELS[instrument.mode]}</td>
+              {allocations.map((allocation) => (
+                <tr key={allocation.key} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-medium">
-                    {allocation.documentClientId
-                      ? `Document client #${allocation.documentClientId}`
-                      : allocation.elementFacturableId
-                        ? `Créance #${allocation.elementFacturableId}`
-                        : "-"}
+                    {allocation.destination}
                   </td>
-                  <td className="px-4 py-3">{allocation.payeurNom || "-"}</td>
+                  <td className="px-4 py-3">{allocation.payer}</td>
+                  <td className="px-4 py-3 text-center">{allocation.instrumentCount}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(allocation.montant)}</td>
                   <td className="px-4 py-3 text-center">
                     <Badge variant="outline">
@@ -252,6 +254,45 @@ export default function ReglementClientDetailPage() {
       </section>
     </div>
   );
+}
+
+function groupAllocations(payment: ClientPayment) {
+  const grouped = new Map<string, {
+    key: string;
+    destination: string;
+    payer: string;
+    instrumentIds: Set<string>;
+    instrumentCount: number;
+    montant: number;
+    statut: PaymentAllocationStatus;
+  }>();
+  payment.instruments.forEach((instrument) => {
+    instrument.affectations.forEach((allocation) => {
+      const target = allocation.documentClientId
+        ? `D:${allocation.documentClientId}:E:${allocation.elementFacturableId ?? ""}`
+        : `E:${allocation.elementFacturableId ?? ""}`;
+      const key = `${target}:${allocation.statut}:${allocation.payeurType ?? ""}:${allocation.payeurId ?? ""}`;
+      const current = grouped.get(key) ?? {
+        key,
+        destination: allocation.destination
+          || (allocation.documentClientId
+            ? `Document client #${allocation.documentClientId}`
+            : allocation.elementFacturableId
+              ? `Créance #${allocation.elementFacturableId}`
+              : "-"),
+        payer: allocation.payeurNom || "-",
+        instrumentIds: new Set<string>(),
+        instrumentCount: 0,
+        montant: 0,
+        statut: allocation.statut,
+      };
+      current.instrumentIds.add(instrument.id);
+      current.instrumentCount = current.instrumentIds.size;
+      current.montant += allocation.montant;
+      grouped.set(key, current);
+    });
+  });
+  return Array.from(grouped.values());
 }
 
 function Summary({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {

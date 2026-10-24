@@ -2578,11 +2578,44 @@ public class ReglementClientService {
                                                 ? null : allocation.getClientPayeur().getId()
                                         : allocation.getGroupePayeur().getId())
                                 .payeurNom(allocation.getPayeurNomSnapshot())
+                                .destination(allocationDestination(allocation))
                                 .montant(allocation.getMontant())
                                 .statut(allocation.getStatut())
                                 .build())
                         .toList())
                 .build();
+    }
+
+    private String allocationDestination(AffectationReglementClient allocation) {
+        DocumentClient document = allocation.getDocumentClient();
+        ElementFacturable element = allocation.getElementFacturable();
+        if (document != null) {
+            String documentLabel = switch (document.getTypeDocument()) {
+                case FACTURE -> "Facture ";
+                case RELEVE -> "Relevé ";
+            };
+            return joinLabels(documentLabel + document.getNumero(), elementReference(element));
+        }
+        return elementReference(element);
+    }
+
+    private String elementReference(ElementFacturable element) {
+        if (element == null) {
+            return "-";
+        }
+        Contrat contract = element.getContrat();
+        String contractReference = contract == null ? null
+                : joinLabels(contract.getNumeroPolice(), contract.getNumeroDossier());
+        return joinLabels(element.getLibelle(), contractReference);
+    }
+
+    private String joinLabels(String first, String second) {
+        boolean firstPresent = first != null && !first.isBlank();
+        boolean secondPresent = second != null && !second.isBlank();
+        if (!firstPresent) {
+            return secondPresent ? second.trim() : "-";
+        }
+        return secondPresent ? first.trim() + " · " + second.trim() : first.trim();
     }
 
     private BigDecimal sumInstruments(List<CreerReglementClientRequest.Instrument> instruments) {

@@ -52,7 +52,11 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -212,34 +216,91 @@ public class ReglementClientPdfService {
 
     private void writeAllocations(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
         document.add(sectionTitle("Affectations", bold).setMarginTop(14));
-        Table table = new Table(new float[]{1.1f, 3f, 1f, 0.95f})
+        Map<String, AllocationSummary> allocations = groupedAllocations(payment);
+        if (!allocations.isEmpty()) {
+            int instrumentCount = allocations.values().stream()
+                    .flatMap(summary -> summary.instrumentIds.stream())
+                    .collect(java.util.stream.Collectors.toSet())
+                    .size();
+            document.add(new Paragraph(instrumentCount + " moyen" + (instrumentCount > 1 ? "s" : "")
+                            + " de paiement · " + allocations.size() + " destination"
+                            + (allocations.size() > 1 ? "s" : "") + " affectée"
+                            + (allocations.size() > 1 ? "s" : ""))
+                    .setFont(regular).setFontSize(7.5f).setFontColor(MUTED)
+                    .setMarginTop(-4).setMarginBottom(6));
+        }
+        Table table = new Table(new float[]{3f, 1.35f, 0.7f, 1f, 1f})
                 .setWidth(UnitValue.createPercentValue(100));
-        addHeader(table, "MOYEN", bold, TextAlignment.LEFT);
         addHeader(table, "CRÉANCE / DOCUMENT", bold, TextAlignment.LEFT);
+        addHeader(table, "PAYEUR", bold, TextAlignment.LEFT);
+        addHeader(table, "MOYENS", bold, TextAlignment.CENTER);
         addHeader(table, "STATUT", bold, TextAlignment.LEFT);
-        addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
+        addHeader(table, "MONTANT AFFECTÉ", bold, TextAlignment.RIGHT);
 
         int index = 0;
+        for (AllocationSummary allocation : allocations.values()) {
+            DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
+            addBody(table, allocation.destination, regular, TextAlignment.LEFT, background);
+            addBody(table, allocation.payer, regular, TextAlignment.LEFT, background);
+            addBody(table, String.valueOf(allocation.instrumentIds.size()), regular, TextAlignment.CENTER, background);
+            addBody(table, allocationStatus(allocation.status), regular, TextAlignment.LEFT, background);
+            addBody(table, amount(allocation.amount), bold, TextAlignment.RIGHT, background);
+        }
+        if (index == 0) {
+            table.addCell(new Cell(1, 5)
+                    .add(new Paragraph("Aucune affectation").setFont(regular).setFontSize(8).setMargin(0))
+                    .setTextAlignment(TextAlignment.CENTER).setFontColor(MUTED)
+                    .setBorder(new SolidBorder(BORDER, 0.45f)).setPadding(10));
+        }
+        document.add(table);
+    }
+
+    private Map<String, AllocationSummary> groupedAllocations(ReglementClient payment) {
+        Map<String, AllocationSummary> grouped = new LinkedHashMap<>();
         for (InstrumentReglementClient instrument : payment.getInstruments().stream()
                 .sorted(Comparator.comparing(InstrumentReglementClient::getId))
                 .toList()) {
             for (AffectationReglementClient allocation : instrument.getAffectations().stream()
                     .sorted(Comparator.comparing(AffectationReglementClient::getId))
                     .toList()) {
-                DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
-                addBody(table, instrumentReference(instrument), regular, TextAlignment.LEFT, background);
-                addBody(table, allocationDestination(allocation), regular, TextAlignment.LEFT, background);
-                addBody(table, allocationStatus(allocation.getStatut()), regular, TextAlignment.LEFT, background);
-                addBody(table, amount(allocation.getMontant()), bold, TextAlignment.RIGHT, background);
+                String key = allocationTargetKey(allocation) + ":" + allocation.getStatut()
+                        + ":" + value(allocation.getPayeurNomSnapshot());
+                AllocationSummary summary = grouped.computeIfAbsent(key, ignored -> new AllocationSummary(
+                        allocationDestination(allocation),
+                        value(allocation.getPayeurNomSnapshot()),
+                        allocation.getStatut()
+                ));
+                summary.amount = summary.amount.add(allocation.getMontant());
+                summary.instrumentIds.add(instrument.getId());
             }
         }
-        if (index == 0) {
-            table.addCell(new Cell(1, 4)
-                    .add(new Paragraph("Aucune affectation").setFont(regular).setFontSize(8).setMargin(0))
-                    .setTextAlignment(TextAlignment.CENTER).setFontColor(MUTED)
-                    .setBorder(new SolidBorder(BORDER, 0.45f)).setPadding(10));
+        return grouped;
+    }
+
+    private String allocationTargetKey(AffectationReglementClient allocation) {
+        String document = allocation.getDocumentClient() == null
+                ? "" : "D:" + allocation.getDocumentClient().getId();
+        String element = allocation.getElementFacturable() == null
+                ? "" : "E:" + allocation.getElementFacturable().getId();
+        return document + ":" + element;
+    }
+
+    private static final class AllocationSummary {
+        private final String destination;
+        private final String payer;
+        private final StatutAffectationReglement status;
+        private final Set<Long> instrumentIds = new LinkedHashSet<>();
+        private BigDecimal amount = BigDecimal.ZERO;
+
+        private AllocationSummary(
+                String destination,
+                String payer,
+                StatutAffectationReglement status
+        ) {
+            this.destination = destination;
+            this.payer = payer;
+            this.status = status;
         }
-        document.add(table);
     }
 
     private void writeNotes(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
@@ -332,10 +393,6 @@ public class ReglementClientPdfService {
         String contractReference = contract == null ? null
                 : join(contract.getNumeroPolice(), contract.getNumeroDossier());
         return join(element.getLibelle(), contractReference);
-    }
-
-    private String instrumentReference(InstrumentReglementClient instrument) {
-        return join(modeLabel(instrument.getMode()), instrument.getReferenceInstrument());
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {

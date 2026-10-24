@@ -77,6 +77,7 @@ public class ReglementClientResponse {
         private String payeurType;
         private Long payeurId;
         private String payeurNom;
+        private String destination;
         private BigDecimal montant;
         private StatutAffectationReglement statut;
     }

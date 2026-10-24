@@ -467,6 +467,7 @@ export type PaymentAllocation = {
   payeurType?: "CLIENT" | "GROUPE" | null;
   payeurId?: string | null;
   payeurNom?: string | null;
+  destination?: string | null;
   montant: number;
   statut: PaymentAllocationStatus;
 };

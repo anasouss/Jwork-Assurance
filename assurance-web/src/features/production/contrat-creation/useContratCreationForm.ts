@@ -47,6 +47,7 @@ export function useContratCreationForm(
   const [searchParams] = useSearchParams();
   const initialCategorieClientId = options?.initialCategorieClientId;
   const [numeroPolice, setNumeroPolice] = useState("");
+  const [libelleReleve, setLibelleReleve] = useState("");
   const [numeroAttestation, setNumeroAttestation] = useState("");
   const [numeroAttestationInitiale, setNumeroAttestationInitiale] = useState("");
   const [compagnieAssuranceId, setCompagnieAssuranceId] = useState("");
@@ -303,6 +304,7 @@ export function useContratCreationForm(
     }
     const hydrated = hydrateDraft(draft);
     setNumeroPolice(hydrated.numeroPolice);
+    setLibelleReleve(hydrated.libelleReleve);
     setNumeroAttestation(hydrated.numeroAttestation);
     setNumeroAttestationInitiale(hydrated.numeroAttestation);
     setCompagnieAssuranceId(hydrated.compagnieAssuranceId);
@@ -394,6 +396,7 @@ export function useContratCreationForm(
   const request = useMemo<CreateContratRequest>(() => ({
     typeContrat,
     numeroPolice,
+    libelleReleve: emptyToUndefined(libelleReleve),
     numeroAttestation: typeContrat === "FLOTTE" ? undefined : numeroAttestation,
     compagnieAssuranceId: emptyToUndefined(compagnieAssuranceId),
     conventionId: typeContrat === "CONVENTION" ? emptyToUndefined(conventionId) : undefined,
@@ -484,6 +487,7 @@ export function useContratCreationForm(
   }), [
     typeContrat,
     numeroPolice,
+    libelleReleve,
     numeroAttestation,
     compagnieAssuranceId,
     conventionId,
@@ -1442,6 +1446,8 @@ export function useContratCreationForm(
     conventionUsageIds,
     numeroPolice,
     setNumeroPolice,
+    libelleReleve,
+    setLibelleReleve,
     numeroAttestation,
     setNumeroAttestation,
     numeroAttestationInitiale,
@@ -1719,6 +1725,7 @@ function assistanceRequestInput(
     numeroContratOuQuittance: includeContractReference
       ? emptyToUndefined(assistance.numeroContratOuQuittance ?? "")
       : undefined,
+    libelleReleve: emptyToUndefined(assistance.libelleReleve ?? ""),
     typeQuittance: "AN",
   }];
 }
@@ -1962,12 +1969,14 @@ function hydrateDraft(draft: ContratSummary) {
       echeanceCode: nullToUndefined(assistance.echeanceCode),
       dateEcheance: nullToUndefined(assistance.dateEcheance),
       numeroContratOuQuittance: nullToUndefined(assistance.numeroContratOuQuittance),
+      libelleReleve: nullToUndefined(assistance.libelleReleve),
     };
   }
   const assistanceDraft = targetAssistances["vehicule:0"] ?? { enabled: false };
 
   return {
     numeroPolice: draft.numeroPolice ?? "",
+    libelleReleve: draft.libelleReleve ?? "",
     numeroAttestation: draft.numeroAttestation ?? "",
     compagnieAssuranceId: idString(draft.compagnieAssuranceId),
     conventionId: idString(draft.conventionId),

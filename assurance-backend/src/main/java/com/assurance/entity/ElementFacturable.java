@@ -65,6 +65,9 @@ public class ElementFacturable extends BaseEntity {
     @Column(length = 160)
     private String libelle;
 
+    @Column(name = "libelle_releve", length = 180)
+    private String libelleReleve;
+
     private LocalDate dateDebut;
 
     private LocalDate dateFin;

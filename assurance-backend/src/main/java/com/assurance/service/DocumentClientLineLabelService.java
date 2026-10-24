@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.Contrat;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.MouvementVehicule;
 import com.assurance.entity.Vehicule;
@@ -11,6 +12,7 @@ import com.assurance.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Stream;
 
@@ -23,6 +25,15 @@ public class DocumentClientLineLabelService {
     private final VehiculeRepository vehiculeRepository;
 
     public String label(LigneDocumentClient line, Integer fleetAnnexNumber) {
+        if (line.getLibelleDocument() != null && !line.getLibelleDocument().isBlank()) {
+            return line.getLibelleDocument().trim();
+        }
+        if (line.getId() == null
+                && line.getElementFacturable() != null
+                && line.getElementFacturable().getLibelleReleve() != null
+                && !line.getElementFacturable().getLibelleReleve().isBlank()) {
+            return line.getElementFacturable().getLibelleReleve().trim();
+        }
         if (fleetAnnexNumber != null) {
             return "Police flotte : Voir annexe " + fleetAnnexNumber;
         }
@@ -40,19 +51,37 @@ public class DocumentClientLineLabelService {
     }
 
     private String assistanceLabel(AssistanceContrat assistance) {
+        String productType = assistance.getProduitAssistance() == null
+                ? null
+                : assistance.getProduitAssistance().getType();
+        String productName = value(
+                assistance.getProduit(),
+                assistance.getProduitAssistance() == null
+                        ? null
+                        : assistance.getProduitAssistance().getLibelle()
+        );
         Vehicule vehicle = assistance.getVehicule();
-        if (vehicle == null) {
-            return "Assistance";
+        if (isTravelAssistance(productType)) {
+            return appendDetail("Assurance Voyage", productName, productType);
         }
-        String descriptor = vehicleDescriptor(
+        String descriptor = vehicle == null ? "" : vehicleDescriptor(
                 vehicle.getMarque() == null ? null : vehicle.getMarque().getLibelle(),
                 vehicle.getImmatriculation(),
                 vehicle.getImmatriculationProvisoire()
         );
-        return descriptor.isBlank() ? "Assistance" : "Assistance : " + descriptor;
+        if (isAutomobileAssistance(productType) || vehicle != null) {
+            return descriptor.isBlank()
+                    ? appendDetail("Assistance Auto", productName, productType)
+                    : "Assistance Auto : " + descriptor;
+        }
+        return appendDetail("Assistance", productName, productType);
     }
 
     private String insuranceLabel(LigneDocumentClient line) {
+        if (isMiscellaneousRisk(line)) {
+            return miscellaneousRiskLabel(line);
+        }
+        String movement = value(line.getMouvement(), "Affaire nouvelle");
         Long movementId = movementId(line);
         if (movementId != null) {
             String movementVehicle = mouvementVehiculeRepository.findByMouvementContratId(movementId).stream()
@@ -60,7 +89,7 @@ public class DocumentClientLineLabelService {
                     .map(this::vehicleDescriptor)
                     .orElse("");
             if (!movementVehicle.isBlank()) {
-                return "Police Auto : " + movementVehicle;
+                return automobileLabel(movement, movementVehicle);
             }
         }
         if (line.getElementFacturable() != null && line.getElementFacturable().getContrat() != null) {
@@ -70,10 +99,60 @@ public class DocumentClientLineLabelService {
                     .findFirst()
                     .map(this::vehicleDescriptor)
                     .filter(value -> !value.isBlank())
-                    .map(value -> "Police Auto : " + value)
-                    .orElse("Police Auto");
+                    .map(value -> automobileLabel(movement, value))
+                    .orElseGet(() -> automobileLabel(movement, ""));
         }
-        return "Police Auto";
+        return automobileLabel(movement, "");
+    }
+
+    private String automobileLabel(String movement, String descriptor) {
+        String base = isNewBusiness(movement)
+                ? "Assurance Auto"
+                : movement + " - Assurance Auto";
+        return descriptor.isBlank() ? base : base + " : " + descriptor;
+    }
+
+    private String miscellaneousRiskLabel(LigneDocumentClient line) {
+        String movement = value(line.getMouvement(), "Affaire nouvelle");
+        String precision = line.getElementFacturable() == null
+                ? null
+                : line.getElementFacturable().getLibelle();
+        if (precision == null || precision.isBlank() || precision.equalsIgnoreCase(movement)) {
+            return movement;
+        }
+        return movement + " : " + precision.trim();
+    }
+
+    private boolean isMiscellaneousRisk(LigneDocumentClient line) {
+        Contrat contract = line.getElementFacturable() == null
+                ? null
+                : line.getElementFacturable().getContrat();
+        return contract != null
+                && contract.getBrancheAssurance() != null
+                && "RISQUES_DIVERS".equalsIgnoreCase(contract.getBrancheAssurance().getCode());
+    }
+
+    private boolean isTravelAssistance(String type) {
+        return type != null && type.toLowerCase(Locale.ROOT).contains("voyage");
+    }
+
+    private boolean isAutomobileAssistance(String type) {
+        String normalized = type == null ? "" : type.toLowerCase(Locale.ROOT);
+        return type != null
+                && (normalized.contains("automobile") || normalized.contains("auto"));
+    }
+
+    private boolean isNewBusiness(String movement) {
+        return movement == null || movement.isBlank() || "affaire nouvelle".equalsIgnoreCase(movement.trim());
+    }
+
+    private String appendDetail(String base, String detail, String type) {
+        if (detail == null || detail.isBlank()
+                || detail.equalsIgnoreCase(base)
+                || (type != null && detail.equalsIgnoreCase(type))) {
+            return base;
+        }
+        return base + " : " + detail.trim();
     }
 
     private Long movementId(LigneDocumentClient line) {

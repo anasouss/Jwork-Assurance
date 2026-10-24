@@ -328,6 +328,7 @@ public class AssistanceVoyageService {
                 .produitAssistance(produit)
                 .tarifProduitAssistance(singleTariff(pricing.lines()))
                 .produit(produit.getLibelle())
+                .libelleReleve(optionalLabel(request.getLibelleReleve()))
                 .dateSouscription(LocalDate.now())
                 .dateEffet(request.getDateEffet())
                 .dateEcheance(dateEcheance)
@@ -367,6 +368,7 @@ public class AssistanceVoyageService {
                 .statut(StatutElementFacturable.A_QUITTANCER)
                 .referenceSource(String.valueOf(assistance.getId()))
                 .libelle("Assistance voyage - " + produit.getLibelle())
+                .libelleReleve(assistance.getLibelleReleve())
                 .dateDebut(request.getDateEffet())
                 .dateFin(dateEcheance)
                 .primeNette(pricing.net())
@@ -546,6 +548,7 @@ public class AssistanceVoyageService {
         assistance.setProduitAssistance(produit);
         assistance.setTarifProduitAssistance(singleTariff(pricing.lines()));
         assistance.setProduit(produit.getLibelle());
+        assistance.setLibelleReleve(optionalLabel(request.getLibelleReleve()));
         assistance.setDateEffet(request.getDateEffet());
         assistance.setDateEcheance(dateEcheance);
         assistance.setDuree(request.getDureeMois());
@@ -576,6 +579,7 @@ public class AssistanceVoyageService {
         }
 
         element.setLibelle("Assistance voyage - " + produit.getLibelle());
+        element.setLibelleReleve(assistance.getLibelleReleve());
         element.setDateDebut(request.getDateEffet());
         element.setDateFin(dateEcheance);
         element.setPrimeNette(pricing.net());
@@ -929,6 +933,10 @@ public class AssistanceVoyageService {
 
     private String normalizedPromo(String value) {
         return hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : null;
+    }
+
+    private String optionalLabel(String value) {
+        return value == null || value.isBlank() ? null : value.trim().replaceAll("[\\r\\n]+", " ");
     }
 
     private BigDecimal money(BigDecimal value) {

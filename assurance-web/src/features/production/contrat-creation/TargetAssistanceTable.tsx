@@ -152,6 +152,17 @@ export function TargetAssistanceTable({
           </tr>
         </tbody>
       </table>
+      {assistance.enabled ? (
+        <div className="grid gap-1.5 border-t px-3 py-3">
+          <label className="text-sm font-medium">Libellé du relevé (facultatif)</label>
+          <Input
+            value={assistance.libelleReleve ?? ""}
+            maxLength={180}
+            placeholder="Libellé généré automatiquement"
+            onChange={(event) => onChange({ libelleReleve: event.target.value.replace(/[\r\n]+/g, " ") })}
+          />
+        </div>
+      ) : null}
       {trimestres ? (
         <div className="border-t px-3 py-2 text-xs font-medium text-muted-foreground">
           Trimestres: {trimestres}/4

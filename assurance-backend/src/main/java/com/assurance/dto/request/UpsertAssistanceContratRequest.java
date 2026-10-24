@@ -1,6 +1,7 @@
 package com.assurance.dto.request;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -23,4 +24,6 @@ public class UpsertAssistanceContratRequest {
     private String echeanceCode;
     private String numeroContratOuQuittance;
     private String typeQuittance;
+    @Size(max = 180)
+    private String libelleReleve;
 }

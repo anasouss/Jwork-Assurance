@@ -491,6 +491,7 @@ export type CreateAssistanceVoyageRequest = {
   dureeMois: number;
   numeroContrat: string;
   codePromo?: string;
+  libelleReleve?: string;
   souscripteur: AssistanceVoyagePersonRequest;
   assures: AssistanceVoyagePersonRequest[];
   assureIdentiqueSouscripteur?: boolean;
@@ -551,6 +552,7 @@ export type CreateAssistanceAutomobileRequest = {
   dureeMois: number;
   numeroContrat: string;
   codePromo?: string;
+  libelleReleve?: string;
   souscripteur: AssistanceVoyagePersonRequest;
   assure?: AssistanceVoyagePersonRequest;
   assureIdentiqueSouscripteur?: boolean;
@@ -869,6 +871,7 @@ export type AssistanceDraft = {
   echeanceCode?: string;
   dateEcheance?: string;
   numeroContratOuQuittance?: string;
+  libelleReleve?: string;
 };
 
 export type AssistanceInput = Omit<AssistanceDraft, "assistanceId" | "modified" | "dateEcheance"> & {
@@ -892,6 +895,7 @@ export type AssistanceContrat = {
   produitAssistanceId?: string | null;
   tarifProduitAssistanceId?: string | null;
   produit?: string | null;
+  libelleReleve?: string | null;
   dateSouscription?: string | null;
   dateEffet?: string | null;
   dateEcheance?: string | null;
@@ -972,6 +976,7 @@ export type UpsertAssistanceContratRequest = {
   echeanceCode?: string;
   numeroContratOuQuittance?: string;
   typeQuittance?: string;
+  libelleReleve?: string;
 };
 
 export type CarteVerte = {
@@ -1054,6 +1059,7 @@ export type CreateContratRequest = {
   assistance?: boolean;
   crmPartage?: boolean;
   crmPartageValeur?: string;
+  libelleReleve?: string;
   clients: ClientInput[];
   vehicules: VehiculeInput[];
   remorques: RemorqueInput[];
@@ -1582,6 +1588,7 @@ export type ContratSummary = {
   assistance?: boolean | null;
   crmPartage?: boolean | null;
   crmPartageValeur?: string | null;
+  libelleReleve?: string | null;
   primeTotale?: number;
   clients?: { clientId: string; nomAffichage: string; role: string; principalPourRole: boolean; client?: ClientResponse }[];
   vehicules?: {

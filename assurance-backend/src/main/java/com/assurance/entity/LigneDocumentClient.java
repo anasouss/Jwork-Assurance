@@ -66,6 +66,9 @@ public class LigneDocumentClient extends BaseEntity {
     @Column(name = "mouvement", length = 180)
     private String mouvement;
 
+    @Column(name = "libelle_document", length = 180)
+    private String libelleDocument;
+
     @Column(name = "compagnie", length = 180)
     private String compagnie;
 

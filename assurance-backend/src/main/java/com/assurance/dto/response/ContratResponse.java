@@ -76,6 +76,7 @@ public class ContratResponse {
     private Boolean assistance;
     private Boolean crmPartage;
     private String crmPartageValeur;
+    private String libelleReleve;
     private List<ClientLink> clients;
     private List<VehiculeView> vehicules;
     private List<RemorqueView> remorques;

@@ -552,6 +552,7 @@ public class AssistanceAutomobileService {
         assistance.setProduitAssistance(produit);
         assistance.setTarifProduitAssistance(pricing.tarif());
         assistance.setProduit(produit.getLibelle());
+        assistance.setLibelleReleve(optionalLabel(request.getLibelleReleve()));
         assistance.setDateSouscription(request.getDateSouscription());
         assistance.setDateEffet(request.getDateEffet());
         assistance.setDateEcheance(pricing.dateEcheance());
@@ -586,6 +587,7 @@ public class AssistanceAutomobileService {
         element.setStatut(StatutElementFacturable.A_QUITTANCER);
         element.setReferenceSource(String.valueOf(assistance.getId()));
         element.setLibelle("Assistance automobile - " + produit.getLibelle());
+        element.setLibelleReleve(assistance.getLibelleReleve());
         element.setDateDebut(contrat.getDateEffet());
         element.setDateFin(pricing.dateEcheance());
         element.setPrimeNette(pricing.net());
@@ -953,6 +955,10 @@ public class AssistanceAutomobileService {
 
     private String normalizedPromo(String value) {
         return value == null || value.isBlank() ? null : value.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String optionalLabel(String value) {
+        return value == null || value.isBlank() ? null : value.trim().replaceAll("[\\r\\n]+", " ");
     }
 
     private String durationLabel(int months) {

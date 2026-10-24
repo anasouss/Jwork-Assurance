@@ -78,6 +78,7 @@ public class QuittanceProductionService {
                 .statut(StatutElementFacturable.A_QUITTANCER)
                 .referenceSource(contrat.getNumeroContrat())
                 .libelle(typeMouvement.getLibelle())
+                .libelleReleve(contrat.getLibelleReleve())
                 .dateDebut(mouvement.getDateEffet())
                 .dateFin(mouvement.getDateEcheance())
                 .primeNette(calcul.primeNette())
@@ -168,6 +169,7 @@ public class QuittanceProductionService {
         element.setNature(resolveNature(typeMouvement));
         element.setReferenceSource(contrat.getNumeroContrat());
         element.setLibelle(typeMouvement.getLibelle());
+        element.setLibelleReleve(contrat.getLibelleReleve());
         element.setDateDebut(mouvement.getDateEffet());
         element.setDateFin(mouvement.getDateEcheance());
         element.setPrimeNette(calcul.primeNette());

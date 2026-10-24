@@ -25,6 +25,7 @@ public class AssistanceContratResponse {
     private Long produitAssistanceId;
     private Long tarifProduitAssistanceId;
     private String produit;
+    private String libelleReleve;
     private LocalDate dateSouscription;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;

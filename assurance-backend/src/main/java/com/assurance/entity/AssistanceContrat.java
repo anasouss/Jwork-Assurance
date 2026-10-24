@@ -82,6 +82,9 @@ public class AssistanceContrat extends BaseEntity {
     @Column(name = "produit", length = 160)
     private String produit;
 
+    @Column(name = "libelle_releve", length = 180)
+    private String libelleReleve;
+
     @Column(name = "date_souscription")
     private LocalDate dateSouscription;
 

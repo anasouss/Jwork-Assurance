@@ -725,6 +725,7 @@ public class ContratService {
                 .crmPartage(request.getCrmPartage() == null ? false : request.getCrmPartage())
                 .crmPartageValeur(request.getCrmPartageValeur())
                 .notes(request.getNotes())
+                .libelleReleve(blankToNull(request.getLibelleReleve()))
                 .build();
         if (Boolean.TRUE.equals(contrat.getProspection()) && !hasText(contrat.getNumeroDevis())) {
             contrat.setNumeroDevis(nextNumeroDevis(agence, compagnie));
@@ -1199,6 +1200,7 @@ public class ContratService {
         contrat.setCrmPartage(request.getCrmPartage() == null ? false : request.getCrmPartage());
         contrat.setCrmPartageValeur(blankToNull(request.getCrmPartageValeur()));
         contrat.setNotes(request.getNotes());
+        contrat.setLibelleReleve(blankToNull(request.getLibelleReleve()));
     }
 
     private void applyReductionSaharienne(Contrat contrat, CreateContratRequest request) {
@@ -2757,6 +2759,7 @@ public class ContratService {
                     input.setDateEffet(assistance.getDateEffet());
                     input.setEcheanceCode(assistance.getEcheanceCode());
                     input.setNumeroContratOuQuittance(assistance.getNumeroContratOuQuittance());
+                    input.setLibelleReleve(assistance.getLibelleReleve());
                     input.setTypeQuittance(assistance.getTypeQuittance());
                     return input;
                 })
@@ -3775,6 +3778,7 @@ public class ContratService {
         assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
         assistanceRequest.setEcheanceCode(input.getEcheanceCode());
         assistanceRequest.setNumeroContratOuQuittance(input.getNumeroContratOuQuittance());
+        assistanceRequest.setLibelleReleve(input.getLibelleReleve());
         assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AVENANT");
         return assistanceRequest;
     }
@@ -5096,6 +5100,7 @@ public class ContratService {
             assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
             assistanceRequest.setEcheanceCode(firstNonNull(input.getEcheanceCode(), request.getEcheance()));
             assistanceRequest.setNumeroContratOuQuittance(input.getNumeroContratOuQuittance());
+            assistanceRequest.setLibelleReleve(input.getLibelleReleve());
             assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AN");
             responses.add(assistanceContratService.preview(contrat, vehicule, assistanceRequest));
         }
@@ -5703,6 +5708,7 @@ public class ContratService {
                         : !assistances.isEmpty())
                 .crmPartage(contrat.getCrmPartage())
                 .crmPartageValeur(contrat.getCrmPartageValeur())
+                .libelleReleve(contrat.getLibelleReleve())
                 .clients(clients)
                 .vehicules(vehicules)
                 .remorques(remorques)
@@ -5861,6 +5867,7 @@ public class ContratService {
                 .produitAssistanceId(assistance.getProduitAssistance() != null ? assistance.getProduitAssistance().getId() : null)
                 .tarifProduitAssistanceId(assistance.getTarifProduitAssistance() != null ? assistance.getTarifProduitAssistance().getId() : null)
                 .produit(assistance.getProduit())
+                .libelleReleve(assistance.getLibelleReleve())
                 .dateSouscription(assistance.getDateSouscription())
                 .dateEffet(assistance.getDateEffet())
                 .dateEcheance(assistance.getDateEcheance())

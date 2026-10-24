@@ -46,6 +46,7 @@ export default function AssistanceAutomobileCreationPage() {
   const [clients, setClients] = useState<ClientInput[]>(initialClients);
   const [vehicule, setVehicule] = useState<VehiculeInput>({ typeVehicule: "AUTOMOBILE" });
   const [numeroContrat, setNumeroContrat] = useState("");
+  const [libelleReleve, setLibelleReleve] = useState("");
   const [dateSouscription, setDateSouscription] = useState(today);
   const [dateEffet, setDateEffet] = useState(today);
   const [echeanceCode, setEcheanceCode] = useState<string | undefined>();
@@ -187,6 +188,7 @@ export default function AssistanceAutomobileCreationPage() {
     setCompagnieId(assistance.compagnieAssistanceId ?? "");
     setProduitId(assistance.produitAssistanceId ?? "");
     setNumeroContrat(renewing ? "" : contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
+    setLibelleReleve(renewing ? "" : assistance.libelleReleve ?? "");
     setDateSouscription(renewing ? today : assistance.dateSouscription ?? today);
     setDateEffet(renewing
       ? dayAfter(assistance.dateEcheance ?? contract.dateEcheance)
@@ -291,6 +293,7 @@ export default function AssistanceAutomobileCreationPage() {
         echeanceCode: echeanceCode!,
         dureeMois,
         numeroContrat,
+        libelleReleve,
         codePromo: hasPromoCodes ? codePromo : "",
         subscriber: subscriber!,
         insured: insured!,
@@ -505,6 +508,14 @@ export default function AssistanceAutomobileCreationPage() {
           </Field>
           <Field label={renewing ? "N° du nouveau contrat" : "N° de contrat"} required>
             <Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} />
+          </Field>
+          <Field label="Libellé du relevé (facultatif)">
+            <Input
+              value={libelleReleve}
+              maxLength={180}
+              placeholder="Libellé généré automatiquement"
+              onChange={(event) => setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
+            />
           </Field>
           <Field label="Durée" required>
             <Select
@@ -747,7 +758,7 @@ function vehicleRequest(vehicle: VehiculeInput): CreateAssistanceAutomobileReque
 }
 
 function buildRequest(input: {
-  compagnieId: string; produitId: string; dateSouscription: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string;
+  compagnieId: string; produitId: string; dateSouscription: string; dateEffet: string; echeanceCode: string; dureeMois: string; numeroContrat: string; codePromo: string; libelleReleve: string;
   subscriber: ClientInput; insured: ClientInput; sameInsured: boolean;
   typePayeurPrime: "SOUSCRIPTEUR" | "TIERS_MANDATE"; payeurPrimeClientId: string; vehicule: VehiculeInput;
 }): CreateAssistanceAutomobileRequest {
@@ -756,6 +767,7 @@ function buildRequest(input: {
     categorieClientId: input.insured.client.categorieClientId!, dateSouscription: input.dateSouscription,
     dateEffet: input.dateEffet, echeanceCode: input.echeanceCode,
     dureeMois: Number(input.dureeMois), numeroContrat: input.numeroContrat.trim(), codePromo: input.codePromo.trim() || undefined,
+    libelleReleve: input.libelleReleve.trim() || undefined,
     souscripteur: personRequest(input.subscriber), assure: input.sameInsured ? undefined : personRequest(input.insured),
     assureIdentiqueSouscripteur: input.sameInsured, typePayeurPrime: input.typePayeurPrime,
     payeurPrimeClientId: input.typePayeurPrime === "TIERS_MANDATE" ? input.payeurPrimeClientId : undefined,

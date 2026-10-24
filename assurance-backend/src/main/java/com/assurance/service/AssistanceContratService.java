@@ -175,6 +175,7 @@ public class AssistanceContratService {
         assistance.setProduitAssistance(pricing.produit());
         assistance.setTarifProduitAssistance(pricing.tarif());
         assistance.setProduit(pricing.produit().getLibelle());
+        assistance.setLibelleReleve(trimToNull(request.getLibelleReleve()));
         assistance.setDateSouscription(pricing.dateSouscription());
         assistance.setDateEffet(pricing.dateEffet());
         assistance.setDateEcheance(pricing.dateEcheance());
@@ -204,6 +205,7 @@ public class AssistanceContratService {
         element.setStatut(StatutElementFacturable.A_QUITTANCER);
         element.setReferenceSource(String.valueOf(assistance.getId()));
         element.setLibelle("Assistance - " + pricing.produit().getLibelle());
+        element.setLibelleReleve(assistance.getLibelleReleve());
         element.setDateDebut(pricing.dateEffet());
         element.setDateFin(pricing.dateEcheance());
         element.setPrimeNette(pricing.primeNette());
@@ -242,6 +244,7 @@ public class AssistanceContratService {
                 .produitAssistanceId(pricing.produit().getId())
                 .tarifProduitAssistanceId(pricing.tarif() != null ? pricing.tarif().getId() : null)
                 .produit(pricing.produit().getLibelle())
+                .libelleReleve(trimToNull(request.getLibelleReleve()))
                 .dateSouscription(pricing.dateSouscription())
                 .dateEffet(pricing.dateEffet())
                 .dateEcheance(pricing.dateEcheance())
@@ -389,6 +392,7 @@ public class AssistanceContratService {
                 .produitAssistanceId(assistance.getProduitAssistance() != null ? assistance.getProduitAssistance().getId() : null)
                 .tarifProduitAssistanceId(assistance.getTarifProduitAssistance() != null ? assistance.getTarifProduitAssistance().getId() : null)
                 .produit(assistance.getProduit())
+                .libelleReleve(assistance.getLibelleReleve())
                 .dateSouscription(assistance.getDateSouscription())
                 .dateEffet(assistance.getDateEffet())
                 .dateEcheance(assistance.getDateEcheance())
@@ -544,6 +548,10 @@ public class AssistanceContratService {
             }
         }
         return null;
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim().replaceAll("[\\r\\n]+", " ");
     }
 
     private record AssistancePricing(

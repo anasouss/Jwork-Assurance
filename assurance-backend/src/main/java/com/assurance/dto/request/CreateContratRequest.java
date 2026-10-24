@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -67,6 +68,8 @@ public class CreateContratRequest {
     private Boolean crmPartage;
     private String crmPartageValeur;
     private String notes;
+    @Size(max = 180)
+    private String libelleReleve;
 
     @Valid
     private List<ClientInput> clients;
@@ -201,6 +204,8 @@ public class CreateContratRequest {
         private String echeanceCode;
         private String numeroContratOuQuittance;
         private String typeQuittance;
+        @Size(max = 180)
+        private String libelleReleve;
     }
 
     @Data

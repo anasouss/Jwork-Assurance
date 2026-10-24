@@ -66,6 +66,7 @@ export default function AssistanceVoyageCreationPage() {
   const [sameInsured, setSameInsured] = useState(true);
   const [insuredPeople, setInsuredPeople] = useState<PersonDraft[]>([emptyPerson()]);
   const [numeroContrat, setNumeroContrat] = useState("");
+  const [libelleReleve, setLibelleReleve] = useState("");
   const [dateEffet, setDateEffet] = useState(today);
   const [dureeMois, setDureeMois] = useState("12");
   const [codePromo, setCodePromo] = useState("");
@@ -174,6 +175,7 @@ export default function AssistanceVoyageCreationPage() {
     setCompagnieId(assistance.compagnieAssistanceId ?? "");
     setProduitId(assistance.produitAssistanceId ?? "");
     setNumeroContrat(renewing ? "" : contract.numeroContrat ?? assistance.numeroContratOuQuittance ?? "");
+    setLibelleReleve(renewing ? "" : assistance.libelleReleve ?? "");
     setDateEffet(renewing
       ? dayAfter(assistance.dateEcheance ?? contract.dateEcheance)
       : assistance.dateEffet ?? contract.dateEffet ?? today);
@@ -257,6 +259,7 @@ export default function AssistanceVoyageCreationPage() {
         dateEffet,
         dureeMois: Number(dureeMois),
         numeroContrat: numeroContrat.trim(),
+        libelleReleve: libelleReleve.trim() || undefined,
         codePromo: hasPromoCodes ? codePromo.trim() || undefined : undefined,
         souscripteur: personRequest(subscriber),
         assures: subscriberIsInsured ? [] : insuredPeople.map(personRequest),
@@ -495,6 +498,14 @@ export default function AssistanceVoyageCreationPage() {
           </Field>
           <Field label={renewing ? "N° du nouveau contrat" : "N° de contrat"} required>
             <Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} />
+          </Field>
+          <Field label="Libellé du relevé (facultatif)">
+            <Input
+              value={libelleReleve}
+              maxLength={180}
+              placeholder="Libellé généré automatiquement"
+              onChange={(event) => setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
+            />
           </Field>
           <Field label="Durée" required>
             <Select value={dureeMois} onValueChange={setDureeMois}>

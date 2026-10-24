@@ -216,6 +216,9 @@ public class Contrat extends AuditedEntity {
     @Column(length = 1000)
     private String notes;
 
+    @Column(name = "libelle_releve", length = 180)
+    private String libelleReleve;
+
     @OneToMany(mappedBy = "contrat", orphanRemoval = true)
     @Builder.Default
     @BatchSize(size = 100)

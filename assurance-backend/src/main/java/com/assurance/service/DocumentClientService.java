@@ -86,6 +86,7 @@ public class DocumentClientService {
     private final EcheanceFacturationConventionRepository echeanceFacturationConventionRepository;
     private final AffectationReglementClientRepository affectationReglementClientRepository;
     private final ConditionPaiementClientService conditionPaiementClientService;
+    private final DocumentClientLineLabelService documentClientLineLabelService;
 
     @Transactional(readOnly = true)
     public PropositionEcheanceDocumentClientResponse proposeDueDate(
@@ -749,6 +750,10 @@ public class DocumentClientService {
                     .accessoires(accessories(element))
                     .montantTtc(originalTtc)
                     .build();
+            if (element.getContrat().getTypeContrat() != TypeContrat.FLOTTE
+                    || (element.getLibelleReleve() != null && !element.getLibelleReleve().isBlank())) {
+                line.setLibelleDocument(documentClientLineLabelService.label(line, null));
+            }
             document.getLignes().add(line);
             debit = debit.add(lineDebit);
             credit = credit.add(lineCredit);

@@ -239,6 +239,14 @@ export function ContractInfoSection({
             )}
           </Field>
         ) : null}
+        <Field label="Libellé du relevé (facultatif)">
+          <Input
+            value={form.libelleReleve}
+            maxLength={180}
+            placeholder="Libellé généré automatiquement"
+            onChange={(event) => form.setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
+          />
+        </Field>
         {form.typeContrat === "PARTICULIER" && selectedUsage?.bySousClasse ? (
           <Field label="Sous-classe" required error={form.validationErrors["vehicules.0.sousClasse"]}>
             <AutocompleteSelect

@@ -499,14 +499,6 @@ export default function AssistanceVoyageCreationPage() {
           <Field label={renewing ? "N° du nouveau contrat" : "N° de contrat"} required>
             <Input value={numeroContrat} onChange={(event) => setNumeroContrat(event.target.value)} />
           </Field>
-          <Field label="Libellé du relevé (facultatif)">
-            <Input
-              value={libelleReleve}
-              maxLength={180}
-              placeholder="Libellé généré automatiquement"
-              onChange={(event) => setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
-            />
-          </Field>
           <Field label="Durée" required>
             <Select value={dureeMois} onValueChange={setDureeMois}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -556,6 +548,14 @@ export default function AssistanceVoyageCreationPage() {
               />
             </Field>
           ) : null}
+          <Field label="Libellé du relevé (facultatif)">
+            <Input
+              value={libelleReleve}
+              maxLength={180}
+              placeholder="Libellé généré automatiquement"
+              onChange={(event) => setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
+            />
+          </Field>
         </div>
 
         {quote.data ? (

@@ -156,21 +156,24 @@ export default function ReglementsClientsPage() {
   const branches = useQuery({
     queryKey: referenceKeys.list("branches-assurance"),
     queryFn: () => referenceApi.list("branches-assurance"),
+    enabled: multiClientDeposit,
   });
   const selectedBranch = (branches.data ?? []).find((branch) => branch.id === branchId);
   const assistanceBranch = normalizeCode(selectedBranch?.code) === "ASSISTANCE";
   const insuranceCompanies = useQuery({
     queryKey: referenceKeys.list("compagnies-assurance"),
     queryFn: () => referenceApi.list("compagnies-assurance"),
-    enabled: branchId !== "ALL" && !assistanceBranch,
+    enabled: multiClientDeposit && branchId !== "ALL" && !assistanceBranch,
   });
   const assistanceCompanies = useQuery({
     queryKey: referenceKeys.list("compagnies-assistance"),
     queryFn: () => referenceApi.list("compagnies-assistance"),
-    enabled: branchId !== "ALL" && assistanceBranch,
+    enabled: multiClientDeposit && branchId !== "ALL" && assistanceBranch,
   });
   const appliedAssistanceBranch = isAssistanceBranch(branches.data, appliedFilters.branchId);
-  const appliedBranchReady = appliedFilters.branchId === "ALL" || !branches.isLoading;
+  const appliedBranchReady = !multiClientDeposit
+    || appliedFilters.branchId === "ALL"
+    || !branches.isLoading;
   const requestedClient = useQuery({
     queryKey: ["crm-client", requestedPayerId],
     queryFn: () => clientApi.getClientCrm(requestedPayerId),
@@ -215,13 +218,17 @@ export default function ReglementsClientsPage() {
   const queryFilters = {
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
-    brancheId: appliedFilters.branchId === "ALL" ? undefined : appliedFilters.branchId,
-    compagnieId: appliedFilters.branchId !== "ALL"
+    brancheId: multiClientDeposit && appliedFilters.branchId !== "ALL"
+      ? appliedFilters.branchId
+      : undefined,
+    compagnieId: multiClientDeposit
+      && appliedFilters.branchId !== "ALL"
       && !appliedAssistanceBranch
       && appliedFilters.companyId !== "ALL" ? appliedFilters.companyId : undefined,
-    compagnieAssistanceId: appliedAssistanceBranch
+    compagnieAssistanceId: multiClientDeposit
+      && appliedAssistanceBranch
       && appliedFilters.companyId !== "ALL" ? appliedFilters.companyId : undefined,
-    typeDate: appliedFilters.dateType,
+    typeDate: multiClientDeposit ? appliedFilters.dateType : "EFFET" as const,
     dateDu: appliedFilters.dateFrom || undefined,
     dateAu: appliedFilters.dateTo || undefined,
     search: appliedReference || undefined,
@@ -322,13 +329,19 @@ export default function ReglementsClientsPage() {
     }
     const nextReference = reference.trim();
     setAppliedReference(nextReference);
-    setAppliedFilters({ branchId, companyId, dateType, dateFrom, dateTo });
+    setAppliedFilters({
+      branchId: multiClientDeposit ? branchId : "ALL",
+      companyId: multiClientDeposit ? companyId : "ALL",
+      dateType: multiClientDeposit ? dateType : "EFFET",
+      dateFrom,
+      dateTo,
+    });
     setPage(0);
     updateUrl({
       search: nextReference,
-      brancheId: branchId === "ALL" ? undefined : branchId,
-      compagnieId: companyId === "ALL" ? undefined : companyId,
-      typeDate: dateType === defaultDateType ? undefined : dateType,
+      brancheId: multiClientDeposit && branchId !== "ALL" ? branchId : undefined,
+      compagnieId: multiClientDeposit && companyId !== "ALL" ? companyId : undefined,
+      typeDate: multiClientDeposit && dateType !== defaultDateType ? dateType : undefined,
       dateDu: dateFrom,
       dateAu: dateTo,
       page: undefined,
@@ -446,7 +459,9 @@ export default function ReglementsClientsPage() {
       />
 
       <section className="grid gap-4 rounded-md border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 2xl:items-end">
+        <div className={`grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:items-end ${
+          multiClientDeposit ? "xl:grid-cols-4 2xl:grid-cols-6" : "xl:grid-cols-[220px_minmax(280px,1.4fr)_minmax(240px,1fr)_170px_170px_auto]"
+        }`}>
           <div className="grid gap-2">
             <Label>Cible</Label>
             <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
@@ -498,49 +513,53 @@ export default function ReglementsClientsPage() {
               placeholder="Numéro du document"
             />
           </div>
-          <div className="grid gap-2">
-            <Label>Branche</Label>
-            <Select
-              value={branchId}
-              onValueChange={(value) => {
-                setBranchId(value);
-                setCompanyId("ALL");
-              }}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Toutes les branches</SelectItem>
-                {(branches.data ?? []).map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>{assistanceBranch ? "Compagnie d’assistance" : "Compagnie"}</Label>
-            <Select value={companyId} disabled={branchId === "ALL"} onValueChange={setCompanyId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">
-                  {branchId === "ALL" ? "Sélectionnez une branche" : "Toutes les compagnies"}
-                </SelectItem>
-                {(assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? [])
-                  .map((company) => (
-                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Date filtrée</Label>
-            <Select value={dateType} onValueChange={(value) => setDateType(value as ReceivableDateType)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="SAISIE">Date de saisie</SelectItem>
-                <SelectItem value="EFFET">Date d’effet</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {multiClientDeposit ? (
+            <>
+              <div className="grid gap-2">
+                <Label>Branche</Label>
+                <Select
+                  value={branchId}
+                  onValueChange={(value) => {
+                    setBranchId(value);
+                    setCompanyId("ALL");
+                  }}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Toutes les branches</SelectItem>
+                    {(branches.data ?? []).map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>{assistanceBranch ? "Compagnie d’assistance" : "Compagnie"}</Label>
+                <Select value={companyId} disabled={branchId === "ALL"} onValueChange={setCompanyId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">
+                      {branchId === "ALL" ? "Sélectionnez une branche" : "Toutes les compagnies"}
+                    </SelectItem>
+                    {(assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? [])
+                      .map((company) => (
+                        <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Date filtrée</Label>
+                <Select value={dateType} onValueChange={(value) => setDateType(value as ReceivableDateType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SAISIE">Date de saisie</SelectItem>
+                    <SelectItem value="EFFET">Date d’effet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : null}
           <div className="grid gap-2">
             <Label>Date du</Label>
             <DatePicker
@@ -653,7 +672,9 @@ export default function ReglementsClientsPage() {
                     <SortableHeader label="Police / contrat" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Nature</th>
                     <SortableHeader
-                      label={appliedFilters.dateType === "SAISIE" ? "Date saisie" : "Date effet"}
+                      label={multiClientDeposit && appliedFilters.dateType === "SAISIE"
+                        ? "Date saisie"
+                        : "Date effet"}
                       column="DATE"
                       active={sortKey}
                       direction={sortDirection}
@@ -704,7 +725,7 @@ export default function ReglementsClientsPage() {
                             <strong>{row.source.mouvement}</strong>
                           </td>
                           <td className="px-3 py-3">
-                            {date(appliedFilters.dateType === "SAISIE"
+                            {date(multiClientDeposit && appliedFilters.dateType === "SAISIE"
                               ? row.source.dateSaisie
                               : row.source.dateEffet)}
                           </td>

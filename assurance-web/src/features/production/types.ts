@@ -1485,6 +1485,8 @@ export type UpsertSousClasseRequest = UpsertCodeReferenceRequest & {
 export type TypePieceJointe = {
   id: string;
   libelle: string;
+  naturePieceJointeId?: string | null;
+  naturePieceJointeLibelle?: string | null;
   brancheAssuranceId?: string | null;
   brancheAssuranceCode?: string | null;
   brancheAssuranceLibelle?: string | null;
@@ -1502,6 +1504,7 @@ export type TypePieceJointe = {
 
 export type UpsertTypePieceJointeRequest = {
   libelle: string;
+  naturePieceJointeId?: string | null;
   brancheAssuranceId?: string | null;
   typeAssistance?: "VOYAGE" | "AUTOMOBILE" | null;
   typeContrat?: TypeContrat | null;

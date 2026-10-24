@@ -12,6 +12,7 @@ public class UpsertTypePieceJointeRequest {
     @NotBlank
     private String libelle;
 
+    private Long naturePieceJointeId;
     private Long brancheAssuranceId;
     private TypeAssistance typeAssistance;
     private TypeContrat typeContrat;

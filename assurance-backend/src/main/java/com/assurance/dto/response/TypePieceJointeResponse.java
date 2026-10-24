@@ -11,6 +11,8 @@ import lombok.Data;
 public class TypePieceJointeResponse {
     private Long id;
     private String libelle;
+    private Long naturePieceJointeId;
+    private String naturePieceJointeLibelle;
     private Long brancheAssuranceId;
     private String brancheAssuranceCode;
     private String brancheAssuranceLibelle;

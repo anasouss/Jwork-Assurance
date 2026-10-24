@@ -1,11 +1,14 @@
 package com.assurance.seeder;
 
 import com.assurance.entity.BrancheAssurance;
+import com.assurance.entity.NaturePieceJointe;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.TypePieceJointe;
+import com.assurance.enums.TypeAssistance;
 import com.assurance.enums.TypeClient;
 import com.assurance.enums.TypeContrat;
 import com.assurance.repository.BrancheAssuranceRepository;
+import com.assurance.repository.NaturePieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import com.assurance.repository.TypePieceJointeRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
 
 @Component
 @Order(4)
@@ -22,7 +27,9 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
     private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final TypePieceJointeRepository typePieceJointeRepository;
     private final BrancheAssuranceRepository brancheAssuranceRepository;
+    private final NaturePieceJointeRepository naturePieceJointeRepository;
     private BrancheAssurance automobileBranch;
+    private BrancheAssurance assistanceBranch;
 
     @Override
     @Transactional
@@ -33,6 +40,8 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
 
         automobileBranch = brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
                 .orElseThrow(() -> new IllegalStateException("Branche AUTOMOBILE absente"));
+        assistanceBranch = brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")
+                .orElseThrow(() -> new IllegalStateException("Branche ASSISTANCE absente"));
 
         TypeMouvementContrat affaireNouvelle = movement("AN");
         TypeMouvementContrat renouvellement = movement("REN");
@@ -126,6 +135,12 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
         seed("Declaration de perte", TypeContrat.FLOTTE, null, duplicataFlotte, true, 590);
         seed("Liste des vehicules concernes", TypeContrat.FLOTTE, null, duplicataFlotte, false, 600);
 
+        seedAssistance("CIN", null, TypeClient.PERSONNE_PHYSIQUE, affaireNouvelle, 610);
+        seedAssistance("Registre de commerce", null, TypeClient.PERSONNE_MORALE, affaireNouvelle, 620);
+        seedAssistance("Passeport", TypeAssistance.VOYAGE, TypeClient.PERSONNE_PHYSIQUE, affaireNouvelle, 630);
+        seedAssistance("Carte grise", TypeAssistance.AUTOMOBILE, null, affaireNouvelle, 640);
+        seedAssistance("Permis de conduire", TypeAssistance.AUTOMOBILE, TypeClient.PERSONNE_PHYSIQUE, affaireNouvelle, 650);
+
         seed("Autre document", null, null, null, false, 1000);
     }
 
@@ -142,6 +157,7 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
             int ordreAffichage
     ) {
         typePieceJointeRepository.save(TypePieceJointe.builder()
+                .naturePieceJointe(nature(libelle))
                 .libelle(libelle)
                 .brancheAssurance(typeMouvement == null ? null : automobileBranch)
                 .typeContrat(typeContrat)
@@ -151,5 +167,35 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
                 .ordreAffichage(ordreAffichage)
                 .actif(true)
                 .build());
+    }
+
+    private void seedAssistance(
+            String libelle,
+            TypeAssistance typeAssistance,
+            TypeClient typeClient,
+            TypeMouvementContrat typeMouvement,
+            int ordreAffichage
+    ) {
+        typePieceJointeRepository.save(TypePieceJointe.builder()
+                .naturePieceJointe(nature(libelle))
+                .libelle(libelle)
+                .brancheAssurance(assistanceBranch)
+                .typeAssistance(typeAssistance)
+                .typeClient(typeClient)
+                .typeMouvement(typeMouvement)
+                .obligatoire(false)
+                .ordreAffichage(ordreAffichage)
+                .actif(true)
+                .build());
+    }
+
+    private NaturePieceJointe nature(String libelle) {
+        String key = libelle.trim().toUpperCase(Locale.ROOT);
+        return naturePieceJointeRepository.findByAgenceIsNullAndCleNormalisee(key)
+                .orElseGet(() -> naturePieceJointeRepository.save(NaturePieceJointe.builder()
+                        .cleNormalisee(key)
+                        .libelle(libelle)
+                        .actif(true)
+                        .build()));
     }
 }

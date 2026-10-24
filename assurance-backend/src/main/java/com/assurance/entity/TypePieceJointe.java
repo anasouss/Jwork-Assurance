@@ -23,6 +23,7 @@ import lombok.Setter;
 @Table(name = "types_piece_jointe", indexes = {
         @Index(name = "idx_type_piece_agence", columnList = "agence_id"),
         @Index(name = "idx_type_piece_branche", columnList = "branche_assurance_id"),
+        @Index(name = "idx_type_piece_nature", columnList = "nature_piece_jointe_id"),
         @Index(name = "idx_type_piece_mouvement", columnList = "type_mouvement_id")
 }, uniqueConstraints = {
         @UniqueConstraint(name = "uk_type_piece_agence_source", columnNames = {"agence_id", "source_systeme_id"})
@@ -42,8 +43,13 @@ public class TypePieceJointe extends BaseEntity {
     @JoinColumn(name = "source_systeme_id")
     private TypePieceJointe sourceSysteme;
 
+    // Retained as the historical display snapshot; the catalogue relation is authoritative.
     @Column(nullable = false, length = 160)
     private String libelle;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "nature_piece_jointe_id", nullable = false)
+    private NaturePieceJointe naturePieceJointe;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "branche_assurance_id")

@@ -12,6 +12,7 @@ import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.MouvementContrat;
+import com.assurance.entity.NaturePieceJointe;
 import com.assurance.entity.PieceJointe;
 import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.TypePieceJointe;
@@ -25,6 +26,7 @@ import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.MouvementContratRepository;
+import com.assurance.repository.NaturePieceJointeRepository;
 import com.assurance.repository.PieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import com.assurance.repository.TypePieceJointeRepository;
@@ -66,6 +68,7 @@ public class PieceJointeService {
     private final ContratRepository contratRepository;
     private final AgenceRepository agenceRepository;
     private final MouvementContratRepository mouvementContratRepository;
+    private final NaturePieceJointeRepository naturePieceJointeRepository;
     private final TypeMouvementContratRepository typeMouvementContratRepository;
     private final TypePieceJointeRepository typePieceJointeRepository;
     private final PieceJointeRepository pieceJointeRepository;
@@ -104,7 +107,14 @@ public class PieceJointeService {
         TypeMouvementContrat mouvement = request.getTypeMouvementId() == null ? null :
                 typeMouvementContratRepository.findById(request.getTypeMouvementId())
                         .orElseThrow(() -> new ResourceNotFoundException("TypeMouvementContrat", request.getTypeMouvementId()));
-        type.setLibelle(requireText(request.getLibelle(), "Le libelle est obligatoire"));
+        NaturePieceJointe nature = resolveNature(
+                agenceId,
+                request.getNaturePieceJointeId(),
+                type.getNaturePieceJointe(),
+                request.getLibelle()
+        );
+        type.setNaturePieceJointe(nature);
+        type.setLibelle(nature.getLibelle());
         type.setBrancheAssurance(branche);
         type.setTypeAssistance(request.getTypeAssistance());
         type.setTypeContrat(request.getTypeContrat());
@@ -243,9 +253,11 @@ public class PieceJointeService {
             if (existing != null) {
                 return existing;
             }
+            NaturePieceJointe nature = resolveNature(agenceId, null, null, customLabel);
             return typePieceJointeRepository.save(TypePieceJointe.builder()
                     .agence(contrat.getAgence())
-                    .libelle(customLabel)
+                    .naturePieceJointe(nature)
+                    .libelle(nature.getLibelle())
                     .brancheAssurance(contrat.getBrancheAssurance())
                     .typeAssistance(resolveAssistanceType(contrat))
                     .typeContrat(isAssistanceBranch(contrat) ? null : contrat.getTypeContrat())
@@ -365,6 +377,7 @@ public class PieceJointeService {
                         .agence(agenceRepository.findById(agenceId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId)))
                         .sourceSysteme(systemType)
+                        .naturePieceJointe(systemType.getNaturePieceJointe())
                         .libelle(systemType.getLibelle())
                         .brancheAssurance(systemType.getBrancheAssurance())
                         .typeAssistance(systemType.getTypeAssistance())
@@ -405,7 +418,7 @@ public class PieceJointeService {
         boolean duplicate = effectiveTypes(agenceId, true).stream()
                 .filter(existing -> !Objects.equals(existing.getId(), candidateId))
                 .filter(existing -> !Objects.equals(existing.getId(), sourceId))
-                .anyMatch(existing -> existing.getLibelle().equalsIgnoreCase(candidate.getLibelle())
+                .anyMatch(existing -> sameNature(existing, candidate)
                         && Objects.equals(entityId(existing.getBrancheAssurance()), entityId(candidate.getBrancheAssurance()))
                         && existing.getTypeAssistance() == candidate.getTypeAssistance()
                         && existing.getTypeContrat() == candidate.getTypeContrat()
@@ -418,6 +431,47 @@ public class PieceJointeService {
 
     private Long entityId(BaseEntity entity) {
         return entity == null ? null : entity.getId();
+    }
+
+    private boolean sameNature(TypePieceJointe first, TypePieceJointe second) {
+        if (first.getNaturePieceJointe() != null && second.getNaturePieceJointe() != null) {
+            return Objects.equals(first.getNaturePieceJointe().getId(), second.getNaturePieceJointe().getId());
+        }
+        return first.getLibelle().equalsIgnoreCase(second.getLibelle());
+    }
+
+    private NaturePieceJointe resolveNature(
+            Long agenceId,
+            Long requestedNatureId,
+            NaturePieceJointe currentNature,
+            String requestedLabel
+    ) {
+        if (requestedNatureId != null) {
+            NaturePieceJointe nature = naturePieceJointeRepository.findById(requestedNatureId)
+                    .orElseThrow(() -> new ResourceNotFoundException("NaturePieceJointe", requestedNatureId));
+            if (nature.getAgence() != null && !agenceId.equals(nature.getAgence().getId())) {
+                throw new ResourceNotFoundException("NaturePieceJointe", requestedNatureId);
+            }
+            return nature;
+        }
+        if (currentNature != null) {
+            return currentNature;
+        }
+        String label = requireText(requestedLabel, "Le libelle est obligatoire");
+        String key = normalizeNatureKey(label);
+        return naturePieceJointeRepository.findByAgenceIdAndCleNormalisee(agenceId, key)
+                .or(() -> naturePieceJointeRepository.findByAgenceIsNullAndCleNormalisee(key))
+                .orElseGet(() -> naturePieceJointeRepository.save(NaturePieceJointe.builder()
+                        .agence(agenceRepository.findById(agenceId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId)))
+                        .cleNormalisee(key)
+                        .libelle(label)
+                        .actif(true)
+                        .build()));
+    }
+
+    private String normalizeNatureKey(String label) {
+        return requireText(label, "Le libelle est obligatoire").toUpperCase(Locale.ROOT);
     }
 
     private Comparator<TypePieceJointe> typeComparator() {
@@ -583,7 +637,13 @@ public class PieceJointeService {
     private TypePieceJointeResponse toTypeResponse(TypePieceJointe type) {
         return TypePieceJointeResponse.builder()
                 .id(type.getId())
-                .libelle(type.getLibelle())
+                .libelle(type.getNaturePieceJointe() == null
+                        ? type.getLibelle()
+                        : type.getNaturePieceJointe().getLibelle())
+                .naturePieceJointeId(type.getNaturePieceJointe() == null ? null : type.getNaturePieceJointe().getId())
+                .naturePieceJointeLibelle(type.getNaturePieceJointe() == null
+                        ? null
+                        : type.getNaturePieceJointe().getLibelle())
                 .brancheAssuranceId(type.getBrancheAssurance() == null ? null : type.getBrancheAssurance().getId())
                 .brancheAssuranceCode(type.getBrancheAssurance() == null ? null : type.getBrancheAssurance().getCode())
                 .brancheAssuranceLibelle(type.getBrancheAssurance() == null ? null : type.getBrancheAssurance().getLibelle())

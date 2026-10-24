@@ -13,6 +13,7 @@ import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.MouvementContratRepository;
+import com.assurance.repository.NaturePieceJointeRepository;
 import com.assurance.repository.PieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
 import com.assurance.repository.TypePieceJointeRepository;
@@ -35,6 +36,7 @@ class PieceJointeServiceTest {
     @Mock private ContratRepository contratRepository;
     @Mock private AgenceRepository agenceRepository;
     @Mock private MouvementContratRepository mouvementContratRepository;
+    @Mock private NaturePieceJointeRepository naturePieceJointeRepository;
     @Mock private TypeMouvementContratRepository typeMouvementContratRepository;
     @Mock private TypePieceJointeRepository typePieceJointeRepository;
     @Mock private PieceJointeRepository pieceJointeRepository;
@@ -50,6 +52,7 @@ class PieceJointeServiceTest {
                 contratRepository,
                 agenceRepository,
                 mouvementContratRepository,
+                naturePieceJointeRepository,
                 typeMouvementContratRepository,
                 typePieceJointeRepository,
                 pieceJointeRepository,

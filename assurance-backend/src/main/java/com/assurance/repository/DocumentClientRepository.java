@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -94,6 +95,38 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               ), 0) < d.totalDocument
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
+              and (:saisieDu is null or d.createdAt >= :saisieDu)
+              and (:saisieAuExclusive is null or d.createdAt < :saisieAuExclusive)
+              and (:brancheId is null or exists (
+                    select 1 from LigneDocumentClient branchLine
+                    join branchLine.elementFacturable branchElement
+                    where branchLine.document = d
+                      and ((branchElement.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                            and branchElement.contrat.brancheAssurance.id = :brancheId)
+                           or (branchElement.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE and exists (
+                            select 1 from AssistanceContrat branchAssistance
+                            where branchAssistance.elementFacturable = branchElement
+                              and branchAssistance.actif = true
+                              and branchAssistance.brancheAssurance.id = :brancheId
+                      )))
+              ))
+              and (:compagnieId is null or exists (
+                    select 1 from LigneDocumentClient companyLine
+                    where companyLine.document = d
+                      and companyLine.elementFacturable.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                      and companyLine.elementFacturable.contrat.compagnieAssurance.id = :compagnieId
+              ))
+              and (:compagnieAssistanceId is null or exists (
+                    select 1 from LigneDocumentClient assistanceLine
+                    join assistanceLine.elementFacturable assistanceElement
+                    where assistanceLine.document = d
+                      and exists (
+                            select 1 from AssistanceContrat companyAssistance
+                            where companyAssistance.elementFacturable = assistanceElement
+                              and companyAssistance.actif = true
+                              and companyAssistance.compagnieAssistance.id = :compagnieAssistanceId
+                      )
+              ))
               and (:payeurId is null or (
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
@@ -119,6 +152,38 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               ), 0) < d.totalDocument
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
+              and (:saisieDu is null or d.createdAt >= :saisieDu)
+              and (:saisieAuExclusive is null or d.createdAt < :saisieAuExclusive)
+              and (:brancheId is null or exists (
+                    select 1 from LigneDocumentClient branchLine
+                    join branchLine.elementFacturable branchElement
+                    where branchLine.document = d
+                      and ((branchElement.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                            and branchElement.contrat.brancheAssurance.id = :brancheId)
+                           or (branchElement.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE and exists (
+                            select 1 from AssistanceContrat branchAssistance
+                            where branchAssistance.elementFacturable = branchElement
+                              and branchAssistance.actif = true
+                              and branchAssistance.brancheAssurance.id = :brancheId
+                      )))
+              ))
+              and (:compagnieId is null or exists (
+                    select 1 from LigneDocumentClient companyLine
+                    where companyLine.document = d
+                      and companyLine.elementFacturable.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                      and companyLine.elementFacturable.contrat.compagnieAssurance.id = :compagnieId
+              ))
+              and (:compagnieAssistanceId is null or exists (
+                    select 1 from LigneDocumentClient assistanceLine
+                    join assistanceLine.elementFacturable assistanceElement
+                    where assistanceLine.document = d
+                      and exists (
+                            select 1 from AssistanceContrat companyAssistance
+                            where companyAssistance.elementFacturable = assistanceElement
+                              and companyAssistance.actif = true
+                              and companyAssistance.compagnieAssistance.id = :compagnieAssistanceId
+                      )
+              ))
               and (:payeurId is null or (
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
@@ -134,6 +199,11 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("saisieDu") LocalDateTime saisieDu,
+            @Param("saisieAuExclusive") LocalDateTime saisieAuExclusive,
+            @Param("brancheId") Long brancheId,
+            @Param("compagnieId") Long compagnieId,
+            @Param("compagnieAssistanceId") Long compagnieAssistanceId,
             @Param("payeurType") String payeurType,
             @Param("payeurId") Long payeurId,
             @Param("search") String search,

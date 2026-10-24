@@ -25,6 +25,7 @@ public class SourceDocumentClientResponse {
     private String reference;
     private String referenceSource;
     private String compagnie;
+    private LocalDate dateSaisie;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String payeurType;

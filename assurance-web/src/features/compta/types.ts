@@ -280,6 +280,7 @@ export type ClientDocumentSource = {
   reference?: string | null;
   referenceSource?: string | null;
   compagnie: string;
+  dateSaisie: string;
   dateEffet: string;
   dateEcheance?: string | null;
   payeurType: "CLIENT" | "GROUPE";

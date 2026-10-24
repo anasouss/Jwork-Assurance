@@ -66,7 +66,10 @@ public class ReglementClientController {
             @RequestParam(required = false) Long souscripteurId,
             @RequestParam(required = false) Long contratId,
             @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long compagnieAssistanceId,
             @RequestParam(required = false) TypeContrat typeContrat,
+            @RequestParam(defaultValue = "EFFET") String typeDate,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false)
@@ -84,7 +87,10 @@ public class ReglementClientController {
                 souscripteurId,
                 contratId,
                 brancheId,
+                compagnieId,
+                compagnieAssistanceId,
                 typeContrat,
+                typeDate,
                 dateDu,
                 dateAu,
                 search,
@@ -100,6 +106,10 @@ public class ReglementClientController {
     public ResponseEntity<ApiResponse<CreanceClientPageResponse>> invoiceReceivables(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long compagnieAssistanceId,
+            @RequestParam(defaultValue = "EFFET") String typeDate,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false)
@@ -115,6 +125,10 @@ public class ReglementClientController {
                         TenantContext.getCurrentAgence(),
                         payeurType,
                         payeurId,
+                        brancheId,
+                        compagnieId,
+                        compagnieAssistanceId,
+                        typeDate,
                         dateDu,
                         dateAu,
                         search,

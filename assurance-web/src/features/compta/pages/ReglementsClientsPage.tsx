@@ -28,11 +28,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SortIcon } from "@/components/ui/sort-icon";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
+import { referenceApi } from "@/features/production/api/references";
+import { referenceKeys } from "@/lib/query-keys";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
@@ -54,6 +57,7 @@ import type {
 const PAGE_SIZE = 25;
 
 type PayerScope = "CLIENT" | "GROUPE";
+type ReceivableDateType = "SAISIE" | "EFFET";
 type SortKey = "PAYER" | "POLICE" | "DATE" | "TTC" | "BALANCE";
 type SortDirection = "ASC" | "DESC";
 
@@ -65,6 +69,7 @@ export default function ReglementsClientsPage() {
   const location = useLocation();
   const multiClientDeposit = location.pathname.endsWith("/versement-multi-clients");
   const [searchParams, setSearchParams] = useSearchParams();
+  const defaultDateType: ReceivableDateType = multiClientDeposit ? "SAISIE" : "EFFET";
   const requestedPayerId = searchParams.get("payeurId") || "";
   const requestedPayerType: PayerScope = searchParams.get("cible") === "GROUPE"
     ? "GROUPE"
@@ -74,9 +79,17 @@ export default function ReglementsClientsPage() {
   const [appliedReference, setAppliedReference] = useState(() => searchParams.get("search") || "");
   const [payerScope, setPayerScope] = useState<PayerScope>(requestedPayerType);
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
+  const [branchId, setBranchId] = useState(() => searchParams.get("brancheId") || "ALL");
+  const [companyId, setCompanyId] = useState(() => searchParams.get("compagnieId") || "ALL");
+  const [dateType, setDateType] = useState<ReceivableDateType>(
+    () => urlDateType(searchParams.get("typeDate"), defaultDateType)
+  );
   const [dateFrom, setDateFrom] = useState(() => searchParams.get("dateDu") || "");
   const [dateTo, setDateTo] = useState(() => searchParams.get("dateAu") || "");
   const [appliedFilters, setAppliedFilters] = useState({
+    branchId: searchParams.get("brancheId") || "ALL",
+    companyId: searchParams.get("compagnieId") || "ALL",
+    dateType: urlDateType(searchParams.get("typeDate"), defaultDateType),
     dateFrom: searchParams.get("dateDu") || "",
     dateTo: searchParams.get("dateAu") || "",
   });
@@ -119,21 +132,45 @@ export default function ReglementsClientsPage() {
     setReference(searchParams.get("search") || "");
     setAppliedReference(searchParams.get("search") || "");
     setPayerScope(searchParams.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT");
+    setBranchId(searchParams.get("brancheId") || "ALL");
+    setCompanyId(searchParams.get("compagnieId") || "ALL");
+    setDateType(urlDateType(searchParams.get("typeDate"), defaultDateType));
     setDateFrom(searchParams.get("dateDu") || "");
     setDateTo(searchParams.get("dateAu") || "");
     setAppliedFilters({
+      branchId: searchParams.get("brancheId") || "ALL",
+      companyId: searchParams.get("compagnieId") || "ALL",
+      dateType: urlDateType(searchParams.get("typeDate"), defaultDateType),
       dateFrom: searchParams.get("dateDu") || "",
       dateTo: searchParams.get("dateAu") || "",
     });
     setSortKey(urlSortKey(searchParams.get("tri")));
     setSortDirection(searchParams.get("ordre") === "ASC" ? "ASC" : "DESC");
     if (!searchParams.get("payeurId")) setSelectedPayer(undefined);
-  }, [searchParams]);
+  }, [defaultDateType, searchParams]);
 
   const payerSearch = usePayerSearch(
     payerScope,
     selectedPayer
   );
+  const branches = useQuery({
+    queryKey: referenceKeys.list("branches-assurance"),
+    queryFn: () => referenceApi.list("branches-assurance"),
+  });
+  const selectedBranch = (branches.data ?? []).find((branch) => branch.id === branchId);
+  const assistanceBranch = normalizeCode(selectedBranch?.code) === "ASSISTANCE";
+  const insuranceCompanies = useQuery({
+    queryKey: referenceKeys.list("compagnies-assurance"),
+    queryFn: () => referenceApi.list("compagnies-assurance"),
+    enabled: branchId !== "ALL" && !assistanceBranch,
+  });
+  const assistanceCompanies = useQuery({
+    queryKey: referenceKeys.list("compagnies-assistance"),
+    queryFn: () => referenceApi.list("compagnies-assistance"),
+    enabled: branchId !== "ALL" && assistanceBranch,
+  });
+  const appliedAssistanceBranch = isAssistanceBranch(branches.data, appliedFilters.branchId);
+  const appliedBranchReady = appliedFilters.branchId === "ALL" || !branches.isLoading;
   const requestedClient = useQuery({
     queryKey: ["crm-client", requestedPayerId],
     queryFn: () => clientApi.getClientCrm(requestedPayerId),
@@ -178,6 +215,13 @@ export default function ReglementsClientsPage() {
   const queryFilters = {
     payeurType: selectedPayer?.type,
     payeurId: selectedPayer?.id,
+    brancheId: appliedFilters.branchId === "ALL" ? undefined : appliedFilters.branchId,
+    compagnieId: appliedFilters.branchId !== "ALL"
+      && !appliedAssistanceBranch
+      && appliedFilters.companyId !== "ALL" ? appliedFilters.companyId : undefined,
+    compagnieAssistanceId: appliedAssistanceBranch
+      && appliedFilters.companyId !== "ALL" ? appliedFilters.companyId : undefined,
+    typeDate: appliedFilters.dateType,
     dateDu: appliedFilters.dateFrom || undefined,
     dateAu: appliedFilters.dateTo || undefined,
     search: appliedReference || undefined,
@@ -191,14 +235,31 @@ export default function ReglementsClientsPage() {
       selectedPayer,
       appliedReference,
       appliedFilters,
+      appliedAssistanceBranch,
       sortKey,
       sortDirection,
       page,
     ],
     queryFn: () => loadCombinedReceivables(queryFilters, page, sortKey, sortDirection),
-    enabled: Boolean(selectedPayer || appliedReference),
+    enabled: appliedBranchReady && Boolean(
+      selectedPayer
+      || appliedReference
+      || (multiClientDeposit && (
+        appliedFilters.dateFrom
+        || appliedFilters.dateTo
+        || appliedFilters.branchId !== "ALL"
+      ))
+    ),
   });
-  const showResults = Boolean(selectedPayer || appliedReference);
+  const showResults = Boolean(
+    selectedPayer
+    || appliedReference
+    || (multiClientDeposit && (
+      appliedFilters.dateFrom
+      || appliedFilters.dateTo
+      || appliedFilters.branchId !== "ALL"
+    ))
+  );
   const result = showResults ? receivables.data : undefined;
   const selectedRows = Object.values(selected);
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
@@ -261,10 +322,13 @@ export default function ReglementsClientsPage() {
     }
     const nextReference = reference.trim();
     setAppliedReference(nextReference);
-    setAppliedFilters({ dateFrom, dateTo });
+    setAppliedFilters({ branchId, companyId, dateType, dateFrom, dateTo });
     setPage(0);
     updateUrl({
       search: nextReference,
+      brancheId: branchId === "ALL" ? undefined : branchId,
+      compagnieId: companyId === "ALL" ? undefined : companyId,
+      typeDate: dateType === defaultDateType ? undefined : dateType,
       dateDu: dateFrom,
       dateAu: dateTo,
       page: undefined,
@@ -277,9 +341,15 @@ export default function ReglementsClientsPage() {
     setPayerScope("CLIENT");
     payerSearch.clearQuery();
     setSelectedPayer(undefined);
+    setBranchId("ALL");
+    setCompanyId("ALL");
+    setDateType(defaultDateType);
     setDateFrom("");
     setDateTo("");
     setAppliedFilters({
+      branchId: "ALL",
+      companyId: "ALL",
+      dateType: defaultDateType,
       dateFrom: "",
       dateTo: "",
     });
@@ -376,7 +446,7 @@ export default function ReglementsClientsPage() {
       />
 
       <section className="grid gap-4 rounded-md border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[220px_minmax(280px,1.4fr)_minmax(240px,1fr)_170px_170px_auto] xl:items-end">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 2xl:items-end">
           <div className="grid gap-2">
             <Label>Cible</Label>
             <div className="grid grid-cols-2 rounded-md border border-slate-300 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900">
@@ -427,6 +497,49 @@ export default function ReglementsClientsPage() {
               }}
               placeholder="Numéro du document"
             />
+          </div>
+          <div className="grid gap-2">
+            <Label>Branche</Label>
+            <Select
+              value={branchId}
+              onValueChange={(value) => {
+                setBranchId(value);
+                setCompanyId("ALL");
+              }}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Toutes les branches</SelectItem>
+                {(branches.data ?? []).map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>{assistanceBranch ? "Compagnie d’assistance" : "Compagnie"}</Label>
+            <Select value={companyId} disabled={branchId === "ALL"} onValueChange={setCompanyId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">
+                  {branchId === "ALL" ? "Sélectionnez une branche" : "Toutes les compagnies"}
+                </SelectItem>
+                {(assistanceBranch ? assistanceCompanies.data ?? [] : insuranceCompanies.data ?? [])
+                  .map((company) => (
+                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Date filtrée</Label>
+            <Select value={dateType} onValueChange={(value) => setDateType(value as ReceivableDateType)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SAISIE">Date de saisie</SelectItem>
+                <SelectItem value="EFFET">Date d’effet</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-2">
             <Label>Date du</Label>
@@ -485,7 +598,9 @@ export default function ReglementsClientsPage() {
                 <p className="text-sm text-muted-foreground">
                   {showResults
                     ? `Solde ouvert: ${money(result?.summary.soldeOuvert ?? 0)}`
-                    : "Sélectionnez un client ou recherchez une référence."}
+                    : multiClientDeposit
+                      ? "Sélectionnez un client, une référence ou une période de saisie."
+                      : "Sélectionnez un client ou recherchez une référence."}
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
@@ -530,12 +645,20 @@ export default function ReglementsClientsPage() {
                         className="border-white data-[state=checked]:border-white data-[state=checked]:bg-white data-[state=checked]:text-orange-600 data-[state=indeterminate]:border-white data-[state=indeterminate]:bg-white data-[state=indeterminate]:text-orange-600"
                       />
                     </th>
-                    <th className="px-3 py-3 text-left">Assuré</th>
+                    <th className="px-3 py-3 text-left">
+                      {multiClientDeposit ? "Payeur" : "Assuré"}
+                    </th>
                     <th className="px-3 py-3 text-left">Référence</th>
                     <th className="px-3 py-3 text-left">Type</th>
                     <SortableHeader label="Police / contrat" column="POLICE" active={sortKey} direction={sortDirection} onSort={changeSort} />
                     <th className="px-3 py-3 text-left">Nature</th>
-                    <SortableHeader label="Date" column="DATE" active={sortKey} direction={sortDirection} onSort={changeSort} />
+                    <SortableHeader
+                      label={appliedFilters.dateType === "SAISIE" ? "Date saisie" : "Date effet"}
+                      column="DATE"
+                      active={sortKey}
+                      direction={sortDirection}
+                      onSort={changeSort}
+                    />
                     <SortableHeader label="TTC" column="TTC" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <SortableHeader label="Reste à affecter" column="BALANCE" active={sortKey} direction={sortDirection} onSort={changeSort} align="right" />
                     <th className="px-3 py-3 text-center">Statut</th>
@@ -560,10 +683,19 @@ export default function ReglementsClientsPage() {
                           </td>
                           <td className="px-3 py-3">
                             <strong>
-                              {row.source.assureNom
-                                || row.source.souscripteurNom
-                                || row.source.payeurNom}
+                              {multiClientDeposit
+                                ? row.source.payeurNom
+                                : row.source.assureNom
+                                  || row.source.souscripteurNom
+                                  || row.source.payeurNom}
                             </strong>
+                            {multiClientDeposit
+                              && row.source.assureNom
+                              && row.source.assureNom !== row.source.payeurNom ? (
+                                <div className="text-xs text-muted-foreground">
+                                  Assuré: {row.source.assureNom}
+                                </div>
+                              ) : null}
                           </td>
                           <td className="px-3 py-3 font-medium">{receivableDocumentReference(row)}</td>
                           <td className="px-3 py-3">{receivableTypeLabel(row)}</td>
@@ -571,7 +703,11 @@ export default function ReglementsClientsPage() {
                           <td className="px-3 py-3">
                             <strong>{row.source.mouvement}</strong>
                           </td>
-                          <td className="px-3 py-3">{date(row.source.dateEffet)}</td>
+                          <td className="px-3 py-3">
+                            {date(appliedFilters.dateType === "SAISIE"
+                              ? row.source.dateSaisie
+                              : row.source.dateEffet)}
+                          </td>
                           <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>
                           <td className="px-3 py-3 text-right font-semibold">{money(row.soldeOuvert)}</td>
                           <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
@@ -938,6 +1074,10 @@ function SortableHeader(props: {
 type ReceivableSearchFilters = {
   payeurType?: "CLIENT" | "GROUPE";
   payeurId?: string;
+  brancheId?: string;
+  compagnieId?: string;
+  compagnieAssistanceId?: string;
+  typeDate: ReceivableDateType;
   dateDu?: string;
   dateAu?: string;
   search?: string;
@@ -963,7 +1103,12 @@ async function loadCombinedReceivables(
       size,
     })),
   ]);
-  const rows = sortReceivables([...directRows, ...invoiceRows], sortKey, sortDirection);
+  const rows = sortReceivables(
+    [...directRows, ...invoiceRows],
+    sortKey,
+    sortDirection,
+    filters.typeDate
+  );
   const totalPages = Math.ceil(rows.length / PAGE_SIZE);
   const start = page * PAGE_SIZE;
   const visibleRows = rows.slice(start, start + PAGE_SIZE);
@@ -1001,7 +1146,12 @@ async function loadAllReceivables(
   return [first, ...remaining].flatMap((result) => result.rows);
 }
 
-function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: SortDirection) {
+function sortReceivables(
+  rows: ClientReceivable[],
+  key: SortKey,
+  direction: SortDirection,
+  dateType: ReceivableDateType
+) {
   const factor = direction === "ASC" ? 1 : -1;
   return [...rows].sort((left, right) => {
     const comparison = key === "TTC"
@@ -1009,7 +1159,8 @@ function sortReceivables(rows: ClientReceivable[], key: SortKey, direction: Sort
       : key === "BALANCE"
         ? left.soldeOuvert - right.soldeOuvert
         : key === "DATE"
-          ? String(left.source.dateEffet ?? "").localeCompare(String(right.source.dateEffet ?? ""))
+          ? String(dateType === "SAISIE" ? left.source.dateSaisie : left.source.dateEffet)
+            .localeCompare(String(dateType === "SAISIE" ? right.source.dateSaisie : right.source.dateEffet))
           : key === "POLICE"
             ? receivableCoverageReference(left).localeCompare(
               receivableCoverageReference(right),
@@ -1067,6 +1218,24 @@ function urlSortKey(value: string | null): SortKey {
     || value === "BALANCE"
     ? value
     : "DATE";
+}
+
+function urlDateType(
+  value: string | null,
+  fallback: ReceivableDateType
+): ReceivableDateType {
+  return value === "SAISIE" || value === "EFFET" ? value : fallback;
+}
+
+function normalizeCode(value?: string | null) {
+  return (value ?? "").trim().toUpperCase();
+}
+
+function isAssistanceBranch(
+  branches: Array<{ id: string; code?: string | null }> | undefined,
+  branchId: string
+) {
+  return normalizeCode(branches?.find((branch) => branch.id === branchId)?.code) === "ASSISTANCE";
 }
 
 function paymentPath(rows: ClientReceivable[], multiClientDeposit = false) {

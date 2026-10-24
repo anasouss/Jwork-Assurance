@@ -177,7 +177,10 @@ public class ReglementClientService {
             Long souscripteurId,
             Long contratId,
             Long brancheId,
+            Long compagnieId,
+            Long compagnieAssistanceId,
             TypeContrat typeContrat,
+            String typeDate,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
@@ -186,24 +189,29 @@ public class ReglementClientService {
             int page,
             int size
     ) {
+        validatePeriod(dateDu, dateAu);
+        boolean filterByEntryDate = isEntryDateFilter(typeDate);
         SourceDocumentClientPageResponse sources = documentClientService.searchSources(
                 agenceId,
                 payeurType,
                 payeurId,
                 contratId,
                 brancheId,
-                null,
+                compagnieId,
                 typeContrat,
                 null,
-                dateDu,
-                dateAu,
+                filterByEntryDate ? null : dateDu,
+                filterByEntryDate ? null : dateAu,
                 search,
                 false,
                 false,
-                receivableSort(sortBy, sortDirection, false),
+                receivableSort(sortBy, sortDirection, false, filterByEntryDate),
                 page,
                 size,
-                souscripteurId
+                souscripteurId,
+                compagnieAssistanceId,
+                filterByEntryDate && dateDu != null ? dateDu.atStartOfDay() : null,
+                filterByEntryDate && dateAu != null ? dateAu.plusDays(1).atStartOfDay() : null
         );
         List<Long> elementIds = sources.getRows().stream()
                 .map(SourceDocumentClientResponse::getElementFacturableId)
@@ -237,6 +245,10 @@ public class ReglementClientService {
             Long agenceId,
             String payeurType,
             Long payeurId,
+            Long brancheId,
+            Long compagnieId,
+            Long compagnieAssistanceId,
+            String typeDate,
             LocalDate dateDu,
             LocalDate dateAu,
             String search,
@@ -247,17 +259,23 @@ public class ReglementClientService {
     ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
+        boolean filterByEntryDate = isEntryDateFilter(typeDate);
         Page<DocumentClient> result = documentClientRepository.searchOpenInvoices(
                 agenceId,
-                dateDu,
-                dateAu,
+                filterByEntryDate ? null : dateDu,
+                filterByEntryDate ? null : dateAu,
+                filterByEntryDate && dateDu != null ? dateDu.atStartOfDay() : null,
+                filterByEntryDate && dateAu != null ? dateAu.plusDays(1).atStartOfDay() : null,
+                brancheId,
+                compagnieId,
+                compagnieAssistanceId,
                 payeurType,
                 payeurId,
                 normalizeSearch(search),
                 PageRequest.of(
                         Math.max(page, 0),
                         Math.min(Math.max(size, 1), 100),
-                        receivableSort(sortBy, sortDirection, true)
+                        receivableSort(sortBy, sortDirection, true, filterByEntryDate)
                 )
         );
         List<Long> documentIds = result.getContent().stream()
@@ -293,14 +311,29 @@ public class ReglementClientService {
                 .build();
     }
 
-    private Sort receivableSort(String sortBy, String sortDirection, boolean invoice) {
+    private Sort receivableSort(
+            String sortBy,
+            String sortDirection,
+            boolean invoice,
+            boolean entryDate
+    ) {
         Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
                 ? Sort.Direction.ASC
                 : Sort.Direction.DESC;
         String property = "TTC".equalsIgnoreCase(sortBy)
                 ? invoice ? "totalDocument" : "primeTotale"
-                : invoice ? "dateEmission" : "dateDebut";
+                : entryDate ? "createdAt" : invoice ? "dateEmission" : "dateDebut";
         return Sort.by(direction, property).and(Sort.by(Sort.Direction.DESC, "id"));
+    }
+
+    private boolean isEntryDateFilter(String typeDate) {
+        if (typeDate == null || typeDate.isBlank() || "EFFET".equalsIgnoreCase(typeDate)) {
+            return false;
+        }
+        if ("SAISIE".equalsIgnoreCase(typeDate)) {
+            return true;
+        }
+        throw new BadRequestException("Le type de date doit être SAISIE ou EFFET");
     }
 
     @Transactional(readOnly = true)
@@ -2279,6 +2312,7 @@ public class ReglementClientService {
                 .documentClientId(document.getId())
                 .mouvement("Facture client")
                 .reference(document.getNumero())
+                .dateSaisie(document.getCreatedAt().toLocalDate())
                 .dateEffet(document.getDateEmission())
                 .dateEcheance(document.getDateEcheance())
                 .payeurType(payerType)

@@ -497,7 +497,10 @@ export const comptaApi = {
     souscripteurId?: string;
     contratId?: string;
     brancheId?: string;
+    compagnieId?: string;
+    compagnieAssistanceId?: string;
     typeContrat?: TypeContrat;
+    typeDate?: "SAISIE" | "EFFET";
     dateDu?: string;
     dateAu?: string;
     search?: string;
@@ -514,6 +517,10 @@ export const comptaApi = {
   async clientInvoiceReceivables(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
+    brancheId?: string;
+    compagnieId?: string;
+    compagnieAssistanceId?: string;
+    typeDate?: "SAISIE" | "EFFET";
     dateDu?: string;
     dateAu?: string;
     search?: string;

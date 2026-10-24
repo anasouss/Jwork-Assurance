@@ -242,6 +242,36 @@ public class DocumentClientService {
             int size,
             Long souscripteurId
     ) {
+        return searchSources(
+                agenceId, payeurType, payeurId, contratId, brancheId, compagnieId,
+                typeContrat, documentState, dateDu, dateAu, search, includeInvoiced,
+                includeSummary, sort, page, size, souscripteurId, null, null, null
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public SourceDocumentClientPageResponse searchSources(
+            Long agenceId,
+            String payeurType,
+            Long payeurId,
+            Long contratId,
+            Long brancheId,
+            Long compagnieId,
+            TypeContrat typeContrat,
+            String documentState,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
+            boolean includeInvoiced,
+            boolean includeSummary,
+            Sort sort,
+            int page,
+            int size,
+            Long souscripteurId,
+            Long compagnieAssistanceId,
+            LocalDateTime saisieDu,
+            LocalDateTime saisieAuExclusive
+    ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         String normalizedDocumentState = normalizeDocumentState(documentState);
@@ -262,6 +292,9 @@ public class DocumentClientService {
                 includeInvoiced,
                 dateDu,
                 dateAu,
+                saisieDu,
+                saisieAuExclusive,
+                compagnieAssistanceId,
                 payeurType,
                 payeurId,
                 normalizedSearch,
@@ -1112,6 +1145,7 @@ public class DocumentClientService {
                 .reference(sourceReference(source))
                 .referenceSource(sourceReference(source))
                 .compagnie(sourceCompany(source))
+                .dateSaisie(element.getCreatedAt().toLocalDate())
                 .dateEffet(element.getDateDebut())
                 .dateEcheance(element.getDateFin())
                 .payeurType(payer.group() == null ? "CLIENT" : "GROUPE")

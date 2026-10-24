@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -70,14 +71,31 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:brancheId is null
+                   or (e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                       and c.brancheAssurance.id = :brancheId)
+                   or (e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE and exists (
+                        select 1 from AssistanceContrat branchAssistance
+                        where branchAssistance.elementFacturable = e
+                          and branchAssistance.actif = true
+                          and branchAssistance.brancheAssurance.id = :brancheId
+                   )))
               and (:contratId is null or c.id = :contratId)
               and (:clientPortefeuilleId is null or pp.id = :clientPortefeuilleId or exists (
                     select 1 from ContratClient portfolioCc
                     where portfolioCc.contrat = c
                       and portfolioCc.client.id = :clientPortefeuilleId
               ))
-              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:compagnieId is null or (
+                    e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                    and c.compagnieAssurance.id = :compagnieId
+              ))
+              and (:compagnieAssistanceId is null or exists (
+                    select 1 from AssistanceContrat companyAssistance
+                    where companyAssistance.elementFacturable = e
+                      and companyAssistance.actif = true
+                      and companyAssistance.compagnieAssistance.id = :compagnieAssistanceId
+              ))
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
@@ -106,6 +124,8 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               )
               and (:dateDu is null or e.dateDebut >= :dateDu)
               and (:dateAu is null or e.dateDebut <= :dateAu)
+              and (:saisieDu is null or e.createdAt >= :saisieDu)
+              and (:saisieAuExclusive is null or e.createdAt < :saisieAuExclusive)
               and (
                     (
                         e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
@@ -242,14 +262,31 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
               )
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
+              and (:brancheId is null
+                   or (e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                       and c.brancheAssurance.id = :brancheId)
+                   or (e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE and exists (
+                        select 1 from AssistanceContrat branchAssistance
+                        where branchAssistance.elementFacturable = e
+                          and branchAssistance.actif = true
+                          and branchAssistance.brancheAssurance.id = :brancheId
+                   )))
               and (:contratId is null or c.id = :contratId)
               and (:clientPortefeuilleId is null or pp.id = :clientPortefeuilleId or exists (
                     select 1 from ContratClient portfolioCc
                     where portfolioCc.contrat = c
                       and portfolioCc.client.id = :clientPortefeuilleId
               ))
-              and (:compagnieId is null or c.compagnieAssurance.id = :compagnieId)
+              and (:compagnieId is null or (
+                    e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                    and c.compagnieAssurance.id = :compagnieId
+              ))
+              and (:compagnieAssistanceId is null or exists (
+                    select 1 from AssistanceContrat companyAssistance
+                    where companyAssistance.elementFacturable = e
+                      and companyAssistance.actif = true
+                      and companyAssistance.compagnieAssistance.id = :compagnieAssistanceId
+              ))
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
@@ -278,6 +315,8 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               )
               and (:dateDu is null or e.dateDebut >= :dateDu)
               and (:dateAu is null or e.dateDebut <= :dateAu)
+              and (:saisieDu is null or e.createdAt >= :saisieDu)
+              and (:saisieAuExclusive is null or e.createdAt < :saisieAuExclusive)
               and (
                     (
                         e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
@@ -394,6 +433,9 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
             @Param("includeInvoiced") boolean includeInvoiced,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("saisieDu") LocalDateTime saisieDu,
+            @Param("saisieAuExclusive") LocalDateTime saisieAuExclusive,
+            @Param("compagnieAssistanceId") Long compagnieAssistanceId,
             @Param("payeurType") String payeurType,
             @Param("payeurId") Long payeurId,
             @Param("search") String search,

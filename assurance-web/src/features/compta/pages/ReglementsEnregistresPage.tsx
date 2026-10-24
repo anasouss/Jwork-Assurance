@@ -106,15 +106,15 @@ const INSTRUMENT_STATUS_LABELS: Record<PaymentInstrument["statut"], string> = {
   REMPLACE: "Remplacé",
 };
 
-const INSTRUMENT_STATUS_BADGE_VARIANTS: Record<
+const INSTRUMENT_STATUS_INDICATOR_STYLES: Record<
   PaymentInstrument["statut"],
-  "warning" | "info" | "success" | "red" | "gray"
+  { dot: string; text: string }
 > = {
-  EN_ATTENTE: "warning",
-  REMIS_EN_BANQUE: "info",
-  CONFIRME: "success",
-  REJETE: "red",
-  REMPLACE: "gray",
+  EN_ATTENTE: { dot: "bg-amber-500", text: "text-amber-800 dark:text-amber-300" },
+  REMIS_EN_BANQUE: { dot: "bg-blue-500", text: "text-blue-800 dark:text-blue-300" },
+  CONFIRME: { dot: "bg-emerald-500", text: "text-emerald-800 dark:text-emerald-300" },
+  REJETE: { dot: "bg-red-500", text: "text-red-700 dark:text-red-300" },
+  REMPLACE: { dot: "bg-gray-500", text: "text-gray-700 dark:text-gray-300" },
 };
 
 export default function ReglementsEnregistresPage() {
@@ -1036,11 +1036,19 @@ function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
   return <Badge variant="red">Annulé</Badge>;
 }
 
-function InstrumentStatusBadge({ value }: { value: PaymentInstrument["statut"] }) {
+function InstrumentStatusIndicator({
+  value,
+  count = 1,
+}: {
+  value: PaymentInstrument["statut"];
+  count?: number;
+}) {
+  const styles = INSTRUMENT_STATUS_INDICATOR_STYLES[value];
   return (
-    <Badge variant={INSTRUMENT_STATUS_BADGE_VARIANTS[value]}>
-      {INSTRUMENT_STATUS_LABELS[value]}
-    </Badge>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${styles.text}`}>
+      <span className={`size-2 shrink-0 rounded-full ${styles.dot}`} aria-hidden="true" />
+      {count > 1 ? `${count} × ` : ""}{INSTRUMENT_STATUS_LABELS[value]}
+    </span>
   );
 }
 
@@ -1061,14 +1069,14 @@ function InstrumentStatusesSummary({ instruments }: { instruments: PaymentInstru
   const counts = countBy(instruments.map((instrument) => instrument.statut));
   if (counts.size === 1) {
     const [status, count] = Array.from(counts.entries())[0];
-    return (
-      <span className="inline-flex items-center gap-1">
-        {count > 1 ? <span className="text-xs font-medium">{count}</span> : null}
-        <InstrumentStatusBadge value={status as PaymentInstrument["statut"]} />
-      </span>
-    );
+    return <InstrumentStatusIndicator value={status as PaymentInstrument["statut"]} count={count} />;
   }
-  return <Badge variant="purple">États mixtes</Badge>;
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-purple-700 dark:text-purple-300">
+      <span className="size-2 shrink-0 rounded-full bg-purple-500" aria-hidden="true" />
+      États mixtes
+    </span>
+  );
 }
 
 function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
@@ -1098,7 +1106,7 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
                 <td className="px-3 py-2 font-medium">{instrument.referenceInstrument || "-"}</td>
                 <td className="px-3 py-2">{formatDate(instrument.dateEcheance)}</td>
                 <td className="px-3 py-2">{formatDate(instrument.dateStatut)}</td>
-                <td className="px-3 py-2 text-center"><InstrumentStatusBadge value={instrument.statut} /></td>
+                <td className="px-3 py-2 text-center"><InstrumentStatusIndicator value={instrument.statut} /></td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums">
                   {formatAccountingAmount(instrument.montant)}
                 </td>

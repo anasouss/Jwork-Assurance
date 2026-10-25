@@ -349,8 +349,6 @@ public class VehiculeImportService {
                         && selectedByVehicle.getOrDefault(vehicles.get(rowIndex).getId(), Set.of()).contains(guarantee.getId());
                 if (selected) {
                     cell.setCellValue("Oui");
-                } else if (rowIndex < vehicles.size()) {
-                    cell.setCellValue("Non");
                 }
                 cell.setCellStyle(inputStyle);
             }

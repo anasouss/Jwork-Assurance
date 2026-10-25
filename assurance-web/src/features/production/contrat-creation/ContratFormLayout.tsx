@@ -358,10 +358,37 @@ export function ContratFormLayout({
         <VehicleExcelImportDialog
           draftId={form.draftId}
           existingVehicles={form.vehicules}
-          onApply={(imported) => form.setVehicules((current) => [
-            ...current.filter((vehicle) => vehicle.vehiculeId != null || Boolean(vehicle.immatriculation?.trim())),
-            ...imported,
-          ])}
+          garanties={form.refs.garanties.data ?? []}
+          lignes={form.lignesGrille.data ?? []}
+          formulesPersonne={form.formulesPersonne.data ?? []}
+          usages={flotteVehicleUsages}
+          grilleSelected={Boolean(form.grilleTarifaireId)}
+          pricingMode={form.modeSaisieGaranties ?? "AUTOMATIQUE_GRILLE"}
+          calculationPreview={form.targetPreview}
+          previewingGuarantees={form.targetPreviewMutation.isPending}
+          onPreviewGuarantees={(vehicles, target, selected) =>
+            form.handlePreviewImportedTarget(vehicles, target, selected)
+          }
+          onApply={(imported, importedGuarantees) => {
+            const retainedIndexes = form.vehicules.flatMap((vehicle, index) =>
+              vehicle.vehiculeId != null || Boolean(vehicle.immatriculation?.trim()) ? [index] : []
+            );
+            const indexMap = new Map(retainedIndexes.map((oldIndex, newIndex) => [oldIndex, newIndex]));
+            const retainedVehicles = retainedIndexes.map((index) => form.vehicules[index]);
+            const offset = retainedVehicles.length;
+            form.setVehicules([...retainedVehicles, ...imported]);
+            form.setGaranties((current) => [
+              ...current.flatMap((item) => {
+                if (item.vehiculeIndex == null) return [item];
+                const mappedIndex = indexMap.get(item.vehiculeIndex);
+                return mappedIndex == null ? [] : [{ ...item, vehiculeIndex: mappedIndex }];
+              }),
+              ...importedGuarantees.map((item) => ({
+                ...item,
+                vehiculeIndex: item.vehiculeIndex == null ? undefined : item.vehiculeIndex + offset,
+              })),
+            ]);
+          }}
         />
       ) : null}
       errors={form.validationErrors}

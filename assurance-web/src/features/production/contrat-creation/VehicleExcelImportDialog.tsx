@@ -11,24 +11,46 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FileDropzone } from "@/components/ui/file-dropzone";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { contractCreationApi } from "../api/contract-creation";
-import type { VehicleImportPreview, VehiculeInput } from "../types";
+import type { GarantieInput, QuittancePreview, ReferenceOption, VehicleImportPreview, VehiculeInput } from "../types";
+import type { ContractPricingMode, ContractTarget } from "./ContractTargetsSection";
+import { VehicleGuaranteeImportReview } from "./VehicleGuaranteeImportReview";
 
 const MAX_IMPORT_SIZE = 5 * 1024 * 1024;
 
 export function VehicleExcelImportDialog({
   draftId,
   existingVehicles,
+  garanties,
+  lignes,
+  formulesPersonne,
+  usages,
+  grilleSelected,
+  pricingMode,
+  calculationPreview,
+  previewingGuarantees,
+  onPreviewGuarantees,
   onApply,
 }: {
   draftId?: string;
   existingVehicles: VehiculeInput[];
-  onApply: (vehicles: VehiculeInput[]) => void;
+  garanties: ReferenceOption[];
+  lignes: ReferenceOption[];
+  formulesPersonne: ReferenceOption[];
+  usages: ReferenceOption[];
+  grilleSelected: boolean;
+  pricingMode: ContractPricingMode;
+  calculationPreview?: QuittancePreview | null;
+  previewingGuarantees?: boolean;
+  onPreviewGuarantees: (vehicles: VehiculeInput[], target: ContractTarget, garanties: GarantieInput[]) => void;
+  onApply: (vehicles: VehiculeInput[], garanties: GarantieInput[]) => void;
 }) {
   const hasSubmittedVehicles = existingVehicles.some((vehicle) => vehicle.vehiculeId != null);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<VehicleImportPreview | null>(null);
+  const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -36,6 +58,7 @@ export function VehicleExcelImportDialog({
   const reset = () => {
     setFile(null);
     setPreview(null);
+    setSelectedGaranties([]);
   };
 
   const selectFile = (selected: File | null) => {
@@ -62,7 +85,13 @@ export function VehicleExcelImportDialog({
     setLoading(true);
     try {
       const result = await contractCreationApi.previewVehicleImport(draftId, file);
-      setPreview(withLocalDuplicateErrors(result, existingVehicles));
+      const checked = withLocalDuplicateErrors(result, existingVehicles);
+      setPreview(checked);
+      setSelectedGaranties(checked.garanties ?? []);
+      const imported = checked.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []);
+      if (imported[0] && checked.garanties?.length) {
+        onPreviewGuarantees(imported, importedVehicleTarget(imported[0], 0, usages), checked.garanties);
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Import Excel impossible");
     } finally {
@@ -104,11 +133,13 @@ export function VehicleExcelImportDialog({
   const apply = () => {
     if (!preview || preview.lignesEnErreur > 0) return;
     const imported = preview.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []);
-    onApply(imported);
+    onApply(imported, selectedGaranties);
     toast.success(`${imported.length} véhicule${imported.length > 1 ? "s" : ""} ajouté${imported.length > 1 ? "s" : ""}`);
     setOpen(false);
     reset();
   };
+
+  const importedVehicles = preview?.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []) ?? [];
 
   return (
     <>
@@ -170,49 +201,42 @@ export function VehicleExcelImportDialog({
             </div>
 
             {preview ? (
-              <>
-                <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
-                  <Metric label="Lignes analysées" value={preview.totalLignes} />
-                  <Metric label="Véhicules valides" value={preview.lignesValides} tone="success" />
-                  <Metric label="Lignes en erreur" value={preview.lignesEnErreur} tone={preview.lignesEnErreur ? "danger" : "default"} />
-                </div>
-                <div className="overflow-x-auto rounded-md border">
-                  <table className="w-full min-w-[900px] text-sm">
-                    <thead className="bg-emerald-800 text-xs uppercase text-white">
-                      <tr>
-                        <th className="px-3 py-2.5 text-left">Ligne</th>
-                        <th className="px-3 py-2.5 text-left">Immatriculation</th>
-                        <th className="px-3 py-2.5 text-left">N° attestation</th>
-                        <th className="px-3 py-2.5 text-left">Usage</th>
-                        <th className="px-3 py-2.5 text-left">Marque</th>
-                        <th className="px-3 py-2.5 text-left">Résultat</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {preview.lignes.map((row) => (
-                        <tr key={row.numeroLigne} className={row.erreurs.length ? "bg-red-50/60 dark:bg-red-950/20" : undefined}>
-                          <td className="px-3 py-2.5 font-medium">{row.numeroLigne}</td>
-                          <td className="px-3 py-2.5">{row.immatriculation || "-"}</td>
-                          <td className="px-3 py-2.5">{row.numeroAttestation || "-"}</td>
-                          <td className="px-3 py-2.5">{row.usage || "-"}</td>
-                          <td className="px-3 py-2.5">{row.marque || "-"}</td>
-                          <td className="px-3 py-2.5">
-                            {row.erreurs.length ? (
-                              <div className="grid gap-1 text-red-700 dark:text-red-300">
-                                {row.erreurs.map((error) => <div key={error} className="flex items-start gap-1.5"><AlertCircle className="mt-0.5 size-4 shrink-0" />{error}</div>)}
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
-                                <CheckCircle2 className="size-4" /> Prêt à importer
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <Tabs defaultValue="vehicles" className="grid gap-3">
+                <TabsList className="w-fit">
+                  <TabsTrigger value="vehicles">Véhicules ({preview.totalLignes})</TabsTrigger>
+                  <TabsTrigger value="guarantees">Garanties ({selectedGaranties.length})</TabsTrigger>
+                </TabsList>
+                <TabsContent value="vehicles" className="mt-0 grid gap-3">
+                  <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
+                    <Metric label="Lignes analysées" value={preview.totalLignes} />
+                    <Metric label="Véhicules valides" value={preview.lignesValides} tone="success" />
+                    <Metric label="Lignes en erreur" value={preview.lignesEnErreur} tone={preview.lignesEnErreur ? "danger" : "default"} />
+                  </div>
+                  <VehiclePreviewTable preview={preview} />
+                </TabsContent>
+                <TabsContent value="guarantees" className="mt-0 grid gap-3">
+                  <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
+                    <Metric label="Véhicules analysés" value={preview.totalLignesGaranties} />
+                    <Metric label="Lignes valides" value={preview.lignesGarantiesValides} tone="success" />
+                    <Metric label="Lignes en erreur" value={preview.lignesGarantiesEnErreur} tone={preview.lignesGarantiesEnErreur ? "danger" : "default"} />
+                  </div>
+                  <VehicleGuaranteeImportReview
+                    preview={preview}
+                    vehicles={importedVehicles}
+                    garanties={garanties}
+                    lignes={lignes}
+                    formulesPersonne={formulesPersonne}
+                    usages={usages}
+                    grilleSelected={grilleSelected}
+                    pricingMode={pricingMode}
+                    selected={selectedGaranties}
+                    setSelected={setSelectedGaranties}
+                    calculationPreview={calculationPreview}
+                    previewing={previewingGuarantees}
+                    onRequestCalculation={(target, next) => onPreviewGuarantees(importedVehicles, target, next)}
+                  />
+                </TabsContent>
+              </Tabs>
             ) : null}
           </div>
 
@@ -221,17 +245,63 @@ export function VehicleExcelImportDialog({
             <Button
               type="button"
               disabled={preview
-                ? preview.lignesEnErreur > 0 || preview.lignesValides === 0
+                ? preview.lignesEnErreur > 0 || preview.lignesGarantiesEnErreur > 0 || preview.lignesValides === 0
                 : !file || loading}
               onClick={preview ? apply : previewFile}
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : preview ? <CheckCircle2 className="size-4" /> : <Upload className="size-4" />}
-              {preview ? "Ajouter les véhicules" : "Analyser le fichier"}
+              {preview ? "Ajouter véhicules et garanties" : "Analyser le fichier"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function VehiclePreviewTable({ preview }: { preview: VehicleImportPreview }) {
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="w-full min-w-[900px] text-sm">
+        <thead className="bg-emerald-800 text-xs uppercase text-white">
+          <tr>
+            <th className="px-3 py-2.5 text-left">Ligne</th>
+            <th className="px-3 py-2.5 text-left">Immatriculation</th>
+            <th className="px-3 py-2.5 text-left">N° attestation</th>
+            <th className="px-3 py-2.5 text-left">Usage</th>
+            <th className="px-3 py-2.5 text-left">Marque</th>
+            <th className="px-3 py-2.5 text-left">Résultat</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y">
+          {preview.lignes.map((row) => (
+            <tr key={row.numeroLigne} className={row.erreurs.length ? "bg-red-50/60 dark:bg-red-950/20" : undefined}>
+              <td className="px-3 py-2.5 font-medium">{row.numeroLigne}</td>
+              <td className="px-3 py-2.5">{row.immatriculation || "-"}</td>
+              <td className="px-3 py-2.5">{row.numeroAttestation || "-"}</td>
+              <td className="px-3 py-2.5">{row.usage || "-"}</td>
+              <td className="px-3 py-2.5">{row.marque || "-"}</td>
+              <td className="px-3 py-2.5">
+                {row.erreurs.length ? (
+                  <div className="grid gap-1 text-red-700 dark:text-red-300">
+                    {row.erreurs.map((error) => (
+                      <div key={error} className="flex items-start gap-1.5">
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                        {error}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                    <CheckCircle2 className="size-4" /> Prêt à importer
+                  </div>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -264,4 +334,22 @@ function withLocalDuplicateErrors(preview: VehicleImportPreview, existingVehicle
 
 function normalizeRegistration(value?: string) {
   return (value ?? "").toLocaleLowerCase("fr").replace(/[^a-z0-9]/g, "");
+}
+
+function importedVehicleTarget(
+  vehicle: VehiculeInput,
+  index: number,
+  usages: ReferenceOption[]
+): ContractTarget {
+  return {
+    kind: "vehicule",
+    index,
+    label: vehicle.immatriculation?.trim() || `Véhicule ${index + 1}`,
+    usageId: vehicle.usageId,
+    usageCode: usages.find((usage) => usage.id === vehicle.usageId)?.code ?? undefined,
+    categorieTransportId: vehicle.categorieTransportId,
+    valeurVenale: vehicle.valeurVenale,
+    valeurNeuf: vehicle.valeurNeuf,
+    valeurGlace: vehicle.valeurGlace,
+  };
 }

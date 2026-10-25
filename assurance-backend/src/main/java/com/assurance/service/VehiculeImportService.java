@@ -6,20 +6,29 @@ import com.assurance.dto.response.VehiculeImportPreviewResponse;
 import com.assurance.entity.Carburant;
 import com.assurance.entity.CategorieTransport;
 import com.assurance.entity.Contrat;
+import com.assurance.entity.ContratGarantie;
+import com.assurance.entity.Garantie;
+import com.assurance.entity.LigneGrilleTarifaire;
 import com.assurance.entity.SousClasse;
 import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
 import com.assurance.enums.ChampMoteurSousClasse;
+import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.ModeTermeRenouvellement;
+import com.assurance.enums.ModeTarificationGarantie;
+import com.assurance.enums.SourceValeurGarantie;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.TypeGarantie;
 import com.assurance.enums.TypeVehiculeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.CarburantRepository;
 import com.assurance.repository.CarrosserieRepository;
 import com.assurance.repository.CategorieTransportRepository;
+import com.assurance.repository.ContratGarantieRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.FormuleGarantiePersonneRepository;
+import com.assurance.repository.GarantieRepository;
 import com.assurance.repository.LigneGrilleTarifaireRepository;
 import com.assurance.repository.MarqueRepository;
 import com.assurance.repository.SousClasseRepository;
@@ -37,6 +46,7 @@ import org.apache.poi.ss.usermodel.DataValidationConstraint;
 import org.apache.poi.ss.usermodel.DataValidationHelper;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Name;
@@ -50,6 +60,7 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -76,6 +87,8 @@ public class VehiculeImportService {
     private static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
     private static final int MAX_ROWS = 1_000;
     private static final int STYLED_TEMPLATE_ROWS = 100;
+    private static final String VEHICLE_SHEET = "Véhicules";
+    private static final String GUARANTEE_SHEET = "Garanties";
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final List<String> TEMPLATE_HEADERS = List.of(
             "Usage", "Immatriculation", "N° attestation", "Marque", "Carrosserie", "Carburant",
@@ -85,7 +98,9 @@ public class VehiculeImportService {
     );
 
     private final ContratRepository contratRepository;
+    private final ContratGarantieRepository contratGarantieRepository;
     private final VehiculeRepository vehiculeRepository;
+    private final GarantieRepository garantieRepository;
     private final UsageRepository usageRepository;
     private final MarqueRepository marqueRepository;
     private final CarrosserieRepository carrosserieRepository;
@@ -106,7 +121,10 @@ public class VehiculeImportService {
             if (workbook.getNumberOfSheets() == 0) {
                 throw new BadRequestException("Le fichier Excel ne contient aucune feuille");
             }
-            Sheet sheet = workbook.getSheetAt(0);
+            Sheet sheet = workbook.getSheet(VEHICLE_SHEET);
+            if (sheet == null) {
+                sheet = workbook.getSheetAt(0);
+            }
             Row header = sheet.getRow(sheet.getFirstRowNum());
             if (header == null) {
                 throw new BadRequestException("La ligne d'en-tête est absente");
@@ -148,11 +166,17 @@ public class VehiculeImportService {
                 throw new BadRequestException("Le fichier ne contient aucun véhicule");
             }
             int valid = (int) rows.stream().filter(item -> item.getErreurs().isEmpty()).count();
+            GuaranteePreview guaranteePreview = parseGuarantees(workbook, contrat, rows);
             return VehiculeImportPreviewResponse.builder()
                     .totalLignes(rows.size())
                     .lignesValides(valid)
                     .lignesEnErreur(rows.size() - valid)
                     .lignes(rows)
+                    .totalLignesGaranties(guaranteePreview.rows().size())
+                    .lignesGarantiesValides(guaranteePreview.validRows())
+                    .lignesGarantiesEnErreur(guaranteePreview.rows().size() - guaranteePreview.validRows())
+                    .garanties(guaranteePreview.guarantees())
+                    .lignesGaranties(guaranteePreview.rows())
                     .build();
         } catch (BadRequestException exception) {
             throw exception;
@@ -163,27 +187,33 @@ public class VehiculeImportService {
 
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
-        requireFleetContract(agenceId, contratId);
-        return createWorkbook(List.of(), "Génération du modèle Excel impossible");
+        Contrat contrat = requireFleetContract(agenceId, contratId);
+        return createWorkbook(contrat, List.of(), List.of(), "Génération du modèle Excel impossible");
     }
 
     @Transactional(readOnly = true)
     public byte[] exportSubmittedVehicles(Long agenceId, Long contratId) {
-        requireFleetContract(agenceId, contratId);
+        Contrat contrat = requireFleetContract(agenceId, contratId);
         List<Vehicule> vehicles = vehiculeRepository.findForExportByContratIdOrderByCreatedAtAsc(contratId);
         if (vehicles.isEmpty()) {
             throw new BadRequestException("Aucun véhicule enregistré à exporter");
         }
-        return createWorkbook(vehicles, "Export des véhicules impossible");
+        List<ContratGarantie> guarantees = contratGarantieRepository.findActiveByContratId(contratId);
+        return createWorkbook(contrat, vehicles, guarantees, "Export des véhicules impossible");
     }
 
-    private byte[] createWorkbook(List<Vehicule> vehicles, String errorMessage) {
+    private byte[] createWorkbook(
+            Contrat contrat,
+            List<Vehicule> vehicles,
+            List<ContratGarantie> selectedGuarantees,
+            String errorMessage
+    ) {
         List<Usage> usages = generalWorkbookUsages(vehicles);
         if (usages.isEmpty()) {
             throw new BadRequestException("Aucun usage actif n'est disponible");
         }
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Véhicules");
+            Sheet sheet = workbook.createSheet(VEHICLE_SHEET);
             CellStyle headerStyle = createHeaderStyle(workbook, IndexedColors.DARK_GREEN);
             CellStyle inputStyle = createInputStyle(workbook);
             CellStyle amountStyle = workbook.createCellStyle();
@@ -237,12 +267,347 @@ public class VehiculeImportService {
             sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TEMPLATE_HEADERS.size() - 1));
             sheet.createFreezePane(0, 1);
             sheet.setActiveCell(new CellAddress(1, 0));
+            createGuaranteeSheet(workbook, contrat, vehicles, selectedGuarantees, headerStyle, inputStyle);
             workbook.setSheetHidden(workbook.getSheetIndex(references), true);
             workbook.write(output);
             return output.toByteArray();
         } catch (Exception exception) {
             throw new BadRequestException(errorMessage);
         }
+    }
+
+    private void createGuaranteeSheet(
+            Workbook workbook,
+            Contrat contrat,
+            List<Vehicule> vehicles,
+            List<ContratGarantie> selectedGuarantees,
+            CellStyle headerStyle,
+            CellStyle inputStyle
+    ) {
+        Map<Long, Garantie> guaranteesById = new LinkedHashMap<>();
+        availableGuarantees(contrat).forEach(guarantee -> guaranteesById.put(guarantee.getId(), guarantee));
+        selectedGuarantees.stream()
+                .map(ContratGarantie::getGarantie)
+                .filter(java.util.Objects::nonNull)
+                .forEach(guarantee -> guaranteesById.putIfAbsent(guarantee.getId(), guarantee));
+        List<Garantie> guarantees = new ArrayList<>(guaranteesById.values());
+        Sheet sheet = workbook.createSheet(GUARANTEE_SHEET);
+        Row header = sheet.createRow(0);
+        header.setHeightInPoints(32);
+        Cell registrationHeader = header.createCell(0);
+        registrationHeader.setCellValue("Immatriculation");
+        registrationHeader.setCellStyle(headerStyle);
+        sheet.setColumnWidth(0, 22 * 256);
+
+        for (int index = 0; index < guarantees.size(); index++) {
+            Garantie guarantee = guarantees.get(index);
+            Cell cell = header.createCell(index + 1);
+            cell.setCellValue(guarantee.getCode() + " - " + guarantee.getLibelle());
+            cell.setCellStyle(headerStyle);
+            sheet.setColumnWidth(index + 1, 24 * 256);
+        }
+
+        Map<Long, Set<Long>> selectedByVehicle = new LinkedHashMap<>();
+        for (ContratGarantie selected : selectedGuarantees) {
+            if (selected.getVehicule() != null && selected.getGarantie() != null) {
+                selectedByVehicle.computeIfAbsent(selected.getVehicule().getId(), ignored -> new HashSet<>())
+                        .add(selected.getGarantie().getId());
+            }
+        }
+
+        int rowCount = Math.max(STYLED_TEMPLATE_ROWS, vehicles.size());
+        DataValidationHelper validationHelper = sheet.getDataValidationHelper();
+        DataValidationConstraint yesNoConstraint = validationHelper.createExplicitListConstraint(new String[]{"Oui", "Non"});
+        if (!guarantees.isEmpty()) {
+            DataValidation validation = validationHelper.createValidation(
+                    yesNoConstraint,
+                    new CellRangeAddressList(1, MAX_ROWS, 1, guarantees.size())
+            );
+            validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
+            validation.createErrorBox("Valeur invalide", "Sélectionnez Oui ou Non");
+            validation.setShowErrorBox(true);
+            validation.setSuppressDropDownArrow(true);
+            sheet.addValidationData(validation);
+        }
+
+        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+            Row row = sheet.createRow(rowIndex + 1);
+            row.setHeightInPoints(22);
+            Cell registration = row.createCell(0);
+            if (rowIndex < vehicles.size()) {
+                registration.setCellValue(vehicles.get(rowIndex).getImmatriculation());
+            } else {
+                registration.setCellFormula("IF('" + VEHICLE_SHEET + "'!B" + (rowIndex + 2)
+                        + "=\"\",\"\",'" + VEHICLE_SHEET + "'!B" + (rowIndex + 2) + ")");
+            }
+            registration.setCellStyle(inputStyle);
+            for (int guaranteeIndex = 0; guaranteeIndex < guarantees.size(); guaranteeIndex++) {
+                Garantie guarantee = guarantees.get(guaranteeIndex);
+                Cell cell = row.createCell(guaranteeIndex + 1);
+                boolean selected = rowIndex < vehicles.size()
+                        && selectedByVehicle.getOrDefault(vehicles.get(rowIndex).getId(), Set.of()).contains(guarantee.getId());
+                if (selected) {
+                    cell.setCellValue("Oui");
+                } else if (rowIndex < vehicles.size()) {
+                    cell.setCellValue("Non");
+                } else if (Boolean.TRUE.equals(guarantee.getResponsabiliteCivile())) {
+                    cell.setCellFormula("IF(A" + (rowIndex + 2) + "=\"\",\"\",\"Oui\")");
+                }
+                cell.setCellStyle(inputStyle);
+            }
+        }
+        sheet.setDisplayGridlines(false);
+        sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, guarantees.size()));
+        sheet.createFreezePane(1, 1);
+    }
+
+    private List<Garantie> availableGuarantees(Contrat contrat) {
+        Set<Long> tariffGuaranteeIds = contrat.getGrilleTarifaire() == null
+                ? Set.of()
+                : ligneGrilleTarifaireRepository
+                .findByGrilleTarifaireIdAndActifTrue(contrat.getGrilleTarifaire().getId()).stream()
+                .map(LigneGrilleTarifaire::getGarantie)
+                .filter(java.util.Objects::nonNull)
+                .map(Garantie::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        return garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
+                .filter(guarantee -> Boolean.TRUE.equals(guarantee.getActif()))
+                .filter(guarantee -> guarantee.getTypeGarantie() != TypeGarantie.PERSONNE)
+                .filter(guarantee -> guarantee.getBrancheAssurance() != null
+                        && "AUTOMOBILE".equalsIgnoreCase(guarantee.getBrancheAssurance().getCode()))
+                .filter(guarantee -> contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
+                        || tariffGuaranteeIds.isEmpty()
+                        || tariffGuaranteeIds.contains(guarantee.getId())
+                        || Boolean.TRUE.equals(guarantee.getResponsabiliteCivile()))
+                .toList();
+    }
+
+    private GuaranteePreview parseGuarantees(
+            Workbook workbook,
+            Contrat contrat,
+            List<VehiculeImportPreviewResponse.Ligne> vehicleRows
+    ) {
+        Sheet sheet = workbook.getSheet(GUARANTEE_SHEET);
+        if (sheet == null) {
+            return new GuaranteePreview(List.of(), List.of(), 0);
+        }
+        Row header = sheet.getRow(sheet.getFirstRowNum());
+        if (header == null) {
+            throw new BadRequestException("La ligne d'en-tête de la feuille Garanties est absente");
+        }
+        DataFormatter formatter = new DataFormatter(Locale.FRANCE);
+        FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+        Map<String, Garantie> guaranteesByHeader = new LinkedHashMap<>();
+        for (Garantie guarantee : availableGuarantees(contrat)) {
+            guaranteesByHeader.put(normalize(guarantee.getCode()), guarantee);
+            guaranteesByHeader.put(normalize(guarantee.getCode() + " - " + guarantee.getLibelle()), guarantee);
+        }
+        Map<Integer, Garantie> guaranteeColumns = new LinkedHashMap<>();
+        Set<Long> guaranteeHeaderIds = new HashSet<>();
+        int registrationColumn = -1;
+        for (Cell cell : header) {
+            String value = formatter.formatCellValue(cell, evaluator).trim();
+            if (normalize(value).equals("immatriculation")) {
+                registrationColumn = cell.getColumnIndex();
+                continue;
+            }
+            if (value.isBlank()) {
+                continue;
+            }
+            Garantie guarantee = guaranteesByHeader.get(normalize(value));
+            if (guarantee == null) {
+                throw new BadRequestException("Colonne de garantie inconnue ou non disponible : " + value);
+            }
+            if (!guaranteeHeaderIds.add(guarantee.getId())) {
+                throw new BadRequestException("Colonne de garantie en double : " + guarantee.getCode());
+            }
+            guaranteeColumns.put(cell.getColumnIndex(), guarantee);
+        }
+        if (registrationColumn < 0) {
+            throw new BadRequestException("Colonne obligatoire absente dans Garanties : Immatriculation");
+        }
+
+        Map<String, VehicleMatch> vehiclesByRegistration = new LinkedHashMap<>();
+        int validVehicleIndex = 0;
+        for (VehiculeImportPreviewResponse.Ligne row : vehicleRows) {
+            if (row.getVehicule() != null) {
+                vehiclesByRegistration.put(
+                        normalizedRegistration(row.getImmatriculation()),
+                        new VehicleMatch(validVehicleIndex++, row.getVehicule())
+                );
+            }
+        }
+        List<LigneGrilleTarifaire> tariffLines = contrat.getGrilleTarifaire() == null
+                ? List.of()
+                : ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(contrat.getGrilleTarifaire().getId());
+        List<CreateContratRequest.GarantieInput> selections = new ArrayList<>();
+        List<VehiculeImportPreviewResponse.LigneGaranties> rows = new ArrayList<>();
+        Set<String> seenRegistrations = new HashSet<>();
+        int firstDataRow = sheet.getFirstRowNum() + 1;
+        int lastRow = Math.min(sheet.getLastRowNum(), firstDataRow + MAX_ROWS - 1);
+        for (int rowIndex = firstDataRow; rowIndex <= lastRow; rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            if (isGuaranteeRowBlank(row, registrationColumn, guaranteeColumns.keySet(), formatter, evaluator)) {
+                continue;
+            }
+            List<String> errors = new ArrayList<>();
+            List<String> warnings = new ArrayList<>();
+            String registration = formatted(
+                    row.getCell(registrationColumn, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL), formatter, evaluator
+            ).toUpperCase(Locale.ROOT);
+            String normalizedRegistration = normalizedRegistration(registration);
+            VehicleMatch vehicle = vehiclesByRegistration.get(normalizedRegistration);
+            if (normalizedRegistration.isBlank()) {
+                errors.add("Immatriculation obligatoire");
+            } else if (!seenRegistrations.add(normalizedRegistration)) {
+                errors.add("Immatriculation en double dans la feuille Garanties");
+            } else if (vehicle == null) {
+                errors.add("Véhicule absent ou invalide dans la feuille Véhicules");
+            }
+
+            List<String> selectedCodes = new ArrayList<>();
+            Map<Long, Garantie> exclusionGroups = new LinkedHashMap<>();
+            for (Map.Entry<Integer, Garantie> entry : guaranteeColumns.entrySet()) {
+                String raw = formatted(
+                        row.getCell(entry.getKey(), Row.MissingCellPolicy.RETURN_BLANK_AS_NULL), formatter, evaluator
+                );
+                Boolean selected = parseYesNo(raw);
+                if (selected == null) {
+                    errors.add(entry.getValue().getCode() + " : utilisez Oui ou Non");
+                    continue;
+                }
+                if (!selected) {
+                    continue;
+                }
+                Garantie guarantee = entry.getValue();
+                selectedCodes.add(guarantee.getCode());
+                if (guarantee.getGroupeExclusion() != null) {
+                    Garantie conflict = exclusionGroups.putIfAbsent(guarantee.getGroupeExclusion().getId(), guarantee);
+                    if (conflict != null) {
+                        errors.add(conflict.getCode() + " et " + guarantee.getCode() + " sont incompatibles");
+                    }
+                }
+                if (vehicle != null
+                        && contrat.getModeSaisieGaranties() == ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
+                        && !Boolean.TRUE.equals(guarantee.getResponsabiliteCivile())
+                        && !hasTariffLine(tariffLines, guarantee, vehicle.input())) {
+                    errors.add("Aucun tarif applicable pour " + guarantee.getCode() + " et l'usage du véhicule");
+                    continue;
+                }
+                if (vehicle != null) {
+                    selections.add(toGuaranteeInput(guarantee, vehicle));
+                }
+            }
+            if (selectedCodes.isEmpty()) {
+                warnings.add("Aucune garantie sélectionnée");
+            }
+            rows.add(VehiculeImportPreviewResponse.LigneGaranties.builder()
+                    .numeroLigne(rowIndex + 1)
+                    .immatriculation(registration)
+                    .nombreGaranties(selectedCodes.size())
+                    .codesGaranties(selectedCodes)
+                    .erreurs(errors)
+                    .avertissements(warnings)
+                    .build());
+        }
+        if (sheet.getLastRowNum() >= firstDataRow + MAX_ROWS) {
+            throw new BadRequestException("La feuille Garanties dépasse la limite de " + MAX_ROWS + " véhicules");
+        }
+        int validRows = (int) rows.stream().filter(row -> row.getErreurs().isEmpty()).count();
+        return new GuaranteePreview(selections, rows, validRows);
+    }
+
+    private boolean isGuaranteeRowBlank(
+            Row row,
+            int registrationColumn,
+            Set<Integer> guaranteeColumns,
+            DataFormatter formatter,
+            FormulaEvaluator evaluator
+    ) {
+        if (row == null) {
+            return true;
+        }
+        if (!formatted(row.getCell(registrationColumn, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL), formatter, evaluator).isBlank()) {
+            return false;
+        }
+        return guaranteeColumns.stream().allMatch(column -> formatted(
+                row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL), formatter, evaluator
+        ).isBlank());
+    }
+
+    private String formatted(Cell cell, DataFormatter formatter, FormulaEvaluator evaluator) {
+        return cell == null ? "" : formatter.formatCellValue(cell, evaluator).trim();
+    }
+
+    private Boolean parseYesNo(String raw) {
+        if (raw == null || raw.isBlank() || "non".equals(normalize(raw)) || "0".equals(raw.trim())) {
+            return false;
+        }
+        if (Set.of("oui", "x", "1", "yes").contains(normalize(raw))) {
+            return true;
+        }
+        return null;
+    }
+
+    private boolean hasTariffLine(
+            List<LigneGrilleTarifaire> tariffLines,
+            Garantie guarantee,
+            CreateContratRequest.VehiculeInput vehicle
+    ) {
+        return tariffLines.stream().anyMatch(line -> line.getGarantie() != null
+                && guarantee.getId().equals(line.getGarantie().getId())
+                && (line.getUsage() == null || line.getUsage().getId().equals(vehicle.getUsageId()))
+                && (line.getCategorieTransport() == null
+                || line.getCategorieTransport().getId().equals(vehicle.getCategorieTransportId())));
+    }
+
+    private CreateContratRequest.GarantieInput toGuaranteeInput(Garantie guarantee, VehicleMatch vehicle) {
+        CreateContratRequest.GarantieInput input = new CreateContratRequest.GarantieInput();
+        input.setGarantieId(guarantee.getId());
+        input.setVehiculeIndex(vehicle.index());
+        input.setModeSelectionne(guarantee.getModeParDefaut() == null
+                ? ModeTarificationGarantie.TAUX.name()
+                : guarantee.getModeParDefaut().name());
+        input.setSourceValeurSelectionnee(defaultValueSource(guarantee, vehicle.input()).name());
+        input.setValeurVenale(vehicle.input().getValeurVenale());
+        input.setValeurNeuf(vehicle.input().getValeurNeuf());
+        input.setValeurGlace(vehicle.input().getValeurGlace());
+        return input;
+    }
+
+    private SourceValeurGarantie defaultValueSource(
+            Garantie guarantee,
+            CreateContratRequest.VehiculeInput vehicle
+    ) {
+        SourceValeurGarantie configured = guarantee.getSourceValeurParDefaut();
+        if (!Boolean.TRUE.equals(guarantee.getAvecCapital())) {
+            return SourceValeurGarantie.AUCUNE;
+        }
+        if (configured != null && sourceAvailable(configured, vehicle)) {
+            return configured;
+        }
+        List<SourceValeurGarantie> available = guarantee.getSourcesValeurAutorisees().stream()
+                .filter(source -> source == SourceValeurGarantie.VENALE
+                        || source == SourceValeurGarantie.NEUF
+                        || source == SourceValeurGarantie.GLACE)
+                .filter(source -> sourceAvailable(source, vehicle))
+                .toList();
+        if (available.size() == 1) {
+            return available.get(0);
+        }
+        if (available.isEmpty() && Boolean.TRUE.equals(guarantee.getSaisieManuelleAutorisee())) {
+            return SourceValeurGarantie.MANUEL;
+        }
+        return SourceValeurGarantie.AUCUNE;
+    }
+
+    private boolean sourceAvailable(SourceValeurGarantie source, CreateContratRequest.VehiculeInput vehicle) {
+        return switch (source) {
+            case VENALE -> vehicle.getValeurVenale() != null;
+            case NEUF -> vehicle.getValeurNeuf() != null;
+            case GLACE -> vehicle.getValeurGlace() != null;
+            case MANUEL, AUCUNE -> true;
+        };
     }
 
     private CellStyle createHeaderStyle(Workbook workbook, IndexedColors fillColor) {
@@ -658,6 +1023,9 @@ public class VehiculeImportService {
                 .noneMatch(allowed -> allowed.getId().equals(usage.getId()))) {
             errors.add("Usage non autorisé pour la catégorie client");
         }
+        if (contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE) {
+            return;
+        }
         if (contrat.getGrilleTarifaire() == null) {
             errors.add("La grille tarifaire doit être enregistrée avant l'import");
             return;
@@ -828,5 +1196,15 @@ public class VehiculeImportService {
 
     private String display(String value) {
         return value == null || value.isBlank() ? "valeur vide" : value;
+    }
+
+    private record VehicleMatch(int index, CreateContratRequest.VehiculeInput input) {
+    }
+
+    private record GuaranteePreview(
+            List<CreateContratRequest.GarantieInput> guarantees,
+            List<VehiculeImportPreviewResponse.LigneGaranties> rows,
+            int validRows
+    ) {
     }
 }

@@ -887,6 +887,20 @@ export function useContratCreationForm(
     targetPreviewMutation.mutate(scopedTargetRequest(previewRequest, target));
   };
 
+  const handlePreviewImportedTarget = (
+    importedVehicles: VehiculeInput[],
+    target: ContratTargetKey,
+    importedGuarantees: GarantieInput[]
+  ) => {
+    const previewRequest: CreateContratRequest = {
+      ...request,
+      vehicules: importedVehicles,
+      garanties: importedGuarantees,
+      nombreVehicules: importedVehicles.length,
+    };
+    targetPreviewMutation.mutate(scopedTargetRequest(previewRequest, target));
+  };
+
   const handleCreate = () => {
     if (validate()) {
       createMutation.mutate(request);
@@ -1441,6 +1455,7 @@ export function useContratCreationForm(
     tariffRecalculationMutation,
     handlePreview,
     handlePreviewTarget,
+    handlePreviewImportedTarget,
     handleCreate,
     handleSaveSection,
     handleSaveDraft,
@@ -1512,6 +1527,7 @@ export function useContratCreationForm(
     setAssistanceDraft,
     targetAssistances,
     setTargetAssistances,
+    modeSaisieGaranties,
     saisiePrimeNette,
     setSaisiePrimeNette,
     clients,

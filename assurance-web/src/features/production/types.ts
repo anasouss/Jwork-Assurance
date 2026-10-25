@@ -791,6 +791,11 @@ export type VehicleImportPreview = {
   lignesValides: number;
   lignesEnErreur: number;
   lignes: VehicleImportPreviewRow[];
+  totalLignesGaranties: number;
+  lignesGarantiesValides: number;
+  lignesGarantiesEnErreur: number;
+  garanties: GarantieInput[];
+  lignesGaranties: VehicleGuaranteeImportPreviewRow[];
 };
 
 export type VehicleImportPreviewRow = {
@@ -800,6 +805,15 @@ export type VehicleImportPreviewRow = {
   usage: string;
   marque: string;
   vehicule?: VehiculeInput | null;
+  erreurs: string[];
+  avertissements: string[];
+};
+
+export type VehicleGuaranteeImportPreviewRow = {
+  numeroLigne: number;
+  immatriculation: string;
+  nombreGaranties: number;
+  codesGaranties: string[];
   erreurs: string[];
   avertissements: string[];
 };

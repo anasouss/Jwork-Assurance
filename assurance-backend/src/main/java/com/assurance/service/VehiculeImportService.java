@@ -187,23 +187,22 @@ public class VehiculeImportService {
 
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
-        Contrat contrat = requireFleetContract(agenceId, contratId);
-        return createWorkbook(contrat, List.of(), List.of(), "Génération du modèle Excel impossible");
+        requireFleetContract(agenceId, contratId);
+        return createWorkbook(List.of(), List.of(), "Génération du modèle Excel impossible");
     }
 
     @Transactional(readOnly = true)
     public byte[] exportSubmittedVehicles(Long agenceId, Long contratId) {
-        Contrat contrat = requireFleetContract(agenceId, contratId);
+        requireFleetContract(agenceId, contratId);
         List<Vehicule> vehicles = vehiculeRepository.findForExportByContratIdOrderByCreatedAtAsc(contratId);
         if (vehicles.isEmpty()) {
             throw new BadRequestException("Aucun véhicule enregistré à exporter");
         }
         List<ContratGarantie> guarantees = contratGarantieRepository.findActiveByContratId(contratId);
-        return createWorkbook(contrat, vehicles, guarantees, "Export des véhicules impossible");
+        return createWorkbook(vehicles, guarantees, "Export des véhicules impossible");
     }
 
     private byte[] createWorkbook(
-            Contrat contrat,
             List<Vehicule> vehicles,
             List<ContratGarantie> selectedGuarantees,
             String errorMessage
@@ -267,7 +266,7 @@ public class VehiculeImportService {
             sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TEMPLATE_HEADERS.size() - 1));
             sheet.createFreezePane(0, 1);
             sheet.setActiveCell(new CellAddress(1, 0));
-            createGuaranteeSheet(workbook, contrat, vehicles, selectedGuarantees, headerStyle, inputStyle);
+            createGuaranteeSheet(workbook, vehicles, selectedGuarantees, headerStyle, inputStyle);
             workbook.setSheetHidden(workbook.getSheetIndex(references), true);
             workbook.write(output);
             return output.toByteArray();
@@ -278,17 +277,19 @@ public class VehiculeImportService {
 
     private void createGuaranteeSheet(
             Workbook workbook,
-            Contrat contrat,
             List<Vehicule> vehicles,
             List<ContratGarantie> selectedGuarantees,
             CellStyle headerStyle,
             CellStyle inputStyle
     ) {
         Map<Long, Garantie> guaranteesById = new LinkedHashMap<>();
-        availableGuarantees(contrat).forEach(guarantee -> guaranteesById.put(guarantee.getId(), guarantee));
+        automobileGuarantees(true).stream()
+                .filter(guarantee -> !Boolean.TRUE.equals(guarantee.getResponsabiliteCivile()))
+                .forEach(guarantee -> guaranteesById.put(guarantee.getId(), guarantee));
         selectedGuarantees.stream()
                 .map(ContratGarantie::getGarantie)
                 .filter(java.util.Objects::nonNull)
+                .filter(guarantee -> !Boolean.TRUE.equals(guarantee.getResponsabiliteCivile()))
                 .forEach(guarantee -> guaranteesById.putIfAbsent(guarantee.getId(), guarantee));
         List<Garantie> guarantees = new ArrayList<>(guaranteesById.values());
         Sheet sheet = workbook.createSheet(GUARANTEE_SHEET);
@@ -302,9 +303,9 @@ public class VehiculeImportService {
         for (int index = 0; index < guarantees.size(); index++) {
             Garantie guarantee = guarantees.get(index);
             Cell cell = header.createCell(index + 1);
-            cell.setCellValue(guarantee.getCode() + " - " + guarantee.getLibelle());
+            cell.setCellValue(guarantee.getCode());
             cell.setCellStyle(headerStyle);
-            sheet.setColumnWidth(index + 1, 24 * 256);
+            sheet.setColumnWidth(index + 1, Math.max(12, guarantee.getCode().length() + 4) * 256);
         }
 
         Map<Long, Set<Long>> selectedByVehicle = new LinkedHashMap<>();
@@ -350,8 +351,6 @@ public class VehiculeImportService {
                     cell.setCellValue("Oui");
                 } else if (rowIndex < vehicles.size()) {
                     cell.setCellValue("Non");
-                } else if (Boolean.TRUE.equals(guarantee.getResponsabiliteCivile())) {
-                    cell.setCellFormula("IF(A" + (rowIndex + 2) + "=\"\",\"\",\"Oui\")");
                 }
                 cell.setCellStyle(inputStyle);
             }
@@ -361,24 +360,12 @@ public class VehiculeImportService {
         sheet.createFreezePane(1, 1);
     }
 
-    private List<Garantie> availableGuarantees(Contrat contrat) {
-        Set<Long> tariffGuaranteeIds = contrat.getGrilleTarifaire() == null
-                ? Set.of()
-                : ligneGrilleTarifaireRepository
-                .findByGrilleTarifaireIdAndActifTrue(contrat.getGrilleTarifaire().getId()).stream()
-                .map(LigneGrilleTarifaire::getGarantie)
-                .filter(java.util.Objects::nonNull)
-                .map(Garantie::getId)
-                .collect(java.util.stream.Collectors.toSet());
+    private List<Garantie> automobileGuarantees(boolean activeOnly) {
         return garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
-                .filter(guarantee -> Boolean.TRUE.equals(guarantee.getActif()))
+                .filter(guarantee -> !activeOnly || Boolean.TRUE.equals(guarantee.getActif()))
                 .filter(guarantee -> guarantee.getTypeGarantie() != TypeGarantie.PERSONNE)
                 .filter(guarantee -> guarantee.getBrancheAssurance() != null
                         && "AUTOMOBILE".equalsIgnoreCase(guarantee.getBrancheAssurance().getCode()))
-                .filter(guarantee -> contrat.getModeSaisieGaranties() != ModeSaisieGarantieContrat.AUTOMATIQUE_GRILLE
-                        || tariffGuaranteeIds.isEmpty()
-                        || tariffGuaranteeIds.contains(guarantee.getId())
-                        || Boolean.TRUE.equals(guarantee.getResponsabiliteCivile()))
                 .toList();
     }
 
@@ -398,7 +385,7 @@ public class VehiculeImportService {
         DataFormatter formatter = new DataFormatter(Locale.FRANCE);
         FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
         Map<String, Garantie> guaranteesByHeader = new LinkedHashMap<>();
-        for (Garantie guarantee : availableGuarantees(contrat)) {
+        for (Garantie guarantee : automobileGuarantees(false)) {
             guaranteesByHeader.put(normalize(guarantee.getCode()), guarantee);
             guaranteesByHeader.put(normalize(guarantee.getCode() + " - " + guarantee.getLibelle()), guarantee);
         }
@@ -440,6 +427,9 @@ public class VehiculeImportService {
         List<LigneGrilleTarifaire> tariffLines = contrat.getGrilleTarifaire() == null
                 ? List.of()
                 : ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(contrat.getGrilleTarifaire().getId());
+        List<Garantie> rcGuarantees = automobileGuarantees(true).stream()
+                .filter(guarantee -> Boolean.TRUE.equals(guarantee.getResponsabiliteCivile()))
+                .toList();
         List<CreateContratRequest.GarantieInput> selections = new ArrayList<>();
         List<VehiculeImportPreviewResponse.LigneGaranties> rows = new ArrayList<>();
         Set<String> seenRegistrations = new HashSet<>();
@@ -466,6 +456,7 @@ public class VehiculeImportService {
             }
 
             List<String> selectedCodes = new ArrayList<>();
+            Set<Long> selectedGuaranteeIds = new HashSet<>();
             Map<Long, Garantie> exclusionGroups = new LinkedHashMap<>();
             for (Map.Entry<Integer, Garantie> entry : guaranteeColumns.entrySet()) {
                 String raw = formatted(
@@ -481,6 +472,11 @@ public class VehiculeImportService {
                 }
                 Garantie guarantee = entry.getValue();
                 selectedCodes.add(guarantee.getCode());
+                selectedGuaranteeIds.add(guarantee.getId());
+                if (!Boolean.TRUE.equals(guarantee.getActif())) {
+                    errors.add("Garantie inactive : " + guarantee.getCode());
+                    continue;
+                }
                 if (guarantee.getGroupeExclusion() != null) {
                     Garantie conflict = exclusionGroups.putIfAbsent(guarantee.getGroupeExclusion().getId(), guarantee);
                     if (conflict != null) {
@@ -496,6 +492,18 @@ public class VehiculeImportService {
                 }
                 if (vehicle != null) {
                     selections.add(toGuaranteeInput(guarantee, vehicle));
+                }
+            }
+            if (vehicle != null) {
+                if (rcGuarantees.isEmpty()) {
+                    errors.add("Aucune garantie Responsabilité civile active n'est configurée");
+                } else {
+                    for (Garantie rcGuarantee : rcGuarantees) {
+                        if (selectedGuaranteeIds.add(rcGuarantee.getId())) {
+                            selectedCodes.add(rcGuarantee.getCode());
+                            selections.add(toGuaranteeInput(rcGuarantee, vehicle));
+                        }
+                    }
                 }
             }
             if (selectedCodes.isEmpty()) {

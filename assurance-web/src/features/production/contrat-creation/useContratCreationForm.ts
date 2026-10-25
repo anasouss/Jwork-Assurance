@@ -23,6 +23,7 @@ import type {
   ContratSummary,
   CreateContratRequest,
   GarantieInput,
+  ModeSaisieGaranties,
   QuittanceInput,
   QuittancePreview,
   ReferenceOption,
@@ -383,7 +384,7 @@ export function useContratCreationForm(
     });
   }, [refs.garanties.data]);
 
-  const modeSaisieGaranties = typeContrat === "PARTICULIER"
+  const modeSaisieGaranties: ModeSaisieGaranties = typeContrat === "PARTICULIER"
     ? saisiePrimeNette ? "MANUELLE_AVEC_PRIME_NETTE" : "MANUELLE"
     : "AUTOMATIQUE_GRILLE";
   const contractUsageFallback = typeContrat === "FLOTTE" ? "" : usageId;

@@ -514,7 +514,7 @@ function RecentActivity({
               <tr>
                 <th className="px-5 py-3 font-semibold">Police / contrat</th>
                 <th className="px-4 py-3 font-semibold">Dossier</th>
-                <th className="px-4 py-3 font-semibold">Nature</th>
+                <th className="px-4 py-3 font-semibold">Mouvement</th>
                 <th className="px-4 py-3 font-semibold">Compagnie</th>
                 <th className="px-4 py-3 font-semibold">Date d'effet</th>
                 <th className="px-4 py-3 text-right font-semibold">TTC</th>

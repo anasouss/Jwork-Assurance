@@ -52,10 +52,14 @@ const portfolioColors: Record<string, string> = {
   PARTICULIER: "#2563eb",
   CONVENTION: "#7c3aed",
   FLOTTE: "#059669",
+  AUTOMOBILE: "#059669",
+  ASSISTANCE: "#0284c7",
+  RISQUES_DIVERS: "#7c3aed",
 };
 
 const categoryColors: Record<string, string> = {
   AUTOMOBILE: "#059669",
+  ASSISTANCE: "#0284c7",
   CORPOREL: "#7c3aed",
   EVCAT: "#ea580c",
 };
@@ -107,6 +111,7 @@ export default function AgencyDashboardPage() {
     ...item,
     label: format(new Date(item.annee, item.mois - 1, 1), "MMM yy", { locale: fr }),
   }));
+  const hasProduction = monthlyData.some((item) => item.primeTotale !== 0 || item.primeNette !== 0);
 
   return (
     <div className="mx-auto grid w-full max-w-[1600px] gap-5">
@@ -166,7 +171,7 @@ export default function AgencyDashboardPage() {
         <Metric
           label="Production TTC"
           value={formatMoney(data.kpis.primeTotale)}
-          detail={`${data.kpis.quittances.toLocaleString("fr-FR")} quittance(s)`}
+          detail={`${data.kpis.quittances.toLocaleString("fr-FR")} quittance(s) · ${data.kpis.assistancesProduites.toLocaleString("fr-FR")} assistance(s)`}
           accent="emerald"
         />
         <Metric
@@ -182,9 +187,9 @@ export default function AgencyDashboardPage() {
           accent="violet"
         />
         <Metric
-          label="Portefeuille actif"
+          label={`Portefeuille au ${formatDate(data.dateAu)}`}
           value={`${data.kpis.contratsActifs.toLocaleString("fr-FR")} contrats`}
-          detail={`${data.kpis.clientsActifs.toLocaleString("fr-FR")} clients · ${data.kpis.contratsBrouillon.toLocaleString("fr-FR")} brouillons`}
+          detail={`${data.kpis.assistancesActives.toLocaleString("fr-FR")} assistance(s) en vigueur · ${data.kpis.clientsActifs.toLocaleString("fr-FR")} clients actifs aujourd'hui · ${data.kpis.contratsBrouillon.toLocaleString("fr-FR")} brouillon(s)`}
           accent="amber"
         />
       </section>
@@ -192,9 +197,9 @@ export default function AgencyDashboardPage() {
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.75fr)]">
         <DashboardPanel
           title="Évolution de la production"
-          description="Montants issus des quittances globales validées sur la période."
+          description="Montants d'assurance et d'assistance validés sur la période."
         >
-          {monthlyData.length ? (
+          {hasProduction ? (
             <ChartContainer config={productionChartConfig} className="h-[310px] w-full aspect-auto">
               <AreaChart data={monthlyData} margin={{ left: 4, right: 12, top: 12, bottom: 0 }}>
                 <CartesianGrid vertical={false} />
@@ -242,19 +247,27 @@ export default function AgencyDashboardPage() {
           )}
         </DashboardPanel>
 
-        <DashboardPanel title="Portefeuille actif" description="Répartition des contrats en vigueur.">
-          <PortfolioChart rows={data.portefeuilleParType} />
+        <DashboardPanel
+          title="Portefeuille en vigueur"
+          description={`Contrats couvrant le ${formatDate(data.dateAu)}, par branche.`}
+        >
+          <PortfolioChart rows={data.portefeuilleParBranche} contractTypes={data.portefeuilleParType} />
         </DashboardPanel>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.65fr)]">
-        <DashboardPanel title="Production par branche" description="Montant TTC validé sur la période.">
+        <DashboardPanel title="Production par catégorie" description="Montant TTC validé sur la période.">
           <CategoryChart rows={data.productionParCategorie} />
         </DashboardPanel>
         <WorkQueue data={data} permissions={permissions} />
       </section>
 
-      <RecentActivity rows={data.activitesRecentes} canView={permissions.includes("contrat:view")} />
+      <RecentActivity
+        rows={data.activitesRecentes}
+        canView={permissions.includes("contrat:view")}
+        dateFrom={data.dateDu}
+        dateTo={data.dateAu}
+      />
     </div>
   );
 }
@@ -311,9 +324,15 @@ function DashboardPanel({
   );
 }
 
-function PortfolioChart({ rows }: { rows: DashboardBreakdown[] }) {
+function PortfolioChart({
+  rows,
+  contractTypes,
+}: {
+  rows: DashboardBreakdown[];
+  contractTypes: DashboardBreakdown[];
+}) {
   const total = rows.reduce((sum, row) => sum + row.nombre, 0);
-  if (!rows.length || total === 0) return <EmptyChart />;
+  if (!rows.length || total === 0) return <EmptyChart message="Aucun contrat en vigueur à cette date." />;
 
   return (
     <div className="grid min-h-[310px] items-center gap-4 sm:grid-cols-[180px_1fr] xl:grid-cols-1 2xl:grid-cols-[180px_1fr]">
@@ -353,6 +372,18 @@ function PortfolioChart({ rows }: { rows: DashboardBreakdown[] }) {
             <span className="font-semibold tabular-nums">{row.nombre.toLocaleString("fr-FR")}</span>
           </div>
         ))}
+        {contractTypes.length ? (
+          <div className="mt-2 border-t pt-3">
+            <div className="text-[11px] font-semibold uppercase text-muted-foreground">Structure des contrats</div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              {contractTypes.map((row) => (
+                <span key={row.code} className="whitespace-nowrap">
+                  {row.libelle} <strong>{row.nombre.toLocaleString("fr-FR")}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -449,17 +480,27 @@ function WorkQueue({ data, permissions }: { data: DashboardData; permissions: st
   );
 }
 
-function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; canView: boolean }) {
+function RecentActivity({
+  rows,
+  canView,
+  dateFrom,
+  dateTo,
+}: {
+  rows: DashboardRecentActivity[];
+  canView: boolean;
+  dateFrom: string;
+  dateTo: string;
+}) {
   return (
     <section className="min-w-0 overflow-hidden rounded-md border bg-card">
       <div className="flex items-center justify-between gap-4 border-b px-5 py-4">
         <div>
           <h2 className="font-semibold">Activité récente</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Derniers mouvements validés de l'agence.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Derniers mouvements validés sur la période sélectionnée.</p>
         </div>
         {canView ? (
           <Button asChild variant="outline" size="sm">
-            <Link to="/app/production/registre">
+            <Link to={`/app/production/registre?typeDate=EFFET&dateDu=${dateFrom}&dateAu=${dateTo}`}>
               Voir la liste
               <ArrowRight className="size-4" />
             </Link>
@@ -471,7 +512,7 @@ function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; ca
           <table className="w-full min-w-[940px] text-sm">
             <thead className="bg-emerald-50/70 text-left text-xs uppercase text-emerald-950 dark:bg-emerald-950/20 dark:text-emerald-200">
               <tr>
-                <th className="px-5 py-3 font-semibold">Police</th>
+                <th className="px-5 py-3 font-semibold">Police / contrat</th>
                 <th className="px-4 py-3 font-semibold">Dossier</th>
                 <th className="px-4 py-3 font-semibold">Nature</th>
                 <th className="px-4 py-3 font-semibold">Compagnie</th>
@@ -485,11 +526,12 @@ function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; ca
                 <tr key={row.mouvementId} className="hover:bg-muted/30">
                   <td className="px-5 py-3">
                     <div className="font-semibold">{row.numeroPolice || "-"}</div>
-                    <div className="text-xs text-muted-foreground">{row.typeContrat}</div>
+                    <div className="text-xs text-muted-foreground">{row.branche || row.typeContrat}</div>
                   </td>
                   <td className="px-4 py-3 font-medium">{row.numeroDossier || `Contrat #${row.contratId}`}</td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{row.mouvement}</div>
+                    {row.detail ? <div className="text-xs text-muted-foreground">{row.detail}</div> : null}
                   </td>
                   <td className="max-w-64 truncate px-4 py-3">{row.compagnie || "-"}</td>
                   <td className="whitespace-nowrap px-4 py-3">{formatDate(row.dateEffet)}</td>
@@ -517,10 +559,10 @@ function RecentActivity({ rows, canView }: { rows: DashboardRecentActivity[]; ca
   );
 }
 
-function EmptyChart() {
+function EmptyChart({ message = "Aucune production sur cette période." }: { message?: string }) {
   return (
     <div className="grid min-h-[260px] place-items-center text-sm text-muted-foreground">
-      Aucune production sur cette période.
+      {message}
     </div>
   );
 }

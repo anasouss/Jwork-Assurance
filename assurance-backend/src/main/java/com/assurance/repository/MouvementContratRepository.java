@@ -119,10 +119,29 @@ public interface MouvementContratRepository extends JpaRepository<MouvementContr
             LocalDate dateAu
     );
 
-    @EntityGraph(attributePaths = {"typeMouvement", "contrat", "contrat.compagnieAssurance"})
+    @EntityGraph(attributePaths = {
+            "typeMouvement",
+            "contrat",
+            "contrat.compagnieAssurance",
+            "contrat.brancheAssurance"
+    })
     Page<MouvementContrat> findByAgenceIdAndStatutOrderByCreatedAtDesc(
             Long agenceId,
             StatutMouvementContrat statut,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {
+            "typeMouvement",
+            "contrat",
+            "contrat.compagnieAssurance",
+            "contrat.brancheAssurance"
+    })
+    Page<MouvementContrat> findByAgenceIdAndStatutAndDateEffetBetweenOrderByCreatedAtDesc(
+            Long agenceId,
+            StatutMouvementContrat statut,
+            LocalDate dateDu,
+            LocalDate dateAu,
             Pageable pageable
     );
 

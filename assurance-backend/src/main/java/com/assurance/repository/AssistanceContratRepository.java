@@ -19,6 +19,23 @@ import java.util.Optional;
 
 public interface AssistanceContratRepository extends JpaRepository<AssistanceContrat, Long> {
     @Query("""
+            select count(a)
+            from AssistanceContrat a
+            where a.contrat.agence.id = :agenceId
+              and a.actif = true
+              and a.contrat.prospection = false
+              and a.contrat.brouillon = false
+              and a.contrat.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and a.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+              and a.dateEffet <= :dateReference
+              and a.dateEcheance >= :dateReference
+            """)
+    long countActiveAt(
+            @Param("agenceId") Long agenceId,
+            @Param("dateReference") LocalDate dateReference
+    );
+
+    @Query("""
             select a.id
             from AssistanceContrat a
             left join a.compagnieAssistance compagnie
@@ -155,7 +172,7 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
     @EntityGraph(attributePaths = {"brancheAssurance", "compagnieAssistance", "produitAssistance"})
     List<AssistanceContrat> findByContratIdInAndActifTrueOrderByCreatedAtDesc(Collection<Long> contratIds);
 
-    @EntityGraph(attributePaths = {"compagnieAssistance"})
+    @EntityGraph(attributePaths = {"mouvementContrat", "compagnieAssistance", "produitAssistance"})
     List<AssistanceContrat> findByMouvementContratIdInAndActifTrueOrderByCreatedAtDesc(Collection<Long> mouvementIds);
 
     List<AssistanceContrat> findByMouvementContratIdOrderByCreatedAtDesc(Long mouvementContratId);

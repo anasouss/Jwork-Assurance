@@ -5,6 +5,7 @@ export type DashboardData = {
   workload: DashboardWorkload;
   productionMensuelle: DashboardMonthlyProduction[];
   portefeuilleParType: DashboardBreakdown[];
+  portefeuilleParBranche: DashboardBreakdown[];
   productionParCategorie: DashboardBreakdown[];
   activitesRecentes: DashboardRecentActivity[];
 };
@@ -16,6 +17,8 @@ export type DashboardKpis = {
   quittances: number;
   mouvements: number;
   contratsActifs: number;
+  assistancesActives: number;
+  assistancesProduites: number;
   contratsBrouillon: number;
   clientsActifs: number;
 };
@@ -50,7 +53,9 @@ export type DashboardRecentActivity = {
   numeroDossier?: string | null;
   numeroPolice?: string | null;
   typeContrat: string;
+  branche?: string | null;
   mouvement: string;
+  detail?: string | null;
   codeMouvement: string;
   compagnie?: string | null;
   dateEffet?: string | null;

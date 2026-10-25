@@ -41,6 +41,21 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
 
     long countByAgenceIdAndProspectionFalseAndBrouillonTrue(Long agenceId);
 
+    @Query("""
+            select count(c)
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = false
+              and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and c.dateEffet <= :dateReference
+              and c.dateEcheance >= :dateReference
+            """)
+    long countActivePortfolioAt(
+            @Param("agenceId") Long agenceId,
+            @Param("dateReference") LocalDate dateReference
+    );
+
     long countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatutAndDateEcheanceBetween(
             Long agenceId,
             StatutContrat statut,
@@ -59,6 +74,40 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             order by c.typeContrat
             """)
     List<Object[]> countActivePortfolioByType(@Param("agenceId") Long agenceId);
+
+    @Query("""
+            select c.typeContrat, count(c)
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = false
+              and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and c.dateEffet <= :dateReference
+              and c.dateEcheance >= :dateReference
+            group by c.typeContrat
+            order by c.typeContrat
+            """)
+    List<Object[]> countActivePortfolioByTypeAt(
+            @Param("agenceId") Long agenceId,
+            @Param("dateReference") LocalDate dateReference
+    );
+
+    @Query("""
+            select c.brancheAssurance.code, c.brancheAssurance.libelle, count(c)
+            from Contrat c
+            where c.agence.id = :agenceId
+              and c.prospection = false
+              and c.brouillon = false
+              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and c.dateEffet <= :dateReference
+              and c.dateEcheance >= :dateReference
+            group by c.brancheAssurance.code, c.brancheAssurance.libelle
+            order by c.brancheAssurance.libelle
+            """)
+    List<Object[]> countActivePortfolioByBranchAt(
+            @Param("agenceId") Long agenceId,
+            @Param("dateReference") LocalDate dateReference
+    );
 
     @Query("""
             select c.agence.id,

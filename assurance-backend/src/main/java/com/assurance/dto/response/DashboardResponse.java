@@ -16,6 +16,7 @@ public class DashboardResponse {
     private Workload workload;
     private List<MonthlyProduction> productionMensuelle;
     private List<Breakdown> portefeuilleParType;
+    private List<Breakdown> portefeuilleParBranche;
     private List<Breakdown> productionParCategorie;
     private List<RecentActivity> activitesRecentes;
 
@@ -28,6 +29,8 @@ public class DashboardResponse {
         private Long quittances;
         private Long mouvements;
         private Long contratsActifs;
+        private Long assistancesActives;
+        private Long assistancesProduites;
         private Long contratsBrouillon;
         private Long clientsActifs;
     }
@@ -70,7 +73,9 @@ public class DashboardResponse {
         private String numeroDossier;
         private String numeroPolice;
         private String typeContrat;
+        private String branche;
         private String mouvement;
+        private String detail;
         private String codeMouvement;
         private String compagnie;
         private LocalDate dateEffet;

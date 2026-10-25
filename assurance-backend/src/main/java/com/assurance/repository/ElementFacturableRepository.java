@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -18,6 +19,67 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ElementFacturableRepository extends JpaRepository<ElementFacturable, Long> {
+    @Query("""
+            select coalesce(sum(e.primeNette), 0) as primeNette,
+                   coalesce(sum(
+                       coalesce(e.taxe, 0)
+                       + coalesce(e.taxeParafiscale, 0)
+                       + coalesce(e.accessoire, 0)
+                       + coalesce(e.cnpac, 0)
+                   ), 0) as taxes,
+                   coalesce(sum(e.primeTotale), 0) as primeTotale,
+                   count(e) as elementCount
+            from ElementFacturable e
+            left join e.mouvementContrat m
+            where e.agence.id = :agenceId
+              and e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
+              and e.actif = true
+              and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+              and e.contrat.prospection = false
+              and e.contrat.brouillon = false
+              and m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+              and e.dateDebut between :dateDu and :dateAu
+            """)
+    DashboardAssistanceTotals sumDashboardAssistance(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
+    @Query("""
+            select year(e.dateDebut), month(e.dateDebut),
+                   coalesce(sum(e.primeNette), 0),
+                   coalesce(sum(e.primeTotale), 0),
+                   count(e)
+            from ElementFacturable e
+            left join e.mouvementContrat m
+            where e.agence.id = :agenceId
+              and e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
+              and e.actif = true
+              and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+              and e.contrat.prospection = false
+              and e.contrat.brouillon = false
+              and m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+              and e.dateDebut between :dateDu and :dateAu
+            group by year(e.dateDebut), month(e.dateDebut)
+            order by year(e.dateDebut), month(e.dateDebut)
+            """)
+    List<Object[]> sumDashboardAssistanceByMonth(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
+    interface DashboardAssistanceTotals {
+        BigDecimal getPrimeNette();
+
+        BigDecimal getTaxes();
+
+        BigDecimal getPrimeTotale();
+
+        Long getElementCount();
+    }
+
     List<ElementFacturable> findByAgenceIdOrderByCreatedAtDesc(Long agenceId);
 
     List<ElementFacturable> findByContratIdOrderByCreatedAtDesc(Long contratId);

@@ -200,6 +200,7 @@ export function UsersPanel({
                       {
                         label: "Modifier",
                         icon: Edit,
+                        iconTone: "primary",
                         disabled: !canManage,
                         onSelect: () => { setEditing(item); setDialogOpen(true); },
                       },
@@ -211,6 +212,7 @@ export function UsersPanel({
                       {
                         label: "Changer le mot de passe",
                         icon: KeyRound,
+                        iconTone: "warning",
                         disabled: !canManage,
                         onSelect: () => setPasswordTarget(item),
                       },
@@ -439,6 +441,7 @@ export function PlatformAdminsPanel({
                       {
                         label: "Modifier",
                         icon: Edit,
+                        iconTone: "primary",
                         onSelect: () => { setEditing(item); setDialogOpen(true); },
                       },
                       {
@@ -449,6 +452,7 @@ export function PlatformAdminsPanel({
                       {
                         label: "Changer le mot de passe",
                         icon: KeyRound,
+                        iconTone: "warning",
                         onSelect: () => setPasswordTarget(item),
                       },
                       {
@@ -2845,6 +2849,7 @@ export function RolesPanel({
                       {
                         label: "Modifier",
                         icon: Edit,
+                        iconTone: "primary",
                         disabled: !canManage,
                         onSelect: () => navigate(`/app/admin/roles/${role.id}`),
                       },

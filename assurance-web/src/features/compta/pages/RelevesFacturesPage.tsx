@@ -948,28 +948,25 @@ function DocumentActionsMenu(props: {
             Voir le détail
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
-            <Printer className="size-4 text-sky-700 dark:text-sky-400" />
+            <Printer className="size-4" />
             {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (
-            <DropdownMenuItem
-              className="bg-emerald-50 font-medium text-emerald-900 focus:bg-emerald-100 focus:text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-200 dark:focus:bg-emerald-950/60 dark:focus:text-emerald-100"
-              onSelect={props.onInvoice}
-            >
-              <ReceiptText className="size-4 text-emerald-700 dark:text-emerald-400" />
+            <DropdownMenuItem onSelect={props.onInvoice}>
+              <ReceiptText className="size-4 text-emerald-600 dark:text-emerald-400" />
               Créer une facture
             </DropdownMenuItem>
           ) : null}
           {props.onRevise || props.onCancel ? <DropdownMenuSeparator /> : null}
           {props.onRevise ? (
             <DropdownMenuItem onSelect={props.onRevise}>
-              <Pencil className="size-4 text-blue-700 dark:text-blue-400" />
+              <Pencil className="size-4 text-blue-600 dark:text-blue-400" />
               Modifier
             </DropdownMenuItem>
           ) : null}
           {props.onCancel ? (
-            <DropdownMenuItem onSelect={props.onCancel}>
-              <Ban className="size-4 text-amber-700 dark:text-amber-400" />
+            <DropdownMenuItem variant="destructive" onSelect={props.onCancel}>
+              <Ban className="size-4" />
               Annuler le document
             </DropdownMenuItem>
           ) : null}
@@ -2081,15 +2078,12 @@ function SourceDocumentActionsMenu(props: {
             Voir le document
           </DropdownMenuItem>
           <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
-            <Printer className="size-4 text-sky-700 dark:text-sky-400" />
+            <Printer className="size-4" />
             {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
           </DropdownMenuItem>
           {props.onInvoice ? (
-            <DropdownMenuItem
-              className="bg-emerald-50 font-medium text-emerald-900 focus:bg-emerald-100 focus:text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-200 dark:focus:bg-emerald-950/60 dark:focus:text-emerald-100"
-              onSelect={props.onInvoice}
-            >
-              <ReceiptText className="size-4 text-emerald-700 dark:text-emerald-400" />
+            <DropdownMenuItem onSelect={props.onInvoice}>
+              <ReceiptText className="size-4 text-emerald-600 dark:text-emerald-400" />
               Créer une facture
             </DropdownMenuItem>
           ) : null}

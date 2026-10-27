@@ -243,12 +243,14 @@ export default function CompaniesConventionsPage() {
                         {
                           label: "Configurer la grille",
                           icon: SlidersHorizontal,
+                          iconTone: "primary",
                           disabled: !conventionField(convention, "grilleTarifaireId"),
                           onSelect: () => setConfiguring(convention),
                         },
                         {
                           label: "Modifier",
                           icon: Edit,
+                          iconTone: "primary",
                           onSelect: () => { setEditing(convention); setDialogOpen(true); },
                         },
                       ]}

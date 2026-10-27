@@ -281,18 +281,18 @@ function ProspectionRow({
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to={`/app/production/contrats/${contrat.id}/assistance`}>
-                <LifeBuoy className="size-4" />
+                <LifeBuoy className="size-4 text-blue-600 dark:text-blue-400" />
                 Ajout Assistance
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to={`/app/production/prospection/devis/flotte/${contrat.id}`}>
-                <Pencil className="size-4" />
+                <Pencil className="size-4 text-blue-600 dark:text-blue-400" />
                 Modifier
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onConvert}>
-              <ShieldCheck className="size-4" />
+              <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
               Convertir en contrat
             </DropdownMenuItem>
             {onDelete ? (

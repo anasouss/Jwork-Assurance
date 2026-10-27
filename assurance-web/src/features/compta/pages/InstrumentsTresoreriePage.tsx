@@ -233,7 +233,7 @@ export default function InstrumentsTresoreriePage() {
                     </DropdownMenuItem>
                     {slip.statut === "BROUILLON" && canManage ? (
                       <DropdownMenuItem onSelect={() => openDeposit(slip)}>
-                        <Send className="size-4" /> Remettre à la banque
+                        <Send className="size-4 text-blue-600 dark:text-blue-400" /> Remettre à la banque
                       </DropdownMenuItem>
                     ) : null}
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void previewPdf(slip)}>
@@ -247,7 +247,7 @@ export default function InstrumentsTresoreriePage() {
                     {slip.statut === "BROUILLON" && canManage ? <DropdownMenuSeparator /> : null}
                     {slip.statut === "BROUILLON" && canManage ? (
                       <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
+                        variant="destructive"
                         disabled={deleteDraft.isPending}
                         onSelect={() => setDeleteTarget(slip)}
                       >

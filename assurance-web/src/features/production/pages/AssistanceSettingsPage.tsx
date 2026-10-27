@@ -144,6 +144,7 @@ export default function AssistanceSettingsPage() {
                         {
                           label: "Modifier",
                           icon: Edit,
+                          iconTone: "primary",
                           onSelect: () => { setEditingCompany(company); setCompanyDialogOpen(true); },
                         },
                         {

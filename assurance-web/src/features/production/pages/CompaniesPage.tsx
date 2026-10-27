@@ -179,6 +179,7 @@ export default function CompaniesPage() {
                         {
                           label: "Modifier",
                           icon: Edit,
+                          iconTone: "primary",
                           onSelect: () => { setEditing(compagnie); setDialogOpen(true); },
                         },
                       ]}

@@ -991,14 +991,14 @@ function PaymentActionsMenu({
         {canModifyPayment && (
           <DropdownMenuItem asChild>
             <Link to={`/app/compta/reglements/${payment.id}/modifier`}>
-              <Pencil className="size-4" />
+              <Pencil className="size-4 text-blue-600 dark:text-blue-400" />
               Modifier
             </Link>
           </DropdownMenuItem>
         )}
         {canCreateInvoice && (
           <DropdownMenuItem onSelect={onInvoice}>
-            <FileText className="size-4" />
+            <FileText className="size-4 text-emerald-600 dark:text-emerald-400" />
             Créer la facture
           </DropdownMenuItem>
         )}
@@ -1008,7 +1008,7 @@ function PaymentActionsMenu({
             key={instrument.id}
             onSelect={() => onAddToRemittance(instrument)}
           >
-            <Landmark className="size-4" />
+            <Landmark className="size-4 text-blue-600 dark:text-blue-400" />
             Ajouter {MODE_LABELS[instrument.mode].toLowerCase()}
             {instrument.referenceInstrument ? ` ${instrument.referenceInstrument}` : ""} au bordereau
           </DropdownMenuItem>
@@ -1019,7 +1019,7 @@ function PaymentActionsMenu({
             key={instrument.id}
             onSelect={() => onReplace(instrument)}
           >
-            <RotateCcw className="size-4" />
+            <RotateCcw className="size-4 text-amber-600 dark:text-amber-400" />
             Remplacer {MODE_LABELS[instrument.mode].toLowerCase()}
             {instrument.referenceInstrument ? ` ${instrument.referenceInstrument}` : ""}
           </DropdownMenuItem>

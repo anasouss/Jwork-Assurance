@@ -541,6 +541,7 @@ export default function TarifUsageSettingsPage() {
                           {
                             label: "Modifier",
                             icon: Edit,
+                            iconTone: "primary",
                             onSelect: () => { setEditing(tarif); setTarifDialogOpen(true); },
                           },
                           {

@@ -843,14 +843,14 @@ function InstrumentAction({ instrument, canReplace, canManage, onProcess, onRepl
       )}
       {instrument.statut === "REMIS_EN_BANQUE" && canManage && <DropdownMenuSeparator />}
       {instrument.statut === "REMIS_EN_BANQUE" && canManage && (
-        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onProcess}>
+        <DropdownMenuItem variant="destructive" onSelect={onProcess}>
           <Ban className="size-4" /> Enregistrer un rejet bancaire
         </DropdownMenuItem>
       )}
       {replaceable && <DropdownMenuSeparator />}
       {replaceable && (
-        <DropdownMenuItem className="text-emerald-700 focus:bg-emerald-50 focus:text-emerald-800 dark:text-emerald-300 dark:focus:bg-emerald-950/50 dark:focus:text-emerald-200" onSelect={onReplace}>
-          <Banknote className="size-4" /> Remplacer par espèces
+        <DropdownMenuItem onSelect={onReplace}>
+          <Banknote className="size-4 text-emerald-600 dark:text-emerald-400" /> Remplacer par espèces
         </DropdownMenuItem>
       )}
     </DropdownMenuContent>

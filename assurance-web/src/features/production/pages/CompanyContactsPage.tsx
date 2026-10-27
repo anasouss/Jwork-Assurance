@@ -225,8 +225,8 @@ export default function CompanyContactsPage() {
                       <TableCell className="text-right">
                         {canManage ? (
                           <TableRowActions label={`Actions ${fullName(contact)}`} actions={[
-                            { label: "Modifier", icon: Edit, onSelect: () => { setEditing(contact); setDialogOpen(true); } },
-                            { label: contact.actif ? "Désactiver" : "Réactiver", icon: contact.actif ? PowerOff : Power, destructive: contact.actif, onSelect: () => setStatusTarget(contact) },
+                            { label: "Modifier", icon: Edit, iconTone: "primary", onSelect: () => { setEditing(contact); setDialogOpen(true); } },
+                            { label: contact.actif ? "Désactiver" : "Réactiver", icon: contact.actif ? PowerOff : Power, iconTone: contact.actif ? "neutral" : "success", destructive: contact.actif, onSelect: () => setStatusTarget(contact) },
                           ]} />
                         ) : null}
                       </TableCell>

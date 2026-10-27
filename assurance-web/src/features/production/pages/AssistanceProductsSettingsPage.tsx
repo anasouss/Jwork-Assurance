@@ -383,6 +383,7 @@ export default function AssistanceProductsSettingsPage() {
                         {
                           label: "Modifier",
                           icon: Edit,
+                          iconTone: "primary",
                           onSelect: () => { setEditingProduct(product); setProductDialogOpen(true); },
                         },
                         {
@@ -593,6 +594,7 @@ export default function AssistanceProductsSettingsPage() {
                           {
                             label: "Modifier tarif",
                             icon: Edit,
+                            iconTone: "primary",
                             onSelect: () => setEditingTarif(tarif),
                           },
                           {
@@ -667,7 +669,7 @@ export default function AssistanceProductsSettingsPage() {
                         <TableCell>{promo.actif === false ? "Inactif" : "Actif"}</TableCell>
                         <TableCell className="text-right">
                           <TableRowActions label={`Actions code ${promo.code || promo.libelle}`} actions={[
-                            { label: "Modifier le code", icon: Edit, onSelect: () => setEditingPromo(promo) },
+                            { label: "Modifier le code", icon: Edit, iconTone: "primary", onSelect: () => setEditingPromo(promo) },
                             { label: "Désactiver le code", icon: PowerOff, destructive: true, disabled: promo.actif === false || deletePromo.isPending, onSelect: () => deletePromo.mutate({ productId: tarifProduct.id, promoId: promo.id }) },
                           ]} />
                         </TableCell>

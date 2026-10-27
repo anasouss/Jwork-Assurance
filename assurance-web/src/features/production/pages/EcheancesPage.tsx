@@ -549,7 +549,7 @@ function EcheanceTableRow({
             {fleetRenewal ? (
               <>
                 <DropdownMenuItem onSelect={onEditPreTerme} disabled={preparing}>
-                  <FilePenLine className="size-4" />
+                  <FilePenLine className="size-4 text-blue-600 dark:text-blue-400" />
                   {row.preTermeDraftId ? "Modifier le brouillon" : "Préparer le renouvellement"}
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onPdf} disabled={!row.preTermeDraftId}>
@@ -557,7 +557,7 @@ function EcheanceTableRow({
                   Générer le pré-terme
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={onRenew} disabled={!row.preTermeDraftId}>
-                  <RefreshCw className="size-4" />
+                  <RefreshCw className="size-4 text-emerald-600 dark:text-emerald-400" />
                   Renouveler
                 </DropdownMenuItem>
               </>
@@ -642,30 +642,29 @@ function AssistanceEcheanceTable({
                   <DropdownMenuContent align="end">
                     {canRenew ? row.assistanceLiee ? (
                       <DropdownMenuItem
-                        className="text-emerald-700 focus:bg-emerald-50 focus:text-emerald-800 dark:text-emerald-300 dark:focus:bg-emerald-950/50 dark:focus:text-emerald-200"
                         disabled={preparingContractId === row.contratId}
                         onSelect={() => onRenewLinked(row)}
                       >
-                        <RefreshCw className="size-4" />
+                        <RefreshCw className="size-4 text-emerald-600 dark:text-emerald-400" />
                         Renouveler le contrat et l’assistance
                       </DropdownMenuItem>
                     ) : (
-                      <DropdownMenuItem asChild className="text-emerald-700 focus:bg-emerald-50 focus:text-emerald-800 dark:text-emerald-300 dark:focus:bg-emerald-950/50 dark:focus:text-emerald-200">
+                      <DropdownMenuItem asChild>
                         <Link to={`${assistanceEditPath(row)}?action=renouveler`}>
-                          <RefreshCw className="size-4" />
+                          <RefreshCw className="size-4 text-emerald-600 dark:text-emerald-400" />
                           Renouveler l’assistance
                         </Link>
                       </DropdownMenuItem>
                     ) : null}
                     {canEdit ? (
-                      <DropdownMenuItem asChild className="text-blue-700 focus:bg-blue-50 focus:text-blue-800 dark:text-blue-300 dark:focus:bg-blue-950/50 dark:focus:text-blue-200">
+                      <DropdownMenuItem asChild>
                         <Link to={assistanceEditPath(row)}>
-                          <FilePenLine className="size-4" />
+                          <FilePenLine className="size-4 text-blue-600 dark:text-blue-400" />
                           Modifier
                         </Link>
                       </DropdownMenuItem>
                     ) : null}
-                    <DropdownMenuItem asChild className="text-slate-700 focus:bg-slate-100 focus:text-slate-900 dark:text-slate-300 dark:focus:bg-slate-800 dark:focus:text-slate-100">
+                    <DropdownMenuItem asChild>
                       <Link to={`/app/production/contrats/${row.contratId}/pieces-jointes`}>
                         <FileText className="size-4" />
                         Pièces jointes

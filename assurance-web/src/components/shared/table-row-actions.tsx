@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,10 +12,18 @@ import {
 export type TableRowAction = {
   label: string;
   icon?: ComponentType<{ className?: string }>;
+  iconTone?: "neutral" | "primary" | "success" | "warning";
   onSelect: () => void;
   disabled?: boolean;
   destructive?: boolean;
 };
+
+const ICON_TONE_CLASS = {
+  neutral: "",
+  primary: "text-blue-600 dark:text-blue-400",
+  success: "text-emerald-600 dark:text-emerald-400",
+  warning: "text-amber-600 dark:text-amber-400",
+} as const;
 
 export function TableRowActions({
   actions,
@@ -40,7 +49,9 @@ export function TableRowActions({
               variant={action.destructive ? "destructive" : "default"}
               onSelect={action.onSelect}
             >
-              {Icon ? <Icon className="size-4" /> : null}
+              {Icon ? (
+                <Icon className={cn("size-4", ICON_TONE_CLASS[action.iconTone ?? "neutral"])} />
+              ) : null}
               {action.label}
             </DropdownMenuItem>
           );

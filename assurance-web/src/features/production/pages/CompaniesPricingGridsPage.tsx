@@ -258,8 +258,8 @@ export default function CompaniesPricingGridsPage() {
                       <TableRowActions
                         label={`Actions ${grille.libelle}`}
                         actions={[
-                          { label: "Configurer", icon: SlidersHorizontal, onSelect: () => setConfiguring(grille) },
-                          { label: "Modifier", icon: Edit, onSelect: () => { setEditing(grille); setDialogOpen(true); } },
+                          { label: "Configurer", icon: SlidersHorizontal, iconTone: "primary", onSelect: () => setConfiguring(grille) },
+                          { label: "Modifier", icon: Edit, iconTone: "primary", onSelect: () => { setEditing(grille); setDialogOpen(true); } },
                         ]}
                       />
                     </TableCell>

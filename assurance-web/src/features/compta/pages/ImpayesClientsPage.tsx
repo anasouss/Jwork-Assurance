@@ -172,8 +172,8 @@ export default function ImpayesClientsPage() {
                       <DropdownMenuContent align="end" className="min-w-60">
                         <DropdownMenuItem asChild><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></DropdownMenuItem>
                         {canManage && <DropdownMenuSeparator />}
-                        {canManage && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4" /> Représenter l’instrument</DropdownMenuItem>}
-                        {canManage && <DropdownMenuItem asChild><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}&remplacer=${instrument.id}`}><RotateCcw className="size-4" /> Remplacer le moyen de paiement</Link></DropdownMenuItem>}
+                        {canManage && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Représenter l’instrument</DropdownMenuItem>}
+                        {canManage && <DropdownMenuItem asChild><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}&remplacer=${instrument.id}`}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Remplacer le moyen de paiement</Link></DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

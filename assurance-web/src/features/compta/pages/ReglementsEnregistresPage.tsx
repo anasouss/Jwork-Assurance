@@ -122,7 +122,6 @@ export default function ReglementsEnregistresPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get("search")?.trim() ?? "";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const currentUserId = useAuthStore((state) => state.user?.id);
   const canManage = permissions.includes("reglement-client:manage");
   const canManageTreasury = permissions.includes("tresorerie:manage");
   const canCreate = permissions.includes("reglement-client:create") || canManage;
@@ -546,7 +545,7 @@ export default function ReglementsEnregistresPage() {
                     <div className="flex justify-end">
                       <PaymentActionsMenu
                         payment={payment}
-                        canEdit={canCreate && payment.creeParId === currentUserId}
+                        canEdit={canCreate}
                         canManage={canManage}
                         canManageTreasury={canManageTreasury}
                         canIssueInvoice={canIssueInvoice}

@@ -669,9 +669,6 @@ public class ReglementClientService {
                 != Boolean.TRUE.equals(request.getMultiPayeur())) {
             throw new BadRequestException("Le type du règlement ne peut pas être modifié");
         }
-        if (!payment.getCreePar().getId().equals(userId)) {
-            throw new BadRequestException("Seul le créateur peut modifier ce règlement à valider");
-        }
         List<Long> previousElementIds = payment.getInstruments().stream()
                 .flatMap(instrument -> instrument.getAffectations().stream())
                 .map(AffectationReglementClient::getElementFacturable)
@@ -691,7 +688,7 @@ public class ReglementClientService {
 
         ReglementClientResponse response = savePending(
                 agenceId,
-                payment.getCreePar().getId(),
+                userId,
                 request,
                 payment
         );
@@ -931,8 +928,13 @@ public class ReglementClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         loadPaymentInstruments(payment, agenceId);
         requirePending(payment);
-        if (payment.getCreePar().getId().equals(validator.getId())) {
-            throw new BadRequestException("Le créateur du règlement ne peut pas le valider");
+        boolean createdByValidator = payment.getCreePar().getId().equals(validator.getId());
+        boolean lastModifiedByValidator = payment.getUpdatedByUserId() != null
+                && payment.getUpdatedByUserId().equals(validator.getId());
+        if (createdByValidator || lastModifiedByValidator) {
+            throw new BadRequestException(
+                    "Le créateur ou le dernier modificateur du règlement ne peut pas le valider"
+            );
         }
         if (Boolean.TRUE.equals(payment.getMultiPayeur())
                 && payment.getBordereauCheminStockage() == null) {
@@ -2542,6 +2544,7 @@ public class ReglementClientService {
                 .notes(payment.getNotes())
                 .creeParId(payment.getCreePar().getId())
                 .creePar(payment.getCreePar().getFullName())
+                .modifieParId(payment.getUpdatedByUserId())
                 .valideParId(payment.getValidePar() == null ? null : payment.getValidePar().getId())
                 .validePar(payment.getValidePar() == null ? null : payment.getValidePar().getFullName())
                 .dateValidation(payment.getDateValidation())

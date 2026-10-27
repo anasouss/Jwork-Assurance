@@ -158,6 +158,8 @@ export default function ValidationReglementsPage() {
               {payments.isLoading ? <TableRowsSkeleton colSpan={7} rows={6} /> : null}
               {!payments.isLoading && (payments.data?.rows ?? []).map((payment) => {
                 const ownPayment = payment.creeParId === user?.id;
+                const modifiedByCurrentUser = payment.modifieParId === user?.id;
+                const cannotValidate = ownPayment || modifiedByCurrentUser;
                 return (
                   <tr key={payment.id} className="hover:bg-muted/30">
                     <td className="px-4 py-2.5 font-semibold">{payment.numero}</td>
@@ -188,7 +190,7 @@ export default function ValidationReglementsPage() {
                             <Eye className="size-4" />
                           </Link>
                         </Button>
-                        {canEdit && ownPayment && (
+                        {canEdit && (
                           <Button asChild variant="ghost" size="icon" title="Modifier">
                             <Link to={`/app/compta/reglements/${payment.id}/modifier`}>
                               <Pencil className="size-4" />
@@ -209,9 +211,9 @@ export default function ValidationReglementsPage() {
                         {canValidate && (
                           <Button
                             size="sm"
-                            disabled={ownPayment}
-                            title={ownPayment
-                              ? "Le créateur ne peut pas valider son propre règlement"
+                            disabled={cannotValidate}
+                            title={cannotValidate
+                              ? "Le créateur ou le dernier modificateur ne peut pas valider ce règlement"
                               : "Valider le règlement"}
                             onClick={() => setPaymentToValidate(payment)}
                           >

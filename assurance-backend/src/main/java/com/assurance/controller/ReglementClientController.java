@@ -16,10 +16,12 @@ import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientPolicyResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.UtilisateurTresorerieResponse;
+import com.assurance.enums.AuditOperationCode;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.TypeContrat;
-import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.security.AuditRequestContext;
 import com.assurance.security.TenantContext;
 import com.assurance.service.JournalReglementsPdfService;
 import com.assurance.service.ReglementClientPdfService;
@@ -310,6 +312,7 @@ public class ReglementClientController {
             @PathVariable Long paymentId,
             @Valid @RequestBody CreerReglementClientRequest request
     ) {
+        AuditRequestContext.setOperation(AuditOperationCode.CLIENT_PAYMENT_UPDATED);
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.updatePending(
                 TenantContext.getCurrentAgence(),
                 TenantContext.getCurrentUser(),

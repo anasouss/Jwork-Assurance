@@ -607,6 +607,7 @@ export type ClientPayment = {
   notes?: string | null;
   creeParId: string;
   creePar: string;
+  modifieParId?: string | null;
   valideParId?: string | null;
   validePar?: string | null;
   dateValidation?: string | null;

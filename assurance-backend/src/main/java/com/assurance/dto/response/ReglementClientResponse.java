@@ -32,6 +32,7 @@ public class ReglementClientResponse {
     private String notes;
     private Long creeParId;
     private String creePar;
+    private Long modifieParId;
     private Long valideParId;
     private String validePar;
     private java.time.LocalDateTime dateValidation;

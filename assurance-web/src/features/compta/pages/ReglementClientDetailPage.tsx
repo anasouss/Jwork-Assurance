@@ -121,7 +121,7 @@ export default function ReglementClientDetailPage() {
               <Download className="size-4" /> Bordereau banque
             </Button>
           )}
-          {data.statut === "A_VALIDER" && data.creeParId === user?.id && canEdit && (
+          {data.statut === "A_VALIDER" && canEdit && (
             <Button asChild variant="outline">
               <Link to={`/app/compta/reglements/${data.id}/modifier`}>
                 <Pencil className="size-4" />

@@ -8,6 +8,7 @@ import {
 import {
   ChevronDown,
   ChevronRight,
+  Eye,
   FileText,
   Landmark,
   MoreHorizontal,
@@ -978,6 +979,12 @@ function PaymentActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuItem asChild>
+          <Link to={`/app/compta/reglements/${payment.id}`}>
+            <Eye className="size-4" />
+            Voir le détail
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={pdfLoading} onSelect={onPreview}>
           <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Imprimer le PDF"}

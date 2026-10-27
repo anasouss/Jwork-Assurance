@@ -3,7 +3,8 @@ export type CategorieMouvement =
   | "AFFAIRE_NOUVELLE"
   | "AVENANT"
   | "RENOUVELLEMENT"
-  | "CARTE_VERTE";
+  | "CARTE_VERTE"
+  | "ASSISTANCE";
 export type StatutAffectation =
   | "NON_AFFECTEE"
   | "PARTIELLEMENT_AFFECTEE"
@@ -14,10 +15,22 @@ export type ModeAffectation = "AUTOMATIQUE" | "MANUEL_OU_IMPORT";
 export type ModeVentilationQuittance = "GLOBALE" | "PAR_CATEGORIE";
 export type ModeCalculCommission = "TAUX_NET" | "TAUX_BRUT_TVA_INCLUSE";
 export type NiveauEcartAffectation = "EQUILIBRE" | "AVERTISSEMENT" | "BLOQUANT";
+export type CompanyCounterpartyType = "ASSURANCE" | "ASSISTANCE";
+
+export type CompanyCounterparty = {
+  id: string;
+  type: CompanyCounterpartyType;
+  sourceId: string;
+  code?: string | null;
+  libelle: string;
+  actif: boolean;
+};
 
 export type Rule = {
   id: string;
-  compagnieAssuranceId: string;
+  tiersCompagnieId: string;
+  compagnieId: string;
+  typeCompagnie: CompanyCounterpartyType;
   compagnie: string;
   typeContrat: TypeContrat;
   modeAffectation: ModeAffectation;
@@ -26,6 +39,7 @@ export type Rule = {
   tauxCommissionAutomobile: number;
   tauxCommissionEvcat: number;
   tauxCommissionCorporel: number;
+  tauxCommissionAssistance: number;
   tauxTvaIncluseCommission: number;
   retenueParDefaut: boolean;
   tauxRetenue: number;
@@ -52,7 +66,7 @@ export type Rule = {
   actif: boolean;
 };
 
-export type RuleRequest = Omit<Rule, "id" | "compagnie">;
+export type RuleRequest = Omit<Rule, "id" | "compagnie" | "compagnieId" | "typeCompagnie">;
 
 export type RulePage = {
   rows: Rule[];
@@ -100,7 +114,9 @@ export type QuittanceAllocation = {
   nature?: CategorieMouvement | null;
   souscripteur: string;
   police: string;
+  tiersCompagnieId?: string | null;
   compagnieId?: string | null;
+  typeCompagnie?: CompanyCounterpartyType | null;
   compagnie: string;
   dateEffet: string;
   dateEcheance?: string | null;
@@ -936,7 +952,9 @@ export type CompanyPaymentStatus = "VALIDE" | "ANNULE";
 
 export type CompanyBordereauSource = {
   id: string;
+  tiersCompagnieId: string;
   compagnieId: string;
+  typeCompagnie: CompanyCounterpartyType;
   compagnie: string;
   quittanceId: string;
   numeroQuittanceCompagnie?: string | null;
@@ -955,7 +973,7 @@ export type CompanyBordereauSource = {
   encaissementConfirme: boolean;
 };
 
-export type CompanyBordereauLine = Omit<CompanyBordereauSource, "id" | "compagnieId" | "compagnie" | "quittanceId" | "encaissementConfirme"> & {
+export type CompanyBordereauLine = Omit<CompanyBordereauSource, "id" | "tiersCompagnieId" | "compagnieId" | "typeCompagnie" | "compagnie" | "quittanceId" | "encaissementConfirme"> & {
   id: string;
   affectationId: string;
   ordre: number;
@@ -979,7 +997,9 @@ export type CompanyBordereauPaymentSummary = {
 export type CompanyBordereau = {
   id: string;
   numero: string;
+  tiersCompagnieId: string;
   compagnieId: string;
+  typeCompagnie: CompanyCounterpartyType;
   compagnie: string;
   baseBordereau: CompanyBordereauBase;
   statut: CompanyBordereauStatus;
@@ -1033,7 +1053,7 @@ export type CompanyPortfolioAccountingSummary = {
 };
 
 export type UpsertCompanyBordereauRequest = {
-  compagnieId?: string;
+  tiersCompagnieId?: string;
   baseBordereau?: CompanyBordereauBase;
   periodeDebut: string;
   periodeFin: string;
@@ -1067,7 +1087,9 @@ export type CompanyPaymentInstrument = {
 export type CompanyPayment = {
   id: string;
   numero: string;
+  tiersCompagnieId: string;
   compagnieId: string;
+  typeCompagnie: CompanyCounterpartyType;
   compagnie: string;
   dateReglement: string;
   statut: CompanyPaymentStatus;
@@ -1081,7 +1103,7 @@ export type CompanyPayment = {
 };
 
 export type CreateCompanyPaymentRequest = {
-  compagnieId: string;
+  tiersCompagnieId: string;
   dateReglement: string;
   notes?: string;
   instruments: Array<{

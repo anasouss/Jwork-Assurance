@@ -1,7 +1,7 @@
 package com.assurance.repository;
 
 import com.assurance.entity.Quittance;
-import com.assurance.entity.CompagnieAssurance;
+import com.assurance.entity.TiersCompagnie;
 import com.assurance.enums.TypeContrat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +38,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (q.elementFacturable is null or (q.elementFacturable.actif = true
+                   and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and q.dateDebut between :dateDu and :dateAu
             """)
     DashboardProductionTotals sumDashboardProduction(
@@ -64,7 +65,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (q.elementFacturable is null or (q.elementFacturable.actif = true
+                   and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and q.dateDebut between :dateDu and :dateAu
               and (:agenceId is null or q.contrat.agence.id = :agenceId)
             group by q.contrat.agence.id
@@ -102,7 +104,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (q.elementFacturable is null or (q.elementFacturable.actif = true
+                   and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and q.dateDebut between :dateDu and :dateAu
               and (:agenceId is null or q.contrat.agence.id = :agenceId)
             group by year(q.dateDebut), month(q.dateDebut)
@@ -125,7 +128,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (q.elementFacturable is null or (q.elementFacturable.actif = true
+                   and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and q.dateDebut between :dateDu and :dateAu
               and (:agenceId is null or q.contrat.agence.id = :agenceId)
             group by q.dateDebut
@@ -146,7 +150,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (q.elementFacturable is null or (q.elementFacturable.actif = true
+                   and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and not exists (
                   select 1 from AffectationQuittanceCompagnie a where a.quittance = q
               )
@@ -162,7 +167,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and q.alternative = false
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (q.elementFacturable is null or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (q.elementFacturable is null or (q.elementFacturable.actif = true
+                   and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and not exists (
                   select 1
                   from LigneDocumentClient l
@@ -182,7 +188,9 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
 
     Optional<Quittance> findFirstByContratIdAndGlobaleTrueOrderByCreatedAtDesc(Long contratId);
 
-    @EntityGraph(attributePaths = {"mouvementContrat", "elementFacturable"})
+    Optional<Quittance> findFirstByElementFacturableIdAndGlobaleTrueOrderByCreatedAtAsc(Long elementFacturableId);
+
+    @EntityGraph(attributePaths = {"mouvementContrat", "elementFacturable", "tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
     List<Quittance> findByContratIdAndGlobaleTrueOrderByCreatedAtAsc(Long contratId);
 
     @EntityGraph(attributePaths = {
@@ -190,31 +198,49 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             "contrat.compagnieAssurance",
             "mouvementContrat",
             "mouvementContrat.typeMouvement",
-            "compagnieAssurance"
+            "tiersCompagnie",
+            "tiersCompagnie.compagnieAssurance",
+            "tiersCompagnie.compagnieAssistance"
     })
     Optional<Quittance> findByContratAgenceIdAndIdAndGlobaleTrue(Long agenceId, Long id);
 
     @Query("""
-            select distinct ca
+            select distinct tc
             from Quittance q
             join q.contrat c
-            join q.compagnieAssurance ca
+            join q.tiersCompagnie tc
+            left join tc.compagnieAssurance ca
+            left join tc.compagnieAssistance cas
+            left join q.elementFacturable e
             left join q.mouvementContrat m
             where c.agence.id = :agenceId
               and q.globale = true
               and q.alternative = false
               and c.prospection = false
-              and ca.actif = true
+              and (
+                    (tc.type = com.assurance.enums.TypeTiersCompagnie.ASSURANCE and ca.actif = true)
+                    or (tc.type = com.assurance.enums.TypeTiersCompagnie.ASSISTANCE and cas.actif = true)
+              )
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
-                    q.elementFacturable is null
-                    or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+                    e is null
+                    or (e.actif = true and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               )
-              and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
-            order by ca.nom
+              and (
+                    :brancheId is null
+                    or ((e is null or e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE)
+                        and c.brancheAssurance.id = :brancheId)
+                    or (e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                        and exists (
+                            select 1 from AssistanceContrat assistance
+                            where assistance.elementFacturable = e
+                              and assistance.actif = true
+                              and assistance.brancheAssurance.id = :brancheId
+                        ))
+              )
+            order by tc.id
             """)
-    List<CompagnieAssurance> findAvailableCompaniesForAffectation(
+    List<TiersCompagnie> findAvailableCompaniesForAffectation(
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId
     );
@@ -222,9 +248,11 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
     @EntityGraph(attributePaths = {
             "contrat",
             "contrat.compagnieAssurance",
+            "tiersCompagnie",
+            "tiersCompagnie.compagnieAssurance",
+            "tiersCompagnie.compagnieAssistance",
             "mouvementContrat",
-            "mouvementContrat.typeMouvement",
-            "compagnieAssurance"
+            "mouvementContrat.typeMouvement"
     })
     @Query(value = """
             select q
@@ -232,19 +260,32 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             join q.contrat c
             left join q.mouvementContrat m
             left join m.typeMouvement tm
-            join q.compagnieAssurance ca
+            join q.tiersCompagnie tc
+            left join tc.compagnieAssurance ca
+            left join tc.compagnieAssistance cas
+            left join q.elementFacturable e
             where c.agence.id = :agenceId
               and q.globale = true
               and q.alternative = false
               and c.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
-                    q.elementFacturable is null
-                    or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+                    e is null
+                    or (e.actif = true and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               )
-              and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
-              and (:compagnieId is null or ca.id = :compagnieId)
+              and (
+                    :brancheId is null
+                    or ((e is null or e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE)
+                        and c.brancheAssurance.id = :brancheId)
+                    or (e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                        and exists (
+                            select 1 from AssistanceContrat assistance
+                            where assistance.elementFacturable = e
+                              and assistance.actif = true
+                              and assistance.brancheAssurance.id = :brancheId
+                        ))
+              )
+              and (:tiersCompagnieId is null or tc.id = :tiersCompagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
                     :avecQuittance is null
@@ -274,6 +315,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                     or lower(coalesce(c.numeroContrat, '')) like concat('%', :search, '%')
                     or lower(coalesce(q.numeroQuittance, '')) like concat('%', :search, '%')
                     or lower(coalesce(ca.nom, '')) like concat('%', :search, '%')
+                    or lower(coalesce(cas.nom, '')) like concat('%', :search, '%')
+                    or lower(coalesce(e.libelle, '')) like concat('%', :search, '%')
                     or exists (
                         select 1
                         from ContratClient cc
@@ -309,19 +352,32 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             join q.contrat c
             left join q.mouvementContrat m
             left join m.typeMouvement tm
-            join q.compagnieAssurance ca
+            join q.tiersCompagnie tc
+            left join tc.compagnieAssurance ca
+            left join tc.compagnieAssistance cas
+            left join q.elementFacturable e
             where c.agence.id = :agenceId
               and q.globale = true
               and q.alternative = false
               and c.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
-                    q.elementFacturable is null
-                    or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+                    e is null
+                    or (e.actif = true and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               )
-              and upper(coalesce(c.brancheAssurance.code, '')) <> 'ASSISTANCE'
-              and (:brancheId is null or c.brancheAssurance.id = :brancheId)
-              and (:compagnieId is null or ca.id = :compagnieId)
+              and (
+                    :brancheId is null
+                    or ((e is null or e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE)
+                        and c.brancheAssurance.id = :brancheId)
+                    or (e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                        and exists (
+                            select 1 from AssistanceContrat assistance
+                            where assistance.elementFacturable = e
+                              and assistance.actif = true
+                              and assistance.brancheAssurance.id = :brancheId
+                        ))
+              )
+              and (:tiersCompagnieId is null or tc.id = :tiersCompagnieId)
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (
                     :avecQuittance is null
@@ -351,6 +407,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
                     or lower(coalesce(c.numeroContrat, '')) like concat('%', :search, '%')
                     or lower(coalesce(q.numeroQuittance, '')) like concat('%', :search, '%')
                     or lower(coalesce(ca.nom, '')) like concat('%', :search, '%')
+                    or lower(coalesce(cas.nom, '')) like concat('%', :search, '%')
+                    or lower(coalesce(e.libelle, '')) like concat('%', :search, '%')
                     or exists (
                         select 1
                         from ContratClient cc
@@ -383,7 +441,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
     Page<Quittance> searchForAffectation(
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId,
-            @Param("compagnieId") Long compagnieId,
+            @Param("tiersCompagnieId") Long tiersCompagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("avecQuittance") Boolean avecQuittance,
             @Param("dateDu") LocalDate dateDu,
@@ -400,8 +458,7 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             "contrat.groupeFacturation",
             "contrat.groupeFacturation.clientTresorerie",
             "mouvementContrat",
-            "mouvementContrat.typeMouvement",
-            "compagnieAssurance"
+            "mouvementContrat.typeMouvement"
     })
     @Query(value = """
             select q
@@ -423,7 +480,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
                     q.elementFacturable is null
-                    or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+                    or (q.elementFacturable.actif = true
+                        and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               )
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (:dateDu is null or q.dateDebut >= :dateDu)
@@ -509,7 +567,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (
                     q.elementFacturable is null
-                    or q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+                    or (q.elementFacturable.actif = true
+                        and q.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
               )
               and (:typeContrat is null or c.typeContrat = :typeContrat)
               and (:dateDu is null or q.dateDebut >= :dateDu)
@@ -597,7 +656,6 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             "contrat.groupeFacturation.clientTresorerie",
             "mouvementContrat",
             "mouvementContrat.typeMouvement",
-            "compagnieAssurance",
             "lignes"
     })
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -619,7 +677,6 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             "contrat.compagnieAssurance",
             "mouvementContrat",
             "mouvementContrat.typeMouvement",
-            "compagnieAssurance",
             "elementFacturable"
     })
     @Query("""

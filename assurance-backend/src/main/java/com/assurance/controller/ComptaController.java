@@ -21,6 +21,7 @@ import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
 import com.assurance.dto.response.LotAffectationQuittanceResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
+import com.assurance.dto.response.TiersCompagnieResponse;
 import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.dto.response.SourceDocumentClientPageResponse;
 import com.assurance.dto.response.PropositionEcheanceDocumentClientResponse;
@@ -78,7 +79,7 @@ public class ComptaController {
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<AffectationQuittancePageResponse>> quittances(
             @RequestParam(required = false) Long brancheId,
-            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long tiersCompagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) Boolean avecQuittance,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -90,7 +91,7 @@ public class ComptaController {
         return ResponseEntity.ok(ApiResponse.success(affectationQuittanceService.search(
                 TenantContext.getCurrentAgence(),
                 brancheId,
-                compagnieId,
+                tiersCompagnieId,
                 typeContrat,
                 avecQuittance,
                 dateDu,
@@ -103,7 +104,7 @@ public class ComptaController {
 
     @GetMapping("/quittances/compagnies-disponibles")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
-    public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> compagniesQuittancesDisponibles(
+    public ResponseEntity<ApiResponse<List<TiersCompagnieResponse>>> compagniesQuittancesDisponibles(
             @RequestParam(required = false) Long brancheId
     ) {
         return ResponseEntity.ok(ApiResponse.success(affectationQuittanceService.listAvailableCompanies(
@@ -116,7 +117,7 @@ public class ComptaController {
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<byte[]> exportQuittances(
             @RequestParam(required = false) Long brancheId,
-            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long tiersCompagnieId,
             @RequestParam(required = false) TypeContrat typeContrat,
             @RequestParam(required = false) Boolean avecQuittance,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -126,7 +127,7 @@ public class ComptaController {
         byte[] file = affectationQuittanceService.export(
                 TenantContext.getCurrentAgence(),
                 brancheId,
-                compagnieId,
+                tiersCompagnieId,
                 typeContrat,
                 avecQuittance,
                 dateDu,

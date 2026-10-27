@@ -30,6 +30,7 @@ import type {
   CompanyBordereauPage,
   CompanyBordereauSource,
   CompanyBordereauStatus,
+  CompanyCounterparty,
   CompanyPortfolioAccountingSummary,
   CompanyPayment,
   CreateCompanyPaymentRequest,
@@ -108,10 +109,10 @@ export const comptaApi = {
 
   async availableQuittanceCompanies(brancheId?: string) {
     return unwrap(
-      await apiFetch<ApiResponse<ReferenceOption[]>>(
+      await apiFetch<ApiResponse<CompanyCounterparty[]>>(
         `/api/v1/compta/quittances/compagnies-disponibles${buildQueryString({ brancheId })}`
       )
-    ).map(normalizeReference);
+    ).map(normalizeCompanyCounterparty);
   },
 
   async conventionBillingInstallments(params: {
@@ -173,7 +174,7 @@ export const comptaApi = {
 
   async searchQuittances(params: {
     brancheId?: string;
-    compagnieId?: string;
+    tiersCompagnieId?: string;
     typeContrat?: TypeContrat;
     avecQuittance?: boolean;
     dateDu?: string;
@@ -192,7 +193,7 @@ export const comptaApi = {
 
   async exportQuittances(params: {
     brancheId?: string;
-    compagnieId?: string;
+    tiersCompagnieId?: string;
     typeContrat?: TypeContrat;
     avecQuittance?: boolean;
     dateDu?: string;
@@ -855,7 +856,7 @@ export const comptaApi = {
   },
 
   async companyBordereauSources(params: {
-    compagnieId?: string;
+    tiersCompagnieId?: string;
     base: CompanyBordereauBase;
     dateDu?: string;
     dateAu?: string;
@@ -867,7 +868,7 @@ export const comptaApi = {
   },
 
   async companyBordereaux(params: {
-    compagnieId?: string;
+    tiersCompagnieId?: string;
     statut?: CompanyBordereauStatus;
     dateDu?: string;
     dateAu?: string;
@@ -1209,11 +1210,20 @@ function normalizeReference(option: ReferenceOption): ReferenceOption {
   };
 }
 
+function normalizeCompanyCounterparty(option: CompanyCounterparty): CompanyCounterparty {
+  return {
+    ...option,
+    id: String(option.id),
+    sourceId: String(option.sourceId),
+  };
+}
+
 function normalizeRule(rule: Rule): Rule {
   return {
     ...rule,
     id: String(rule.id),
-    compagnieAssuranceId: String(rule.compagnieAssuranceId),
+    tiersCompagnieId: String(rule.tiersCompagnieId),
+    compagnieId: String(rule.compagnieId),
   };
 }
 
@@ -1223,6 +1233,7 @@ function normalizeAllocation(allocation: QuittanceAllocation): QuittanceAllocati
     quittanceId: String(allocation.quittanceId),
     contratId: String(allocation.contratId),
     mouvementId: allocation.mouvementId == null ? null : String(allocation.mouvementId),
+    tiersCompagnieId: allocation.tiersCompagnieId == null ? null : String(allocation.tiersCompagnieId),
     compagnieId: allocation.compagnieId == null ? null : String(allocation.compagnieId),
     regle: allocation.regle ? normalizeRule(allocation.regle) : null,
     lignes: allocation.lignes.map(normalizeAllocationLine),
@@ -1437,6 +1448,7 @@ function normalizeCompanyBordereauSource(
   return {
     ...source,
     id: String(source.id),
+    tiersCompagnieId: String(source.tiersCompagnieId),
     compagnieId: String(source.compagnieId),
     quittanceId: String(source.quittanceId),
   };
@@ -1457,6 +1469,7 @@ function normalizeCompanyBordereau(
   return {
     ...bordereau,
     id: String(bordereau.id),
+    tiersCompagnieId: String(bordereau.tiersCompagnieId),
     compagnieId: String(bordereau.compagnieId),
     lignes: (bordereau.lignes ?? []).map((line) => ({
       ...line,
@@ -1478,6 +1491,7 @@ function normalizeCompanyPayment(payment: CompanyPayment): CompanyPayment {
   return {
     ...payment,
     id: String(payment.id),
+    tiersCompagnieId: String(payment.tiersCompagnieId),
     compagnieId: String(payment.compagnieId),
     instruments: payment.instruments.map((instrument) => ({
       ...instrument,

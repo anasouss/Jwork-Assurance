@@ -83,7 +83,7 @@ export default function NouveauReglementCompagniePage() {
   const totalDue = bordereaux.reduce((sum, row) => sum + row.soldeRestant, 0);
   const paymentTotal = methods.reduce((sum, method) => sum + amount(method.amount), 0);
   const remaining = round(totalDue - paymentTotal);
-  const companyIds = new Set(bordereaux.map((row) => row.compagnieId));
+  const companyIds = new Set(bordereaux.map((row) => row.tiersCompagnieId));
   const validSelection = bordereaux.length === bordereauIds.length
     && companyIds.size === 1
     && bordereaux.every((row) => row.statut === "TRANSMIS" && row.soldeRestant > 0.004);
@@ -316,7 +316,7 @@ function buildRequest(
     bordereaux.map((row) => [row.id, round(row.soldeRestant)])
   );
   return {
-    compagnieId: bordereaux[0].compagnieId,
+    tiersCompagnieId: bordereaux[0].tiersCompagnieId,
     dateReglement: paymentDate,
     notes: notes.trim() || undefined,
     instruments: methods.map((method) => {

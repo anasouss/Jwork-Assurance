@@ -38,8 +38,8 @@ import java.util.List;
         indexes = {
                 @Index(name = "idx_bordereau_compagnie_agence_statut", columnList = "agence_id,statut"),
                 @Index(
-                        name = "idx_bordereau_compagnie_compagnie_periode",
-                        columnList = "compagnie_assurance_id,periode_debut,periode_fin"
+                        name = "idx_bordereau_compagnie_tiers_periode",
+                        columnList = "tiers_compagnie_id,periode_debut,periode_fin"
                 )
         }
 )
@@ -55,8 +55,8 @@ public class BordereauCompagnie extends AuditedEntity {
     private Agence agence;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
-    private CompagnieAssurance compagnieAssurance;
+    @JoinColumn(name = "tiers_compagnie_id", nullable = false)
+    private TiersCompagnie tiersCompagnie;
 
     @Column(nullable = false, length = 80)
     private String numero;

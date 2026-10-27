@@ -35,6 +35,7 @@ public class QuittanceProductionService {
     private final LigneQuittanceRepository ligneQuittanceRepository;
     private final ApplicationRegleFiscaleQuittanceRepository applicationRegleFiscaleRepository;
     private final ElementFacturableCibleService elementFacturableCibleService;
+    private final TiersCompagnieService tiersCompagnieService;
 
     public Quittance genererPourMouvement(
             Contrat contrat,
@@ -94,7 +95,7 @@ public class QuittanceProductionService {
                 .contrat(contrat)
                 .mouvementContrat(mouvement)
                 .elementFacturable(element)
-                .compagnieAssurance(contrat.getCompagnieAssurance())
+                .tiersCompagnie(tiersCompagnieService.resolveAssurance(contrat.getCompagnieAssurance()))
                 .numeroQuittance(genererNumeroQuittance(contrat, mouvement, typeMouvement))
                 .type(typeMouvement.getCode())
                 .categorie(CategorieQuittance.TOTAL.name())
@@ -180,7 +181,7 @@ public class QuittanceProductionService {
         element.setPrimeTotale(calcul.primeTotale());
         elementFacturableRepository.save(element);
 
-        quittance.setCompagnieAssurance(contrat.getCompagnieAssurance());
+        quittance.setTiersCompagnie(tiersCompagnieService.resolveAssurance(contrat.getCompagnieAssurance()));
         // A recalculation updates amounts in place; the accounting reference is immutable.
         quittance.setType(typeMouvement.getCode());
         quittance.setCategorie(CategorieQuittance.TOTAL.name());

@@ -15,33 +15,33 @@ import java.util.Optional;
 
 public interface RegleAffectationQuittanceRepository extends JpaRepository<RegleAffectationQuittance, Long> {
 
-    @EntityGraph(attributePaths = {"compagnieAssurance"})
-    Page<RegleAffectationQuittance> findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
+    Page<RegleAffectationQuittance> findByAgenceIdOrderByDateDebutDesc(
             Long agenceId,
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"compagnieAssurance"})
-    List<RegleAffectationQuittance> findAllByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
+    List<RegleAffectationQuittance> findAllByAgenceIdOrderByDateDebutDesc(
             Long agenceId
     );
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "agence"})
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance", "agence"})
     Optional<RegleAffectationQuittance> findByAgenceIdAndId(Long agenceId, Long id);
 
-    Optional<RegleAffectationQuittance> findByAgenceIdAndCompagnieAssuranceIdAndTypeContratAndDateDebut(
+    Optional<RegleAffectationQuittance> findByAgenceIdAndTiersCompagnieIdAndTypeContratAndDateDebut(
             Long agenceId,
-            Long compagnieAssuranceId,
+            Long tiersCompagnieId,
             TypeContrat typeContrat,
             LocalDate dateDebut
     );
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "agence"})
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance", "agence"})
     @Query("""
             select r
             from RegleAffectationQuittance r
             where r.agence.id = :agenceId
-              and r.compagnieAssurance.id = :compagnieId
+              and r.tiersCompagnie.id = :tiersCompagnieId
               and r.typeContrat = :typeContrat
               and r.actif = true
               and r.dateDebut <= :dateEffet
@@ -50,7 +50,7 @@ public interface RegleAffectationQuittanceRepository extends JpaRepository<Regle
             """)
     List<RegleAffectationQuittance> findEffectiveRules(
             @Param("agenceId") Long agenceId,
-            @Param("compagnieId") Long compagnieId,
+            @Param("tiersCompagnieId") Long tiersCompagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("dateEffet") LocalDate dateEffet
     );
@@ -59,7 +59,7 @@ public interface RegleAffectationQuittanceRepository extends JpaRepository<Regle
             select count(r)
             from RegleAffectationQuittance r
             where r.agence.id = :agenceId
-              and r.compagnieAssurance.id = :compagnieId
+              and r.tiersCompagnie.id = :tiersCompagnieId
               and r.typeContrat = :typeContrat
               and r.id <> :excludedId
               and r.actif = true
@@ -68,7 +68,7 @@ public interface RegleAffectationQuittanceRepository extends JpaRepository<Regle
             """)
     long countOverlappingRules(
             @Param("agenceId") Long agenceId,
-            @Param("compagnieId") Long compagnieId,
+            @Param("tiersCompagnieId") Long tiersCompagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("dateDebut") LocalDate dateDebut,
             @Param("dateFin") LocalDate dateFin,
@@ -81,14 +81,14 @@ public interface RegleAffectationQuittanceRepository extends JpaRepository<Regle
             join a.quittance q
             join q.contrat c
             where a.agence.id = :agenceId
-              and a.compagnieAssurance.id = :compagnieId
+              and a.tiersCompagnie.id = :tiersCompagnieId
               and c.typeContrat = :typeContrat
               and q.dateDebut >= :dateDebut
               and q.dateDebut <= :dateFin
             """)
     long countAllocationsUsingRule(
             @Param("agenceId") Long agenceId,
-            @Param("compagnieId") Long compagnieId,
+            @Param("tiersCompagnieId") Long tiersCompagnieId,
             @Param("typeContrat") TypeContrat typeContrat,
             @Param("dateDebut") LocalDate dateDebut,
             @Param("dateFin") LocalDate dateFin

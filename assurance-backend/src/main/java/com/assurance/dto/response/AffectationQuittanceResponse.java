@@ -5,6 +5,7 @@ import com.assurance.enums.SourceAffectationQuittance;
 import com.assurance.enums.StatutAffectationQuittance;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.TypeTiersCompagnie;
 import lombok.Builder;
 import lombok.Data;
 
@@ -25,7 +26,9 @@ public class AffectationQuittanceResponse {
     private NatureAffectationQuittance nature;
     private String souscripteur;
     private String police;
+    private Long tiersCompagnieId;
     private Long compagnieId;
+    private TypeTiersCompagnie typeCompagnie;
     private String compagnie;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;

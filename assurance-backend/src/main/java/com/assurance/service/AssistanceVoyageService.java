@@ -81,6 +81,7 @@ public class AssistanceVoyageService {
     private final AssistanceContratRepository assistanceContratRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final LigneTarificationAssistanceRepository ligneTarificationAssistanceRepository;
+    private final AssistanceQuittanceService assistanceQuittanceService;
     private final ContractDirectModificationPolicy directModificationPolicy;
 
     @Transactional(readOnly = true)
@@ -380,7 +381,8 @@ public class AssistanceVoyageService {
                 .actif(true)
                 .build());
         assistance.setElementFacturable(element);
-        assistanceContratRepository.save(assistance);
+        assistance = assistanceContratRepository.save(assistance);
+        assistanceQuittanceService.synchroniser(assistance);
 
         if (renewal) {
             source.setRenouvele(true);

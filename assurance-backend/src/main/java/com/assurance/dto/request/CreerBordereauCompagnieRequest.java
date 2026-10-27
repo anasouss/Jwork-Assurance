@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 public class CreerBordereauCompagnieRequest {
     @NotNull
-    private Long compagnieId;
+    private Long tiersCompagnieId;
     @NotNull
     private BaseBordereauCompagnie baseBordereau;
     @NotNull

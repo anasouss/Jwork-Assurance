@@ -14,9 +14,9 @@ import com.assurance.entity.AffectationQuittanceCompagnie;
 import com.assurance.entity.AffectationReglementCompagnie;
 import com.assurance.entity.Agence;
 import com.assurance.entity.BordereauCompagnie;
-import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.LigneBordereauCompagnie;
 import com.assurance.entity.SequenceBordereauCompagnie;
+import com.assurance.entity.TiersCompagnie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.BaseBordereauCompagnie;
 import com.assurance.enums.StatutAffectationReglement;
@@ -29,7 +29,6 @@ import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import com.assurance.repository.AffectationReglementCompagnieRepository;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.BordereauCompagnieRepository;
-import com.assurance.repository.CompagnieAssuranceRepository;
 import com.assurance.repository.LigneBordereauCompagnieRepository;
 import com.assurance.repository.SequenceBordereauCompagnieRepository;
 import com.assurance.repository.UtilisateurRepository;
@@ -65,13 +64,13 @@ public class BordereauCompagnieService {
     private final AffectationReglementCompagnieRepository allocationRepository;
     private final SequenceBordereauCompagnieRepository sequenceRepository;
     private final AgenceRepository agenceRepository;
-    private final CompagnieAssuranceRepository compagnieRepository;
+    private final TiersCompagnieService tiersCompagnieService;
     private final UtilisateurRepository utilisateurRepository;
 
     @Transactional(readOnly = true)
     public List<SourceBordereauCompagnieResponse> eligibleSources(
             Long agenceId,
-            Long compagnieId,
+            Long tiersCompagnieId,
             BaseBordereauCompagnie base,
             LocalDate dateDu,
             LocalDate dateAu,
@@ -79,7 +78,7 @@ public class BordereauCompagnieService {
     ) {
         validatePeriod(dateDu, dateAu);
         String normalizedSearch = normalizeSearch(search);
-        return sourceRepository.findEligible(agenceId, compagnieId, dateDu, dateAu).stream()
+        return sourceRepository.findEligible(agenceId, tiersCompagnieId, dateDu, dateAu).stream()
                 .filter(source -> base != BaseBordereauCompagnie.ENCAISSEMENT
                         || Boolean.TRUE.equals(source.getQuittance().getPayee()))
                 .filter(source -> matches(source, normalizedSearch))
@@ -90,7 +89,7 @@ public class BordereauCompagnieService {
     @Transactional(readOnly = true)
     public BordereauCompagniePageResponse search(
             Long agenceId,
-            Long compagnieId,
+            Long tiersCompagnieId,
             StatutBordereauCompagnie statut,
             LocalDate dateDu,
             LocalDate dateAu,
@@ -101,7 +100,7 @@ public class BordereauCompagnieService {
         validatePeriod(dateDu, dateAu);
         Page<BordereauCompagnie> result = bordereauRepository.search(
                 agenceId,
-                compagnieId,
+                tiersCompagnieId,
                 statut,
                 dateDu,
                 dateAu,
@@ -217,11 +216,11 @@ public class BordereauCompagnieService {
         validatePeriod(request.getPeriodeDebut(), request.getPeriodeFin());
         Agence agence = agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
-        CompagnieAssurance compagnie = findActiveCompany(request.getCompagnieId());
+        TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
         Utilisateur actor = currentUser();
         BordereauCompagnie bordereau = BordereauCompagnie.builder()
                 .agence(agence)
-                .compagnieAssurance(compagnie)
+                .tiersCompagnie(tiers)
                 .numero(nextNumber(agence, request.getPeriodeFin().getYear()))
                 .baseBordereau(request.getBaseBordereau())
                 .statut(StatutBordereauCompagnie.BROUILLON)
@@ -396,7 +395,7 @@ public class BordereauCompagnieService {
             BordereauCompagnie bordereau,
             AffectationQuittanceCompagnie source
     ) {
-        if (!source.getCompagnieAssurance().getId().equals(bordereau.getCompagnieAssurance().getId())) {
+        if (!source.getTiersCompagnie().getId().equals(bordereau.getTiersCompagnie().getId())) {
             throw new BadRequestException("Toutes les lignes doivent appartenir à la même compagnie");
         }
         if (source.getDateEffet().isBefore(bordereau.getPeriodeDebut())
@@ -473,8 +472,10 @@ public class BordereauCompagnieService {
         return BordereauCompagnieResponse.builder()
                 .id(bordereau.getId())
                 .numero(bordereau.getNumero())
-                .compagnieId(bordereau.getCompagnieAssurance().getId())
-                .compagnie(bordereau.getCompagnieAssurance().getNom())
+                .tiersCompagnieId(bordereau.getTiersCompagnie().getId())
+                .compagnieId(bordereau.getTiersCompagnie().getSourceId())
+                .typeCompagnie(bordereau.getTiersCompagnie().getType())
+                .compagnie(bordereau.getTiersCompagnie().getNom())
                 .baseBordereau(bordereau.getBaseBordereau())
                 .statut(bordereau.getStatut())
                 .statutRapprochement(bordereau.getStatutRapprochement())
@@ -563,8 +564,10 @@ public class BordereauCompagnieService {
     ) {
         return SourceBordereauCompagnieResponse.builder()
                 .id(source.getId())
-                .compagnieId(source.getCompagnieAssurance().getId())
-                .compagnie(source.getCompagnieAssurance().getNom())
+                .tiersCompagnieId(source.getTiersCompagnie().getId())
+                .compagnieId(source.getTiersCompagnie().getSourceId())
+                .typeCompagnie(source.getTiersCompagnie().getType())
+                .compagnie(source.getTiersCompagnie().getNom())
                 .quittanceId(source.getQuittance().getId())
                 .numeroQuittanceCompagnie(source.getNumeroQuittanceCompagnie())
                 .numeroPolice(source.getQuittance().getContrat().getNumeroPolice())
@@ -641,23 +644,14 @@ public class BordereauCompagnieService {
         if (search == null) {
             return true;
         }
-        return List.of(
+        return java.util.stream.Stream.of(
                         source.getNumeroQuittanceCompagnie(),
                         source.getQuittance().getContrat().getNumeroPolice(),
                         source.getQuittance().getContrat().getNumeroDossier(),
                         resolveMovement(source)
-                ).stream()
+                )
                 .filter(Objects::nonNull)
                 .anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(search));
-    }
-
-    private CompagnieAssurance findActiveCompany(Long id) {
-        CompagnieAssurance company = compagnieRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Compagnie", id));
-        if (!Boolean.TRUE.equals(company.getActif())) {
-            throw new BadRequestException("La compagnie sélectionnée est inactive");
-        }
-        return company;
     }
 
     private BordereauCompagnie lock(Long agencyId, Long id) {

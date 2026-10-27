@@ -98,6 +98,7 @@ public class AssistanceAutomobileService {
     private final MouvementVehiculeRepository mouvementVehiculeRepository;
     private final AssistanceContratRepository assistanceContratRepository;
     private final ElementFacturableRepository elementFacturableRepository;
+    private final AssistanceQuittanceService assistanceQuittanceService;
     private final ContractDirectModificationPolicy directModificationPolicy;
 
     @Transactional(readOnly = true)
@@ -599,7 +600,8 @@ public class AssistanceAutomobileService {
         element.setActif(true);
         element = elementFacturableRepository.save(element);
         assistance.setElementFacturable(element);
-        assistanceContratRepository.save(assistance);
+        assistance = assistanceContratRepository.save(assistance);
+        assistanceQuittanceService.synchroniser(assistance);
     }
 
     private Client resolvePerson(Long agenceId, CreateAssistanceAutomobileRequest.Personne person, String role) {

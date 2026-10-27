@@ -5,6 +5,7 @@ import com.assurance.enums.ModeReglementCompagnie;
 import com.assurance.enums.StatutBordereauCompagnie;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutRapprochementCompagnie;
+import com.assurance.enums.TypeTiersCompagnie;
 import lombok.Builder;
 import lombok.Data;
 
@@ -18,7 +19,9 @@ import java.util.List;
 public class BordereauCompagnieResponse {
     private Long id;
     private String numero;
+    private Long tiersCompagnieId;
     private Long compagnieId;
+    private TypeTiersCompagnie typeCompagnie;
     private String compagnie;
     private BaseBordereauCompagnie baseBordereau;
     private StatutBordereauCompagnie statut;

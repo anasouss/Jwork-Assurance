@@ -46,7 +46,7 @@ export default function BordereauCompagnieFormPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const initialized = useRef(false);
-  const [compagnieId, setCompagnieId] = useState("");
+  const [tiersCompagnieId, setTiersCompagnieId] = useState("");
   const [base, setBase] = useState<CompanyBordereauBase>("EMISSION");
   const [dateDu, setDateDu] = useState(currentMonth.start);
   const [dateAu, setDateAu] = useState(currentMonth.end);
@@ -61,14 +61,14 @@ export default function BordereauCompagnieFormPage() {
     enabled: editing,
   });
   const companies = useQuery({
-    queryKey: ["compta", "companies"],
-    queryFn: comptaApi.companies,
+    queryKey: ["compta", "quittances", "compagnies-disponibles", "ALL"],
+    queryFn: () => comptaApi.availableQuittanceCompanies(),
   });
 
   useEffect(() => {
     if (!detail.data || initialized.current) return;
     initialized.current = true;
-    setCompagnieId(detail.data.compagnieId);
+    setTiersCompagnieId(detail.data.tiersCompagnieId);
     setBase(detail.data.baseBordereau);
     setDateDu(detail.data.periodeDebut);
     setDateAu(detail.data.periodeFin);
@@ -80,26 +80,28 @@ export default function BordereauCompagnieFormPage() {
     queryKey: [
       "compta",
       "company-bordereau-sources",
-      compagnieId,
+      tiersCompagnieId,
       base,
       dateDu,
       dateAu,
       submittedSearch,
     ],
     queryFn: () => comptaApi.companyBordereauSources({
-      compagnieId,
+      tiersCompagnieId,
       base,
       dateDu,
       dateAu,
       search: submittedSearch || undefined,
     }),
-    enabled: Boolean(compagnieId && dateDu && dateAu),
+    enabled: Boolean(tiersCompagnieId && dateDu && dateAu),
   });
 
   const existingSources = useMemo(
     () => (detail.data?.lignes ?? []).map((line): CompanyBordereauSource => ({
       id: line.affectationId,
+      tiersCompagnieId: detail.data!.tiersCompagnieId,
       compagnieId: detail.data!.compagnieId,
+      typeCompagnie: detail.data!.typeCompagnie,
       compagnie: detail.data!.compagnie,
       quittanceId: "",
       numeroQuittanceCompagnie: line.numeroQuittanceCompagnie,
@@ -139,7 +141,7 @@ export default function BordereauCompagnieFormPage() {
   const save = useMutation({
     mutationFn: () => {
       const request = {
-        compagnieId: editing ? undefined : compagnieId,
+        tiersCompagnieId: editing ? undefined : tiersCompagnieId,
         baseBordereau: editing ? undefined : base,
         periodeDebut: dateDu,
         periodeFin: dateAu,
@@ -160,7 +162,7 @@ export default function BordereauCompagnieFormPage() {
     ),
   });
 
-  const canSave = Boolean(compagnieId)
+  const canSave = Boolean(tiersCompagnieId)
     && Boolean(dateDu)
     && Boolean(dateAu)
     && dateDu <= dateAu
@@ -192,17 +194,19 @@ export default function BordereauCompagnieFormPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Compagnie">
             <Select
-              value={compagnieId}
+              value={tiersCompagnieId}
               disabled={editing}
               onValueChange={(value) => {
-                setCompagnieId(value);
+                setTiersCompagnieId(value);
                 setSelectedIds([]);
               }}
             >
               <SelectTrigger><SelectValue placeholder="Choisir une compagnie" /></SelectTrigger>
               <SelectContent>
                 {(companies.data ?? []).map((company) => (
-                  <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.type === "ASSISTANCE" ? `${company.libelle} (Assistance)` : company.libelle}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -358,7 +362,7 @@ export default function BordereauCompagnieFormPage() {
               {!sources.isLoading && rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={11} className="h-28 text-center text-muted-foreground">
-                    {compagnieId
+                    {tiersCompagnieId
                       ? "Aucune écriture disponible pour ces critères."
                       : "Choisissez une compagnie."}
                   </TableCell>

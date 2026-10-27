@@ -41,8 +41,8 @@ export default function BordereauxCompagniesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const companies = useQuery({
-    queryKey: ["compta", "companies"],
-    queryFn: comptaApi.companies,
+    queryKey: ["compta", "quittances", "compagnies-disponibles", "ALL"],
+    queryFn: () => comptaApi.availableQuittanceCompanies(),
   });
   const bordereaux = useQuery({
     queryKey: [
@@ -56,7 +56,7 @@ export default function BordereauxCompagniesPage() {
       page,
     ],
     queryFn: () => comptaApi.companyBordereaux({
-      compagnieId: compagnieId === all ? undefined : compagnieId,
+      tiersCompagnieId: compagnieId === all ? undefined : compagnieId,
       statut: status === all ? undefined : status as CompanyBordereauStatus,
       dateDu: dateDu || undefined,
       dateAu: dateAu || undefined,
@@ -71,14 +71,14 @@ export default function BordereauxCompagniesPage() {
     () => rows.filter((row) => selectedIds.includes(row.id)),
     [rows, selectedIds]
   );
-  const selectedCompany = selectedRows[0]?.compagnieId;
+  const selectedCompany = selectedRows[0]?.tiersCompagnieId;
   const payableRows = rows.filter((row) => isPayable(row));
   const allPayableSelected = payableRows.length > 0
     && payableRows.every((row) => selectedIds.includes(row.id));
 
   function toggleRow(row: CompanyBordereau, checked: boolean) {
     if (!isPayable(row)) return;
-    if (checked && selectedCompany && selectedCompany !== row.compagnieId) return;
+    if (checked && selectedCompany && selectedCompany !== row.tiersCompagnieId) return;
     setSelectedIds((current) => checked
       ? [...new Set([...current, row.id])]
       : current.filter((id) => id !== row.id));
@@ -139,7 +139,9 @@ export default function BordereauxCompagniesPage() {
               <SelectContent>
                 <SelectItem value={all}>Toutes</SelectItem>
                 {(companies.data ?? []).map((company) => (
-                  <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                  <SelectItem key={company.id} value={company.id}>
+                    {company.type === "ASSISTANCE" ? `${company.libelle} (Assistance)` : company.libelle}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -217,7 +219,7 @@ export default function BordereauxCompagniesPage() {
                     aria-label="Sélectionner les bordereaux réglables de la page"
                     onCheckedChange={(checked) => setSelectedIds(checked
                       ? payableRows
-                          .filter((row) => !selectedCompany || row.compagnieId === selectedCompany)
+                          .filter((row) => !selectedCompany || row.tiersCompagnieId === selectedCompany)
                           .map((row) => row.id)
                       : [])}
                   />
@@ -238,7 +240,7 @@ export default function BordereauxCompagniesPage() {
             <TableBody>
               {rows.map((row) => {
                 const selectable = isPayable(row)
-                  && (!selectedCompany || selectedCompany === row.compagnieId || selectedIds.includes(row.id));
+                  && (!selectedCompany || selectedCompany === row.tiersCompagnieId || selectedIds.includes(row.id));
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="px-4 py-3 text-center">

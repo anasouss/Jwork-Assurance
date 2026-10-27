@@ -15,24 +15,24 @@ import java.util.List;
 
 public interface AffectationQuittanceCompagnieRepository extends JpaRepository<AffectationQuittanceCompagnie, Long> {
 
-    @EntityGraph(attributePaths = {"compagnieAssurance"})
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
     List<AffectationQuittanceCompagnie> findByQuittanceIdOrderByDateEffetAscNumeroQuittanceCompagnieAsc(Long quittanceId);
 
-    @EntityGraph(attributePaths = {"compagnieAssurance"})
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
     List<AffectationQuittanceCompagnie> findByQuittanceIdIn(Collection<Long> quittanceIds);
 
     void deleteByQuittanceId(Long quittanceId);
 
     boolean existsByQuittanceId(Long quittanceId);
 
-    boolean existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNot(
+    boolean existsByAgenceIdAndTiersCompagnieIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNot(
             Long agenceId,
             Long compagnieId,
             String numeroQuittanceCompagnie,
             Long quittanceId
     );
 
-    boolean existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
+    boolean existsByAgenceIdAndTiersCompagnieIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
             Long agenceId,
             Long compagnieId,
             String numeroQuittanceCompagnie,
@@ -40,7 +40,9 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
     );
 
     @EntityGraph(attributePaths = {
-            "compagnieAssurance",
+            "tiersCompagnie",
+            "tiersCompagnie.compagnieAssurance",
+            "tiersCompagnie.compagnieAssistance",
             "quittance",
             "quittance.contrat",
             "quittance.mouvementContrat",
@@ -50,7 +52,7 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
             select a
             from AffectationQuittanceCompagnie a
             where a.agence.id = :agenceId
-              and (:compagnieId is null or a.compagnieAssurance.id = :compagnieId)
+              and (:tiersCompagnieId is null or a.tiersCompagnie.id = :tiersCompagnieId)
               and (:dateDu is null or a.dateEffet >= :dateDu)
               and (:dateAu is null or a.dateEffet <= :dateAu)
               and not exists (
@@ -62,12 +64,12 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
             """)
     List<AffectationQuittanceCompagnie> findEligible(
             @Param("agenceId") Long agenceId,
-            @Param("compagnieId") Long compagnieId,
+            @Param("tiersCompagnieId") Long tiersCompagnieId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu
     );
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "quittance", "quittance.contrat"})
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance", "quittance", "quittance.contrat"})
     @Query("""
             select distinct a
             from AffectationQuittanceCompagnie a
@@ -94,7 +96,9 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {
-            "compagnieAssurance",
+            "tiersCompagnie",
+            "tiersCompagnie.compagnieAssurance",
+            "tiersCompagnie.compagnieAssistance",
             "quittance",
             "quittance.contrat",
             "quittance.mouvementContrat",

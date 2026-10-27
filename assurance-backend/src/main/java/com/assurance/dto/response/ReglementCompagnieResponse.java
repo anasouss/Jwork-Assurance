@@ -3,6 +3,7 @@ package com.assurance.dto.response;
 import com.assurance.enums.ModeReglementCompagnie;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementCompagnie;
+import com.assurance.enums.TypeTiersCompagnie;
 import lombok.Builder;
 import lombok.Data;
 
@@ -16,7 +17,9 @@ import java.util.List;
 public class ReglementCompagnieResponse {
     private Long id;
     private String numero;
+    private Long tiersCompagnieId;
     private Long compagnieId;
+    private TypeTiersCompagnie typeCompagnie;
     private String compagnie;
     private LocalDate dateReglement;
     private StatutReglementCompagnie statut;

@@ -9,7 +9,9 @@ import java.util.Optional;
 public interface ReglementCompagnieRepository extends JpaRepository<ReglementCompagnie, Long> {
 
     @EntityGraph(attributePaths = {
-            "compagnieAssurance",
+            "tiersCompagnie",
+            "tiersCompagnie.compagnieAssurance",
+            "tiersCompagnie.compagnieAssistance",
             "creePar",
             "instruments",
             "instruments.compteTresorerie"

@@ -7,17 +7,17 @@ import com.assurance.dto.response.AffectationQuittancePageResponse;
 import com.assurance.dto.response.AffectationQuittanceResponse;
 import com.assurance.dto.response.ImportAffectationQuittancePreviewResponse;
 import com.assurance.dto.response.LotAffectationQuittanceResponse;
-import com.assurance.dto.response.ReferenceOptionResponse;
 import com.assurance.dto.response.RegleAffectationQuittancePageResponse;
 import com.assurance.dto.response.RegleAffectationQuittanceResponse;
+import com.assurance.dto.response.TiersCompagnieResponse;
 import com.assurance.entity.AffectationQuittanceCompagnie;
 import com.assurance.entity.Agence;
-import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.LigneQuittance;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.RegleAffectationQuittance;
+import com.assurance.entity.TiersCompagnie;
 import com.assurance.enums.CategorieQuittance;
 import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
@@ -29,11 +29,11 @@ import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.SourceAffectationQuittance;
 import com.assurance.enums.StatutAffectationQuittance;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.TypeTiersCompagnie;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import com.assurance.repository.AgenceRepository;
-import com.assurance.repository.CompagnieAssuranceRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.LigneQuittanceRepository;
 import com.assurance.repository.QuittanceRepository;
@@ -100,18 +100,23 @@ public class AffectationQuittanceService {
     private final AffectationQuittanceCompagnieRepository affectationRepository;
     private final RegleAffectationQuittanceRepository regleRepository;
     private final AgenceRepository agenceRepository;
-    private final CompagnieAssuranceRepository compagnieRepository;
+    private final TiersCompagnieService tiersCompagnieService;
 
     @Transactional(readOnly = true)
-    public List<ReferenceOptionResponse> listAvailableCompanies(Long agenceId, Long brancheId) {
+    public List<TiersCompagnieResponse> listAvailableCompanies(Long agenceId, Long brancheId) {
         validateTenant(agenceId);
-        return quittanceRepository.findAvailableCompaniesForAffectation(agenceId, brancheId)
+        List<TiersCompagnie> tiers = brancheId == null
+                ? tiersCompagnieService.listActive()
+                : quittanceRepository.findAvailableCompaniesForAffectation(agenceId, brancheId);
+        return tiers
                 .stream()
-                .map(compagnie -> ReferenceOptionResponse.builder()
-                        .id(compagnie.getId())
-                        .code(compagnie.getCode())
-                        .libelle(compagnie.getNom())
-                        .actif(compagnie.getActif())
+                .map(item -> TiersCompagnieResponse.builder()
+                        .id(item.getId())
+                        .type(item.getType())
+                        .sourceId(item.getSourceId())
+                        .code(item.getCode())
+                        .libelle(item.getNom())
+                        .actif(item.isActif())
                         .build())
                 .toList();
     }
@@ -120,7 +125,7 @@ public class AffectationQuittanceService {
     public AffectationQuittancePageResponse search(
             Long agenceId,
             Long brancheId,
-            Long compagnieId,
+            Long tiersCompagnieId,
             TypeContrat typeContrat,
             Boolean avecQuittance,
             LocalDate dateDu,
@@ -135,7 +140,7 @@ public class AffectationQuittanceService {
         Page<Quittance> result = quittanceRepository.searchForAffectation(
                 agenceId,
                 brancheId,
-                compagnieId,
+                tiersCompagnieId,
                 typeContrat,
                 avecQuittance,
                 dateDu,
@@ -154,7 +159,7 @@ public class AffectationQuittanceService {
                         .collect(Collectors.groupingBy(item -> item.getQuittance().getId()));
         Map<Long, String> souscripteurs = resolveSouscripteurs(contratIds);
         List<RegleAffectationQuittance> regles = regleRepository
-                .findAllByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(agenceId);
+                .findAllByAgenceIdOrderByDateDebutDesc(agenceId);
 
         List<AffectationQuittanceResponse> rows = quittances.stream()
                 .map(quittance -> {
@@ -202,7 +207,7 @@ public class AffectationQuittanceService {
     public byte[] export(
             Long agenceId,
             Long brancheId,
-            Long compagnieId,
+            Long tiersCompagnieId,
             TypeContrat typeContrat,
             Boolean avecQuittance,
             LocalDate dateDu,
@@ -211,7 +216,7 @@ public class AffectationQuittanceService {
     ) {
         validateTenant(agenceId);
         if (brancheId == null
-                && compagnieId == null
+                && tiersCompagnieId == null
                 && typeContrat == null
                 && avecQuittance == null
                 && dateDu == null
@@ -230,7 +235,7 @@ public class AffectationQuittanceService {
             result = search(
                     agenceId,
                     brancheId,
-                    compagnieId,
+                    tiersCompagnieId,
                     typeContrat,
                     avecQuittance,
                     dateDu,
@@ -394,6 +399,9 @@ public class AffectationQuittanceService {
     }
 
     private String productLabel(AffectationQuittanceResponse item) {
+        if (item.getNature() == NatureAffectationQuittance.ASSISTANCE) {
+            return firstNonBlank(item.getProduit(), "Assistance");
+        }
         if (item.getTypeContrat() == null) return "";
         return switch (item.getTypeContrat()) {
             case PARTICULIER -> "Mono";
@@ -416,6 +424,7 @@ public class AffectationQuittanceService {
             case AVENANT -> "Avenant";
             case RENOUVELLEMENT -> "Renouvellement";
             case CARTE_VERTE -> "Carte verte";
+            case ASSISTANCE -> "Assistance";
         };
     }
 
@@ -654,7 +663,7 @@ public class AffectationQuittanceService {
     ) {
         validateTenant(agenceId);
         Page<RegleAffectationQuittance> result =
-                regleRepository.findByAgenceIdOrderByCompagnieAssuranceNomAscTypeContratAscDateDebutDesc(
+                regleRepository.findByAgenceIdOrderByDateDebutDesc(
                         agenceId,
                         PageRequest.of(Math.max(0, page), Math.min(Math.max(size, 1), 100))
                 );
@@ -677,11 +686,11 @@ public class AffectationQuittanceService {
             UpsertRegleAffectationQuittanceRequest request
     ) {
         Agence agence = requireAgence(agenceId);
-        CompagnieAssurance compagnie = requireCompagnie(request.getCompagnieAssuranceId());
-        validateRule(request, agenceId, 0L);
+        TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
+        validateRule(request, tiers, agenceId, 0L);
         RegleAffectationQuittance entity = new RegleAffectationQuittance();
         entity.setAgence(agence);
-        entity.setCompagnieAssurance(compagnie);
+        applyTiers(entity, tiers);
         applyRule(entity, request);
         return toRuleResponse(regleRepository.save(entity));
     }
@@ -701,9 +710,9 @@ public class AffectationQuittanceService {
                             + "Créez une nouvelle règle datée pour modifier le calcul"
             );
         }
-        CompagnieAssurance compagnie = requireCompagnie(request.getCompagnieAssuranceId());
-        validateRule(request, agenceId, ruleId);
-        entity.setCompagnieAssurance(compagnie);
+        TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
+        validateRule(request, tiers, agenceId, ruleId);
+        applyTiers(entity, tiers);
         applyRule(entity, request);
         return toRuleResponse(regleRepository.save(entity));
     }
@@ -727,7 +736,7 @@ public class AffectationQuittanceService {
     private boolean isRuleUsed(RegleAffectationQuittance rule) {
         return regleRepository.countAllocationsUsingRule(
                 rule.getAgence().getId(),
-                rule.getCompagnieAssurance().getId(),
+                rule.getTiersCompagnie().getId(),
                 rule.getTypeContrat(),
                 rule.getDateDebut(),
                 rule.getDateFin() != null ? rule.getDateFin() : OPEN_ENDED_DATE
@@ -738,7 +747,7 @@ public class AffectationQuittanceService {
             RegleAffectationQuittance rule,
             UpsertRegleAffectationQuittanceRequest request
     ) {
-        return !Objects.equals(rule.getCompagnieAssurance().getId(), request.getCompagnieAssuranceId())
+        return !Objects.equals(rule.getTiersCompagnie().getId(), request.getTiersCompagnieId())
                 || rule.getTypeContrat() != request.getTypeContrat()
                 || rule.getModeAffectation() != request.getModeAffectation()
                 || rule.getModeVentilation() != request.getModeVentilation()
@@ -746,6 +755,7 @@ public class AffectationQuittanceService {
                 || decimalChanged(rule.getTauxCommissionAutomobile(), request.getTauxCommissionAutomobile())
                 || decimalChanged(rule.getTauxCommissionEvcat(), request.getTauxCommissionEvcat())
                 || decimalChanged(rule.getTauxCommissionCorporel(), request.getTauxCommissionCorporel())
+                || decimalChanged(rule.getTauxCommissionAssistance(), request.getTauxCommissionAssistance())
                 || decimalChanged(rule.getTauxTvaIncluseCommission(), request.getTauxTvaIncluseCommission())
                 || !Objects.equals(rule.getRetenueParDefaut(), request.getRetenueParDefaut())
                 || decimalChanged(rule.getTauxRetenue(), request.getTauxRetenue())
@@ -792,7 +802,7 @@ public class AffectationQuittanceService {
         AffectationQuittanceCompagnie entity = AffectationQuittanceCompagnie.builder()
                 .agence(requireAgence(agenceId))
                 .quittance(quittance)
-                .compagnieAssurance(requireQuittanceCompagnie(quittance))
+                .tiersCompagnie(requireQuittanceTiers(quittance))
                 .numeroQuittanceCompagnie(numero)
                 .source(SourceAffectationQuittance.AUTOMATIQUE)
                 .dateEffet(resolveDateEffet(quittance))
@@ -847,7 +857,7 @@ public class AffectationQuittanceService {
                 ));
 
         Agence agence = requireAgence(agenceId);
-        CompagnieAssurance compagnie = requireQuittanceCompagnie(quittance);
+        TiersCompagnie tiers = requireQuittanceTiers(quittance);
         List<AffectationQuittanceCompagnie> result = new ArrayList<>();
         for (LigneQuittance categoryLine : categoryLines) {
             CategorieQuittance categorie = categoryLine.getCategorie();
@@ -863,7 +873,7 @@ public class AffectationQuittanceService {
             result.add(AffectationQuittanceCompagnie.builder()
                     .agence(agence)
                     .quittance(quittance)
-                    .compagnieAssurance(compagnie)
+                    .tiersCompagnie(tiers)
                     .numeroQuittanceCompagnie(requestLine.getNumeroQuittanceCompagnie().trim())
                     .source(SourceAffectationQuittance.AUTOMATIQUE)
                     .dateEffet(resolveDateEffet(quittance))
@@ -901,7 +911,7 @@ public class AffectationQuittanceService {
             throw new BadRequestException("Ajoutez au moins une ligne de quittance compagnie");
         }
         Agence agence = requireAgence(agenceId);
-        CompagnieAssurance compagnie = requireQuittanceCompagnie(quittance);
+        TiersCompagnie tiers = requireQuittanceTiers(quittance);
         String fichierSource = request.getSource() == SourceAffectationQuittance.IMPORT
                 ? trimToNull(request.getFichierSource())
                 : null;
@@ -917,7 +927,7 @@ public class AffectationQuittanceService {
             result.add(AffectationQuittanceCompagnie.builder()
                     .agence(agence)
                     .quittance(quittance)
-                    .compagnieAssurance(compagnie)
+                    .tiersCompagnie(tiers)
                     .numeroQuittanceCompagnie(line.getNumeroQuittanceCompagnie().trim())
                     .source(request.getSource())
                     .dateEffet(line.getDateEffet())
@@ -985,9 +995,9 @@ public class AffectationQuittanceService {
                 throw new BadRequestException("Le numéro de quittance " + entity.getNumeroQuittanceCompagnie() + " est dupliqué");
             }
             if (affectationRepository
-                    .existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNot(
+                    .existsByAgenceIdAndTiersCompagnieIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNot(
                             agenceId,
-                            entity.getCompagnieAssurance().getId(),
+                            entity.getTiersCompagnie().getId(),
                             entity.getNumeroQuittanceCompagnie(),
                             quittance.getId()
                     )) {
@@ -1010,9 +1020,9 @@ public class AffectationQuittanceService {
                 throw new BadRequestException("Le numéro de quittance " + entity.getNumeroQuittanceCompagnie() + " est dupliqué");
             }
             if (affectationRepository
-                    .existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
+                    .existsByAgenceIdAndTiersCompagnieIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
                             agenceId,
-                            entity.getCompagnieAssurance().getId(),
+                            entity.getTiersCompagnie().getId(),
                             entity.getNumeroQuittanceCompagnie(),
                             quittanceIds
                     )) {
@@ -1032,11 +1042,11 @@ public class AffectationQuittanceService {
         List<Quittance> quittances = ids.stream().map(id -> requireQuittance(agenceId, id)).toList();
         Quittance reference = quittances.get(0);
         Long contractId = reference.getContrat().getId();
-        Long companyId = requireQuittanceCompagnie(reference).getId();
+        Long companyId = requireQuittanceTiers(reference).getId();
         if (reference.getContrat().getTypeContrat() != TypeContrat.FLOTTE
                 || quittances.stream().anyMatch(item -> item.getContrat().getTypeContrat() != TypeContrat.FLOTTE)
                 || quittances.stream().anyMatch(item -> !item.getContrat().getId().equals(contractId))
-                || quittances.stream().anyMatch(item -> !requireQuittanceCompagnie(item).getId().equals(companyId))) {
+                || quittances.stream().anyMatch(item -> !requireQuittanceTiers(item).getId().equals(companyId))) {
             throw new BadRequestException("Les quittances groupées doivent appartenir à la même flotte, police et compagnie");
         }
         Long ruleId = requireEffectiveRule(agenceId, reference).getId();
@@ -1108,7 +1118,8 @@ public class AffectationQuittanceService {
 
         BigDecimal base = percent(primes.getOrDefault(CategorieQuittance.AUTOMOBILE, ZERO), regle.getTauxCommissionAutomobile())
                 .add(percent(primes.getOrDefault(CategorieQuittance.EVCAT, ZERO), regle.getTauxCommissionEvcat()))
-                .add(percent(primes.getOrDefault(CategorieQuittance.CORPOREL, ZERO), regle.getTauxCommissionCorporel()));
+                .add(percent(primes.getOrDefault(CategorieQuittance.CORPOREL, ZERO), regle.getTauxCommissionCorporel()))
+                .add(percent(primes.getOrDefault(CategorieQuittance.ASSISTANCE, ZERO), regle.getTauxCommissionAssistance()));
         if (regle.getModeCalculCommission() == ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE) {
             base = base.subtract(percent(base, regle.getTauxTvaIncluseCommission()));
         }
@@ -1120,7 +1131,8 @@ public class AffectationQuittanceService {
             case AUTOMOBILE -> percent(requiredAmount(line.getPrimeNette(), "Prime nette automobile"), regle.getTauxCommissionAutomobile());
             case EVCAT -> percent(requiredAmount(line.getPrimeNette(), "Prime nette EVCAT"), regle.getTauxCommissionEvcat());
             case CORPOREL -> percent(requiredAmount(line.getPrimeNette(), "Prime nette corporel"), regle.getTauxCommissionCorporel());
-            case ASSISTANCE, TOTAL -> ZERO;
+            case ASSISTANCE -> percent(requiredAmount(line.getPrimeNette(), "Prime nette assistance"), regle.getTauxCommissionAssistance());
+            case TOTAL -> ZERO;
         };
         if (regle.getModeCalculCommission() == ModeCalculCommission.TAUX_BRUT_TVA_INCLUSE) {
             base = base.subtract(percent(base, regle.getTauxTvaIncluseCommission()));
@@ -1175,7 +1187,8 @@ public class AffectationQuittanceService {
     private boolean isAffectableCategory(CategorieQuittance categorie) {
         return categorie == CategorieQuittance.AUTOMOBILE
                 || categorie == CategorieQuittance.EVCAT
-                || categorie == CategorieQuittance.CORPOREL;
+                || categorie == CategorieQuittance.CORPOREL
+                || categorie == CategorieQuittance.ASSISTANCE;
     }
 
     private Retention calculateRetention(
@@ -1217,6 +1230,15 @@ public class AffectationQuittanceService {
                 .map(AffectationQuittanceCompagnie::getAvecRetenue)
                 .map(Boolean.TRUE::equals)
                 .orElse(regle != null && Boolean.TRUE.equals(regle.getRetenueParDefaut()));
+        BigDecimal commissionCalculee = affectations.isEmpty()
+                ? regle == null ? ZERO : calculateCommission(quittance, regle)
+                : sum(affectations, AffectationQuittanceCompagnie::getCommissionNette);
+        BigDecimal retenueCalculee = affectations.isEmpty()
+                ? regle == null ? ZERO : calculateRetention(commissionCalculee, avecRetenue, regle).amount()
+                : sum(affectations, AffectationQuittanceCompagnie::getMontantRetenue);
+        BigDecimal netCompagnieCalcule = affectations.isEmpty()
+                ? money(expected.subtract(commissionCalculee).add(retenueCalculee))
+                : sum(affectations, AffectationQuittanceCompagnie::getNetCompagnie);
         Contrat contrat = quittance.getContrat();
 
         return AffectationQuittanceResponse.builder()
@@ -1224,13 +1246,15 @@ public class AffectationQuittanceService {
                 .contratId(contrat.getId())
                 .mouvementId(quittance.getMouvementContrat() != null ? quittance.getMouvementContrat().getId() : null)
                 .dossier(firstNonBlank(contrat.getNumeroDossier(), contrat.getNumeroContrat(), "#" + contrat.getId()))
-                .produit(productLabel(contrat))
+                .produit(productLabel(quittance))
                 .typeContrat(contrat.getTypeContrat())
                 .mouvement(movementLabel(quittance))
                 .nature(resolveNature(quittance))
                 .souscripteur(firstNonBlank(souscripteur, "-"))
                 .police(firstNonBlank(contrat.getNumeroPolice(), contrat.getNumeroContrat(), "-"))
+                .tiersCompagnieId(resolveTiersCompagnieId(quittance))
                 .compagnieId(resolveCompagnieId(quittance))
+                .typeCompagnie(resolveTypeCompagnie(quittance))
                 .compagnie(resolveCompagnieName(quittance))
                 .dateEffet(resolveDateEffet(quittance))
                 .dateEcheance(resolveDateEcheance(quittance))
@@ -1246,6 +1270,9 @@ public class AffectationQuittanceService {
                 .montantTtc(expected)
                 .montantAffecte(money(allocated))
                 .ecart(money(allocated.subtract(expected)))
+                .commissionCalculee(commissionCalculee)
+                .retenueCalculee(retenueCalculee)
+                .netCompagnieCalcule(netCompagnieCalcule)
                 .avecRetenue(avecRetenue)
                 .statutAffectation(statut)
                 .regle(regle != null ? toRuleResponse(regle) : null)
@@ -1267,6 +1294,9 @@ public class AffectationQuittanceService {
     }
 
     private NatureAffectationQuittance resolveNature(Quittance quittance) {
+        if (isAssistance(quittance)) {
+            return NatureAffectationQuittance.ASSISTANCE;
+        }
         if (quittance.getElementFacturable() != null
                 && quittance.getElementFacturable().getNature() == NatureElementFacturable.CARTE_VERTE) {
             return NatureAffectationQuittance.CARTE_VERTE;
@@ -1351,9 +1381,9 @@ public class AffectationQuittanceService {
                         throw new BadRequestException("le numéro " + number + " est dupliqué dans le fichier");
                     }
                     if (affectationRepository
-                            .existsByAgenceIdAndCompagnieAssuranceIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
+                            .existsByAgenceIdAndTiersCompagnieIdAndNumeroQuittanceCompagnieIgnoreCaseAndQuittanceIdNotIn(
                                     referenceQuittance.getContrat().getAgence().getId(),
-                                    requireQuittanceCompagnie(referenceQuittance).getId(),
+                                    requireQuittanceTiers(referenceQuittance).getId(),
                                     number,
                                     selectedIds
                             )) {
@@ -1689,13 +1719,19 @@ public class AffectationQuittanceService {
         return true;
     }
 
-    private void validateRule(UpsertRegleAffectationQuittanceRequest request, Long agenceId, Long excludedId) {
+    private void validateRule(
+            UpsertRegleAffectationQuittanceRequest request,
+            TiersCompagnie tiers,
+            Long agenceId,
+            Long excludedId
+    ) {
         if (request.getDateFin() != null && request.getDateFin().isBefore(request.getDateDebut())) {
             throw new BadRequestException("La date de fin doit être postérieure ou égale à la date de début");
         }
         validatePercentage(request.getTauxCommissionAutomobile(), "Taux commission automobile");
         validatePercentage(request.getTauxCommissionEvcat(), "Taux commission EVCAT");
         validatePercentage(request.getTauxCommissionCorporel(), "Taux commission corporel");
+        validatePercentage(request.getTauxCommissionAssistance(), "Taux commission assistance");
         validatePercentage(request.getTauxTvaIncluseCommission(), "Taux TVA incluse");
         validatePercentage(request.getTauxRetenue(), "Taux retenue");
         BigDecimal warningThreshold = requiredAmount(
@@ -1719,32 +1755,45 @@ public class AffectationQuittanceService {
                     "La marge sans alerte doit être inférieure ou égale aux marges maximales"
             );
         }
-        if (request.getTypeContrat() == TypeContrat.FLOTTE
+        boolean fleetInsurance = request.getTypeContrat() == TypeContrat.FLOTTE
+                && tiers.getType() == TypeTiersCompagnie.ASSURANCE;
+        if (tiers.getType() == TypeTiersCompagnie.ASSISTANCE
+                && (request.getTauxCommissionAutomobile().signum() != 0
+                || request.getTauxCommissionEvcat().signum() != 0
+                || request.getTauxCommissionCorporel().signum() != 0)) {
+            throw new BadRequestException("Seul le taux de commission assistance s'applique à une compagnie d'assistance");
+        }
+        if (tiers.getType() == TypeTiersCompagnie.ASSURANCE
+                && request.getTauxCommissionAssistance().signum() != 0) {
+            throw new BadRequestException("Le taux de commission assistance ne s'applique pas à une compagnie d'assurance");
+        }
+        if (fleetInsurance
                 && request.getModeAffectation() != ModeAffectationQuittance.MANUEL_OU_IMPORT) {
             throw new BadRequestException("Une règle flotte doit utiliser le mode manuel/import");
         }
-        if (request.getTypeContrat() == TypeContrat.FLOTTE
+        if (fleetInsurance
                 && request.getModeVentilation() != ModeVentilationQuittance.GLOBALE) {
             throw new BadRequestException("Une règle flotte doit utiliser une ventilation globale");
         }
-        if (request.getTypeContrat() == TypeContrat.FLOTTE
+        if (fleetInsurance
                 && (request.getModeCalculCommission() != ModeCalculCommission.TAUX_NET
                 || request.getTauxCommissionAutomobile().signum() != 0
                 || request.getTauxCommissionEvcat().signum() != 0
                 || request.getTauxCommissionCorporel().signum() != 0
+                || request.getTauxCommissionAssistance().signum() != 0
                 || request.getTauxTvaIncluseCommission().signum() != 0)) {
             throw new BadRequestException(
                     "Les taux de commission par catégorie ne s'appliquent pas aux quittances flotte"
             );
         }
-        if (request.getTypeContrat() == TypeContrat.FLOTTE) {
+        if (fleetInsurance) {
             validateExcelImportConfiguration(request);
         }
-        if (request.getTypeContrat() != TypeContrat.FLOTTE
+        if (!fleetInsurance
                 && request.getModeAffectation() != ModeAffectationQuittance.AUTOMATIQUE) {
-            throw new BadRequestException("Une règle Mono ou Convention doit utiliser le mode automatique");
+            throw new BadRequestException("Cette règle doit utiliser le mode automatique");
         }
-        if (request.getTypeContrat() != TypeContrat.FLOTTE
+        if (!fleetInsurance
                 && request.getModeCalculCommission() == ModeCalculCommission.TAUX_NET
                 && request.getTauxTvaIncluseCommission().signum() != 0) {
             throw new BadRequestException(
@@ -1753,7 +1802,7 @@ public class AffectationQuittanceService {
         }
         long overlaps = regleRepository.countOverlappingRules(
                 agenceId,
-                request.getCompagnieAssuranceId(),
+                request.getTiersCompagnieId(),
                 request.getTypeContrat(),
                 request.getDateDebut(),
                 request.getDateFin() != null ? request.getDateFin() : OPEN_ENDED_DATE,
@@ -1857,6 +1906,7 @@ public class AffectationQuittanceService {
         entity.setTauxCommissionAutomobile(request.getTauxCommissionAutomobile());
         entity.setTauxCommissionEvcat(request.getTauxCommissionEvcat());
         entity.setTauxCommissionCorporel(request.getTauxCommissionCorporel());
+        entity.setTauxCommissionAssistance(request.getTauxCommissionAssistance());
         entity.setTauxTvaIncluseCommission(request.getTauxTvaIncluseCommission());
         entity.setRetenueParDefaut(request.getRetenueParDefaut());
         entity.setTauxRetenue(request.getTauxRetenue());
@@ -1886,8 +1936,10 @@ public class AffectationQuittanceService {
     private RegleAffectationQuittanceResponse toRuleResponse(RegleAffectationQuittance entity) {
         return RegleAffectationQuittanceResponse.builder()
                 .id(entity.getId())
-                .compagnieAssuranceId(entity.getCompagnieAssurance().getId())
-                .compagnie(entity.getCompagnieAssurance().getNom())
+                .tiersCompagnieId(entity.getTiersCompagnie().getId())
+                .compagnieId(entity.getTiersCompagnie().getSourceId())
+                .typeCompagnie(entity.getTiersCompagnie().getType())
+                .compagnie(entity.getTiersCompagnie().getNom())
                 .typeContrat(entity.getTypeContrat())
                 .modeAffectation(entity.getModeAffectation())
                 .modeVentilation(entity.getModeVentilation())
@@ -1895,6 +1947,7 @@ public class AffectationQuittanceService {
                 .tauxCommissionAutomobile(entity.getTauxCommissionAutomobile())
                 .tauxCommissionEvcat(entity.getTauxCommissionEvcat())
                 .tauxCommissionCorporel(entity.getTauxCommissionCorporel())
+                .tauxCommissionAssistance(entity.getTauxCommissionAssistance())
                 .tauxTvaIncluseCommission(entity.getTauxTvaIncluseCommission())
                 .retenueParDefaut(entity.getRetenueParDefaut())
                 .tauxRetenue(entity.getTauxRetenue())
@@ -1923,9 +1976,9 @@ public class AffectationQuittanceService {
     }
 
     private RegleAffectationQuittance requireEffectiveRule(Long agenceId, Quittance quittance) {
-        Long companyId = resolveCompagnieId(quittance);
+        Long companyId = resolveTiersCompagnieId(quittance);
         if (companyId == null) {
-            throw new BadRequestException("La compagnie du contrat est obligatoire pour affecter la quittance");
+            throw new BadRequestException("Le tiers compagnie de la quittance est obligatoire pour l'affectation");
         }
         LocalDate effectDate = resolveDateEffet(quittance);
         if (effectDate == null) {
@@ -1952,14 +2005,14 @@ public class AffectationQuittanceService {
             List<RegleAffectationQuittance> rules,
             Quittance quittance
     ) {
-        Long companyId = resolveCompagnieId(quittance);
+        Long companyId = resolveTiersCompagnieId(quittance);
         LocalDate effectDate = resolveDateEffet(quittance);
         if (companyId == null || effectDate == null) {
             return null;
         }
         return rules.stream()
                 .filter(RegleAffectationQuittance::getActif)
-                .filter(rule -> rule.getCompagnieAssurance().getId().equals(companyId))
+                .filter(rule -> rule.getTiersCompagnie().getId().equals(companyId))
                 .filter(rule -> rule.getTypeContrat() == quittance.getContrat().getTypeContrat())
                 .filter(rule -> !rule.getDateDebut().isAfter(effectDate))
                 .filter(rule -> rule.getDateFin() == null || !rule.getDateFin().isBefore(effectDate))
@@ -2012,18 +2065,18 @@ public class AffectationQuittanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
     }
 
-    private CompagnieAssurance requireCompagnie(Long id) {
-        return compagnieRepository.findById(id)
-                .filter(company -> Boolean.TRUE.equals(company.getActif()))
-                .orElseThrow(() -> new ResourceNotFoundException("Compagnie", id));
+    private TiersCompagnie requireQuittanceTiers(Quittance quittance) {
+        TiersCompagnie tiers = quittance.getTiersCompagnie();
+        if (tiers == null) {
+            throw new BadRequestException(
+                    "Le tiers compagnie de la quittance est manquant; exécutez la migration comptable"
+            );
+        }
+        return tiers;
     }
 
-    private CompagnieAssurance requireQuittanceCompagnie(Quittance quittance) {
-        CompagnieAssurance company = quittance.getCompagnieAssurance();
-        if (company == null) {
-            throw new BadRequestException("La compagnie enregistrée sur la quittance est obligatoire");
-        }
-        return company;
+    private void applyTiers(RegleAffectationQuittance rule, TiersCompagnie tiers) {
+        rule.setTiersCompagnie(tiers);
     }
 
     private void validateTenant(Long agenceId) {
@@ -2090,6 +2143,9 @@ public class AffectationQuittanceService {
     }
 
     private String movementLabel(Quittance quittance) {
+        if (isAssistance(quittance)) {
+            return "Assistance";
+        }
         if (quittance.getMouvementContrat() != null
                 && quittance.getMouvementContrat().getTypeMouvement() != null) {
             return quittance.getMouvementContrat().getTypeMouvement().getLibelle();
@@ -2097,12 +2153,21 @@ public class AffectationQuittanceService {
         return firstNonBlank(quittance.getType(), "Quittance");
     }
 
-    private String productLabel(Contrat contrat) {
+    private String productLabel(Quittance quittance) {
+        if (isAssistance(quittance) && quittance.getElementFacturable().getLibelle() != null) {
+            return quittance.getElementFacturable().getLibelle();
+        }
+        Contrat contrat = quittance.getContrat();
         return switch (contrat.getTypeContrat()) {
             case PARTICULIER -> "Mono";
             case CONVENTION -> "Convention";
             case FLOTTE -> "Flotte";
         };
+    }
+
+    private boolean isAssistance(Quittance quittance) {
+        return quittance.getElementFacturable() != null
+                && quittance.getElementFacturable().getNature() == NatureElementFacturable.ASSISTANCE;
     }
 
     private String categoryLabel(CategorieQuittance categorie) {
@@ -2124,11 +2189,19 @@ public class AffectationQuittanceService {
     }
 
     private Long resolveCompagnieId(Quittance quittance) {
-        return requireQuittanceCompagnie(quittance).getId();
+        return requireQuittanceTiers(quittance).getSourceId();
+    }
+
+    private Long resolveTiersCompagnieId(Quittance quittance) {
+        return requireQuittanceTiers(quittance).getId();
+    }
+
+    private TypeTiersCompagnie resolveTypeCompagnie(Quittance quittance) {
+        return requireQuittanceTiers(quittance).getType();
     }
 
     private String resolveCompagnieName(Quittance quittance) {
-        return requireQuittanceCompagnie(quittance).getNom();
+        return requireQuittanceTiers(quittance).getNom();
     }
 
     private void validatePercentage(BigDecimal value, String label) {

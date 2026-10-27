@@ -12,6 +12,7 @@ import com.assurance.enums.StatutAgence;
 import com.assurance.enums.TypeContrat;
 import com.assurance.enums.TypeGarantie;
 import com.assurance.repository.*;
+import com.assurance.service.TiersCompagnieService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -91,6 +92,7 @@ public class DataSeeder implements CommandLineRunner {
     private final CapitalResponsabiliteCivileRepository capitalResponsabiliteCivileRepository;
     private final RegleAffectationQuittanceRepository regleAffectationQuittanceRepository;
     private final AgenceCompagnieAssuranceRepository agenceCompagnieAssuranceRepository;
+    private final TiersCompagnieService tiersCompagnieService;
 
     @Value("${app.seed.admin-email:admin@jway.ma}")
     private String adminEmail;
@@ -466,9 +468,9 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedRegleAffectation(RegleAffectationQuittance candidate) {
         boolean exists = regleAffectationQuittanceRepository
-                .findByAgenceIdAndCompagnieAssuranceIdAndTypeContratAndDateDebut(
+                .findByAgenceIdAndTiersCompagnieIdAndTypeContratAndDateDebut(
                         candidate.getAgence().getId(),
-                        candidate.getCompagnieAssurance().getId(),
+                        candidate.getTiersCompagnie().getId(),
                         candidate.getTypeContrat(),
                         candidate.getDateDebut()
                 )
@@ -493,7 +495,7 @@ public class DataSeeder implements CommandLineRunner {
     ) {
         RegleAffectationQuittance regle = RegleAffectationQuittance.builder()
                 .agence(agence)
-                .compagnieAssurance(compagnie)
+                .tiersCompagnie(tiersCompagnieService.resolveAssurance(compagnie))
                 .typeContrat(typeContrat)
                 .modeAffectation(modeAffectation)
                 .modeVentilation(modeVentilation)
@@ -644,6 +646,7 @@ public class DataSeeder implements CommandLineRunner {
                 "MATU", "500"
         );
         for (CompagnieAssurance compagnie : compagnies) {
+            tiersCompagnieService.resolveAssurance(compagnie);
             AgenceCompagnieAssurance relation = agenceCompagnieAssuranceRepository
                     .findByAgenceIdAndCompagnieAssuranceId(agence.getId(), compagnie.getId())
                     .orElseGet(() -> AgenceCompagnieAssurance.builder()
@@ -666,7 +669,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private CompagnieAssistance seedCompagnieAssistanceProvider(String code, String nom, String email, String telephone) {
-        return compagnieAssistanceRepository.findByCodeIgnoreCase(code).orElseGet(() ->
+        CompagnieAssistance compagnie = compagnieAssistanceRepository.findByCodeIgnoreCase(code).orElseGet(() ->
                 compagnieAssistanceRepository.save(CompagnieAssistance.builder()
                         .code(code)
                         .nom(nom)
@@ -675,6 +678,8 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build())
         );
+        tiersCompagnieService.resolveAssistance(compagnie);
+        return compagnie;
     }
 
     private Garantie seedGarantie(

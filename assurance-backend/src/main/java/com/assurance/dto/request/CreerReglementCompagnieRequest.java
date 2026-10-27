@@ -15,7 +15,7 @@ import java.util.List;
 @Data
 public class CreerReglementCompagnieRequest {
     @NotNull
-    private Long compagnieId;
+    private Long tiersCompagnieId;
     @NotNull
     private LocalDate dateReglement;
     @Size(max = 1000)

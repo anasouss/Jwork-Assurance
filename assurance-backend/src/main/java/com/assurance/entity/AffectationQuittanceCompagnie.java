@@ -25,12 +25,13 @@ import java.time.LocalDate;
 @Table(name = "affectations_quittance_compagnie",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_affectation_compagnie_numero",
-                columnNames = {"agence_id", "compagnie_assurance_id", "numero_quittance_compagnie"}
+                columnNames = {"agence_id", "tiers_compagnie_id", "numero_quittance_compagnie"}
         ),
         indexes = {
                 @Index(name = "idx_affectation_quittance", columnList = "quittance_id"),
                 @Index(name = "idx_affectation_agence", columnList = "agence_id"),
-                @Index(name = "idx_affectation_numero", columnList = "numero_quittance_compagnie")
+                @Index(name = "idx_affectation_numero", columnList = "numero_quittance_compagnie"),
+                @Index(name = "idx_affectation_tiers_compagnie", columnList = "tiers_compagnie_id")
         })
 @Getter
 @Setter
@@ -48,8 +49,8 @@ public class AffectationQuittanceCompagnie extends BaseEntity {
     private Quittance quittance;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
-    private CompagnieAssurance compagnieAssurance;
+    @JoinColumn(name = "tiers_compagnie_id", nullable = false)
+    private TiersCompagnie tiersCompagnie;
 
     @Column(name = "numero_quittance_compagnie", nullable = false, length = 100)
     private String numeroQuittanceCompagnie;

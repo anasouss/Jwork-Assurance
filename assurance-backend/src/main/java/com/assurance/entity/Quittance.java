@@ -23,7 +23,8 @@ import java.util.List;
 @Entity
 @Table(name = "quittances", indexes = {
         @Index(name = "idx_quittance_contrat", columnList = "contrat_id"),
-        @Index(name = "idx_quittance_numero", columnList = "numero_quittance")
+        @Index(name = "idx_quittance_numero", columnList = "numero_quittance"),
+        @Index(name = "idx_quittance_tiers_compagnie", columnList = "tiers_compagnie_id")
 })
 @Getter
 @Setter
@@ -45,10 +46,10 @@ public class Quittance extends BaseEntity {
     private ElementFacturable elementFacturable;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
-    private CompagnieAssurance compagnieAssurance;
+    @JoinColumn(name = "tiers_compagnie_id", nullable = false)
+    private TiersCompagnie tiersCompagnie;
 
-    @Column(name = "numero_quittance", nullable = false, length = 80)
+    @Column(name = "numero_quittance", nullable = false, length = 120)
     private String numeroQuittance;
 
     @Column(length = 60)

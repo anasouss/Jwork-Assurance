@@ -7,11 +7,11 @@ import com.assurance.dto.response.ReglementCompagnieResponse;
 import com.assurance.entity.AffectationReglementCompagnie;
 import com.assurance.entity.Agence;
 import com.assurance.entity.BordereauCompagnie;
-import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementCompagnie;
 import com.assurance.entity.ReglementCompagnie;
 import com.assurance.entity.SequenceReglementCompagnie;
+import com.assurance.entity.TiersCompagnie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeReglementCompagnie;
 import com.assurance.enums.StatutAffectationReglement;
@@ -25,7 +25,6 @@ import com.assurance.exception.UnauthorizedException;
 import com.assurance.repository.AffectationReglementCompagnieRepository;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.BordereauCompagnieRepository;
-import com.assurance.repository.CompagnieAssuranceRepository;
 import com.assurance.repository.InstrumentReglementCompagnieRepository;
 import com.assurance.repository.ReglementCompagnieRepository;
 import com.assurance.repository.SequenceReglementCompagnieRepository;
@@ -60,7 +59,7 @@ public class ReglementCompagnieService {
     private final BordereauCompagnieRepository bordereauRepository;
     private final SequenceReglementCompagnieRepository sequenceRepository;
     private final AgenceRepository agenceRepository;
-    private final CompagnieAssuranceRepository compagnieRepository;
+    private final TiersCompagnieService tiersCompagnieService;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieService tresorerieService;
 
@@ -69,7 +68,7 @@ public class ReglementCompagnieService {
             Long agenceId,
             CreerReglementCompagnieRequest request
     ) {
-        CompagnieAssurance company = findActiveCompany(request.getCompagnieId());
+        TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
         List<CreerReglementCompagnieRequest.Instrument> requestedInstruments = request.getInstruments();
         validateDuplicateAllocations(requestedInstruments);
         Map<Long, BigDecimal> requestedByBordereau = requestedAmounts(requestedInstruments);
@@ -88,7 +87,7 @@ public class ReglementCompagnieService {
         Map<Long, AllocationAmounts> currentAmounts = loadAllocationAmounts(bordereauIds);
         for (Map.Entry<Long, BigDecimal> requested : requestedByBordereau.entrySet()) {
             BordereauCompagnie bordereau = byId.get(requested.getKey());
-            validateBordereau(company, bordereau);
+            validateBordereau(tiers, bordereau);
             AllocationAmounts current = currentAmounts.getOrDefault(
                     bordereau.getId(),
                     AllocationAmounts.empty()
@@ -117,7 +116,7 @@ public class ReglementCompagnieService {
         Utilisateur actor = currentUser();
         ReglementCompagnie payment = ReglementCompagnie.builder()
                 .agence(agency)
-                .compagnieAssurance(company)
+                .tiersCompagnie(tiers)
                 .numero(nextNumber(agency, request.getDateReglement().getYear()))
                 .dateReglement(request.getDateReglement())
                 .statut(StatutReglementCompagnie.VALIDE)
@@ -336,10 +335,10 @@ public class ReglementCompagnieService {
     }
 
     private void validateBordereau(
-            CompagnieAssurance company,
+            TiersCompagnie tiers,
             BordereauCompagnie bordereau
     ) {
-        if (!bordereau.getCompagnieAssurance().getId().equals(company.getId())) {
+        if (!bordereau.getTiersCompagnie().getId().equals(tiers.getId())) {
             throw new BadRequestException("Tous les bordereaux doivent appartenir à la même compagnie");
         }
         if (bordereau.getStatut() != StatutBordereauCompagnie.TRANSMIS) {
@@ -399,8 +398,10 @@ public class ReglementCompagnieService {
         return ReglementCompagnieResponse.builder()
                 .id(payment.getId())
                 .numero(payment.getNumero())
-                .compagnieId(payment.getCompagnieAssurance().getId())
-                .compagnie(payment.getCompagnieAssurance().getNom())
+                .tiersCompagnieId(payment.getTiersCompagnie().getId())
+                .compagnieId(payment.getTiersCompagnie().getSourceId())
+                .typeCompagnie(payment.getTiersCompagnie().getType())
+                .compagnie(payment.getTiersCompagnie().getNom())
                 .dateReglement(payment.getDateReglement())
                 .statut(payment.getStatut())
                 .montantTotal(payment.getMontantTotal())
@@ -447,15 +448,6 @@ public class ReglementCompagnieService {
     private ReglementCompagnie findPayment(Long agenceId, Long id) {
         return reglementRepository.findByIdAndAgenceId(id, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement compagnie", id));
-    }
-
-    private CompagnieAssurance findActiveCompany(Long id) {
-        CompagnieAssurance company = compagnieRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Compagnie", id));
-        if (!Boolean.TRUE.equals(company.getActif())) {
-            throw new BadRequestException("La compagnie sélectionnée est inactive");
-        }
-        return company;
     }
 
     private String nextNumber(Agence agency, int year) {

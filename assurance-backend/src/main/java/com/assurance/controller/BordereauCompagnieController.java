@@ -46,7 +46,7 @@ public class BordereauCompagnieController {
     @GetMapping("/sources")
     @PreAuthorize("hasAuthority('PERM_bordereau-compagnie:view')")
     public ResponseEntity<ApiResponse<List<SourceBordereauCompagnieResponse>>> sources(
-            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long tiersCompagnieId,
             @RequestParam(defaultValue = "EMISSION") BaseBordereauCompagnie base,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -56,7 +56,7 @@ public class BordereauCompagnieController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(bordereauService.eligibleSources(
                 TenantContext.getCurrentAgence(),
-                compagnieId,
+                tiersCompagnieId,
                 base,
                 dateDu,
                 dateAu,
@@ -67,7 +67,7 @@ public class BordereauCompagnieController {
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_bordereau-compagnie:view')")
     public ResponseEntity<ApiResponse<BordereauCompagniePageResponse>> search(
-            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long tiersCompagnieId,
             @RequestParam(required = false) StatutBordereauCompagnie statut,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -79,7 +79,7 @@ public class BordereauCompagnieController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(bordereauService.search(
                 TenantContext.getCurrentAgence(),
-                compagnieId,
+                tiersCompagnieId,
                 statut,
                 dateDu,
                 dateAu,

@@ -25,7 +25,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "regles_affectation_quittance", indexes = {
         @Index(name = "idx_regle_affectation_agence", columnList = "agence_id"),
-        @Index(name = "idx_regle_affectation_compagnie", columnList = "compagnie_assurance_id"),
+        @Index(name = "idx_regle_affectation_tiers", columnList = "tiers_compagnie_id"),
         @Index(name = "idx_regle_affectation_periode", columnList = "date_debut,date_fin")
 })
 @Getter
@@ -40,8 +40,8 @@ public class RegleAffectationQuittance extends BaseEntity {
     private Agence agence;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
-    private CompagnieAssurance compagnieAssurance;
+    @JoinColumn(name = "tiers_compagnie_id", nullable = false)
+    private TiersCompagnie tiersCompagnie;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_contrat", nullable = false, length = 30)
@@ -68,6 +68,10 @@ public class RegleAffectationQuittance extends BaseEntity {
 
     @Column(name = "taux_commission_corporel", nullable = false, precision = 9, scale = 4)
     private BigDecimal tauxCommissionCorporel;
+
+    @Builder.Default
+    @Column(name = "taux_commission_assistance", nullable = false, precision = 9, scale = 4)
+    private BigDecimal tauxCommissionAssistance = BigDecimal.ZERO;
 
     @Column(name = "taux_tva_incluse_commission", nullable = false, precision = 9, scale = 4)
     private BigDecimal tauxTvaIncluseCommission;

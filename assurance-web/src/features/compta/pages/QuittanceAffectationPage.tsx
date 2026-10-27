@@ -73,7 +73,7 @@ export default function QuittanceAffectationPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [ruleTarget, setRuleTarget] = useState<{
-    compagnieId?: string | null;
+    tiersCompagnieId?: string | null;
     typeContrat: TypeContrat;
     rule?: Rule | null;
   }>();
@@ -82,9 +82,7 @@ export default function QuittanceAffectationPage() {
     queryKey: referenceKeys.list("branches-assurance"),
     queryFn: comptaApi.insuranceBranches,
   });
-  const insuranceBranches = (branches.data ?? []).filter(
-    (branch) => branch.code?.trim().toUpperCase() !== "ASSISTANCE"
-  );
+  const insuranceBranches = branches.data ?? [];
   const selectedBranchId = filters.brancheId === "ALL" ? undefined : filters.brancheId;
   const companies = useQuery({
     queryKey: ["compta", "quittances", "compagnies-disponibles", selectedBranchId ?? "ALL"],
@@ -93,7 +91,7 @@ export default function QuittanceAffectationPage() {
   const params = useMemo(
     () => !searched ? null : ({
       brancheId: appliedFilters.brancheId === "ALL" ? undefined : appliedFilters.brancheId,
-      compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
+      tiersCompagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,
       typeContrat: appliedFilters.typeContrat === "ALL" ? undefined : appliedFilters.typeContrat,
       avecQuittance: appliedFilters.nature === "AVEC_QUITTANCE",
       dateDu: appliedFilters.dateDu || undefined,
@@ -193,7 +191,7 @@ export default function QuittanceAffectationPage() {
   function openAllocation(row: QuittanceAllocation) {
     if (!row.regle) {
       if (!canConfigure) return;
-      setRuleTarget({ compagnieId: row.compagnieId, typeContrat: row.typeContrat });
+      setRuleTarget({ tiersCompagnieId: row.tiersCompagnieId, typeContrat: row.typeContrat });
       setRulesOpen(true);
       return;
     }
@@ -264,7 +262,9 @@ export default function QuittanceAffectationPage() {
                 <SelectContent>
                   <SelectItem value="ALL">Toutes les compagnies</SelectItem>
                   {(companies.data ?? []).map((company) => (
-                    <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.type === "ASSISTANCE" ? `${company.libelle} (Assistance)` : company.libelle}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -568,7 +568,7 @@ export default function QuittanceAffectationPage() {
           setAllocationOpen(false);
           setSelectedQuittanceId(undefined);
           setRuleTarget({
-            compagnieId: data.compagnieId,
+            tiersCompagnieId: data.tiersCompagnieId,
             typeContrat: data.typeContrat,
             rule: data.regle,
           });
@@ -591,7 +591,7 @@ export default function QuittanceAffectationPage() {
           setRulesOpen(value);
           if (!value) setRuleTarget(undefined);
         }}
-        initialCompanyId={ruleTarget?.compagnieId ?? undefined}
+        initialCompanyId={ruleTarget?.tiersCompagnieId ?? undefined}
         initialTypeContrat={ruleTarget?.typeContrat}
         initialRule={ruleTarget?.rule}
       />
@@ -624,7 +624,7 @@ function isBulkCompatible(row: QuittanceAllocation, reference?: QuittanceAllocat
   }
   if (!reference) return true;
   return row.contratId === reference.contratId
-    && row.compagnieId === reference.compagnieId
+    && row.tiersCompagnieId === reference.tiersCompagnieId
     && row.regle?.id === reference.regle?.id;
 }
 
@@ -645,6 +645,7 @@ function StatusBadge({ status }: { status: StatutAffectation }) {
 }
 
 function productLabel(row: QuittanceAllocation) {
+  if (row.nature === "ASSISTANCE") return row.produit || "Assistance";
   if (row.typeContrat === "PARTICULIER") return "Mono";
   if (row.typeContrat === "CONVENTION") return row.produit || "Convention";
   return "Flotte";
@@ -655,6 +656,7 @@ function natureLabel(nature?: CategorieMouvement | null) {
   if (nature === "RENOUVELLEMENT") return "Renouvellement";
   if (nature === "AVENANT") return "Avenant";
   if (nature === "CARTE_VERTE") return "Carte verte";
+  if (nature === "ASSISTANCE") return "Assistance";
   return "";
 }
 
@@ -716,7 +718,7 @@ function validDateParam(value: string | null) {
 function toApiFilters(filters: Filters) {
   return {
     brancheId: filters.brancheId === "ALL" ? undefined : filters.brancheId,
-    compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+    tiersCompagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
     typeContrat: filters.typeContrat === "ALL" ? undefined : filters.typeContrat,
     avecQuittance: filters.nature === "AVEC_QUITTANCE",
     dateDu: filters.dateDu || undefined,

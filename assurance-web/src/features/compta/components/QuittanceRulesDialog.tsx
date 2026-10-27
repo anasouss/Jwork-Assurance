@@ -39,7 +39,14 @@ import { toDateOnly } from "@/features/production/date";
 import { accountingKeys } from "@/lib/query-keys";
 import { comptaApi } from "../api";
 import { formatAccountingMoney } from "../format";
-import type { ModeCalculCommission, ModeVentilationQuittance, Rule, RuleRequest, TypeContrat } from "../types";
+import type {
+  CompanyCounterpartyType,
+  ModeCalculCommission,
+  ModeVentilationQuittance,
+  Rule,
+  RuleRequest,
+  TypeContrat,
+} from "../types";
 
 type Props = {
   open: boolean;
@@ -50,13 +57,15 @@ type Props = {
 };
 
 type RuleForm = {
-  compagnieAssuranceId: string;
+  tiersCompagnieId: string;
+  typeCompagnie?: CompanyCounterpartyType;
   typeContrat: TypeContrat;
   modeVentilation: ModeVentilationQuittance;
   modeCalculCommission: ModeCalculCommission;
   tauxCommissionAutomobile?: number;
   tauxCommissionEvcat?: number;
   tauxCommissionCorporel?: number;
+  tauxCommissionAssistance?: number;
   tauxTvaIncluseCommission?: number;
   retenueParDefaut: boolean;
   tauxRetenue?: number;
@@ -104,7 +113,7 @@ const DEFAULT_EXCEL_MAPPING = {
 };
 
 const EMPTY_FORM: RuleForm = {
-  compagnieAssuranceId: "",
+  tiersCompagnieId: "",
   typeContrat: "PARTICULIER",
   modeVentilation: "GLOBALE",
   modeCalculCommission: "TAUX_NET",
@@ -133,8 +142,8 @@ export function QuittanceRulesDialog({
   const [page, setPage] = useState(0);
 
   const companies = useQuery({
-    queryKey: ["referentiel", "compagnies-assurance", "compta"],
-    queryFn: comptaApi.companies,
+    queryKey: ["compta", "quittances", "compagnies-disponibles", "ALL"],
+    queryFn: () => comptaApi.availableQuittanceCompanies(),
     enabled: open,
   });
   const rules = useQuery({
@@ -172,13 +181,21 @@ export function QuittanceRulesDialog({
       const typeContrat = initialTypeContrat ?? "PARTICULIER";
       setForm({
         ...EMPTY_FORM,
-        compagnieAssuranceId: initialCompanyId ?? "",
+        tiersCompagnieId: initialCompanyId ?? "",
         typeContrat,
         modeVentilation: typeContrat === "FLOTTE" ? "GLOBALE" : EMPTY_FORM.modeVentilation,
       });
       setShowForm(true);
     }
   }, [initialCompanyId, initialRule, initialTypeContrat, open]);
+
+  useEffect(() => {
+    if (!form.tiersCompagnieId || form.typeCompagnie || !companies.data) return;
+    const company = companies.data.find((item) => item.id === form.tiersCompagnieId);
+    if (company) {
+      setForm((current) => ({ ...current, typeCompagnie: company.type }));
+    }
+  }, [companies.data, form.tiersCompagnieId, form.typeCompagnie]);
 
   useEffect(() => {
     const availablePages = rules.data?.page.totalPages;
@@ -228,7 +245,7 @@ export function QuittanceRulesDialog({
     setEditing(null);
     setForm({
       ...EMPTY_FORM,
-      compagnieAssuranceId: initialCompanyId ?? "",
+      tiersCompagnieId: initialCompanyId ?? "",
       typeContrat,
       modeVentilation: typeContrat === "FLOTTE" ? "GLOBALE" : EMPTY_FORM.modeVentilation,
     });
@@ -274,13 +291,26 @@ export function QuittanceRulesDialog({
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Field label="Compagnie" required>
                   <Select
-                    value={form.compagnieAssuranceId}
-                    onValueChange={(value) => setForm((current) => ({ ...current, compagnieAssuranceId: value }))}
+                    value={form.tiersCompagnieId}
+                    onValueChange={(value) => {
+                      const typeCompagnie = companies.data?.find((company) => company.id === value)?.type;
+                      setForm((current) => ({
+                        ...current,
+                        tiersCompagnieId: value,
+                        typeCompagnie,
+                        tauxCommissionAutomobile: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionAutomobile ?? 0,
+                        tauxCommissionEvcat: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionEvcat ?? 0,
+                        tauxCommissionCorporel: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionCorporel ?? 0,
+                        tauxCommissionAssistance: typeCompagnie === "ASSURANCE" ? 0 : current.tauxCommissionAssistance ?? 0,
+                      }));
+                    }}
                   >
                     <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                     <SelectContent>
                       {(companies.data ?? []).map((company) => (
-                        <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.type === "ASSISTANCE" ? `${company.libelle} (Assistance)` : company.libelle}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -293,12 +323,25 @@ export function QuittanceRulesDialog({
                       setForm((current) => ({
                         ...current,
                         typeContrat,
-                        modeCalculCommission: typeContrat === "FLOTTE" ? "TAUX_NET" : current.modeCalculCommission,
+                        modeCalculCommission: typeContrat === "FLOTTE" && current.typeCompagnie !== "ASSISTANCE"
+                          ? "TAUX_NET"
+                          : current.modeCalculCommission,
                         modeVentilation: typeContrat === "FLOTTE" ? "GLOBALE" : current.modeVentilation,
-                        tauxCommissionAutomobile: typeContrat === "FLOTTE" ? 0 : current.tauxCommissionAutomobile,
-                        tauxCommissionEvcat: typeContrat === "FLOTTE" ? 0 : current.tauxCommissionEvcat,
-                        tauxCommissionCorporel: typeContrat === "FLOTTE" ? 0 : current.tauxCommissionCorporel,
-                        tauxTvaIncluseCommission: typeContrat === "FLOTTE" ? 0 : current.tauxTvaIncluseCommission,
+                        tauxCommissionAutomobile: typeContrat === "FLOTTE" && current.typeCompagnie !== "ASSISTANCE"
+                          ? 0
+                          : current.tauxCommissionAutomobile,
+                        tauxCommissionEvcat: typeContrat === "FLOTTE" && current.typeCompagnie !== "ASSISTANCE"
+                          ? 0
+                          : current.tauxCommissionEvcat,
+                        tauxCommissionCorporel: typeContrat === "FLOTTE" && current.typeCompagnie !== "ASSISTANCE"
+                          ? 0
+                          : current.tauxCommissionCorporel,
+                        tauxCommissionAssistance: typeContrat === "FLOTTE" && current.typeCompagnie !== "ASSISTANCE"
+                          ? 0
+                          : current.tauxCommissionAssistance,
+                        tauxTvaIncluseCommission: typeContrat === "FLOTTE" && current.typeCompagnie !== "ASSISTANCE"
+                          ? 0
+                          : current.tauxTvaIncluseCommission,
                       }));
                     }}
                   >
@@ -310,7 +353,7 @@ export function QuittanceRulesDialog({
                     </SelectContent>
                   </Select>
                 </Field>
-                {form.typeContrat !== "FLOTTE" ? (
+                {!usesFleetImport(form) ? (
                   <Field label="Mode de calcul" required>
                     <Select
                       value={form.modeCalculCommission}
@@ -335,10 +378,10 @@ export function QuittanceRulesDialog({
                 <Field label="Mode d'affectation">
                   <Input
                     readOnly
-                    value={form.typeContrat === "FLOTTE" ? "Manuel ou import Excel" : "Calcul automatique"}
+                    value={usesFleetImport(form) ? "Manuel ou import Excel" : "Calcul automatique"}
                   />
                 </Field>
-                {form.typeContrat !== "FLOTTE" ? (
+                {!usesFleetImport(form) ? (
                   <Field label="Ventilation compagnie" required>
                     <Select
                       value={form.modeVentilation}
@@ -354,23 +397,33 @@ export function QuittanceRulesDialog({
                     </Select>
                   </Field>
                 ) : null}
-                {form.typeContrat !== "FLOTTE" ? (
+                {!usesFleetImport(form) ? (
                   <>
-                    <RateField
-                      label="Commission automobile (%)"
-                      value={form.tauxCommissionAutomobile}
-                      onChange={(value) => setForm((current) => ({ ...current, tauxCommissionAutomobile: value }))}
-                    />
-                    <RateField
-                      label="Commission EVCAT (%)"
-                      value={form.tauxCommissionEvcat}
-                      onChange={(value) => setForm((current) => ({ ...current, tauxCommissionEvcat: value }))}
-                    />
-                    <RateField
-                      label="Commission corporel / PTA (%)"
-                      value={form.tauxCommissionCorporel}
-                      onChange={(value) => setForm((current) => ({ ...current, tauxCommissionCorporel: value }))}
-                    />
+                    {form.typeCompagnie !== "ASSISTANCE" ? (
+                      <>
+                        <RateField
+                          label="Commission automobile (%)"
+                          value={form.tauxCommissionAutomobile}
+                          onChange={(value) => setForm((current) => ({ ...current, tauxCommissionAutomobile: value }))}
+                        />
+                        <RateField
+                          label="Commission EVCAT (%)"
+                          value={form.tauxCommissionEvcat}
+                          onChange={(value) => setForm((current) => ({ ...current, tauxCommissionEvcat: value }))}
+                        />
+                        <RateField
+                          label="Commission corporel / PTA (%)"
+                          value={form.tauxCommissionCorporel}
+                          onChange={(value) => setForm((current) => ({ ...current, tauxCommissionCorporel: value }))}
+                        />
+                      </>
+                    ) : (
+                      <RateField
+                        label="Commission assistance (%)"
+                        value={form.tauxCommissionAssistance}
+                        onChange={(value) => setForm((current) => ({ ...current, tauxCommissionAssistance: value }))}
+                      />
+                    )}
                     {form.modeCalculCommission === "TAUX_BRUT_TVA_INCLUSE" ? (
                       <RateField
                         label="TVA incluse sur commission (%)"
@@ -398,7 +451,7 @@ export function QuittanceRulesDialog({
                   />
                 </Field>
               </div>
-              {form.typeContrat === "FLOTTE" ? (
+              {usesFleetImport(form) ? (
                 <div className="grid gap-4 border-t pt-4">
                   <div>
                     <h3 className="text-sm font-semibold">Tolérance d’écart d’affectation</h3>
@@ -425,7 +478,7 @@ export function QuittanceRulesDialog({
                   </div>
                 </div>
               ) : null}
-              {form.typeContrat === "FLOTTE" ? (
+              {usesFleetImport(form) ? (
                 <div className="grid gap-4 border-t pt-4">
                   <div>
                     <h3 className="text-sm font-semibold">Colonnes de l’import Excel</h3>
@@ -579,6 +632,7 @@ export function QuittanceRulesDialog({
                   <th className="px-3 py-2 text-right">Auto</th>
                   <th className="px-3 py-2 text-right">EVCAT</th>
                   <th className="px-3 py-2 text-right">Corporel</th>
+                  <th className="px-3 py-2 text-right">Assistance</th>
                   <th className="px-3 py-2 text-right">Sans alerte / manque / dépassement</th>
                   <th className="px-3 py-2">Période</th>
                   <th className="px-3 py-2">Statut</th>
@@ -589,7 +643,7 @@ export function QuittanceRulesDialog({
                 {rules.isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
                     <tr key={index} className="border-t">
-                      <td colSpan={11} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
+                      <td colSpan={12} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
                     </tr>
                   ))
                 ) : sortedRules.length ? (
@@ -601,17 +655,18 @@ export function QuittanceRulesDialog({
                         {rule.modeAffectation === "AUTOMATIQUE" ? "Automatique" : "Manuel / import"}
                       </td>
                       <td className="px-3 py-3">
-                        {rule.typeContrat === "FLOTTE"
+                        {isFleetInsuranceRule(rule)
                           ? "—"
                           : rule.modeVentilation === "PAR_CATEGORIE"
                             ? "Par catégorie"
                             : "Globale"}
                       </td>
-                      <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionAutomobile)}</td>
-                      <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionEvcat)}</td>
-                      <td className="px-3 py-3 text-right">{rule.typeContrat === "FLOTTE" ? "—" : rateLabel(rule.tauxCommissionCorporel)}</td>
+                      <td className="px-3 py-3 text-right">{isFleetInsuranceRule(rule) || rule.typeCompagnie === "ASSISTANCE" ? "—" : rateLabel(rule.tauxCommissionAutomobile)}</td>
+                      <td className="px-3 py-3 text-right">{isFleetInsuranceRule(rule) || rule.typeCompagnie === "ASSISTANCE" ? "—" : rateLabel(rule.tauxCommissionEvcat)}</td>
+                      <td className="px-3 py-3 text-right">{isFleetInsuranceRule(rule) || rule.typeCompagnie === "ASSISTANCE" ? "—" : rateLabel(rule.tauxCommissionCorporel)}</td>
+                      <td className="px-3 py-3 text-right">{isFleetInsuranceRule(rule) || rule.typeCompagnie === "ASSURANCE" ? "—" : rateLabel(rule.tauxCommissionAssistance)}</td>
                       <td className="px-3 py-3 whitespace-nowrap text-right">
-                        {rule.typeContrat === "FLOTTE"
+                        {isFleetInsuranceRule(rule)
                           ? `${moneyLabel(rule.seuilAvertissementEcart)} / ${moneyLabel(rule.margeManquanteMaximale)} / ${moneyLabel(rule.margeDepassementMaximale)}`
                           : "—"}
                       </td>
@@ -632,7 +687,7 @@ export function QuittanceRulesDialog({
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
+                  <tr><td colSpan={12} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -801,19 +856,20 @@ function CheckField({
 }
 
 function isComplete(form: RuleForm) {
+  const fleetImport = usesFleetImport(form);
   const commissionComplete =
-    form.typeContrat === "FLOTTE" ||
-    (
-      form.tauxCommissionAutomobile != null &&
-      form.tauxCommissionEvcat != null &&
-      form.tauxCommissionCorporel != null &&
+    fleetImport ||
+    (form.typeCompagnie === "ASSISTANCE"
+      ? form.tauxCommissionAssistance != null
+      : form.tauxCommissionAutomobile != null &&
+        form.tauxCommissionEvcat != null &&
+        form.tauxCommissionCorporel != null) &&
       (
         form.modeCalculCommission === "TAUX_NET" ||
         form.tauxTvaIncluseCommission != null
-      )
-    );
+      );
   const excelComplete =
-    form.typeContrat !== "FLOTTE" ||
+    !fleetImport ||
     (
       form.excelLigneEntete >= 1 &&
       Boolean(
@@ -825,7 +881,8 @@ function isComplete(form: RuleForm) {
       )
     );
   return Boolean(
-    form.compagnieAssuranceId &&
+    form.tiersCompagnieId &&
+      form.typeCompagnie &&
       form.dateDebut &&
       commissionComplete &&
       excelComplete &&
@@ -844,13 +901,15 @@ function isComplete(form: RuleForm) {
 
 function ruleToForm(rule: Rule): RuleForm {
   return {
-    compagnieAssuranceId: rule.compagnieAssuranceId,
+    tiersCompagnieId: rule.tiersCompagnieId,
+    typeCompagnie: rule.typeCompagnie,
     typeContrat: rule.typeContrat,
-    modeVentilation: rule.typeContrat === "FLOTTE" ? "GLOBALE" : rule.modeVentilation ?? "GLOBALE",
+    modeVentilation: isFleetInsuranceRule(rule) ? "GLOBALE" : rule.modeVentilation ?? "GLOBALE",
     modeCalculCommission: rule.modeCalculCommission,
     tauxCommissionAutomobile: rule.tauxCommissionAutomobile,
     tauxCommissionEvcat: rule.tauxCommissionEvcat,
     tauxCommissionCorporel: rule.tauxCommissionCorporel,
+    tauxCommissionAssistance: rule.tauxCommissionAssistance,
     tauxTvaIncluseCommission: rule.tauxTvaIncluseCommission,
     retenueParDefaut: rule.retenueParDefaut,
     tauxRetenue: rule.tauxRetenue,
@@ -882,18 +941,19 @@ function toRequest(form: RuleForm): RuleRequest {
   if (!isComplete(form)) {
     throw new Error("Complétez tous les paramètres obligatoires");
   }
-  const isFleet = form.typeContrat === "FLOTTE";
+  const isFleet = usesFleetImport(form);
   return {
-    compagnieAssuranceId: form.compagnieAssuranceId,
+    tiersCompagnieId: form.tiersCompagnieId,
     typeContrat: form.typeContrat,
-    modeAffectation: form.typeContrat === "FLOTTE" ? "MANUEL_OU_IMPORT" : "AUTOMATIQUE",
-    modeVentilation: form.typeContrat === "FLOTTE" ? "GLOBALE" : form.modeVentilation,
-    modeCalculCommission: form.typeContrat === "FLOTTE" ? "TAUX_NET" : form.modeCalculCommission,
-    tauxCommissionAutomobile: form.typeContrat === "FLOTTE" ? 0 : form.tauxCommissionAutomobile!,
-    tauxCommissionEvcat: form.typeContrat === "FLOTTE" ? 0 : form.tauxCommissionEvcat!,
-    tauxCommissionCorporel: form.typeContrat === "FLOTTE" ? 0 : form.tauxCommissionCorporel!,
+    modeAffectation: isFleet ? "MANUEL_OU_IMPORT" : "AUTOMATIQUE",
+    modeVentilation: isFleet ? "GLOBALE" : form.modeVentilation,
+    modeCalculCommission: isFleet ? "TAUX_NET" : form.modeCalculCommission,
+    tauxCommissionAutomobile: isFleet || form.typeCompagnie === "ASSISTANCE" ? 0 : form.tauxCommissionAutomobile!,
+    tauxCommissionEvcat: isFleet || form.typeCompagnie === "ASSISTANCE" ? 0 : form.tauxCommissionEvcat!,
+    tauxCommissionCorporel: isFleet || form.typeCompagnie === "ASSISTANCE" ? 0 : form.tauxCommissionCorporel!,
+    tauxCommissionAssistance: isFleet || form.typeCompagnie === "ASSURANCE" ? 0 : form.tauxCommissionAssistance!,
     tauxTvaIncluseCommission:
-      form.typeContrat === "FLOTTE" || form.modeCalculCommission === "TAUX_NET"
+      isFleet || form.modeCalculCommission === "TAUX_NET"
         ? 0
         : form.tauxTvaIncluseCommission!,
     retenueParDefaut: form.retenueParDefaut,
@@ -920,6 +980,14 @@ function toRequest(form: RuleForm): RuleRequest {
     excelColonneStatut: isFleet ? form.excelColonneStatut.trim() || null : null,
     actif: form.actif,
   };
+}
+
+function usesFleetImport(form: Pick<RuleForm, "typeContrat" | "typeCompagnie">) {
+  return form.typeContrat === "FLOTTE" && form.typeCompagnie === "ASSURANCE";
+}
+
+function isFleetInsuranceRule(rule: Pick<Rule, "typeContrat" | "typeCompagnie">) {
+  return rule.typeContrat === "FLOTTE" && rule.typeCompagnie === "ASSURANCE";
 }
 
 function contractLabel(type: TypeContrat) {

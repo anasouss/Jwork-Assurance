@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @Data
 public class UpsertRegleAffectationQuittanceRequest {
     @NotNull
-    private Long compagnieAssuranceId;
+    private Long tiersCompagnieId;
     @NotNull
     private TypeContrat typeContrat;
     @NotNull
@@ -32,6 +32,9 @@ public class UpsertRegleAffectationQuittanceRequest {
     @NotNull
     @DecimalMin("0")
     private BigDecimal tauxCommissionCorporel;
+    @NotNull
+    @DecimalMin("0")
+    private BigDecimal tauxCommissionAssistance;
     @NotNull
     @DecimalMin("0")
     private BigDecimal tauxTvaIncluseCommission;

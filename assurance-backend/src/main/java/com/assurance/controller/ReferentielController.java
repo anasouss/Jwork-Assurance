@@ -63,6 +63,7 @@ import com.assurance.security.TenantContext;
 import com.assurance.service.RichTextSanitizer;
 import com.assurance.service.GrilleTarifaireCatalogueService;
 import com.assurance.service.TarifUsageAjustementService;
+import com.assurance.service.TiersCompagnieService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -125,6 +126,7 @@ public class ReferentielController {
     private final RichTextSanitizer richTextSanitizer;
     private final GrilleTarifaireCatalogueService grilleTarifaireCatalogueService;
     private final TarifUsageAjustementService tarifUsageAjustementService;
+    private final TiersCompagnieService tiersCompagnieService;
 
     @GetMapping("/branches-assurance")
     @Transactional(readOnly = true)
@@ -383,6 +385,7 @@ public class ReferentielController {
         compagnie.setCode(nextCompagnieAssuranceCode(request.getNom()));
         applyCompagnieAssuranceRequest(compagnie, request);
         compagnie = compagnieAssuranceRepository.save(compagnie);
+        tiersCompagnieService.resolveAssurance(compagnie);
         String codeIntermediaire = saveCodeIntermediaire(compagnie, request.getCodeIntermediaire());
         return ResponseEntity.ok(ApiResponse.success(
                 toCompagnieAssuranceResponse(compagnie, codeIntermediaire),
@@ -419,6 +422,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/compagnies-assistance")
+    @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistance(
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
     ) {
@@ -427,8 +431,10 @@ public class ReferentielController {
         });
         CompagnieAssistance compagnie = new CompagnieAssistance();
         applyCompagnieAssistanceRequest(compagnie, request);
+        compagnie = compagnieAssistanceRepository.save(compagnie);
+        tiersCompagnieService.resolveAssistance(compagnie);
         return ResponseEntity.ok(ApiResponse.success(
-                toCompagnieAssistanceResponse(compagnieAssistanceRepository.save(compagnie)),
+                toCompagnieAssistanceResponse(compagnie),
                 "Compagnie d'assistance creee"
         ));
     }

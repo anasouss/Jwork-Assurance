@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.assurance.enums.TypeTiersCompagnie;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,7 +11,9 @@ import java.time.LocalDate;
 @Builder
 public class SourceBordereauCompagnieResponse {
     private Long id;
+    private Long tiersCompagnieId;
     private Long compagnieId;
+    private TypeTiersCompagnie typeCompagnie;
     private String compagnie;
     private Long quittanceId;
     private String numeroQuittanceCompagnie;

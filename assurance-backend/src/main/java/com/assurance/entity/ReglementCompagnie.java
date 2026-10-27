@@ -34,7 +34,7 @@ import java.util.List;
         ),
         indexes = {
                 @Index(name = "idx_reglement_compagnie_agence_date", columnList = "agence_id,date_reglement"),
-                @Index(name = "idx_reglement_compagnie_compagnie", columnList = "compagnie_assurance_id")
+                @Index(name = "idx_reglement_compagnie_tiers", columnList = "tiers_compagnie_id")
         }
 )
 @Getter
@@ -49,8 +49,8 @@ public class ReglementCompagnie extends AuditedEntity {
     private Agence agence;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "compagnie_assurance_id", nullable = false)
-    private CompagnieAssurance compagnieAssurance;
+    @JoinColumn(name = "tiers_compagnie_id", nullable = false)
+    private TiersCompagnie tiersCompagnie;
 
     @Column(nullable = false, length = 80)
     private String numero;

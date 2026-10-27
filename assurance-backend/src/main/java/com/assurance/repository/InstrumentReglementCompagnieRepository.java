@@ -17,7 +17,9 @@ public interface InstrumentReglementCompagnieRepository
     @EntityGraph(attributePaths = {
             "agence",
             "reglement",
-            "reglement.compagnieAssurance",
+            "reglement.tiersCompagnie",
+            "reglement.tiersCompagnie.compagnieAssurance",
+            "reglement.tiersCompagnie.compagnieAssistance",
             "compteTresorerie",
             "affectations",
             "affectations.bordereau"

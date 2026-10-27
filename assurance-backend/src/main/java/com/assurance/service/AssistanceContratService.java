@@ -13,16 +13,18 @@ import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.MouvementVehicule;
 import com.assurance.entity.ProduitAssistance;
+import com.assurance.entity.Quittance;
 import com.assurance.entity.TarifProduitAssistance;
 import com.assurance.entity.Usage;
 import com.assurance.entity.Vehicule;
-import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.NatureElementFacturable;
+import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
+import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.CompagnieAssistanceRepository;
@@ -31,6 +33,7 @@ import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.MouvementVehiculeRepository;
 import com.assurance.repository.ProduitAssistanceRepository;
+import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.SousClasseRepository;
 import com.assurance.repository.VehiculeRepository;
 import lombok.RequiredArgsConstructor;
@@ -61,10 +64,13 @@ public class AssistanceContratService {
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final SousClasseRepository sousClasseRepository;
     private final AssistanceContratRepository assistanceContratRepository;
+    private final QuittanceRepository quittanceRepository;
+    private final AffectationQuittanceCompagnieRepository affectationQuittanceCompagnieRepository;
     private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
     private final EcheanceService echeanceService;
+    private final AssistanceQuittanceService assistanceQuittanceService;
 
     @Transactional(readOnly = true)
     public AssistanceContratContextResponse getContext(Long agenceId, Long contratId, Long mouvementId, LocalDate dateSouscription) {
@@ -218,6 +224,7 @@ public class AssistanceContratService {
         element = elementFacturableRepository.save(element);
         assistance.setElementFacturable(element);
         assistance = assistanceContratRepository.save(assistance);
+        assistanceQuittanceService.synchroniser(assistance);
 
         return toResponse(assistance, pricing.trimestres(), pricing.prorata());
     }
@@ -349,10 +356,22 @@ public class AssistanceContratService {
         if (assistance.getContrat() == null || !assistance.getContrat().getId().equals(contrat.getId())) {
             throw new BadRequestException("L'assistance ne correspond pas au contrat");
         }
+        ElementFacturable element = assistance.getElementFacturable();
+        if (element != null) {
+            Quittance quittance = quittanceRepository
+                    .findFirstByElementFacturableIdAndGlobaleTrueOrderByCreatedAtAsc(element.getId())
+                    .orElse(null);
+            if (quittance != null && affectationQuittanceCompagnieRepository.existsByQuittanceId(quittance.getId())) {
+                throw new BadRequestException(
+                        "L'assistance est déjà affectée en comptabilité compagnie et ne peut pas être désactivée"
+                );
+            }
+        }
         assistance.setActif(false);
-        if (assistance.getElementFacturable() != null) {
-            assistance.getElementFacturable().setActif(false);
-            elementFacturableRepository.save(assistance.getElementFacturable());
+        if (element != null) {
+            element.setActif(false);
+            element.setStatut(StatutElementFacturable.ANNULE);
+            elementFacturableRepository.save(element);
         }
         assistanceContratRepository.save(assistance);
         contrat.setAssistance(assistanceContratRepository.countByContratIdAndActifTrue(contrat.getId()) > 0);

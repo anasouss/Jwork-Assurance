@@ -4,6 +4,7 @@ import com.assurance.enums.ModeAffectationQuittance;
 import com.assurance.enums.ModeCalculCommission;
 import com.assurance.enums.ModeVentilationQuittance;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.TypeTiersCompagnie;
 import lombok.Builder;
 import lombok.Data;
 
@@ -14,7 +15,9 @@ import java.time.LocalDate;
 @Builder
 public class RegleAffectationQuittanceResponse {
     private Long id;
-    private Long compagnieAssuranceId;
+    private Long tiersCompagnieId;
+    private Long compagnieId;
+    private TypeTiersCompagnie typeCompagnie;
     private String compagnie;
     private TypeContrat typeContrat;
     private ModeAffectationQuittance modeAffectation;
@@ -23,6 +26,7 @@ public class RegleAffectationQuittanceResponse {
     private BigDecimal tauxCommissionAutomobile;
     private BigDecimal tauxCommissionEvcat;
     private BigDecimal tauxCommissionCorporel;
+    private BigDecimal tauxCommissionAssistance;
     private BigDecimal tauxTvaIncluseCommission;
     private Boolean retenueParDefaut;
     private BigDecimal tauxRetenue;

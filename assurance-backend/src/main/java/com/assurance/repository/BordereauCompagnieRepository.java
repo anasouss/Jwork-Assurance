@@ -18,26 +18,28 @@ import java.util.Optional;
 
 public interface BordereauCompagnieRepository extends JpaRepository<BordereauCompagnie, Long> {
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "creePar", "validePar"})
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance", "creePar", "validePar"})
     @Query("""
             select b
             from BordereauCompagnie b
+            left join b.tiersCompagnie.compagnieAssurance ca
+            left join b.tiersCompagnie.compagnieAssistance cas
             where b.agence.id = :agenceId
-              and (:compagnieId is null or b.compagnieAssurance.id = :compagnieId)
+              and (:tiersCompagnieId is null or b.tiersCompagnie.id = :tiersCompagnieId)
               and (:statut is null or b.statut = :statut)
               and (:dateDu is null or b.periodeFin >= :dateDu)
               and (:dateAu is null or b.periodeDebut <= :dateAu)
               and (
                     :search is null
                     or lower(b.numero) like concat('%', :search, '%')
-                    or lower(b.compagnieAssurance.nom) like concat('%', :search, '%')
+                    or lower(coalesce(ca.nom, cas.nom)) like concat('%', :search, '%')
                     or lower(coalesce(b.referenceTransmission, '')) like concat('%', :search, '%')
               )
             order by b.createdAt desc, b.id desc
             """)
     Page<BordereauCompagnie> search(
             @Param("agenceId") Long agenceId,
-            @Param("compagnieId") Long compagnieId,
+            @Param("tiersCompagnieId") Long tiersCompagnieId,
             @Param("statut") StatutBordereauCompagnie statut,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
@@ -46,7 +48,9 @@ public interface BordereauCompagnieRepository extends JpaRepository<BordereauCom
     );
 
     @EntityGraph(attributePaths = {
-            "compagnieAssurance",
+            "tiersCompagnie",
+            "tiersCompagnie.compagnieAssurance",
+            "tiersCompagnie.compagnieAssistance",
             "creePar",
             "validePar",
             "lignes",

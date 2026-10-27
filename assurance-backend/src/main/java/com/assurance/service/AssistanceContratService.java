@@ -101,7 +101,7 @@ public class AssistanceContratService {
                         || produit.getUsages().isEmpty()
                         || produit.getUsages().stream().anyMatch(usage -> usageIds.contains(usage.getId())))
                 .map(produit -> toProduitOption(produit, referenceDate))
-                .filter(produit -> produit.getTarifProduitAssistanceId() != null)
+                .filter(produit -> !produit.getTarifs().isEmpty())
                 .sorted(Comparator.comparing(
                         AssistanceContratContextResponse.ProduitAssistanceOption::getLibelle,
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
@@ -481,6 +481,17 @@ public class AssistanceContratService {
 
     private AssistanceContratContextResponse.ProduitAssistanceOption toProduitOption(ProduitAssistance produit, LocalDate referenceDate) {
         TarifProduitAssistance tarif = tarifProduitAssistanceService.resolveTarifForDate(produit, referenceDate);
+        List<AssistanceContratContextResponse.TarifAssistanceOption> tarifs = tarifProduitAssistanceService
+                .findActiveTarifs(produit)
+                .stream()
+                .map(item -> AssistanceContratContextResponse.TarifAssistanceOption.builder()
+                        .id(item.getId())
+                        .dateDebut(item.getDateDebut())
+                        .dateFin(item.getDateFin())
+                        .montantHt(item.getMontantHt())
+                        .montantTtc(item.getMontantTtc())
+                        .build())
+                .toList();
         return AssistanceContratContextResponse.ProduitAssistanceOption.builder()
                 .id(produit.getId())
                 .libelle(produit.getLibelle())
@@ -494,6 +505,7 @@ public class AssistanceContratService {
                 .dateFinTarif(tarif != null ? tarif.getDateFin() : null)
                 .montantHt(tarif != null ? tarif.getMontantHt() : null)
                 .montantTtc(tarif != null ? tarif.getMontantTtc() : null)
+                .tarifs(tarifs)
                 .build();
     }
 

@@ -47,9 +47,15 @@ export function TargetAssistanceTable({
   const selectableProducts = selectedProduct && !filteredProducts.some((produit) => produit.id === selectedProduct.id)
     ? [selectedProduct, ...filteredProducts]
     : filteredProducts;
-  const draftPrime = resolveAssistanceDraftTotal(selectedProduct, assistance.dateEffet, assistance.dateEcheance);
+  const draftPrime = resolveAssistanceDraftTotal(
+    selectedProduct,
+    assistance.dateSouscription,
+    assistance.dateEffet,
+    assistance.dateEcheance
+  );
   const previewMatchesProduct = String(preview?.produitAssistanceId ?? "") === selectedProductId;
-  const prime = draftPrime ?? (previewMatchesProduct ? preview?.primeTotale ?? undefined : undefined);
+  const hasTariffHistory = Array.isArray(selectedProduct?.tarifs);
+  const prime = draftPrime ?? (!hasTariffHistory && previewMatchesProduct ? preview?.primeTotale ?? undefined : undefined);
   const trimestres = assistance.dateEffet || assistance.dateEcheance
     ? resolveAssistanceQuarterCount(assistance.dateEffet, assistance.dateEcheance)
     : previewMatchesProduct ? preview?.trimestres ?? undefined : undefined;

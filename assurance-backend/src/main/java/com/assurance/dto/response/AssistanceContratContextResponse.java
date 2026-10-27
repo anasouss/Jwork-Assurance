@@ -62,5 +62,16 @@ public class AssistanceContratContextResponse {
         private LocalDate dateFinTarif;
         private BigDecimal montantHt;
         private BigDecimal montantTtc;
+        private List<TarifAssistanceOption> tarifs;
+    }
+
+    @Data
+    @Builder
+    public static class TarifAssistanceOption {
+        private Long id;
+        private LocalDate dateDebut;
+        private LocalDate dateFin;
+        private BigDecimal montantHt;
+        private BigDecimal montantTtc;
     }
 }

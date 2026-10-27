@@ -978,6 +978,13 @@ export type AssistanceContratContext = {
     dateFinTarif?: string | null;
     montantHt?: number | null;
     montantTtc?: number | null;
+    tarifs?: Array<{
+      id: string;
+      dateDebut: string;
+      dateFin?: string | null;
+      montantHt: number;
+      montantTtc: number;
+    }>;
   }[];
 };
 

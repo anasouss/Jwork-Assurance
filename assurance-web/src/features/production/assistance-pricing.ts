@@ -1,9 +1,16 @@
 import type { ReferenceOption } from "./types";
 import { numberValue, roundMoney } from "./utils/format";
 
+type AssistanceTariff = {
+  dateDebut?: unknown;
+  dateFin?: unknown;
+  montantHt?: unknown;
+  montantTtc?: unknown;
+};
+
 export function resolveAssistanceTariffAmount(
   product: ReferenceOption | undefined,
-  tarifs: ReferenceOption[] | undefined,
+  tarifs: AssistanceTariff[] | undefined,
   dateSouscription?: string,
   amountKey: "montantHt" | "montantTtc" = "montantHt"
 ) {
@@ -11,6 +18,9 @@ export function resolveAssistanceTariffAmount(
   const datedAmount = numberValue(String(datedTarif?.[amountKey] ?? ""));
   if (datedAmount != null) {
     return datedAmount;
+  }
+  if (tarifs) {
+    return undefined;
   }
   return numberValue(String(product?.[amountKey] ?? ""));
 }
@@ -35,17 +45,24 @@ export function resolveAssistanceQuarterCount(dateEffet?: string, dateEcheance?:
 
 export function resolveAssistanceDraftTotal(
   product: ReferenceOption | undefined,
+  dateSouscription?: string,
   dateEffet?: string,
   dateEcheance?: string
 ) {
-  const annualTotal = resolveAssistanceTariffAmount(product, undefined, undefined, "montantTtc");
+  const tarifs = Array.isArray(product?.tarifs) ? product.tarifs as AssistanceTariff[] : undefined;
+  const annualTotal = resolveAssistanceTariffAmount(
+    product,
+    tarifs,
+    dateSouscription ?? dateEffet,
+    "montantTtc"
+  );
   if (annualTotal == null) {
     return undefined;
   }
   return roundMoney(annualTotal * resolveAssistanceQuarterCount(dateEffet, dateEcheance) / 4);
 }
 
-function resolveAssistanceTariff(tarifs: ReferenceOption[] | undefined, dateSouscription?: string) {
+function resolveAssistanceTariff(tarifs: AssistanceTariff[] | undefined, dateSouscription?: string) {
   if (!dateSouscription || !tarifs || tarifs.length === 0) {
     return undefined;
   }

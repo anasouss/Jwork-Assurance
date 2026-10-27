@@ -32,6 +32,15 @@ public class TarifProduitAssistanceService {
     }
 
     @Transactional(readOnly = true)
+    public List<TarifProduitAssistance> findActiveTarifs(ProduitAssistance produitAssistance) {
+        if (produitAssistance == null) {
+            return List.of();
+        }
+        return tarifProduitAssistanceRepository
+                .findByProduitAssistanceAndActifTrueOrderByDateDebutDescCreatedAtDesc(produitAssistance);
+    }
+
+    @Transactional(readOnly = true)
     public TarifProduitAssistance resolveTravelTarif(
             ProduitAssistance produitAssistance,
             LocalDate referenceDate,

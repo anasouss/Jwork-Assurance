@@ -11,7 +11,22 @@ describe("assistance pricing preview", () => {
   it("updates the TTC amount from the selected product", () => {
     const product = { id: "5", libelle: "Premium", montantTtc: 329 };
 
-    expect(resolveAssistanceDraftTotal(product, "2026-10-01", "2027-09-30")).toBe(329);
-    expect(resolveAssistanceDraftTotal(product, "2026-10-01", "2026-12-31")).toBe(82.25);
+    expect(resolveAssistanceDraftTotal(product, "2026-10-01", "2026-10-01", "2027-09-30")).toBe(329);
+    expect(resolveAssistanceDraftTotal(product, "2026-10-01", "2026-10-01", "2026-12-31")).toBe(82.25);
+  });
+
+  it("selects the tariff period from the subscription date", () => {
+    const product = {
+      id: "5",
+      libelle: "Premium",
+      montantTtc: 405,
+      tarifs: [
+        { id: "3", libelle: "2026", dateDebut: "2026-01-01", dateFin: "2026-12-31", montantTtc: 405 },
+        { id: "2", libelle: "2025", dateDebut: "2025-01-01", dateFin: "2025-12-31", montantTtc: 399 },
+        { id: "1", libelle: "2024", dateDebut: "2023-01-01", dateFin: "2024-12-31", montantTtc: 329 },
+      ],
+    };
+
+    expect(resolveAssistanceDraftTotal(product, "2024-10-29", "2026-10-29", "2027-10-28")).toBe(329);
   });
 });

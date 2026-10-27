@@ -976,8 +976,14 @@ function assistanceTotalForTarget(
   if (!draft?.enabled) return undefined;
 
   const product = products.find((item) => item.id === draft.produitAssistanceId);
-  const draftTotal = resolveAssistanceDraftTotal(product, draft.dateEffet, draft.dateEcheance);
+  const draftTotal = resolveAssistanceDraftTotal(
+    product,
+    draft.dateSouscription,
+    draft.dateEffet,
+    draft.dateEcheance
+  );
   if (draftTotal != null) return draftTotal;
+  if (Array.isArray(product?.tarifs)) return undefined;
 
   const previewAssistance = preview?.assistances?.[0];
   return String(previewAssistance?.produitAssistanceId ?? "") === String(draft.produitAssistanceId ?? "")

@@ -675,8 +675,9 @@ public class ReleveClientPdfRenderer {
 
         Paragraph issuer = new Paragraph()
                 .setFontColor(BRAND_BLUE)
-                .setTextAlignment(TextAlignment.RIGHT)
-                .setMarginTop(48)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setMargin(0)
+                .setMultipliedLeading(1.15f)
                 .setMarginBottom(0);
         issuer.add(new com.itextpdf.layout.element.Text(
                 value(source.getAgence().getNom()).toUpperCase(Locale.FRENCH))
@@ -688,7 +689,15 @@ public class ReleveClientPdfRenderer {
                 + "le " + LONG_DATE_FORMAT.format(source.getDateEmission()))
                 .setFont(italic)
                 .setFontSize(8f));
-        document.add(issuer);
+        Table issuerBlock = new Table(new float[]{1})
+                .setWidth(UnitValue.createPercentValue(32))
+                .setHorizontalAlignment(HorizontalAlignment.RIGHT)
+                .setMarginTop(48);
+        issuerBlock.addCell(borderless(new Cell())
+                .add(issuer)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setPadding(0));
+        document.add(issuerBlock);
     }
 
     private String amountInWords(BigDecimal value) {

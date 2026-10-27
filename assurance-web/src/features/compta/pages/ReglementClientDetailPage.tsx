@@ -284,7 +284,7 @@ export default function ReglementClientDetailPage() {
                         : ALLOCATION_STATUS_BADGE_VARIANTS[allocation.statut]}
                     >
                       {data.statut === "A_VALIDER"
-                        ? "Réservée"
+                        ? "En attente de validation"
                         : data.statut === "ANNULE"
                           ? "Annulée"
                           : ALLOCATION_STATUS_LABELS[allocation.statut]}

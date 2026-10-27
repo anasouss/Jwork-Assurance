@@ -16,6 +16,8 @@ public class UpsertRegleAffectationQuittanceRequest {
     @NotNull
     private Long tiersCompagnieId;
     @NotNull
+    private Long brancheAssuranceId;
+    @NotNull
     private TypeContrat typeContrat;
     @NotNull
     private ModeAffectationQuittance modeAffectation;

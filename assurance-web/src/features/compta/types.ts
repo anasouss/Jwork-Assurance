@@ -32,6 +32,9 @@ export type Rule = {
   compagnieId: string;
   typeCompagnie: CompanyCounterpartyType;
   compagnie: string;
+  brancheAssuranceId: string;
+  brancheAssuranceCode: string;
+  brancheAssuranceLibelle: string;
   typeContrat: TypeContrat;
   modeAffectation: ModeAffectation;
   modeVentilation: ModeVentilationQuittance;
@@ -66,7 +69,15 @@ export type Rule = {
   actif: boolean;
 };
 
-export type RuleRequest = Omit<Rule, "id" | "compagnie" | "compagnieId" | "typeCompagnie">;
+export type RuleRequest = Omit<
+  Rule,
+  | "id"
+  | "compagnie"
+  | "compagnieId"
+  | "typeCompagnie"
+  | "brancheAssuranceCode"
+  | "brancheAssuranceLibelle"
+>;
 
 export type RulePage = {
   rows: Rule[];

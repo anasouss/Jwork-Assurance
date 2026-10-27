@@ -263,7 +263,7 @@ export default function QuittanceAffectationPage() {
                   <SelectItem value="ALL">Toutes les compagnies</SelectItem>
                   {(companies.data ?? []).map((company) => (
                     <SelectItem key={company.id} value={company.id}>
-                      {company.type === "ASSISTANCE" ? `${company.libelle} (Assistance)` : company.libelle}
+                      {company.libelle}
                     </SelectItem>
                   ))}
                 </SelectContent>

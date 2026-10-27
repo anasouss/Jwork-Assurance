@@ -1224,6 +1224,7 @@ function normalizeRule(rule: Rule): Rule {
     id: String(rule.id),
     tiersCompagnieId: String(rule.tiersCompagnieId),
     compagnieId: String(rule.compagnieId),
+    brancheAssuranceId: String(rule.brancheAssuranceId),
   };
 }
 

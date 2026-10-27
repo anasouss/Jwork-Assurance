@@ -19,6 +19,9 @@ public class RegleAffectationQuittanceResponse {
     private Long compagnieId;
     private TypeTiersCompagnie typeCompagnie;
     private String compagnie;
+    private Long brancheAssuranceId;
+    private String brancheAssuranceCode;
+    private String brancheAssuranceLibelle;
     private TypeContrat typeContrat;
     private ModeAffectationQuittance modeAffectation;
     private ModeVentilationQuittance modeVentilation;

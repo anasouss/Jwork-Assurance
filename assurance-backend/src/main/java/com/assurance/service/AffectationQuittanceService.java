@@ -12,6 +12,7 @@ import com.assurance.dto.response.RegleAffectationQuittanceResponse;
 import com.assurance.dto.response.TiersCompagnieResponse;
 import com.assurance.entity.AffectationQuittanceCompagnie;
 import com.assurance.entity.Agence;
+import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.LigneQuittance;
@@ -34,6 +35,7 @@ import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.LigneQuittanceRepository;
 import com.assurance.repository.QuittanceRepository;
@@ -100,6 +102,7 @@ public class AffectationQuittanceService {
     private final AffectationQuittanceCompagnieRepository affectationRepository;
     private final RegleAffectationQuittanceRepository regleRepository;
     private final AgenceRepository agenceRepository;
+    private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final TiersCompagnieService tiersCompagnieService;
 
     @Transactional(readOnly = true)
@@ -687,10 +690,12 @@ public class AffectationQuittanceService {
     ) {
         Agence agence = requireAgence(agenceId);
         TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
-        validateRule(request, tiers, agenceId, 0L);
+        BrancheAssurance branche = requireActiveBranch(request.getBrancheAssuranceId());
+        validateRule(request, tiers, branche, agenceId, 0L);
         RegleAffectationQuittance entity = new RegleAffectationQuittance();
         entity.setAgence(agence);
         applyTiers(entity, tiers);
+        entity.setBrancheAssurance(branche);
         applyRule(entity, request);
         return toRuleResponse(regleRepository.save(entity));
     }
@@ -711,8 +716,10 @@ public class AffectationQuittanceService {
             );
         }
         TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
-        validateRule(request, tiers, agenceId, ruleId);
+        BrancheAssurance branche = requireActiveBranch(request.getBrancheAssuranceId());
+        validateRule(request, tiers, branche, agenceId, ruleId);
         applyTiers(entity, tiers);
+        entity.setBrancheAssurance(branche);
         applyRule(entity, request);
         return toRuleResponse(regleRepository.save(entity));
     }
@@ -738,6 +745,8 @@ public class AffectationQuittanceService {
                 rule.getAgence().getId(),
                 rule.getTiersCompagnie().getId(),
                 rule.getTypeContrat(),
+                rule.getBrancheAssurance().getId(),
+                rule.getTiersCompagnie().getType() == TypeTiersCompagnie.ASSISTANCE,
                 rule.getDateDebut(),
                 rule.getDateFin() != null ? rule.getDateFin() : OPEN_ENDED_DATE
         ) > 0;
@@ -748,6 +757,7 @@ public class AffectationQuittanceService {
             UpsertRegleAffectationQuittanceRequest request
     ) {
         return !Objects.equals(rule.getTiersCompagnie().getId(), request.getTiersCompagnieId())
+                || !Objects.equals(rule.getBrancheAssurance().getId(), request.getBrancheAssuranceId())
                 || rule.getTypeContrat() != request.getTypeContrat()
                 || rule.getModeAffectation() != request.getModeAffectation()
                 || rule.getModeVentilation() != request.getModeVentilation()
@@ -1722,6 +1732,7 @@ public class AffectationQuittanceService {
     private void validateRule(
             UpsertRegleAffectationQuittanceRequest request,
             TiersCompagnie tiers,
+            BrancheAssurance branche,
             Long agenceId,
             Long excludedId
     ) {
@@ -1754,6 +1765,13 @@ public class AffectationQuittanceService {
             throw new BadRequestException(
                     "La marge sans alerte doit être inférieure ou égale aux marges maximales"
             );
+        }
+        boolean assistanceBranch = "ASSISTANCE".equalsIgnoreCase(branche.getCode());
+        if (tiers.getType() == TypeTiersCompagnie.ASSISTANCE && !assistanceBranch) {
+            throw new BadRequestException("Une compagnie d'assistance doit utiliser la branche Assistance");
+        }
+        if (tiers.getType() == TypeTiersCompagnie.ASSURANCE && assistanceBranch) {
+            throw new BadRequestException("Une compagnie d'assurance ne peut pas utiliser la branche Assistance");
         }
         boolean fleetInsurance = request.getTypeContrat() == TypeContrat.FLOTTE
                 && tiers.getType() == TypeTiersCompagnie.ASSURANCE;
@@ -1803,6 +1821,7 @@ public class AffectationQuittanceService {
         long overlaps = regleRepository.countOverlappingRules(
                 agenceId,
                 request.getTiersCompagnieId(),
+                request.getBrancheAssuranceId(),
                 request.getTypeContrat(),
                 request.getDateDebut(),
                 request.getDateFin() != null ? request.getDateFin() : OPEN_ENDED_DATE,
@@ -1940,6 +1959,9 @@ public class AffectationQuittanceService {
                 .compagnieId(entity.getTiersCompagnie().getSourceId())
                 .typeCompagnie(entity.getTiersCompagnie().getType())
                 .compagnie(entity.getTiersCompagnie().getNom())
+                .brancheAssuranceId(entity.getBrancheAssurance().getId())
+                .brancheAssuranceCode(entity.getBrancheAssurance().getCode())
+                .brancheAssuranceLibelle(entity.getBrancheAssurance().getLibelle())
                 .typeContrat(entity.getTypeContrat())
                 .modeAffectation(entity.getModeAffectation())
                 .modeVentilation(entity.getModeVentilation())
@@ -1987,12 +2009,14 @@ public class AffectationQuittanceService {
         List<RegleAffectationQuittance> rules = regleRepository.findEffectiveRules(
                 agenceId,
                 companyId,
+                resolveRuleBranchId(quittance),
                 quittance.getContrat().getTypeContrat(),
                 effectDate
         );
         if (rules.isEmpty()) {
             throw new BadRequestException(
-                    "Aucune règle d'affectation active ne couvre cette compagnie, ce type de contrat et cette date d'effet"
+                    "Aucune règle d'affectation active ne couvre cette compagnie, cette branche, "
+                            + "ce type de contrat et cette date d'effet"
             );
         }
         if (rules.size() > 1) {
@@ -2013,6 +2037,7 @@ public class AffectationQuittanceService {
         return rules.stream()
                 .filter(RegleAffectationQuittance::getActif)
                 .filter(rule -> rule.getTiersCompagnie().getId().equals(companyId))
+                .filter(rule -> matchesRuleBranch(rule, quittance))
                 .filter(rule -> rule.getTypeContrat() == quittance.getContrat().getTypeContrat())
                 .filter(rule -> !rule.getDateDebut().isAfter(effectDate))
                 .filter(rule -> rule.getDateFin() == null || !rule.getDateFin().isBefore(effectDate))
@@ -2063,6 +2088,18 @@ public class AffectationQuittanceService {
         validateTenant(agenceId);
         return agenceRepository.findById(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+    }
+
+    private BrancheAssurance requireActiveBranch(Long branchId) {
+        if (branchId == null) {
+            throw new BadRequestException("La branche d'assurance est obligatoire");
+        }
+        BrancheAssurance branche = brancheAssuranceRepository.findById(branchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Branche d'assurance", branchId));
+        if (!Boolean.TRUE.equals(branche.getActif())) {
+            throw new BadRequestException("La branche d'assurance sélectionnée est inactive");
+        }
+        return branche;
     }
 
     private TiersCompagnie requireQuittanceTiers(Quittance quittance) {
@@ -2194,6 +2231,28 @@ public class AffectationQuittanceService {
 
     private Long resolveTiersCompagnieId(Quittance quittance) {
         return requireQuittanceTiers(quittance).getId();
+    }
+
+    private Long resolveRuleBranchId(Quittance quittance) {
+        if (resolveTypeCompagnie(quittance) == TypeTiersCompagnie.ASSISTANCE) {
+            return brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")
+                    .filter(branch -> Boolean.TRUE.equals(branch.getActif()))
+                    .map(BrancheAssurance::getId)
+                    .orElseThrow(() -> new BadRequestException("La branche Assistance active est introuvable"));
+        }
+        BrancheAssurance branche = quittance.getContrat().getBrancheAssurance();
+        if (branche == null) {
+            throw new BadRequestException("La branche du contrat est obligatoire pour l'affectation");
+        }
+        return branche.getId();
+    }
+
+    private boolean matchesRuleBranch(RegleAffectationQuittance rule, Quittance quittance) {
+        if (resolveTypeCompagnie(quittance) == TypeTiersCompagnie.ASSISTANCE) {
+            return "ASSISTANCE".equalsIgnoreCase(rule.getBrancheAssurance().getCode());
+        }
+        BrancheAssurance branche = quittance.getContrat().getBrancheAssurance();
+        return branche != null && Objects.equals(rule.getBrancheAssurance().getId(), branche.getId());
     }
 
     private TypeTiersCompagnie resolveTypeCompagnie(Quittance quittance) {

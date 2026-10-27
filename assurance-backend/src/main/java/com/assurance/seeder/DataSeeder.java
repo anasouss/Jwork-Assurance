@@ -420,6 +420,8 @@ public class DataSeeder implements CommandLineRunner {
             List<CompagnieAssurance> compagnies
     ) {
         LocalDate dateDebut = LocalDate.of(2000, 1, 1);
+        BrancheAssurance brancheAutomobile = brancheAssuranceRepository.findByCodeIgnoreCase("AUTOMOBILE")
+                .orElseThrow(() -> new IllegalStateException("Branche AUTOMOBILE introuvable"));
         for (CompagnieAssurance compagnie : compagnies) {
             ModeVentilationQuittance modeVentilation = "ATLANTA_SANAD".equalsIgnoreCase(compagnie.getCode())
                     ? ModeVentilationQuittance.PAR_CATEGORIE
@@ -427,6 +429,7 @@ public class DataSeeder implements CommandLineRunner {
             seedRegleAffectation(buildRegleAffectation(
                     agence,
                     compagnie,
+                    brancheAutomobile,
                     TypeContrat.PARTICULIER,
                     ModeAffectationQuittance.AUTOMATIQUE,
                     modeVentilation,
@@ -440,6 +443,7 @@ public class DataSeeder implements CommandLineRunner {
             seedRegleAffectation(buildRegleAffectation(
                     agence,
                     compagnie,
+                    brancheAutomobile,
                     TypeContrat.CONVENTION,
                     ModeAffectationQuittance.AUTOMATIQUE,
                     modeVentilation,
@@ -453,6 +457,7 @@ public class DataSeeder implements CommandLineRunner {
             seedRegleAffectation(buildRegleAffectation(
                     agence,
                     compagnie,
+                    brancheAutomobile,
                     TypeContrat.FLOTTE,
                     ModeAffectationQuittance.MANUEL_OU_IMPORT,
                     ModeVentilationQuittance.GLOBALE,
@@ -468,9 +473,10 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedRegleAffectation(RegleAffectationQuittance candidate) {
         boolean exists = regleAffectationQuittanceRepository
-                .findByAgenceIdAndTiersCompagnieIdAndTypeContratAndDateDebut(
+                .findByAgenceIdAndTiersCompagnieIdAndBrancheAssuranceIdAndTypeContratAndDateDebut(
                         candidate.getAgence().getId(),
                         candidate.getTiersCompagnie().getId(),
+                        candidate.getBrancheAssurance().getId(),
                         candidate.getTypeContrat(),
                         candidate.getDateDebut()
                 )
@@ -483,6 +489,7 @@ public class DataSeeder implements CommandLineRunner {
     private RegleAffectationQuittance buildRegleAffectation(
             Agence agence,
             CompagnieAssurance compagnie,
+            BrancheAssurance brancheAssurance,
             TypeContrat typeContrat,
             ModeAffectationQuittance modeAffectation,
             ModeVentilationQuittance modeVentilation,
@@ -496,6 +503,7 @@ public class DataSeeder implements CommandLineRunner {
         RegleAffectationQuittance regle = RegleAffectationQuittance.builder()
                 .agence(agence)
                 .tiersCompagnie(tiersCompagnieService.resolveAssurance(compagnie))
+                .brancheAssurance(brancheAssurance)
                 .typeContrat(typeContrat)
                 .modeAffectation(modeAffectation)
                 .modeVentilation(modeVentilation)

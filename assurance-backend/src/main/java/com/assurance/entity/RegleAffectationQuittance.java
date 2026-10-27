@@ -26,6 +26,7 @@ import java.time.LocalDate;
 @Table(name = "regles_affectation_quittance", indexes = {
         @Index(name = "idx_regle_affectation_agence", columnList = "agence_id"),
         @Index(name = "idx_regle_affectation_tiers", columnList = "tiers_compagnie_id"),
+        @Index(name = "idx_regle_affectation_branche", columnList = "branche_assurance_id"),
         @Index(name = "idx_regle_affectation_periode", columnList = "date_debut,date_fin")
 })
 @Getter
@@ -42,6 +43,10 @@ public class RegleAffectationQuittance extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tiers_compagnie_id", nullable = false)
     private TiersCompagnie tiersCompagnie;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "branche_assurance_id", nullable = false)
+    private BrancheAssurance brancheAssurance;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_contrat", nullable = false, length = 30)

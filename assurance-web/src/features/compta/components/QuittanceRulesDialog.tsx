@@ -58,6 +58,7 @@ type Props = {
 
 type RuleForm = {
   tiersCompagnieId: string;
+  brancheAssuranceId: string;
   typeCompagnie?: CompanyCounterpartyType;
   typeContrat: TypeContrat;
   modeVentilation: ModeVentilationQuittance;
@@ -114,6 +115,7 @@ const DEFAULT_EXCEL_MAPPING = {
 
 const EMPTY_FORM: RuleForm = {
   tiersCompagnieId: "",
+  brancheAssuranceId: "",
   typeContrat: "PARTICULIER",
   modeVentilation: "GLOBALE",
   modeCalculCommission: "TAUX_NET",
@@ -146,6 +148,11 @@ export function QuittanceRulesDialog({
     queryFn: () => comptaApi.availableQuittanceCompanies(),
     enabled: open,
   });
+  const branches = useQuery({
+    queryKey: ["referentiel", "branches-assurance"],
+    queryFn: () => comptaApi.insuranceBranches(),
+    enabled: open,
+  });
   const rules = useQuery({
     queryKey: ["compta", "regles-quittances", page, RULES_PAGE_SIZE],
     queryFn: () => comptaApi.rules({ page, size: RULES_PAGE_SIZE }),
@@ -157,10 +164,20 @@ export function QuittanceRulesDialog({
       [...(rules.data?.rows ?? [])].sort(
         (left, right) =>
           left.compagnie.localeCompare(right.compagnie) ||
+          left.brancheAssuranceLibelle.localeCompare(right.brancheAssuranceLibelle) ||
           left.typeContrat.localeCompare(right.typeContrat) ||
           right.dateDebut.localeCompare(left.dateDebut)
       ),
     [rules.data]
+  );
+  const eligibleBranches = useMemo(
+    () =>
+      (branches.data ?? []).filter((branch) =>
+        form.typeCompagnie === "ASSISTANCE"
+          ? branch.code?.toUpperCase() === "ASSISTANCE"
+          : branch.code?.toUpperCase() !== "ASSISTANCE"
+      ),
+    [branches.data, form.typeCompagnie]
   );
   const totalPages = Math.max(1, rules.data?.page.totalPages ?? 1);
   const currentPage = Math.min(rules.data?.page.number ?? page, totalPages - 1);
@@ -196,6 +213,17 @@ export function QuittanceRulesDialog({
       setForm((current) => ({ ...current, typeCompagnie: company.type }));
     }
   }, [companies.data, form.tiersCompagnieId, form.typeCompagnie]);
+
+  useEffect(() => {
+    if (!form.typeCompagnie || !branches.data) return;
+    const currentIsEligible = eligibleBranches.some((branch) => branch.id === form.brancheAssuranceId);
+    if (!currentIsEligible) {
+      const nextBranchId = eligibleBranches.length === 1 ? eligibleBranches[0].id : "";
+      if (form.brancheAssuranceId !== nextBranchId) {
+        setForm((current) => ({ ...current, brancheAssuranceId: nextBranchId }));
+      }
+    }
+  }, [branches.data, eligibleBranches, form.brancheAssuranceId, form.typeCompagnie]);
 
   useEffect(() => {
     const availablePages = rules.data?.page.totalPages;
@@ -297,6 +325,7 @@ export function QuittanceRulesDialog({
                       setForm((current) => ({
                         ...current,
                         tiersCompagnieId: value,
+                        brancheAssuranceId: "",
                         typeCompagnie,
                         tauxCommissionAutomobile: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionAutomobile ?? 0,
                         tauxCommissionEvcat: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionEvcat ?? 0,
@@ -309,8 +338,25 @@ export function QuittanceRulesDialog({
                     <SelectContent>
                       {(companies.data ?? []).map((company) => (
                         <SelectItem key={company.id} value={company.id}>
-                          {company.type === "ASSISTANCE" ? `${company.libelle} (Assistance)` : company.libelle}
+                          {company.libelle}
                         </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Branche" required>
+                  <Select
+                    value={form.brancheAssuranceId}
+                    onValueChange={(value) => setForm((current) => ({
+                      ...current,
+                      brancheAssuranceId: value,
+                    }))}
+                    disabled={!form.typeCompagnie || branches.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                    <SelectContent>
+                      {eligibleBranches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -626,6 +672,7 @@ export function QuittanceRulesDialog({
               <thead className="bg-muted/60 text-left text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2">Compagnie</th>
+                  <th className="px-3 py-2">Branche</th>
                   <th className="px-3 py-2">Contrat</th>
                   <th className="px-3 py-2">Affectation</th>
                   <th className="px-3 py-2">Ventilation</th>
@@ -643,13 +690,14 @@ export function QuittanceRulesDialog({
                 {rules.isLoading ? (
                   Array.from({ length: 3 }).map((_, index) => (
                     <tr key={index} className="border-t">
-                      <td colSpan={12} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
+                      <td colSpan={13} className="px-3 py-3"><Skeleton className="h-8 w-full" /></td>
                     </tr>
                   ))
                 ) : sortedRules.length ? (
                   sortedRules.map((rule) => (
                     <tr key={rule.id} className="border-t">
                       <td className="px-3 py-3 font-medium">{rule.compagnie}</td>
+                      <td className="px-3 py-3">{rule.brancheAssuranceLibelle}</td>
                       <td className="px-3 py-3">{contractLabel(rule.typeContrat)}</td>
                       <td className="px-3 py-3">
                         {rule.modeAffectation === "AUTOMATIQUE" ? "Automatique" : "Manuel / import"}
@@ -687,7 +735,7 @@ export function QuittanceRulesDialog({
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan={12} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
+                  <tr><td colSpan={13} className="px-3 py-10 text-center text-muted-foreground">Aucune règle configurée.</td></tr>
                 )}
               </tbody>
             </table>
@@ -882,6 +930,7 @@ function isComplete(form: RuleForm) {
     );
   return Boolean(
     form.tiersCompagnieId &&
+      form.brancheAssuranceId &&
       form.typeCompagnie &&
       form.dateDebut &&
       commissionComplete &&
@@ -902,6 +951,7 @@ function isComplete(form: RuleForm) {
 function ruleToForm(rule: Rule): RuleForm {
   return {
     tiersCompagnieId: rule.tiersCompagnieId,
+    brancheAssuranceId: rule.brancheAssuranceId,
     typeCompagnie: rule.typeCompagnie,
     typeContrat: rule.typeContrat,
     modeVentilation: isFleetInsuranceRule(rule) ? "GLOBALE" : rule.modeVentilation ?? "GLOBALE",
@@ -944,6 +994,7 @@ function toRequest(form: RuleForm): RuleRequest {
   const isFleet = usesFleetImport(form);
   return {
     tiersCompagnieId: form.tiersCompagnieId,
+    brancheAssuranceId: form.brancheAssuranceId,
     typeContrat: form.typeContrat,
     modeAffectation: isFleet ? "MANUEL_OU_IMPORT" : "AUTOMATIQUE",
     modeVentilation: isFleet ? "GLOBALE" : form.modeVentilation,

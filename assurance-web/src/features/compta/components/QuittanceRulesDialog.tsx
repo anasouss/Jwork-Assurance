@@ -170,14 +170,18 @@ export function QuittanceRulesDialog({
       ),
     [rules.data]
   );
-  const eligibleBranches = useMemo(
-    () =>
-      (branches.data ?? []).filter((branch) =>
-        form.typeCompagnie === "ASSISTANCE"
-          ? branch.code?.toUpperCase() === "ASSISTANCE"
-          : branch.code?.toUpperCase() !== "ASSISTANCE"
-      ),
-    [branches.data, form.typeCompagnie]
+  const selectedBranch = useMemo(
+    () => (branches.data ?? []).find((branch) => branch.id === form.brancheAssuranceId),
+    [branches.data, form.brancheAssuranceId]
+  );
+  const selectedBranchCompanyType: CompanyCounterpartyType | undefined = selectedBranch
+    ? selectedBranch.code?.toUpperCase() === "ASSISTANCE" ? "ASSISTANCE" : "ASSURANCE"
+    : undefined;
+  const eligibleCompanies = useMemo(
+    () => selectedBranchCompanyType
+      ? (companies.data ?? []).filter((company) => company.type === selectedBranchCompanyType)
+      : [],
+    [companies.data, selectedBranchCompanyType]
   );
   const totalPages = Math.max(1, rules.data?.page.totalPages ?? 1);
   const currentPage = Math.min(rules.data?.page.number ?? page, totalPages - 1);
@@ -213,17 +217,6 @@ export function QuittanceRulesDialog({
       setForm((current) => ({ ...current, typeCompagnie: company.type }));
     }
   }, [companies.data, form.tiersCompagnieId, form.typeCompagnie]);
-
-  useEffect(() => {
-    if (!form.typeCompagnie || !branches.data) return;
-    const currentIsEligible = eligibleBranches.some((branch) => branch.id === form.brancheAssuranceId);
-    if (!currentIsEligible) {
-      const nextBranchId = eligibleBranches.length === 1 ? eligibleBranches[0].id : "";
-      if (form.brancheAssuranceId !== nextBranchId) {
-        setForm((current) => ({ ...current, brancheAssuranceId: nextBranchId }));
-      }
-    }
-  }, [branches.data, eligibleBranches, form.brancheAssuranceId, form.typeCompagnie]);
 
   useEffect(() => {
     const availablePages = rules.data?.page.totalPages;
@@ -317,6 +310,37 @@ export function QuittanceRulesDialog({
                 </p>
               ) : null}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <Field label="Branche" required>
+                  <Select
+                    value={form.brancheAssuranceId}
+                    onValueChange={(value) => {
+                      const branch = branches.data?.find((item) => item.id === value);
+                      const typeCompagnie: CompanyCounterpartyType = branch?.code?.toUpperCase() === "ASSISTANCE"
+                        ? "ASSISTANCE"
+                        : "ASSURANCE";
+                      setForm((current) => ({
+                        ...current,
+                        brancheAssuranceId: value,
+                        tiersCompagnieId: companies.data?.some(
+                          (company) => company.id === current.tiersCompagnieId && company.type === typeCompagnie
+                        ) ? current.tiersCompagnieId : "",
+                        typeCompagnie,
+                        tauxCommissionAutomobile: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionAutomobile ?? 0,
+                        tauxCommissionEvcat: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionEvcat ?? 0,
+                        tauxCommissionCorporel: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionCorporel ?? 0,
+                        tauxCommissionAssistance: typeCompagnie === "ASSURANCE" ? 0 : current.tauxCommissionAssistance ?? 0,
+                      }));
+                    }}
+                    disabled={branches.isLoading}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                    <SelectContent>
+                      {(branches.data ?? []).map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <Field label="Compagnie" required>
                   <Select
                     value={form.tiersCompagnieId}
@@ -325,38 +349,19 @@ export function QuittanceRulesDialog({
                       setForm((current) => ({
                         ...current,
                         tiersCompagnieId: value,
-                        brancheAssuranceId: "",
                         typeCompagnie,
-                        tauxCommissionAutomobile: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionAutomobile ?? 0,
-                        tauxCommissionEvcat: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionEvcat ?? 0,
-                        tauxCommissionCorporel: typeCompagnie === "ASSISTANCE" ? 0 : current.tauxCommissionCorporel ?? 0,
-                        tauxCommissionAssistance: typeCompagnie === "ASSURANCE" ? 0 : current.tauxCommissionAssistance ?? 0,
                       }));
                     }}
+                    disabled={!form.brancheAssuranceId || companies.isLoading}
                   >
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder={form.brancheAssuranceId ? "Choisir" : "Choisir d'abord une branche"} />
+                    </SelectTrigger>
                     <SelectContent>
-                      {(companies.data ?? []).map((company) => (
+                      {eligibleCompanies.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.libelle}
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Branche" required>
-                  <Select
-                    value={form.brancheAssuranceId}
-                    onValueChange={(value) => setForm((current) => ({
-                      ...current,
-                      brancheAssuranceId: value,
-                    }))}
-                    disabled={!form.typeCompagnie || branches.isLoading}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                    <SelectContent>
-                      {eligibleBranches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>{branch.libelle}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

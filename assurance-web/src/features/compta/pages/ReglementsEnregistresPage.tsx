@@ -1080,10 +1080,9 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
         Moyens du règlement {payment.numero}
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 text-left">Payeur</th>
               <th className="px-3 py-2 text-left">Moyen</th>
               <th className="px-3 py-2 text-left">Référence</th>
               <th className="px-3 py-2 text-left">Date de valeur</th>
@@ -1094,7 +1093,6 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
           <tbody className="divide-y">
             {payment.instruments.map((instrument) => (
               <tr key={instrument.id}>
-                <td className="px-3 py-2">{instrumentPayerLabel(payment, instrument)}</td>
                 <td className="px-3 py-2">{MODE_LABELS[instrument.mode]}</td>
                 <td className="px-3 py-2 font-medium">{instrument.referenceInstrument || "-"}</td>
                 <td className="px-3 py-2">{formatDate(instrument.dateEcheance)}</td>
@@ -1168,16 +1166,6 @@ function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
 
 function formatDate(value?: string | null) {
   return value ? value.split("-").reverse().join("/") : "-";
-}
-
-function instrumentPayerLabel(payment: ClientPayment, instrument: PaymentInstrument) {
-  if (!payment.multiPayeur) return payment.payeurNom;
-  const names = Array.from(new Set(
-    instrument.affectations
-      .map((allocation) => allocation.payeurNom?.trim())
-      .filter((name): name is string => Boolean(name))
-  ));
-  return names.length > 0 ? names.join(", ") : payment.payeurNom;
 }
 
 function PaymentSortHeader(props: {

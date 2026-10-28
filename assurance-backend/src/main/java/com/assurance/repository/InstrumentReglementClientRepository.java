@@ -50,7 +50,14 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             Long agenceId
     );
 
-    @EntityGraph(attributePaths = {"reglement", "reglement.creePar"})
+    @EntityGraph(attributePaths = {
+            "reglement",
+            "reglement.creePar",
+            "affectations",
+            "affectations.elementFacturable",
+            "affectations.elementFacturable.contrat",
+            "affectations.documentClient"
+    })
     @Query("""
             select instrument
             from InstrumentReglementClient instrument

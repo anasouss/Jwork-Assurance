@@ -57,7 +57,7 @@ export function ClientPaymentsWorkspaceHeader({
             <SelectContent>
               <SelectItem value="receivables">Primes à encaisser</SelectItem>
               <SelectItem value="saved">Règlements enregistrés</SelectItem>
-              <SelectItem value="journal">Journal des règlements</SelectItem>
+              <SelectItem value="journal">État d’encaissement journalier</SelectItem>
             </SelectContent>
           </Select>
         </div> : null}

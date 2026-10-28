@@ -376,7 +376,7 @@ export default function ReglementsEnregistresPage() {
 
   async function previewJournal() {
     if (!journalDateFrom || !journalDateTo) {
-      toast.error("Renseignez la période du journal");
+      toast.error("Renseignez la période de l’état d’encaissement");
       return;
     }
     if (journalDateFrom > journalDateTo) {
@@ -412,9 +412,9 @@ export default function ReglementsEnregistresPage() {
   return (
     <div className="grid gap-5">
       <ClientPaymentsWorkspaceHeader
-        title={journalView ? "Journal des règlements" : "Règlements enregistrés"}
+        title={journalView ? "État d’encaissement journalier" : "Règlements enregistrés"}
         description={journalView
-          ? "Générez le journal PDF selon la période, l’utilisateur, le moyen et le statut."
+          ? "Générez l’état PDF selon la période, l’utilisateur, le moyen et le statut."
           : "Recherchez les règlements et suivez chaque moyen de paiement jusqu’à son dénouement."}
         canCreate={canCreate}
       />
@@ -605,7 +605,7 @@ export default function ReglementsEnregistresPage() {
       {journalView ? (
         <section className="grid gap-4 rounded-md border bg-card p-4">
           <div>
-            <h2 className="font-semibold">Paramètres du journal</h2>
+            <h2 className="font-semibold">Paramètres de l’état</h2>
             <p className="text-sm text-muted-foreground">
               Le PDF reprend uniquement les règlements correspondant aux critères ci-dessous.
             </p>
@@ -678,7 +678,7 @@ export default function ReglementsEnregistresPage() {
               onClick={() => void previewJournal()}
             >
               <Printer className="size-4" />
-              {journalLoading ? "Génération..." : "Imprimer le journal PDF"}
+              {journalLoading ? "Génération..." : "Imprimer l’état PDF"}
             </Button>
           </div>
         </section>

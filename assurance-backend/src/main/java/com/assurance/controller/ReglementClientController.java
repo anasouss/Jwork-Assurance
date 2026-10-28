@@ -227,7 +227,7 @@ public class ReglementClientController {
                 mode,
                 statut
         );
-        String filename = "journal-reglements-" + dateDu + "-" + dateAu + ".pdf";
+        String filename = "etat-encaissement-journalier-" + dateDu + "-" + dateAu + ".pdf";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=" + filename)
                 .contentType(MediaType.APPLICATION_PDF)

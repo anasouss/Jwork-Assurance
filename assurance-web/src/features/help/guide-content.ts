@@ -1059,7 +1059,7 @@ export const guideModules: GuideModule[] = [
         permissions: ["reglement-client:view", "reglement-client:create", "reglement-client:manage"],
         prerequisites: ["Les éléments sélectionnés doivent avoir un payeur, une agence et une devise compatibles."],
         steps: [
-          { title: "Choisir la vue", description: "Dans Vue, choisissez Primes à encaisser, Règlements enregistrés ou Journal des règlements. La vue choisie détermine les filtres et le tableau affichés." },
+          { title: "Choisir la vue", description: "Dans Vue, choisissez Primes à encaisser, Règlements enregistrés ou État d’encaissement journalier. La vue choisie détermine les filtres et le tableau affichés." },
           { title: "Choisir la cible", description: "Sélectionnez Client ou Groupe puis recherchez le payeur." },
           { title: "Sélectionner les créances", description: "Cochez les éléments à encaisser et cliquez sur Encaisser." },
           { title: "Ouvrir un versement multi-clients", description: "Cliquez sur Nouveau versement multi-clients. Cette commande ouvre un parcours séparé; aucun règlement n’est créé à cette étape." },
@@ -1091,15 +1091,15 @@ export const guideModules: GuideModule[] = [
           { title: "Ouvrir la vue", description: "Dans Vue, choisissez Règlements enregistrés. Le tableau reste vide tant qu’aucun critère de recherche n’a été appliqué." },
           { title: "Rechercher", description: "Renseignez au moins un critère parmi le payeur, le déposant, le numéro ou la référence, la période, le moyen de paiement et l’état du moyen, puis cliquez sur Rechercher." },
           { title: "Ouvrir", description: "Consultez le détail pour vérifier payeur, montant, instruments, affectations et historique." },
-          { title: "Imprimer", description: "Utilisez les actions PDF pour le reçu ou le journal; autorisez les fenêtres contextuelles et renseignez la période du journal." },
-          { title: "Générer le journal", description: "Dans Vue, choisissez Journal des règlements, renseignez la période et les filtres puis cliquez sur Imprimer le journal PDF." },
+          { title: "Imprimer", description: "Utilisez les actions PDF pour le reçu ou l’état d’encaissement; autorisez les fenêtres contextuelles et renseignez sa période." },
+          { title: "Générer l’état", description: "Dans Vue, choisissez État d’encaissement journalier, renseignez la période et les filtres puis cliquez sur Imprimer l’état PDF." },
           { title: "Créer une facture", description: "Depuis un règlement éligible, utilisez l’action de facturation; les affectations sont transférées sans créer un double paiement." },
           { title: "Annuler ou remplacer", description: "Utilisez Annuler lorsque le cycle l’autorise, ou Remplacer l’instrument selon le moyen et son état. Confirmez toujours le motif demandé." },
         ],
         warnings: ["L’enregistrement déclenche immédiatement les conséquences de trésorerie propres au moyen de paiement."],
         errors: [
           { message: "Autorisez les fenêtres contextuelles", resolution: "Autorisez les pop-ups du site pour ouvrir les PDF." },
-          { message: "Renseignez la période du journal", resolution: "Complétez les deux dates et vérifiez que la date de début précède la date de fin." },
+          { message: "Renseignez la période de l’état d’encaissement", resolution: "Complétez les deux dates et vérifiez que la date de début précède la date de fin." },
         ],
       },
       {

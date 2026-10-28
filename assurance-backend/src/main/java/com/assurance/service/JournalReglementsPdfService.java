@@ -1,15 +1,22 @@
 package com.assurance.service;
 
 import com.assurance.entity.Agence;
+import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.ContratClient;
+import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.ReglementClient;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
+import com.assurance.repository.AssistanceContratRepository;
+import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.UtilisateurRepository;
 import com.itextpdf.io.font.constants.StandardFonts;
@@ -48,12 +55,17 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -72,6 +84,8 @@ public class JournalReglementsPdfService {
     private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final InstrumentReglementClientRepository instrumentRepository;
+    private final AssistanceContratRepository assistanceContratRepository;
+    private final ContratClientRepository contratClientRepository;
     private final AgenceRepository agenceRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final AgencyLogoStorageService agencyLogoStorageService;
@@ -97,6 +111,8 @@ public class JournalReglementsPdfService {
                 mode == null ? List.of(ModeReglementClient.values()) : List.of(mode),
                 statutReglement
         );
+        Map<Long, String> assistancePolicyNumbers = assistancePolicyNumbers(instruments);
+        Map<Long, String> insuredNamesByContract = insuredNamesByContract(instruments);
 
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
@@ -116,25 +132,33 @@ public class JournalReglementsPdfService {
             writeFilters(document, dateDu, dateAu, selectedUser, mode, statutReglement, regular, bold);
             writeOverview(document, instruments, regular, bold);
             writeModeSummary(document, instruments, regular, bold);
-            writeDetails(document, instruments, selectedUser == null, regular, bold);
+            writeDetails(
+                    document,
+                    instruments,
+                    assistancePolicyNumbers,
+                    insuredNamesByContract,
+                    selectedUser == null,
+                    regular,
+                    bold
+            );
 
             document.close();
             return output.toByteArray();
         } catch (Exception exception) {
-            log.error("Failed to generate payment journal PDF for agency {}", agenceId, exception);
-            throw new BadRequestException("La génération du journal des règlements a échoué");
+            log.error("Failed to generate daily collection statement PDF for agency {}", agenceId, exception);
+            throw new BadRequestException("La génération de l'état d'encaissement a échoué");
         }
     }
 
     private void validatePeriod(LocalDate dateDu, LocalDate dateAu) {
         if (dateDu == null || dateAu == null) {
-            throw new BadRequestException("La période du journal est obligatoire");
+            throw new BadRequestException("La période de l'état d'encaissement est obligatoire");
         }
         if (dateDu.isAfter(dateAu)) {
             throw new BadRequestException("La date de début doit précéder la date de fin");
         }
         if (ChronoUnit.DAYS.between(dateDu, dateAu) > 366) {
-            throw new BadRequestException("La période du journal ne peut pas dépasser 366 jours");
+            throw new BadRequestException("La période de l'état d'encaissement ne peut pas dépasser 366 jours");
         }
     }
 
@@ -177,7 +201,7 @@ public class JournalReglementsPdfService {
                 : DATE_FORMAT.format(dateDu) + " au " + DATE_FORMAT.format(dateAu);
         Cell title = cell().setTextAlignment(TextAlignment.RIGHT)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE);
-        title.add(new Paragraph("JOURNAL DES RÈGLEMENTS CLIENTS")
+        title.add(new Paragraph("ÉTAT D’ENCAISSEMENT JOURNALIER")
                 .setFont(bold).setFontSize(15).setMargin(0));
         title.add(new Paragraph("Période de saisie : " + period)
                 .setFont(regular).setFontSize(9).setFontColor(MUTED)
@@ -295,18 +319,21 @@ public class JournalReglementsPdfService {
     private void writeDetails(
             Document document,
             List<InstrumentReglementClient> instruments,
+            Map<Long, String> assistancePolicyNumbers,
+            Map<Long, String> insuredNamesByContract,
             boolean showUser,
             PdfFont regular,
             PdfFont bold
     ) {
         document.add(sectionTitle("Détail des règlements", bold));
         float[] columns = showUser
-                ? new float[]{1.05f, 1.65f, 0.85f, 1.35f, 0.8f, 1.05f, 0.85f, 1.1f, 0.85f}
-                : new float[]{1.05f, 1.8f, 0.9f, 0.85f, 1.1f, 0.9f, 1.15f, 0.9f};
+                ? new float[]{1.05f, 1.45f, 1.05f, 0.85f, 1.25f, 0.8f, 1.05f, 0.85f, 1.05f, 0.85f}
+                : new float[]{1.05f, 1.55f, 1.1f, 0.9f, 0.85f, 1.1f, 0.9f, 1.1f, 0.9f};
         Table table = new Table(columns)
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N° RÈGLEMENT", bold, TextAlignment.LEFT);
-        addHeader(table, "PAYEUR", bold, TextAlignment.LEFT);
+        addHeader(table, "ASSURÉ", bold, TextAlignment.LEFT);
+        addHeader(table, "N° POLICE", bold, TextAlignment.LEFT);
         addHeader(table, "DATE RÈGLEMENT", bold, TextAlignment.CENTER);
         if (showUser) {
             addHeader(table, "UTILISATEUR", bold, TextAlignment.LEFT);
@@ -322,10 +349,10 @@ public class JournalReglementsPdfService {
             ReglementClient payment = instrument.getReglement();
             DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
             addBody(table, payment.getNumero(), bold, TextAlignment.LEFT, background);
-            String payer = Boolean.TRUE.equals(payment.getMultiPayeur())
-                    ? payment.getPayeurNom() + "\nDéposant : " + payment.getDeposantNom()
-                    : payment.getPayeurNom();
-            addBody(table, payer, regular, TextAlignment.LEFT, background);
+            addBody(table, insuredNames(instrument, insuredNamesByContract), regular,
+                    TextAlignment.LEFT, background);
+            addBody(table, policyNumbers(instrument, assistancePolicyNumbers), regular,
+                    TextAlignment.LEFT, background);
             addBody(table, date(payment.getDateReglement()), regular, TextAlignment.CENTER, background);
             if (showUser) {
                 addBody(table, payment.getCreePar() == null ? "-" : payment.getCreePar().getFullName(), regular,
@@ -340,7 +367,7 @@ public class JournalReglementsPdfService {
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         if (instruments.isEmpty()) {
-            table.addCell(new Cell(1, showUser ? 9 : 8)
+            table.addCell(new Cell(1, showUser ? 10 : 9)
                     .add(new Paragraph("Aucun règlement pour les critères sélectionnés")
                             .setFont(regular).setFontSize(8).setMargin(0))
                     .setTextAlignment(TextAlignment.CENTER)
@@ -351,6 +378,122 @@ public class JournalReglementsPdfService {
         document.add(new Paragraph(
                 "Les chèques et effets en attente ou remis en banque sont enregistrés, mais ne sont pas encore définitivement encaissés."
         ).setFont(regular).setFontSize(7.5f).setFontColor(MUTED).setMarginTop(8).setMarginBottom(0));
+    }
+
+    private Map<Long, String> assistancePolicyNumbers(List<InstrumentReglementClient> instruments) {
+        Set<Long> elementIds = instruments.stream()
+                .flatMap(this::billableElements)
+                .map(ElementFacturable::getId)
+                .collect(Collectors.toSet());
+        if (elementIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> result = new HashMap<>();
+        for (AssistanceContrat assistance : assistanceContratRepository
+                .findByElementFacturableIds(elementIds)) {
+            String number = firstNonBlank(
+                    assistance.getNumeroPoliceContrat(),
+                    assistance.getNumeroContratOuQuittance()
+            );
+            if (number != null) {
+                result.put(assistance.getElementFacturable().getId(), number);
+            }
+        }
+        return result;
+    }
+
+    private Map<Long, String> insuredNamesByContract(List<InstrumentReglementClient> instruments) {
+        Set<Long> contractIds = instruments.stream()
+                .flatMap(this::billableElements)
+                .map(element -> element.getContrat().getId())
+                .collect(Collectors.toSet());
+        if (contractIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<ContratClient>> linksByContract = contratClientRepository
+                .findByContratIdInAndRole(contractIds, RoleClientContrat.SOUSCRIPTEUR)
+                .stream()
+                .collect(Collectors.groupingBy(link -> link.getContrat().getId()));
+        Map<Long, String> result = new HashMap<>();
+        linksByContract.forEach((contractId, links) -> links.stream()
+                .sorted(Comparator.comparing(link -> !Boolean.TRUE.equals(link.getPrincipalPourRole())))
+                .findFirst()
+                .ifPresent(link -> result.put(contractId, link.getClient().getNomAffichage())));
+        return result;
+    }
+
+    private String insuredNames(
+            InstrumentReglementClient instrument,
+            Map<Long, String> insuredNamesByContract
+    ) {
+        Set<String> names = billableElements(instrument)
+                .map(element -> insuredNamesByContract.get(element.getContrat().getId()))
+                .filter(name -> name != null && !name.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (names.isEmpty()) {
+            names.addAll(instrument.getAffectations().stream()
+                    .map(allocation -> allocation.getPayeurNomSnapshot())
+                    .filter(name -> name != null && !name.isBlank())
+                    .collect(Collectors.toCollection(LinkedHashSet::new)));
+        }
+        return names.isEmpty() ? value(instrument.getReglement().getPayeurNom()) : String.join("\n", names);
+    }
+
+    private String policyNumbers(
+            InstrumentReglementClient instrument,
+            Map<Long, String> assistancePolicyNumbers
+    ) {
+        Stream<String> directNumbers = instrument.getAffectations().stream()
+                .filter(allocation -> allocation.getElementFacturable() != null)
+                .map(allocation -> policyNumber(
+                        allocation.getElementFacturable(),
+                        assistancePolicyNumbers
+                ));
+        Stream<String> documentNumbers = instrument.getAffectations().stream()
+                .filter(allocation -> allocation.getDocumentClient() != null)
+                .flatMap(allocation -> allocation.getDocumentClient().getLignes().stream())
+                .map(line -> firstNonBlank(
+                        line.getNumeroPolice(),
+                        policyNumber(line.getElementFacturable(), assistancePolicyNumbers)
+                ));
+        Set<String> numbers = Stream.concat(directNumbers, documentNumbers)
+                .filter(number -> number != null && !number.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return numbers.isEmpty() ? "-" : String.join("\n", numbers);
+    }
+
+    private String policyNumber(
+            ElementFacturable element,
+            Map<Long, String> assistancePolicyNumbers
+    ) {
+        String assistanceNumber = assistancePolicyNumbers.get(element.getId());
+        if (assistanceNumber != null) {
+            return assistanceNumber;
+        }
+        return firstNonBlank(
+                element.getContrat().getNumeroPolice(),
+                element.getContrat().getNumeroContrat()
+        );
+    }
+
+    private Stream<ElementFacturable> billableElements(InstrumentReglementClient instrument) {
+        return instrument.getAffectations().stream().flatMap(allocation -> {
+            if (allocation.getElementFacturable() != null) {
+                return Stream.of(allocation.getElementFacturable());
+            }
+            if (allocation.getDocumentClient() != null) {
+                return allocation.getDocumentClient().getLignes().stream()
+                        .map(LigneDocumentClient::getElementFacturable);
+            }
+            return Stream.empty();
+        }).distinct();
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second == null || second.isBlank() ? null : second;
     }
 
     private void writeFooter(
@@ -366,7 +509,7 @@ public class JournalReglementsPdfService {
                 .moveTo(PAGE_MARGIN, 34).lineTo(pageSize.getWidth() - PAGE_MARGIN, 34).stroke();
         Canvas footer = new Canvas(canvas, pdf, new Rectangle(
                 PAGE_MARGIN, 12, pageSize.getWidth() - PAGE_MARGIN * 2, 16));
-        footer.add(new Paragraph(agencyLine(agency) + " · Journal des règlements · Page "
+        footer.add(new Paragraph(agencyLine(agency) + " · État d’encaissement journalier · Page "
                         + pdf.getPageNumber(page))
                 .setFont(regular).setFontSize(6.8f).setFontColor(MUTED)
                 .setTextAlignment(TextAlignment.CENTER).setMargin(0));

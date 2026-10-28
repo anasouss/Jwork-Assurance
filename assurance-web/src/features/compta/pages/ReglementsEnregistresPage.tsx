@@ -164,7 +164,8 @@ export default function ReglementsEnregistresPage() {
   const [journalLoading, setJournalLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
-  const [instrumentToRemit, setInstrumentToRemit] = useState<PaymentInstrument>();
+  const [replacementCandidates, setReplacementCandidates] = useState<PaymentInstrument[]>([]);
+  const [instrumentsToRemit, setInstrumentsToRemit] = useState<PaymentInstrument[]>([]);
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
   const [replacementReason, setReplacementReason] = useState("");
   const replacementTargetId = searchParams.get("remplacer");
@@ -204,6 +205,7 @@ export default function ReglementsEnregistresPage() {
       .find((instrument) => instrument.id === replacementTargetId
         && instrument.statut === "REJETE");
     if (!target) return;
+    setReplacementCandidates([target]);
     setInstrumentToReplace(target);
     setReplacement(newReplacement());
     setReplacementReason("");
@@ -282,6 +284,7 @@ export default function ReglementsEnregistresPage() {
 
   function closeReplacement() {
     setInstrumentToReplace(undefined);
+    setReplacementCandidates([]);
     setReplacement(newReplacement());
     setReplacementReason("");
   }
@@ -548,12 +551,13 @@ export default function ReglementsEnregistresPage() {
                         onPreview={() => void previewPayment(payment)}
                         onInvoice={() => setPaymentToInvoice(payment)}
                         onCancel={() => setPaymentToCancel(payment)}
-                        onReplace={(instrument) => {
-                          setInstrumentToReplace(instrument);
+                        onReplace={(instruments) => {
+                          setReplacementCandidates(instruments);
+                          setInstrumentToReplace(instruments[0]);
                           setReplacement(newReplacement());
                           setReplacementReason("");
                         }}
-                        onAddToRemittance={setInstrumentToRemit}
+                        onAddToRemittance={setInstrumentsToRemit}
                       />
                     </div>
                   </td>
@@ -595,9 +599,9 @@ export default function ReglementsEnregistresPage() {
       </section>
 
       <AddInstrumentToRemittanceDialog
-        instrument={instrumentToRemit}
-        open={Boolean(instrumentToRemit)}
-        onOpenChange={(open) => !open && setInstrumentToRemit(undefined)}
+        instruments={instrumentsToRemit}
+        open={instrumentsToRemit.length > 0}
+        onOpenChange={(open) => !open && setInstrumentsToRemit([])}
       />
 
       </> : null}
@@ -778,6 +782,29 @@ export default function ReglementsEnregistresPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
+            {replacementCandidates.length > 1 && (
+              <div className="grid gap-2 sm:col-span-2">
+                <Label>Moyen à remplacer</Label>
+                <Select
+                  value={instrumentToReplace?.id}
+                  onValueChange={(value) => {
+                    setInstrumentToReplace(replacementCandidates.find((candidate) => candidate.id === value));
+                    setReplacement(newReplacement());
+                    setReplacementReason("");
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                  <SelectContent>
+                    {replacementCandidates.map((candidate) => (
+                      <SelectItem key={candidate.id} value={candidate.id}>
+                        {MODE_LABELS[candidate.mode]} {candidate.referenceInstrument || "sans référence"}
+                        {" · "}{formatAccountingAmount(candidate.montant)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid gap-2">
               <Label>Mode</Label>
               <Select
@@ -941,8 +968,8 @@ function PaymentActionsMenu({
   onPreview: () => void;
   onInvoice: () => void;
   onCancel: () => void;
-  onReplace: (instrument: PaymentInstrument) => void;
-  onAddToRemittance: (instrument: PaymentInstrument) => void;
+  onReplace: (instruments: PaymentInstrument[]) => void;
+  onAddToRemittance: (instruments: PaymentInstrument[]) => void;
 }) {
   const replaceableInstruments = canManage && payment.statut === "VALIDE" && !payment.multiPayeur
     ? payment.instruments.filter((instrument) => (instrument.statut === "REJETE"
@@ -959,6 +986,9 @@ function PaymentActionsMenu({
       && !instrument.bordereauRemiseId
       && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET"))
     : [];
+  const remittableGroups = (["CHEQUE", "EFFET"] as const)
+    .map((mode) => remittableInstruments.filter((instrument) => instrument.mode === mode))
+    .filter((instruments) => instruments.length > 0);
   const canCancelPayment = payment.statut !== "ANNULE" && canManage;
 
   return (
@@ -991,28 +1021,28 @@ function PaymentActionsMenu({
             Créer la facture
           </DropdownMenuItem>
         )}
-        {remittableInstruments.length > 0 && <DropdownMenuSeparator />}
-        {remittableInstruments.map((instrument) => (
+        {remittableGroups.length > 0 && <DropdownMenuSeparator />}
+        {remittableGroups.map((instruments) => (
           <DropdownMenuItem
-            key={instrument.id}
-            onSelect={() => onAddToRemittance(instrument)}
+            key={instruments[0].mode}
+            onSelect={() => onAddToRemittance(instruments)}
           >
             <Landmark className="size-4 text-blue-600 dark:text-blue-400" />
-            Ajouter {MODE_LABELS[instrument.mode].toLowerCase()}
-            {instrument.referenceInstrument ? ` ${instrument.referenceInstrument}` : ""} au bordereau
+            Ajouter {instruments.length > 1 ? `${instruments.length} ` : ""}
+            {instruments[0].mode === "CHEQUE"
+              ? `chèque${instruments.length > 1 ? "s" : ""}`
+              : `effet${instruments.length > 1 ? "s" : ""}`} au bordereau
           </DropdownMenuItem>
         ))}
         {canReplaceInstrument && <DropdownMenuSeparator />}
-        {replaceableInstruments.map((instrument) => (
-          <DropdownMenuItem
-            key={instrument.id}
-            onSelect={() => onReplace(instrument)}
-          >
+        {canReplaceInstrument && (
+          <DropdownMenuItem onSelect={() => onReplace(replaceableInstruments)}>
             <RotateCcw className="size-4 text-amber-600 dark:text-amber-400" />
-            Remplacer {MODE_LABELS[instrument.mode].toLowerCase()}
-            {instrument.referenceInstrument ? ` ${instrument.referenceInstrument}` : ""}
+            Remplacer {replaceableInstruments.length > 1
+              ? `un moyen de paiement (${replaceableInstruments.length})`
+              : `${MODE_LABELS[replaceableInstruments[0].mode].toLowerCase()} ${replaceableInstruments[0].referenceInstrument || ""}`}
           </DropdownMenuItem>
-        ))}
+        )}
         {canCancelPayment && <DropdownMenuSeparator />}
         {canCancelPayment && (
           <DropdownMenuItem variant="destructive" onSelect={onCancel}>

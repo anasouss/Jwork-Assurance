@@ -1088,8 +1088,8 @@ export const guideModules: GuideModule[] = [
         route: "/app/compta/reglements/historique",
         permissions: ["reglement-client:view", "reglement-client:manage"],
         steps: [
-          { title: "Ouvrir la vue", description: "Dans Vue, choisissez Règlements enregistrés. Le tableau présente une ligne par moyen de paiement afin de distinguer sa référence, son échéance, sa date de valeur et son état." },
-          { title: "Rechercher", description: "Filtrez par payeur, déposant, numéro ou référence, période, statut du règlement, moyen de paiement et état du moyen, puis cliquez sur Rechercher." },
+          { title: "Ouvrir la vue", description: "Dans Vue, choisissez Règlements enregistrés. Le tableau reste vide tant qu’aucun critère de recherche n’a été appliqué." },
+          { title: "Rechercher", description: "Renseignez au moins un critère parmi le payeur, le déposant, le numéro ou la référence, la période, le moyen de paiement et l’état du moyen, puis cliquez sur Rechercher." },
           { title: "Ouvrir", description: "Consultez le détail pour vérifier payeur, montant, instruments, affectations et historique." },
           { title: "Imprimer", description: "Utilisez les actions PDF pour le reçu ou le journal; autorisez les fenêtres contextuelles et renseignez la période du journal." },
           { title: "Générer le journal", description: "Dans Vue, choisissez Journal des règlements, renseignez la période et les filtres puis cliquez sur Imprimer le journal PDF." },

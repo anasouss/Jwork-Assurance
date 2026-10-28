@@ -136,18 +136,21 @@ export default function ReglementsEnregistresPage() {
   const [dateTo, setDateTo] = useState(searchParams.get("dateAu") ?? "");
   const [appliedDateFrom, setAppliedDateFrom] = useState(searchParams.get("dateDu") ?? "");
   const [appliedDateTo, setAppliedDateTo] = useState(searchParams.get("dateAu") ?? "");
-  const [paymentStatus, setPaymentStatus] = useState<ClientPayment["statut"] | "ALL">(
-    (searchParams.get("statut") as ClientPayment["statut"] | null) ?? "ALL"
-  );
   const [paymentMode, setPaymentMode] = useState<ClientPaymentMode | "ALL">(
     (searchParams.get("mode") as ClientPaymentMode | null) ?? "ALL"
   );
   const [instrumentStatus, setInstrumentStatus] = useState<PaymentInstrument["statut"] | "ALL">(
     (searchParams.get("statutInstrument") as PaymentInstrument["statut"] | null) ?? "ALL"
   );
-  const [appliedPaymentStatus, setAppliedPaymentStatus] = useState(paymentStatus);
   const [appliedPaymentMode, setAppliedPaymentMode] = useState(paymentMode);
   const [appliedInstrumentStatus, setAppliedInstrumentStatus] = useState(instrumentStatus);
+  const [hasAppliedFilters, setHasAppliedFilters] = useState(() => Boolean(
+    initialSearch
+      || searchParams.get("dateDu")
+      || searchParams.get("dateAu")
+      || searchParams.get("mode")
+      || searchParams.get("statutInstrument")
+  ));
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
@@ -168,14 +171,13 @@ export default function ReglementsEnregistresPage() {
   const payments = useQuery({
     queryKey: [
       "compta", "client-payments", appliedSearch, appliedDateFrom, appliedDateTo,
-      appliedPaymentStatus, appliedPaymentMode, appliedInstrumentStatus,
+      appliedPaymentMode, appliedInstrumentStatus,
       sortBy, sortDirection, page,
     ],
     queryFn: () => comptaApi.clientPayments({
       search: appliedSearch || undefined,
       dateDu: appliedDateFrom || undefined,
       dateAu: appliedDateTo || undefined,
-      statut: appliedPaymentStatus === "ALL" ? undefined : appliedPaymentStatus,
       mode: appliedPaymentMode === "ALL" ? undefined : appliedPaymentMode,
       statutInstrument: appliedInstrumentStatus === "ALL" ? undefined : appliedInstrumentStatus,
       sortBy,
@@ -183,6 +185,7 @@ export default function ReglementsEnregistresPage() {
       page,
       size: PAGE_SIZE,
     }),
+    enabled: !journalView && hasAppliedFilters,
   });
 
   const accounts = useQuery({
@@ -290,12 +293,11 @@ export default function ReglementsEnregistresPage() {
     setDateTo("");
     setAppliedDateFrom("");
     setAppliedDateTo("");
-    setPaymentStatus("ALL");
     setPaymentMode("ALL");
     setInstrumentStatus("ALL");
-    setAppliedPaymentStatus("ALL");
     setAppliedPaymentMode("ALL");
     setAppliedInstrumentStatus("ALL");
+    setHasAppliedFilters(false);
     setSortBy("dateReglement");
     setSortDirection("desc");
     setPage(0);
@@ -308,18 +310,29 @@ export default function ReglementsEnregistresPage() {
       return;
     }
     const nextSearch = search.trim();
+    const hasCriteria = Boolean(
+      nextSearch
+        || dateFrom
+        || dateTo
+        || paymentMode !== "ALL"
+        || instrumentStatus !== "ALL"
+    );
+    if (!hasCriteria) {
+      resetFilters();
+      toast.info("Renseignez au moins un critère de recherche");
+      return;
+    }
     setAppliedSearch(nextSearch);
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
-    setAppliedPaymentStatus(paymentStatus);
     setAppliedPaymentMode(paymentMode);
     setAppliedInstrumentStatus(instrumentStatus);
+    setHasAppliedFilters(true);
     setPage(0);
     const next = new URLSearchParams();
     if (nextSearch) next.set("search", nextSearch);
     if (dateFrom) next.set("dateDu", dateFrom);
     if (dateTo) next.set("dateAu", dateTo);
-    if (paymentStatus !== "ALL") next.set("statut", paymentStatus);
     if (paymentMode !== "ALL") next.set("mode", paymentMode);
     if (instrumentStatus !== "ALL") next.set("statutInstrument", instrumentStatus);
     setSearchParams(next, { replace: true });
@@ -407,7 +420,7 @@ export default function ReglementsEnregistresPage() {
       />
 
       {!journalView ? <>
-      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(240px,1.5fr)_170px_170px_180px_190px_190px_auto] xl:items-end">
+      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,1.7fr)_170px_170px_190px_190px_auto] xl:items-end">
         <div className="grid gap-2">
           <Label htmlFor="payment-search">Payeur, numéro ou référence</Label>
           <Input
@@ -428,17 +441,6 @@ export default function ReglementsEnregistresPage() {
         <div className="grid gap-2">
           <Label>Date au</Label>
           <DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Statut du règlement</Label>
-          <Select value={paymentStatus} onValueChange={(value) => setPaymentStatus(value as ClientPayment["statut"] | "ALL")}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tous les statuts</SelectItem>
-              <SelectItem value="VALIDE">Enregistré</SelectItem>
-              <SelectItem value="ANNULE">Annulé</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
         <div className="grid gap-2">
           <Label>Moyen</Label>
@@ -500,9 +502,9 @@ export default function ReglementsEnregistresPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {payments.isLoading ? (
+              {hasAppliedFilters && payments.isLoading ? (
                 <TableRowsSkeleton colSpan={12} rows={8} />
-              ) : (payments.data?.rows ?? []).flatMap((payment) => {
+              ) : hasAppliedFilters ? (payments.data?.rows ?? []).flatMap((payment) => {
                 const expanded = expandedPayments.has(payment.id);
                 return [
                 <tr key={payment.id} className="hover:bg-muted/30">
@@ -568,8 +570,14 @@ export default function ReglementsEnregistresPage() {
                   </tr>
                 ) : null,
                 ];
-              }) }
-              {!payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
+              }) : null}
+              {!hasAppliedFilters ? (
+                <tr>
+                  <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
+                    Renseignez au moins un critère puis lancez la recherche.
+                  </td>
+                </tr>
+              ) : !payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
                   <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun règlement ne correspond à la recherche.
@@ -579,7 +587,7 @@ export default function ReglementsEnregistresPage() {
             </tbody>
           </table>
         </div>
-        {payments.data && (
+        {hasAppliedFilters && payments.data && (
           <ServerPagination
             page={payments.data.page.number}
             totalPages={payments.data.page.totalPages}

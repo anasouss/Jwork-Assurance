@@ -283,7 +283,7 @@ public class JournalReglementsPdfService {
         }
         if (totals.isEmpty()) {
             table.addCell(new Cell(1, 6)
-                    .add(new Paragraph("Aucun règlement valide pour les critères sélectionnés")
+                    .add(new Paragraph("Aucun règlement enregistré pour les critères sélectionnés")
                             .setFont(regular).setFontSize(8).setMargin(0))
                     .setTextAlignment(TextAlignment.CENTER)
                     .setBorder(new SolidBorder(BORDER, 0.45f))
@@ -336,9 +336,7 @@ public class JournalReglementsPdfService {
             addBody(table, instrumentDueDate(instrument), regular, TextAlignment.CENTER, background);
             addBody(table, payment.getStatut() == StatutReglementClient.ANNULE
                     ? "Annulé"
-                    : payment.getStatut() == StatutReglementClient.A_VALIDER
-                        ? "À valider"
-                        : instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
+                    : instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         if (instruments.isEmpty()) {
@@ -421,8 +419,7 @@ public class JournalReglementsPdfService {
             return "Tous les statuts";
         }
         return switch (status) {
-            case A_VALIDER -> "À valider";
-            case VALIDE -> "Validés";
+            case VALIDE -> "Enregistrés";
             case ANNULE -> "Annulés";
         };
     }

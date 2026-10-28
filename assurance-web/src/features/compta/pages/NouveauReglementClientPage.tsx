@@ -27,7 +27,6 @@ import {
   ChevronsUpDown,
   GripVertical,
   Landmark,
-  Paperclip,
   Pencil,
   Plus,
   ReceiptText,
@@ -35,7 +34,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -81,7 +80,6 @@ import {
   receivableTypeLabel,
 } from "../receivable-display";
 import type {
-  ClientPayment,
   ClientPaymentMode,
   ClientReceivable,
   CreateClientPaymentRequest,
@@ -114,25 +112,15 @@ const paymentModes: Array<{
 ];
 
 export default function NouveauReglementClientPage() {
-  const { reglementId } = useParams();
-  const editing = Boolean(reglementId);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const currentUserId = useAuthStore((state) => state.user?.id);
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:manage");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const payment = useQuery({
-    queryKey: ["compta", "client-payment", reglementId],
-    queryFn: () => comptaApi.clientPayment(reglementId!),
-    enabled: editing,
-  });
   const requestedMultiClientDeposit = searchParams.get("multi") === "1";
-  const multiClientDeposit = requestedMultiClientDeposit || Boolean(payment.data?.multiPayeur);
-  const selection = editing && payment.data
-    ? selectionFromPayment(payment.data)
-    : selectionFromParams(searchParams);
+  const multiClientDeposit = requestedMultiClientDeposit;
+  const selection = selectionFromParams(searchParams);
   const returnPath = multiClientDeposit
     ? multiClientSelectionPath(selection)
     : "/app/compta/reglements";
@@ -150,17 +138,15 @@ export default function NouveauReglementClientPage() {
   const [excludedTargetKeys, setExcludedTargetKeys] = useState<Set<string>>(new Set());
   const [recentlyMovedId, setRecentlyMovedId] = useState<string>();
   const movedHighlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initializedPaymentId = useRef<string | null>(null);
   const dragSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const receivables = useQuery({
-    queryKey: ["compta", "client-receivable-selection", selection, reglementId, multiClientDeposit],
+    queryKey: ["compta", "client-receivable-selection", selection, multiClientDeposit],
     queryFn: () => comptaApi.selectedClientReceivables({
       ...selection,
-      reglementIdExclu: reglementId,
       multiPayeur: multiClientDeposit,
     }),
     enabled: hasSelection,
@@ -210,32 +196,13 @@ export default function NouveauReglementClientPage() {
   }, [receivables.data, excludedTargetKeys]);
 
   useEffect(() => {
-    if (!payment.data || initializedPaymentId.current === payment.data.id) return;
-    initializedPaymentId.current = payment.data.id;
-    setDateReglement(payment.data.dateReglement);
-    setNotes(payment.data.notes ?? "");
-    setDepositorName(payment.data.deposantNom ?? "");
-    setMethods(payment.data.instruments.map((instrument) => ({
-      key: instrument.id,
-      mode: instrument.mode,
-      montant: money(instrument.montant),
-      dateEcheance: instrument.dateEcheance ?? "",
-      referenceInstrument: instrument.referenceInstrument ?? "",
-      banqueEmettriceId: instrument.banqueEmettriceId ?? "",
-      compteTresorerieId: instrument.compteTresorerieId ?? "",
-      reglementBureau: Boolean(instrument.reglementBureau),
-    })));
-    setEditingMethodKey(undefined);
-  }, [payment.data]);
-
-  useEffect(() => {
-    if (!editing && requestedMultiClientDeposit && methods.length === 0) {
+    if (requestedMultiClientDeposit && methods.length === 0) {
       const method = newPaymentMethod("VERSEMENT_BANCAIRE");
       setMethods([method]);
       setEditingMethodKey(method.key);
       setActivePaymentMode("VERSEMENT_BANCAIRE");
     }
-  }, [editing, methods.length, requestedMultiClientDeposit]);
+  }, [methods.length, requestedMultiClientDeposit]);
 
   useEffect(() => {
     if (!soleActiveBankAccountId) return;
@@ -253,8 +220,7 @@ export default function NouveauReglementClientPage() {
   }, [methods, soleActiveBankAccountId]);
 
   useEffect(() => {
-    if (!editing
-      && multiClientDeposit
+    if (multiClientDeposit
       && selectedTotal > 0
       && methods.length === 1
       && !methods[0]?.montant) {
@@ -263,7 +229,7 @@ export default function NouveauReglementClientPage() {
         montant: money(selectedTotal),
       })));
     }
-  }, [editing, methods, multiClientDeposit, selectedTotal]);
+  }, [methods, multiClientDeposit, selectedTotal]);
 
   useEffect(() => () => {
     if (movedHighlightTimer.current) clearTimeout(movedHighlightTimer.current);
@@ -287,30 +253,23 @@ export default function NouveauReglementClientPage() {
         multiClientDeposit,
         depositorName
       );
-      if (!editing && multiClientDeposit && receipt) {
+      if (multiClientDeposit && receipt) {
         return comptaApi.createMultiClientBankDeposit(request, receipt);
       }
-      return editing
-        ? comptaApi.updateClientPayment(reglementId!, request)
-        : comptaApi.createClientPayment(request);
+      return comptaApi.createClientPayment(request);
     },
     onSuccess: async (payment) => {
-      toast.success(editing
-        ? `Règlement ${payment.numero} modifié`
-        : multiClientDeposit
-          ? `Versement ${payment.numero} enregistré et comptabilisé`
-          : `Règlement ${payment.numero} enregistré et envoyé pour validation`);
+      toast.success(multiClientDeposit
+        ? `Versement ${payment.numero} enregistré et comptabilisé`
+        : `Règlement ${payment.numero} enregistré`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
-      navigate(
-        multiClientDeposit
-          ? `/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`
-          : `/app/compta/reglements/etat-encaissements?date=${payment.dateReglement}`,
-        { replace: true }
-      );
+      navigate(`/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`, {
+        replace: true,
+      });
     },
     onError: (error) => toast.error(
       error instanceof Error ? error.message : "Règlement impossible"
@@ -327,7 +286,7 @@ export default function NouveauReglementClientPage() {
     && (!multiClientDeposit || (
       remainingAmount >= -0.001
       && Boolean(depositorName.trim())
-      && (editing ? Boolean(payment.data?.bordereauNomFichier) : Boolean(receipt))
+      && Boolean(receipt)
       && methods.length === 1
       && methods[0]?.mode === "VERSEMENT_BANCAIRE"
     ))
@@ -389,7 +348,7 @@ export default function NouveauReglementClientPage() {
       return;
     }
 
-    if (editing || (row.source.documentClientId && row.source.elementFacturableId)) {
+    if (row.source.documentClientId && row.source.elementFacturableId) {
       setExcludedTargetKeys((current) => {
         const next = new Set(current);
         next.add(receivableTargetKey(row));
@@ -414,20 +373,8 @@ export default function NouveauReglementClientPage() {
     setSearchParams(nextParams, { replace: true });
   }
 
-  if (editing && payment.isLoading) {
-    return <div className="py-16 text-center text-sm text-muted-foreground">Chargement du règlement...</div>;
-  }
-  if (editing && (payment.isError || !payment.data)) {
-    return <InvalidSelection message="Le règlement à modifier est introuvable." />;
-  }
-  if (editing && payment.data?.statut !== "A_VALIDER") {
-    return <InvalidSelection message="Seul un règlement à valider peut être modifié." />;
-  }
-  if (editing && payment.data?.creeParId !== currentUserId) {
-    return <InvalidSelection message="Seul le créateur peut modifier ce règlement à valider." />;
-  }
   if (!hasSelection) {
-    return <InvalidSelection message="Aucun élément à encaisser n’a été sélectionné." />;
+    return <InvalidSelection message="Aucune prime à encaisser n’a été sélectionnée." />;
   }
   if (receivables.isError) {
     return <InvalidSelection message={receivables.error instanceof Error
@@ -443,7 +390,7 @@ export default function NouveauReglementClientPage() {
             Comptabilité
           </div>
           <h1 className="mt-1 text-xl font-semibold">
-            {editing ? `Modifier ${payment.data?.numero ?? "le règlement"}` : "Enregistrer un règlement"}
+            Enregistrer un règlement
           </h1>
           <p className="text-sm text-muted-foreground">
             {receivables.isLoading
@@ -454,9 +401,9 @@ export default function NouveauReglementClientPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : returnPath}>
+          <Link to={returnPath}>
             <ArrowLeft className="size-4" />
-            {editing ? "Retour aux règlements à valider" : "Retour aux montants à encaisser"}
+            Retour aux primes à encaisser
           </Link>
         </Button>
       </header>
@@ -579,18 +526,12 @@ export default function NouveauReglementClientPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="deposit-receipt">Justificatif du bordereau bancaire</Label>
-                {editing && payment.data?.bordereauNomFichier ? (
-                  <div className="flex h-10 items-center gap-2 rounded-md border bg-muted/20 px-3 text-sm">
-                    <Paperclip className="size-4" /> {payment.data.bordereauNomFichier}
-                  </div>
-                ) : (
-                  <Input
-                    id="deposit-receipt"
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png"
-                    onChange={(event) => setReceipt(event.target.files?.[0])}
-                  />
-                )}
+                <Input
+                  id="deposit-receipt"
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png"
+                  onChange={(event) => setReceipt(event.target.files?.[0])}
+                />
               </div>
             </div>
           ) : null}
@@ -827,7 +768,7 @@ export default function NouveauReglementClientPage() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to={editing ? `/app/compta/reglements/etat-encaissements?date=${dateReglement}` : returnPath}>Annuler</Link>
+            <Link to={returnPath}>Annuler</Link>
           </Button>
           <Button
             disabled={!canSubmit || savePayment.isPending}
@@ -840,11 +781,7 @@ export default function NouveauReglementClientPage() {
             }}
           >
             <Banknote className="size-4" />
-            {editing
-              ? "Enregistrer les modifications"
-              : multiClientDeposit
-                ? "Enregistrer le versement"
-                : "Enregistrer pour validation"}
+            {multiClientDeposit ? "Enregistrer le versement" : "Enregistrer le règlement"}
           </Button>
         </div>
       </footer>
@@ -988,7 +925,7 @@ function InvalidSelection({ message }: { message: string }) {
           <p className="mt-1 text-sm text-muted-foreground">{message}</p>
         </div>
         <Button asChild>
-          <Link to="/app/compta/reglements">Retour aux montants à encaisser</Link>
+          <Link to="/app/compta/reglements">Retour aux primes à encaisser</Link>
         </Button>
       </div>
     </div>
@@ -1212,23 +1149,6 @@ function multiClientSelectionPath(selection: {
   selection.documentClientIds.forEach((id) => params.append("selectionDocument", id));
   const query = params.toString();
   return `/app/compta/reglements/versement-multi-clients${query ? `?${query}` : ""}`;
-}
-
-function selectionFromPayment(payment: ClientPayment) {
-  return {
-    elementFacturableIds: uniqueIds(payment.instruments.flatMap((instrument) =>
-      instrument.affectations.flatMap((allocation) =>
-        allocation.elementFacturableId && !allocation.documentClientId
-          ? [allocation.elementFacturableId]
-          : []
-      )
-    )),
-    documentClientIds: uniqueIds(payment.instruments.flatMap((instrument) =>
-      instrument.affectations.flatMap((allocation) =>
-        allocation.documentClientId ? [allocation.documentClientId] : []
-      )
-    )),
-  };
 }
 
 function uniqueIds(values: string[]) {

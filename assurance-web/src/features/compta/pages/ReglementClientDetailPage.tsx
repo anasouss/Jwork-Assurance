@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Download, Landmark, Pencil } from "lucide-react";
+import { ArrowLeft, Download, Landmark } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -61,8 +61,6 @@ const ALLOCATION_STATUS_BADGE_VARIANTS: Record<
 export default function ReglementClientDetailPage() {
   const { reglementId = "" } = useParams();
   const user = useAuthStore((state) => state.user);
-  const canEdit = user?.permissions.includes("reglement-client:create")
-    || user?.permissions.includes("reglement-client:manage");
   const canManageTreasury = user?.permissions.includes("tresorerie:manage") ?? false;
   const [instrumentToRemit, setInstrumentToRemit] = useState<ClientPayment["instruments"][number]>();
   const payment = useQuery({
@@ -103,10 +101,7 @@ export default function ReglementClientDetailPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Button asChild variant="ghost" className="mb-2 -ml-3">
-            <Link to={data.statut === "A_VALIDER"
-              ? `/app/compta/reglements/etat-encaissements?date=${data.dateReglement}`
-              : "/app/compta/reglements/historique"}
-            >
+            <Link to="/app/compta/reglements/historique">
               <ArrowLeft className="size-4" />
               Retour aux règlements
             </Link>
@@ -121,36 +116,19 @@ export default function ReglementClientDetailPage() {
               <Download className="size-4" /> Bordereau banque
             </Button>
           )}
-          {data.statut === "A_VALIDER" && canEdit && (
-            <Button asChild variant="outline">
-              <Link to={`/app/compta/reglements/${data.id}/modifier`}>
-                <Pencil className="size-4" />
-                Modifier
-              </Link>
-            </Button>
-          )}
-          <Badge variant={data.statut === "VALIDE"
-            ? "success"
-            : data.statut === "ANNULE" ? "red" : "warning"}
-          >
-            {data.statut === "VALIDE" ? "Validé" : data.statut === "ANNULE" ? "Annulé" : "À valider"}
+          <Badge variant={data.statut === "VALIDE" ? "success" : "red"}>
+            {data.statut === "VALIDE" ? "Enregistré" : "Annulé"}
           </Badge>
         </div>
       </header>
 
-      <section className={`grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 ${data.multiPayeur ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}>
+      <section className={`grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 ${data.multiPayeur ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         <Summary label="Payeur" value={data.payeurNom} />
         {data.multiPayeur && <Summary label="Déposant" value={data.deposantNom || "-"} />}
         <Summary label="Date" value={formatDate(data.dateReglement)} />
         <Summary label="Montant total" value={formatAccountingAmount(data.montantTotal)} strong />
         <Summary label="Non affecté" value={formatAccountingAmount(data.montantNonAffecte)} />
         <Summary label="Créé par" value={data.creePar || "-"} />
-        <Summary
-          label="Validation"
-          value={data.validePar
-            ? `${data.validePar}${data.dateValidation ? ` · ${formatDateTime(data.dateValidation)}` : ""}`
-            : data.statut === "A_VALIDER" ? "En attente" : "-"}
-        />
       </section>
 
       {data.notes && (
@@ -206,17 +184,13 @@ export default function ReglementClientDetailPage() {
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(instrument.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant={data.statut === "A_VALIDER"
-                      ? "warning"
-                      : data.statut === "ANNULE"
-                        ? "red"
-                        : INSTRUMENT_STATUS_BADGE_VARIANTS[instrument.statut]}
+                    <Badge variant={data.statut === "ANNULE"
+                      ? "red"
+                      : INSTRUMENT_STATUS_BADGE_VARIANTS[instrument.statut]}
                     >
-                      {data.statut === "A_VALIDER"
-                        ? "À valider"
-                        : data.statut === "ANNULE"
-                          ? "Annulé"
-                          : INSTRUMENT_STATUS_LABELS[instrument.statut]}
+                      {data.statut === "ANNULE"
+                        ? "Annulé"
+                        : INSTRUMENT_STATUS_LABELS[instrument.statut]}
                     </Badge>
                     {instrument.motifStatut && (
                       <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>
@@ -277,17 +251,13 @@ export default function ReglementClientDetailPage() {
                   <td className="px-4 py-3 text-center">{allocation.instrumentCount}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(allocation.montant)}</td>
                   <td className="px-4 py-3 text-center">
-                    <Badge variant={data.statut === "A_VALIDER"
-                      ? "warning"
-                      : data.statut === "ANNULE"
-                        ? "red"
-                        : ALLOCATION_STATUS_BADGE_VARIANTS[allocation.statut]}
+                    <Badge variant={data.statut === "ANNULE"
+                      ? "red"
+                      : ALLOCATION_STATUS_BADGE_VARIANTS[allocation.statut]}
                     >
-                      {data.statut === "A_VALIDER"
-                        ? "En attente de validation"
-                        : data.statut === "ANNULE"
-                          ? "Annulée"
-                          : ALLOCATION_STATUS_LABELS[allocation.statut]}
+                      {data.statut === "ANNULE"
+                        ? "Annulée"
+                        : ALLOCATION_STATUS_LABELS[allocation.statut]}
                     </Badge>
                   </td>
                 </tr>
@@ -365,7 +335,3 @@ function formatDate(value?: string | null) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function formatDateTime(value: string) {
-  const [datePart, timePart = ""] = value.split("T");
-  return `${formatDate(datePart)} ${timePart.slice(0, 5)}`.trim();
-}

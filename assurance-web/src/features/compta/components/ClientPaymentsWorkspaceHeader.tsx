@@ -11,11 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type PaymentsView = "receivables" | "validation" | "saved" | "journal";
+type PaymentsView = "receivables" | "saved" | "journal";
 
 const VIEW_PATHS: Record<PaymentsView, string> = {
   receivables: "/app/compta/reglements",
-  validation: "/app/compta/reglements/etat-encaissements",
   saved: "/app/compta/reglements/historique",
   journal: "/app/compta/reglements/historique?vue=journal",
 };
@@ -56,8 +55,7 @@ export function ClientPaymentsWorkspaceHeader({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="receivables">Éléments à encaisser</SelectItem>
-              <SelectItem value="validation">Règlements à valider</SelectItem>
+              <SelectItem value="receivables">Primes à encaisser</SelectItem>
               <SelectItem value="saved">Règlements enregistrés</SelectItem>
               <SelectItem value="journal">Journal des règlements</SelectItem>
             </SelectContent>
@@ -78,7 +76,6 @@ export function ClientPaymentsWorkspaceHeader({
 }
 
 function currentView(pathname: string, search: string): PaymentsView {
-  if (pathname.endsWith("/etat-encaissements")) return "validation";
   if (pathname.endsWith("/historique")) {
     const params = new URLSearchParams(search);
     return params.get("vue") === "journal" || params.get("journal") === "1"

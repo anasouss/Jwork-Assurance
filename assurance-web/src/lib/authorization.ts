@@ -82,7 +82,6 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: [
       "reglement-client:view",
       "reglement-client:create",
-      "reglement-client:validate",
       "reglement-client:manage",
     ],
   },

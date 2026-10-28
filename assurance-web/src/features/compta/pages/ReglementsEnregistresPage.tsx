@@ -12,7 +12,6 @@ import {
   FileText,
   Landmark,
   MoreHorizontal,
-  Pencil,
   Printer,
   RotateCcw,
   Search,
@@ -436,8 +435,7 @@ export default function ReglementsEnregistresPage() {
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Tous les statuts</SelectItem>
-              <SelectItem value="A_VALIDER">À valider</SelectItem>
-              <SelectItem value="VALIDE">Validé</SelectItem>
+              <SelectItem value="VALIDE">Enregistré</SelectItem>
               <SelectItem value="ANNULE">Annulé</SelectItem>
             </SelectContent>
           </Select>
@@ -545,7 +543,6 @@ export default function ReglementsEnregistresPage() {
                     <div className="flex justify-end">
                       <PaymentActionsMenu
                         payment={payment}
-                        canEdit={canCreate}
                         canManage={canManage}
                         canManageTreasury={canManageTreasury}
                         canIssueInvoice={canIssueInvoice}
@@ -662,8 +659,7 @@ export default function ReglementsEnregistresPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Tous les statuts</SelectItem>
-                  <SelectItem value="A_VALIDER">À valider</SelectItem>
-                  <SelectItem value="VALIDE">Validés</SelectItem>
+                  <SelectItem value="VALIDE">Enregistrés</SelectItem>
                   <SelectItem value="ANNULE">Annulés</SelectItem>
                 </SelectContent>
               </Select>
@@ -923,7 +919,6 @@ function AccountSelect({
 
 function PaymentActionsMenu({
   payment,
-  canEdit,
   canManage,
   canManageTreasury,
   canIssueInvoice,
@@ -935,7 +930,6 @@ function PaymentActionsMenu({
   onAddToRemittance,
 }: {
   payment: ClientPayment;
-  canEdit: boolean;
   canManage: boolean;
   canManageTreasury: boolean;
   canIssueInvoice: boolean;
@@ -961,7 +955,6 @@ function PaymentActionsMenu({
       && !instrument.bordereauRemiseId
       && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET"))
     : [];
-  const canModifyPayment = payment.statut === "A_VALIDER" && canEdit;
   const canCancelPayment = payment.statut !== "ANNULE" && canManage;
 
   return (
@@ -988,14 +981,6 @@ function PaymentActionsMenu({
           <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Imprimer le PDF"}
         </DropdownMenuItem>
-        {canModifyPayment && (
-          <DropdownMenuItem asChild>
-            <Link to={`/app/compta/reglements/${payment.id}/modifier`}>
-              <Pencil className="size-4 text-blue-600 dark:text-blue-400" />
-              Modifier
-            </Link>
-          </DropdownMenuItem>
-        )}
         {canCreateInvoice && (
           <DropdownMenuItem onSelect={onInvoice}>
             <FileText className="size-4 text-emerald-600 dark:text-emerald-400" />
@@ -1037,8 +1022,7 @@ function PaymentActionsMenu({
 }
 
 function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
-  if (value === "A_VALIDER") return <Badge variant="warning">À valider</Badge>;
-  if (value === "VALIDE") return <Badge variant="success">Validé</Badge>;
+  if (value === "VALIDE") return <Badge variant="success">Enregistré</Badge>;
   return <Badge variant="red">Annulé</Badge>;
 }
 

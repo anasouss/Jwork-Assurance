@@ -454,7 +454,7 @@ export type ClientPaymentMode =
   | "VIREMENT"
   | "VERSEMENT_BANCAIRE";
 
-export type ClientPaymentStatus = "A_VALIDER" | "VALIDE" | "ANNULE";
+export type ClientPaymentStatus = "VALIDE" | "ANNULE";
 export type PaymentInstrumentStatus =
   | "EN_ATTENTE"
   | "REMIS_EN_BANQUE"

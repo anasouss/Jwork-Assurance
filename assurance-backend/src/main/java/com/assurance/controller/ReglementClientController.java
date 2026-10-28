@@ -7,7 +7,6 @@ import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.request.RepresenterInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.request.UpdateReglementClientPolicyRequest;
-import com.assurance.dto.request.ValiderReglementsClientsRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
@@ -16,12 +15,10 @@ import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientPolicyResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.UtilisateurTresorerieResponse;
-import com.assurance.enums.AuditOperationCode;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.TypeContrat;
-import com.assurance.security.AuditRequestContext;
 import com.assurance.security.TenantContext;
 import com.assurance.service.JournalReglementsPdfService;
 import com.assurance.service.ReglementClientPdfService;
@@ -304,45 +301,6 @@ public class ReglementClientController {
                         .build()
                         .toString())
                 .body(download.resource());
-    }
-
-    @PutMapping("/{paymentId}")
-    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
-    public ResponseEntity<ApiResponse<ReglementClientResponse>> update(
-            @PathVariable Long paymentId,
-            @Valid @RequestBody CreerReglementClientRequest request
-    ) {
-        AuditRequestContext.setOperation(AuditOperationCode.CLIENT_PAYMENT_UPDATED);
-        return ResponseEntity.ok(ApiResponse.success(reglementClientService.updatePending(
-                TenantContext.getCurrentAgence(),
-                TenantContext.getCurrentUser(),
-                paymentId,
-                request
-        ), "Règlement à valider modifié"));
-    }
-
-    @PostMapping("/{paymentId}/validation")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:validate')")
-    public ResponseEntity<ApiResponse<ReglementClientResponse>> validate(
-            @PathVariable Long paymentId
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(reglementClientService.validatePending(
-                TenantContext.getCurrentAgence(),
-                TenantContext.getCurrentUser(),
-                paymentId
-        ), "Règlement client validé"));
-    }
-
-    @PostMapping("/validation-groupee")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:validate')")
-    public ResponseEntity<ApiResponse<List<ReglementClientResponse>>> validateBatch(
-            @Valid @RequestBody ValiderReglementsClientsRequest request
-    ) {
-        return ResponseEntity.ok(ApiResponse.success(reglementClientService.validatePendingBatch(
-                TenantContext.getCurrentAgence(),
-                TenantContext.getCurrentUser(),
-                request.getReglementIds()
-        ), "Règlements clients validés"));
     }
 
     @PostMapping("/{paymentId}/facture")

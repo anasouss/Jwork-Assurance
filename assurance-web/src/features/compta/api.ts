@@ -538,7 +538,6 @@ export const comptaApi = {
   async selectedClientReceivables(request: {
     elementFacturableIds: string[];
     documentClientIds: string[];
-    reglementIdExclu?: string;
     multiPayeur?: boolean;
   }) {
     return unwrap(await apiFetch<ApiResponse<ClientReceivable[]>>(
@@ -630,27 +629,6 @@ export const comptaApi = {
 
   async clientPaymentReceipt(id: string) {
     return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/bordereau`);
-  },
-
-  async updateClientPayment(id: string, request: CreateClientPaymentRequest) {
-    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
-      `/api/v1/compta/reglements-clients/${id}`,
-      { method: "PUT", body: JSON.stringify(request) }
-    )));
-  },
-
-  async validateClientPayment(id: string) {
-    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
-      `/api/v1/compta/reglements-clients/${id}/validation`,
-      { method: "POST" }
-    )));
-  },
-
-  async validateClientPayments(ids: string[]) {
-    return unwrap(await apiFetch<ApiResponse<ClientPayment[]>>(
-      "/api/v1/compta/reglements-clients/validation-groupee",
-      { method: "POST", body: JSON.stringify({ reglementIds: ids }) }
-    )).map(normalizeClientPayment);
   },
 
   async createInvoiceFromClientPayment(id: string) {

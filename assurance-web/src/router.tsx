@@ -217,15 +217,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "compta/reglements/validation",
-        element: <Navigate to="/app/compta/reglements/etat-encaissements" replace />,
+        element: <Navigate to="/app/compta/reglements" replace />,
       },
       {
         path: "compta/reglements/etat-encaissements",
-        lazy: lazyRoute(() => import("@/features/compta/pages/ValidationReglementsPage")),
-      },
-      {
-        path: "compta/reglements/:reglementId/modifier",
-        lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementClientPage")),
+        element: <Navigate to="/app/compta/reglements" replace />,
       },
       {
         path: "compta/reglements/:reglementId",

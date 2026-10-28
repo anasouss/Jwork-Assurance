@@ -324,10 +324,6 @@ public class ReglementClientPdfService {
             document.add(new Paragraph("RÈGLEMENT ANNULÉ" + reason)
                     .setFont(bold).setFontSize(10).setFontColor(ColorConstants.RED)
                     .setTextAlignment(TextAlignment.CENTER).setMarginTop(12));
-        } else if (payment.getStatut() == StatutReglementClient.A_VALIDER) {
-            document.add(new Paragraph("RÈGLEMENT EN ATTENTE DE VALIDATION")
-                    .setFont(bold).setFontSize(9).setFontColor(MUTED)
-                    .setBackgroundColor(SOFT_ACCENT).setPadding(8).setMarginTop(12));
         } else if (pending) {
             document.add(new Paragraph("Ce document confirme l’enregistrement du règlement. "
                             + "Les instruments en attente ou remis en banque ne sont pas encore définitivement encaissés.")
@@ -456,9 +452,6 @@ public class ReglementClientPdfService {
     private String paymentStatus(ReglementClient payment) {
         if (payment.getStatut() == StatutReglementClient.ANNULE) {
             return "ANNULÉ";
-        }
-        if (payment.getStatut() == StatutReglementClient.A_VALIDER) {
-            return "À VALIDER";
         }
         if (!payment.getInstruments().isEmpty() && payment.getInstruments().stream()
                 .allMatch(instrument -> instrument.getStatut() == StatutInstrumentReglement.CONFIRME)) {

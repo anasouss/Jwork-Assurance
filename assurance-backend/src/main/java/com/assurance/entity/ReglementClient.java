@@ -89,7 +89,7 @@ public class ReglementClient extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private StatutReglementClient statut = StatutReglementClient.A_VALIDER;
+    private StatutReglementClient statut = StatutReglementClient.VALIDE;
 
     @Column(name = "montant_total", nullable = false, precision = 16, scale = 2)
     private BigDecimal montantTotal;

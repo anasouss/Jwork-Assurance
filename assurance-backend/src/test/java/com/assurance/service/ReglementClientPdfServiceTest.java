@@ -108,7 +108,7 @@ class ReglementClientPdfServiceTest {
                 .numero("REG-26-000005")
                 .dateReglement(LocalDate.of(2026, 10, 13))
                 .payeurNom("YASLID CARS")
-                .statut(StatutReglementClient.A_VALIDER)
+                .statut(StatutReglementClient.VALIDE)
                 .montantTotal(new BigDecimal("55000.00"))
                 .montantNonAffecte(BigDecimal.ZERO)
                 .creePar(creator)

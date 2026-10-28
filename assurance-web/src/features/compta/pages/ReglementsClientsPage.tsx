@@ -442,10 +442,10 @@ export default function ReglementsClientsPage() {
   return (
     <div className="grid gap-5">
       <ClientPaymentsWorkspaceHeader
-        title={multiClientDeposit ? "Nouveau versement multi-clients" : "Règlements clients"}
+        title={multiClientDeposit ? "Nouveau versement multi-clients" : "Primes à encaisser"}
         description={multiClientDeposit
           ? "Recherchez plusieurs clients, conservez leurs créances dans la sélection puis enregistrez le bordereau bancaire."
-          : "Montants à encaisser, paiements partiels et moyens de règlement."}
+          : "Primes restant à encaisser, paiements partiels et moyens de règlement."}
         canCreate={canCreate && !multiClientDeposit}
         showViewSelector={!multiClientDeposit}
         actions={multiClientDeposit ? (
@@ -613,7 +613,7 @@ export default function ReglementsClientsPage() {
       <section className="overflow-hidden rounded-md border bg-card">
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div>
-                <h2 className="font-semibold">Éléments à encaisser</h2>
+                <h2 className="font-semibold">Primes à encaisser</h2>
                 <p className="text-sm text-muted-foreground">
                   {showResults
                     ? `Solde ouvert: ${money(result?.summary.soldeOuvert ?? 0)}`

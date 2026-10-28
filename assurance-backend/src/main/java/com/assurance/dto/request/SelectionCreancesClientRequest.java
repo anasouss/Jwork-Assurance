@@ -15,7 +15,5 @@ public class SelectionCreancesClientRequest {
     @Size(max = 100)
     private List<Long> documentClientIds = new ArrayList<>();
 
-    private Long reglementIdExclu;
-
     private Boolean multiPayeur = false;
 }

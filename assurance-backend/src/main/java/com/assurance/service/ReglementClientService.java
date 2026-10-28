@@ -395,7 +395,7 @@ public class ReglementClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         loadPaymentInstruments(payment, agenceId);
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Seul un règlement valide peut être facturé");
+            throw new BadRequestException("Seul un règlement enregistré peut être facturé");
         }
         if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
             throw new BadRequestException(
@@ -541,44 +541,9 @@ public class ReglementClientService {
                                     AllocationAmounts.empty()
                             )
                     ))
-                    .filter(row -> request.getReglementIdExclu() != null
-                            || row.getSoldeOuvert().signum() > 0)
+                    .filter(row -> row.getSoldeOuvert().signum() > 0)
                     .forEach(rows::add);
         });
-
-        if (request.getReglementIdExclu() != null) {
-            ReglementClient editedPayment = findPayment(agenceId, request.getReglementIdExclu());
-            requirePending(editedPayment);
-            Map<String, BigDecimal> ownPendingAmounts = editedPayment.getInstruments().stream()
-                    .flatMap(instrument -> instrument.getAffectations().stream())
-                    .filter(allocation -> allocation.getStatut() != StatutAffectationReglement.ANNULEE)
-                    .collect(Collectors.toMap(
-                            allocation -> allocationTargetKey(
-                                    allocation.getElementFacturable() == null
-                                            ? null : allocation.getElementFacturable().getId(),
-                                    allocation.getDocumentClient() == null
-                                            ? null : allocation.getDocumentClient().getId()
-                            ),
-                            allocation -> money(allocation.getMontant()),
-                            BigDecimal::add
-                    ));
-            List<CreanceClientPageResponse.Ligne> adjustedRows = rows.stream().map(row -> {
-                BigDecimal ownAmount = ownPendingAmounts.getOrDefault(
-                        allocationTargetKey(
-                                row.getSource().getElementFacturableId(),
-                                row.getSource().getDocumentClientId()
-                        ),
-                        ZERO
-                );
-                AllocationAmounts adjusted = new AllocationAmounts(
-                        money(row.getMontantConfirme()),
-                        money(row.getMontantEnAttente()).subtract(ownAmount).max(ZERO)
-                );
-                return toReceivable(row.getSource(), adjusted);
-            }).toList();
-            rows.clear();
-            rows.addAll(adjustedRows);
-        }
 
         if (rows.isEmpty()
                 || rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() <= 0)) {
@@ -595,10 +560,6 @@ public class ReglementClientService {
         return rows;
     }
 
-    private String allocationTargetKey(Long elementId, Long documentId) {
-        return (documentId == null ? "" : documentId) + ":" + (elementId == null ? "" : elementId);
-    }
-
     @Transactional
     public ReglementClientResponse create(
             Long agenceId,
@@ -610,7 +571,7 @@ public class ReglementClientService {
                     "Utilisez l'enregistrement de versement bancaire avec son justificatif"
             );
         }
-        return savePending(agenceId, userId, request, null);
+        return savePayment(agenceId, userId, request, null);
     }
 
     @Transactional
@@ -622,10 +583,7 @@ public class ReglementClientService {
     ) {
         request.setMultiPayeur(true);
         validateReceipt(receipt, true);
-        ReglementClientResponse created = savePending(agenceId, userId, request, null);
-        ReglementClient payment = findPayment(agenceId, created.getId());
-        storeReceipt(payment, receipt);
-        return toResponse(reglementRepository.save(payment));
+        return savePayment(agenceId, userId, request, receipt);
     }
 
     @Transactional(readOnly = true)
@@ -654,53 +612,11 @@ public class ReglementClientService {
         );
     }
 
-    @Transactional
-    public ReglementClientResponse updatePending(
-            Long agenceId,
-            Long userId,
-            Long paymentId,
-            CreerReglementClientRequest request
-    ) {
-        ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
-        loadPaymentInstruments(payment, agenceId);
-        requirePending(payment);
-        if (Boolean.TRUE.equals(payment.getMultiPayeur())
-                != Boolean.TRUE.equals(request.getMultiPayeur())) {
-            throw new BadRequestException("Le type du règlement ne peut pas être modifié");
-        }
-        List<Long> previousElementIds = payment.getInstruments().stream()
-                .flatMap(instrument -> instrument.getAffectations().stream())
-                .map(AffectationReglementClient::getElementFacturable)
-                .filter(Objects::nonNull)
-                .map(ElementFacturable::getId)
-                .distinct()
-                .toList();
-        List<Long> previousDocumentIds = payment.getInstruments().stream()
-                .flatMap(instrument -> instrument.getAffectations().stream())
-                .map(AffectationReglementClient::getDocumentClient)
-                .filter(Objects::nonNull)
-                .map(DocumentClient::getId)
-                .distinct()
-                .toList();
-        payment.getInstruments().clear();
-        reglementRepository.saveAndFlush(payment);
-
-        ReglementClientResponse response = savePending(
-                agenceId,
-                userId,
-                request,
-                payment
-        );
-        recalculatePaymentFlags(previousElementIds, previousDocumentIds);
-        return response;
-    }
-
-    private ReglementClientResponse savePending(
+    private ReglementClientResponse savePayment(
             Long agenceId,
             Long userId,
             CreerReglementClientRequest request,
-            ReglementClient existingPayment
+            MultipartFile receipt
     ) {
         List<CreerReglementClientRequest.Instrument> requestedInstruments = request.getInstruments();
         List<Long> elementIds = requestedInstruments.stream()
@@ -840,28 +756,23 @@ public class ReglementClientService {
             );
         }
 
-        ReglementClient payment;
-        if (existingPayment == null) {
-            payment = ReglementClient.builder()
-                    .agence(agence)
-                    .numero(nextNumber(agence, request.getDateReglement().getYear()))
-                    .creePar(user)
-                    .build();
-        } else {
-            payment = existingPayment;
-        }
+        ReglementClient payment = ReglementClient.builder()
+                .agence(agence)
+                .numero(nextNumber(agence, request.getDateReglement().getYear()))
+                .creePar(user)
+                .build();
         payment.setDateReglement(request.getDateReglement());
         payment.setClientPayeur(payer.client());
         payment.setGroupePayeur(payer.group());
         payment.setPayeurNom(payer.name());
         payment.setMultiPayeur(multiPayer);
         payment.setDeposantNom(multiPayer ? trimToNull(request.getDeposantNom()) : null);
-        payment.setStatut(StatutReglementClient.A_VALIDER);
+        payment.setStatut(StatutReglementClient.VALIDE);
         payment.setMontantTotal(totalPayment);
         payment.setMontantNonAffecte(unallocatedCredit);
         payment.setNotes(trimToNull(request.getNotes()));
-        payment.setValidePar(null);
-        payment.setDateValidation(null);
+        payment.setValidePar(user);
+        payment.setDateValidation(LocalDateTime.now());
 
         for (CreerReglementClientRequest.Instrument requested : requestedInstruments) {
             InstrumentReglementClient instrument = buildInstrument(agence, payment, requested, true);
@@ -888,72 +799,18 @@ public class ReglementClientService {
         }
 
         payment = reglementRepository.saveAndFlush(payment);
+        if (receipt != null) {
+            storeReceipt(payment, receipt);
+        }
+        confirmImmediateInstruments(payment);
+        reglementRepository.save(payment);
         recalculatePaymentFlags(elementIds, documentIds);
         return toResponse(payment);
     }
 
-    @Transactional
-    public ReglementClientResponse validatePending(Long agenceId, Long userId, Long paymentId) {
-        Utilisateur validator = findValidator(userId);
-        return validatePendingLocked(agenceId, validator, paymentId);
-    }
-
-    @Transactional
-    public List<ReglementClientResponse> validatePendingBatch(
-            Long agenceId,
-            Long userId,
-            List<Long> paymentIds
-    ) {
-        List<Long> distinctPaymentIds = paymentIds.stream().distinct().sorted().toList();
-        if (distinctPaymentIds.size() != paymentIds.size()) {
-            throw new BadRequestException("La sélection contient des règlements en double");
-        }
-        Utilisateur validator = findValidator(userId);
-        return distinctPaymentIds.stream()
-                .map(paymentId -> validatePendingLocked(agenceId, validator, paymentId))
-                .toList();
-    }
-
-    private Utilisateur findValidator(Long userId) {
-        return utilisateurRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
-    }
-
-    private ReglementClientResponse validatePendingLocked(
-            Long agenceId,
-            Utilisateur validator,
-            Long paymentId
-    ) {
-        ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
-        loadPaymentInstruments(payment, agenceId);
-        requirePending(payment);
-        boolean createdByValidator = payment.getCreePar().getId().equals(validator.getId());
-        boolean lastModifiedByValidator = payment.getUpdatedByUserId() != null
-                && payment.getUpdatedByUserId().equals(validator.getId());
-        if (createdByValidator || lastModifiedByValidator) {
-            throw new BadRequestException(
-                    "Le créateur ou le dernier modificateur du règlement ne peut pas le valider"
-            );
-        }
-        if (Boolean.TRUE.equals(payment.getMultiPayeur())
-                && payment.getBordereauCheminStockage() == null) {
-            throw new BadRequestException("Le justificatif du bordereau bancaire est obligatoire");
-        }
+    private void confirmImmediateInstruments(ReglementClient payment) {
         LocalDate operationDate = LocalDate.now();
-        List<Long> elementIds = new ArrayList<>();
-        List<Long> documentIds = new ArrayList<>();
         for (InstrumentReglementClient instrument : payment.getInstruments()) {
-            elementIds.addAll(instrument.getAffectations().stream()
-                    .map(AffectationReglementClient::getElementFacturable)
-                    .filter(Objects::nonNull)
-                    .map(ElementFacturable::getId)
-                    .toList());
-            documentIds.addAll(instrument.getAffectations().stream()
-                    .map(AffectationReglementClient::getDocumentClient)
-                    .filter(Objects::nonNull)
-                    .map(DocumentClient::getId)
-                    .toList());
             if (instrument.getMode() == ModeReglementClient.ESPECES
                     || instrument.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE) {
                 instrument.setStatut(StatutInstrumentReglement.CONFIRME);
@@ -967,15 +824,6 @@ public class ReglementClientService {
                 );
             }
         }
-        payment.setStatut(StatutReglementClient.VALIDE);
-        payment.setValidePar(validator);
-        payment.setDateValidation(LocalDateTime.now());
-        reglementRepository.save(payment);
-        recalculatePaymentFlags(
-                elementIds.stream().distinct().toList(),
-                documentIds.stream().distinct().toList()
-        );
-        return toResponse(payment);
     }
 
     @Transactional
@@ -990,7 +838,7 @@ public class ReglementClientService {
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("Instrument de règlement", instrumentId));
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Le règlement doit être validé avant de traiter son moyen de paiement");
+            throw new BadRequestException("Le règlement doit être enregistré avant de traiter son moyen de paiement");
         }
         LocalDate operationDate = request.getDateOperation() == null ? LocalDate.now() : request.getDateOperation();
         if (request.getStatut() == StatutInstrumentReglement.CONFIRME) {
@@ -1104,7 +952,7 @@ public class ReglementClientService {
             );
         }
         if (replaced.getReglement().getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Le règlement doit être validé avant de remplacer son moyen de paiement");
+            throw new BadRequestException("Le règlement doit être enregistré avant de remplacer son moyen de paiement");
         }
         boolean pendingReplacement = replaced.getStatut() == StatutInstrumentReglement.EN_ATTENTE;
         if (!pendingReplacement && replaced.getStatut() != StatutInstrumentReglement.REJETE) {
@@ -1220,7 +1068,7 @@ public class ReglementClientService {
                         instrumentId
                 ));
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Le règlement doit être validé avant la représentation");
+            throw new BadRequestException("Le règlement doit être enregistré avant la représentation");
         }
         if (instrument.getStatut() != StatutInstrumentReglement.REJETE) {
             throw new BadRequestException("Seul un instrument impayé peut être représenté");
@@ -1432,7 +1280,7 @@ public class ReglementClientService {
             Agence agence,
             ReglementClient payment,
             CreerReglementClientRequest.Instrument request,
-            boolean pendingApproval
+            boolean deferCashConfirmation
     ) {
         BigDecimal allocated = request.getAffectations().stream()
                 .map(CreerReglementClientRequest.Affectation::getMontant)
@@ -1481,7 +1329,7 @@ public class ReglementClientService {
                 .agence(agence)
                 .reglement(payment)
                 .mode(request.getMode())
-                .statut(cash && !pendingApproval
+                .statut(cash && !deferCashConfirmation
                         ? StatutInstrumentReglement.CONFIRME
                         : StatutInstrumentReglement.EN_ATTENTE)
                 .montant(money(request.getMontant()))
@@ -1635,7 +1483,7 @@ public class ReglementClientService {
             LigneReleveBancaire bankStatementLine
     ) {
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Le règlement doit être validé avant l'encaissement");
+            throw new BadRequestException("Le règlement doit être enregistré avant l'encaissement");
         }
         if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
                 && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
@@ -1691,7 +1539,7 @@ public class ReglementClientService {
             LocalDate operationDate
     ) {
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Le règlement doit être validé avant le rejet de son moyen");
+            throw new BadRequestException("Le règlement doit être enregistré avant le rejet de son moyen");
         }
         if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
                 && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE
@@ -1731,7 +1579,7 @@ public class ReglementClientService {
             throw new BadRequestException("Seul un instrument en attente peut être remis en banque");
         }
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
-            throw new BadRequestException("Le règlement doit être validé avant la remise en banque");
+            throw new BadRequestException("Le règlement doit être enregistré avant la remise en banque");
         }
         if (instrument.getMode() != ModeReglementClient.CHEQUE
                 && instrument.getMode() != ModeReglementClient.EFFET) {
@@ -2501,12 +2349,6 @@ public class ReglementClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         loadPaymentInstruments(payment, agenceId);
         return payment;
-    }
-
-    private void requirePending(ReglementClient payment) {
-        if (payment.getStatut() != StatutReglementClient.A_VALIDER) {
-            throw new BadRequestException("Seul un règlement à valider peut être modifié ou validé");
-        }
     }
 
     private void loadPaymentInstruments(ReglementClient payment, Long agenceId) {

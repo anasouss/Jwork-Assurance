@@ -2180,6 +2180,15 @@ public class ReferentielController {
                 .map();
     }
 
+    private SousClasse resolveSousClasse(Long sousClasseId) {
+        if (sousClasseId == null) {
+            return null;
+        }
+        return sousClasseRepository.findById(sousClasseId)
+                .filter(sousClasse -> Boolean.TRUE.equals(sousClasse.getActif()))
+                .orElseThrow(() -> new BadRequestException("Sous-classe inactive ou inconnue"));
+    }
+
     private CritereSelectionTarif effectiveCritereSelectionTarif(Garantie garantie) {
         if (garantie != null
                 && garantie.getCritereSelectionTarif() == CritereSelectionTarif.TAUX_FRANCHISE

@@ -135,7 +135,7 @@ export default function EncaissementsEnAttentePage() {
     queryFn: () => comptaApi.paymentInstruments({
       statuts: ["EN_ATTENTE", "REMIS_EN_BANQUE"],
       mode: mode === "ALL" ? undefined : mode,
-      payeurType,
+      payeurType: payerType,
       payeurId: payerId || undefined,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,

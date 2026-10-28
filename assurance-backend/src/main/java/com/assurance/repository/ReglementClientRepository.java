@@ -25,6 +25,25 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
             where r.agence.id = :agenceId
               and (:dateDu is null or r.dateReglement >= :dateDu)
               and (:dateAu is null or r.dateReglement <= :dateAu)
+              and (:payeurId is null
+                   or (:payeurType = 'CLIENT' and (
+                       r.clientPayeur.id = :payeurId
+                       or exists (
+                           select clientAllocation.id
+                           from AffectationReglementClient clientAllocation
+                           where clientAllocation.instrument.reglement = r
+                             and clientAllocation.clientPayeur.id = :payeurId
+                       )
+                   ))
+                   or (:payeurType = 'GROUPE' and (
+                       r.groupePayeur.id = :payeurId
+                       or exists (
+                           select groupAllocation.id
+                           from AffectationReglementClient groupAllocation
+                           where groupAllocation.instrument.reglement = r
+                             and groupAllocation.groupePayeur.id = :payeurId
+                       )
+                   )))
               and (:statut is null or r.statut = :statut)
               and (:mode is null or exists (
                   select modeInstrument.id
@@ -54,6 +73,8 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("payeurType") String payeurType,
+            @Param("payeurId") Long payeurId,
             @Param("statut") com.assurance.enums.StatutReglementClient statut,
             @Param("mode") com.assurance.enums.ModeReglementClient mode,
             @Param("statutInstrument") com.assurance.enums.StatutInstrumentReglement statutInstrument,

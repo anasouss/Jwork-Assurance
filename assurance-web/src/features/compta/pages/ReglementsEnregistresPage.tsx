@@ -20,6 +20,7 @@ import {
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -49,6 +50,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SortIcon } from "@/components/ui/sort-icon";
+import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
@@ -56,6 +58,10 @@ import { comptaApi } from "../api";
 import { BankSelect } from "../components/BankSelect";
 import { AddInstrumentToRemittanceDialog } from "../components/AddInstrumentToRemittanceDialog";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
+import {
+  usePayerSearch,
+  type PayerSelection,
+} from "../components/use-payer-search";
 import {
   requiresBankAccountAtEntry,
   requiresPaymentReference,
@@ -72,6 +78,7 @@ import type {
 const PAGE_SIZE = 25;
 const TODAY = toDateOnly(new Date())!;
 type PaymentSortBy = "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
+type PayerScope = "CLIENT" | "GROUPE";
 
 type InstrumentDraft = {
   mode: ClientPaymentMode;
@@ -120,6 +127,11 @@ const INSTRUMENT_STATUS_INDICATOR_STYLES: Record<
 export default function ReglementsEnregistresPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get("search")?.trim() ?? "";
+  const requestedPayerId = searchParams.get("payeurId") ?? "";
+  const requestedPayerType: PayerScope = searchParams.get("cible") === "GROUPE"
+    ? "GROUPE"
+    : "CLIENT";
+  const journalView = searchParams.get("vue") === "journal" || searchParams.get("journal") === "1";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
   const canManageTreasury = permissions.includes("tresorerie:manage");
@@ -132,6 +144,12 @@ export default function ReglementsEnregistresPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [search, setSearch] = useState(initialSearch);
   const [appliedSearch, setAppliedSearch] = useState(initialSearch);
+  const [payerScope, setPayerScope] = useState<PayerScope>(requestedPayerType);
+  const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
+  const [appliedPayerType, setAppliedPayerType] = useState<PayerScope | undefined>(
+    requestedPayerId ? requestedPayerType : undefined
+  );
+  const [appliedPayerId, setAppliedPayerId] = useState(requestedPayerId);
   const [dateFrom, setDateFrom] = useState(searchParams.get("dateDu") ?? "");
   const [dateTo, setDateTo] = useState(searchParams.get("dateAu") ?? "");
   const [appliedDateFrom, setAppliedDateFrom] = useState(searchParams.get("dateDu") ?? "");
@@ -146,6 +164,7 @@ export default function ReglementsEnregistresPage() {
   const [appliedInstrumentStatus, setAppliedInstrumentStatus] = useState(instrumentStatus);
   const [hasAppliedFilters, setHasAppliedFilters] = useState(() => Boolean(
     initialSearch
+      || requestedPayerId
       || searchParams.get("dateDu")
       || searchParams.get("dateAu")
       || searchParams.get("mode")
@@ -155,7 +174,6 @@ export default function ReglementsEnregistresPage() {
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
-  const journalView = searchParams.get("vue") === "journal" || searchParams.get("journal") === "1";
   const [journalDateFrom, setJournalDateFrom] = useState(TODAY);
   const [journalDateTo, setJournalDateTo] = useState(TODAY);
   const [journalUserId, setJournalUserId] = useState("ALL");
@@ -169,13 +187,22 @@ export default function ReglementsEnregistresPage() {
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
   const [replacementReason, setReplacementReason] = useState("");
   const replacementTargetId = searchParams.get("remplacer");
+  const payerSearch = usePayerSearch(journalView ? undefined : payerScope, selectedPayer);
+  const requestedClient = useQuery({
+    queryKey: ["crm-client", requestedPayerId],
+    queryFn: () => clientApi.getClientCrm(requestedPayerId),
+    enabled: !journalView && Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
+    staleTime: 30_000,
+  });
   const payments = useQuery({
     queryKey: [
       "compta", "client-payments", appliedSearch, appliedDateFrom, appliedDateTo,
-      appliedPaymentMode, appliedInstrumentStatus,
+      appliedPayerType, appliedPayerId, appliedPaymentMode, appliedInstrumentStatus,
       sortBy, sortDirection, page,
     ],
     queryFn: () => comptaApi.clientPayments({
+      payeurType: appliedPayerType,
+      payeurId: appliedPayerId || undefined,
       search: appliedSearch || undefined,
       dateDu: appliedDateFrom || undefined,
       dateAu: appliedDateTo || undefined,
@@ -188,6 +215,42 @@ export default function ReglementsEnregistresPage() {
     }),
     enabled: !journalView && hasAppliedFilters,
   });
+
+  useEffect(() => {
+    if (!requestedPayerId) return;
+    setPayerScope(requestedPayerType);
+    if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
+    if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
+      const client = requestedClient.data.client;
+      setSelectedPayer({
+        type: "CLIENT",
+        id: client.id,
+        name: client.nomAffichage || "Client",
+        identifier: client.codeClient || client.rc || client.cin || client.ice || "",
+        groupName: client.groupe?.libelle || undefined,
+      });
+      return;
+    }
+    if (requestedPayerType === "GROUPE") {
+      const group = payerSearch.groups.find((item) => item.id === requestedPayerId);
+      if (!group) return;
+      setSelectedPayer({
+        type: "GROUPE",
+        id: group.id,
+        name: group.libelle,
+        identifier: group.code,
+        treasuryName: group.clientTresorerieNom || undefined,
+        memberCount: group.membres.length,
+      });
+    }
+  }, [
+    payerSearch.groups,
+    requestedClient.data,
+    requestedPayerId,
+    requestedPayerType,
+    selectedPayer?.id,
+    selectedPayer?.type,
+  ]);
 
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
@@ -289,9 +352,39 @@ export default function ReglementsEnregistresPage() {
     setReplacementReason("");
   }
 
+  function applyPayerFilter(payer?: PayerSelection) {
+    setSelectedPayer(payer);
+    setAppliedPayerType(payer?.type);
+    setAppliedPayerId(payer?.id ?? "");
+    setPage(0);
+    const hasOtherCriteria = Boolean(
+      appliedSearch
+        || appliedDateFrom
+        || appliedDateTo
+        || appliedPaymentMode !== "ALL"
+        || appliedInstrumentStatus !== "ALL"
+    );
+    setHasAppliedFilters(Boolean(payer) || hasOtherCriteria);
+    const next = new URLSearchParams(searchParams);
+    if (payer) {
+      next.set("cible", payer.type);
+      next.set("payeurId", payer.id);
+    } else {
+      next.delete("cible");
+      next.delete("payeurId");
+    }
+    next.delete("page");
+    setSearchParams(next, { replace: true });
+  }
+
   function resetFilters() {
     setSearch("");
     setAppliedSearch("");
+    setPayerScope("CLIENT");
+    payerSearch.clearQuery();
+    setSelectedPayer(undefined);
+    setAppliedPayerType(undefined);
+    setAppliedPayerId("");
     setDateFrom("");
     setDateTo("");
     setAppliedDateFrom("");
@@ -315,6 +408,7 @@ export default function ReglementsEnregistresPage() {
     const nextSearch = search.trim();
     const hasCriteria = Boolean(
       nextSearch
+        || selectedPayer
         || dateFrom
         || dateTo
         || paymentMode !== "ALL"
@@ -326,6 +420,8 @@ export default function ReglementsEnregistresPage() {
       return;
     }
     setAppliedSearch(nextSearch);
+    setAppliedPayerType(selectedPayer?.type);
+    setAppliedPayerId(selectedPayer?.id ?? "");
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedPaymentMode(paymentMode);
@@ -334,6 +430,10 @@ export default function ReglementsEnregistresPage() {
     setPage(0);
     const next = new URLSearchParams();
     if (nextSearch) next.set("search", nextSearch);
+    if (selectedPayer) {
+      next.set("cible", selectedPayer.type);
+      next.set("payeurId", selectedPayer.id);
+    }
     if (dateFrom) next.set("dateDu", dateFrom);
     if (dateTo) next.set("dateAu", dateTo);
     if (paymentMode !== "ALL") next.set("mode", paymentMode);
@@ -423,9 +523,45 @@ export default function ReglementsEnregistresPage() {
       />
 
       {!journalView ? <>
-      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,1.7fr)_170px_170px_190px_190px_auto] xl:items-end">
+      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
         <div className="grid gap-2">
-          <Label htmlFor="payment-search">Payeur, numéro ou référence</Label>
+          <Label>Type de payeur</Label>
+          <div className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
+            {(["CLIENT", "GROUPE"] as const).map((scope) => (
+              <button
+                key={scope}
+                type="button"
+                className={`h-8 flex-1 rounded-sm px-3 text-sm font-medium ${
+                  payerScope === scope
+                    ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
+                    : "text-slate-600 hover:bg-background/70 hover:text-foreground dark:text-slate-300"
+                }`}
+                onClick={() => {
+                  setPayerScope(scope);
+                  payerSearch.clearQuery();
+                  applyPayerFilter(undefined);
+                }}
+              >
+                {scope === "CLIENT" ? "Client" : "Groupe"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-2 xl:col-span-2">
+          <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
+          <AutocompleteSelect
+            options={payerSearch.options}
+            value={selectedPayer?.type === payerScope ? selectedPayer.id : ""}
+            onValueChange={(value) => applyPayerFilter(payerSearch.resolve(value))}
+            onQueryChange={payerScope === "CLIENT" ? payerSearch.setQuery : undefined}
+            placeholder={payerScope === "CLIENT"
+              ? "Nom, RC, CIN, ICE ou code"
+              : "Code, groupe ou membre"}
+            emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
+          />
+        </div>
+        <div className="grid gap-2 xl:col-span-2">
+          <Label htmlFor="payment-search">N° règlement ou référence</Label>
           <Input
             id="payment-search"
             value={search}

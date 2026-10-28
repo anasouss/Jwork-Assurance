@@ -187,6 +187,25 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
               and instrument.mode in :modes
               and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
               and (:dateAu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
+              and (:payeurId is null
+                   or (:payeurType = 'CLIENT' and (
+                       reglement.clientPayeur.id = :payeurId
+                       or exists (
+                           select clientAllocation.id
+                           from AffectationReglementClient clientAllocation
+                           where clientAllocation.instrument = instrument
+                             and clientAllocation.clientPayeur.id = :payeurId
+                       )
+                   ))
+                   or (:payeurType = 'GROUPE' and (
+                       reglement.groupePayeur.id = :payeurId
+                       or exists (
+                           select groupAllocation.id
+                           from AffectationReglementClient groupAllocation
+                           where groupAllocation.instrument = instrument
+                             and groupAllocation.groupePayeur.id = :payeurId
+                       )
+                   )))
               and (
                     :search is null
                     or lower(reglement.numero) like lower(concat('%', :search, '%'))
@@ -236,6 +255,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             @Param("modes") Collection<ModeReglementClient> modes,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
+            @Param("payeurType") String payeurType,
+            @Param("payeurId") Long payeurId,
             @Param("search") String search,
             @Param("sortBy") String sortBy,
             @Param("sortDirection") String sortDirection,

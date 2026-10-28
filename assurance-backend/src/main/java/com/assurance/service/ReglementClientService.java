@@ -339,6 +339,8 @@ public class ReglementClientService {
             Long agenceId,
             LocalDate dateDu,
             LocalDate dateAu,
+            String payeurType,
+            Long payeurId,
             StatutReglementClient statut,
             ModeReglementClient mode,
             StatutInstrumentReglement statutInstrument,
@@ -348,10 +350,13 @@ public class ReglementClientService {
             int page,
             int size
     ) {
+        validateOptionalPayer(payeurType, payeurId);
         Page<ReglementClient> result = reglementRepository.search(
                 agenceId,
                 dateDu,
                 dateAu,
+                payeurType,
+                payeurId,
                 statut,
                 mode,
                 statutInstrument,
@@ -1146,12 +1151,15 @@ public class ReglementClientService {
             Collection<ModeReglementClient> modes,
             LocalDate dateDu,
             LocalDate dateAu,
+            String payeurType,
+            Long payeurId,
             String search,
             String sortBy,
             String sortDirection,
             int page,
             int size
     ) {
+        validateOptionalPayer(payeurType, payeurId);
         if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
             throw new BadRequestException("La date de début doit précéder la date de fin");
         }
@@ -1161,6 +1169,8 @@ public class ReglementClientService {
                 modes,
                 dateDu,
                 dateAu,
+                payeurType,
+                payeurId,
                 search == null || search.isBlank() ? null : search.trim(),
                 instrumentSortBy(sortBy),
                 "DESC".equalsIgnoreCase(sortDirection) ? "DESC" : "ASC",

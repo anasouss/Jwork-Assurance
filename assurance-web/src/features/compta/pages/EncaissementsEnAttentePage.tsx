@@ -4,6 +4,7 @@ import { ArrowRight, Banknote, Ban, CircleAlert, Eye, Landmark, MoreHorizontal, 
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,15 +29,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SortIcon } from "@/components/ui/sort-icon";
+import { clientApi } from "@/features/production/api/clients";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { usePayerSearch, type PayerSelection } from "../components/use-payer-search";
 import type { ClientPaymentMode, EligibleCashDay, PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type ModeFilter = Extract<ClientPaymentMode, "ESPECES" | "CHEQUE" | "EFFET" | "VIREMENT" | "VERSEMENT_BANCAIRE"> | "ALL";
 type InstrumentSortBy = "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "DUE" | "AMOUNT";
 type SortDirection = "ASC" | "DESC";
+type PayerScope = "CLIENT" | "GROUPE";
 
 export default function EncaissementsEnAttentePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,8 +49,13 @@ export default function EncaissementsEnAttentePage() {
   const canManage = permissions.includes("tresorerie:manage");
   const canReplacePayment = permissions.includes("reglement-client:manage");
   const queryClient = useQueryClient();
-  const { mode, search: appliedSearch, dateFrom, dateTo, page, sortBy, sortDirection } = urlState;
+  const {
+    mode, search: appliedSearch, payerType, payerId,
+    dateFrom, dateTo, page, sortBy, sortDirection,
+  } = urlState;
   const [search, setSearch] = useState(appliedSearch);
+  const [payerScope, setPayerScope] = useState<PayerScope>(payerType ?? "CLIENT");
+  const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
   const [selectedInstruments, setSelectedInstruments] = useState<PaymentInstrument[]>([]);
   const [selectedCashDays, setSelectedCashDays] = useState<EligibleCashDay[]>([]);
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
@@ -61,25 +70,73 @@ export default function EncaissementsEnAttentePage() {
   const [slipDate, setSlipDate] = useState(TODAY);
   const [slipNotes, setSlipNotes] = useState("");
   const pdfWindowRef = useRef<Window | null>(null);
+  const payerSearch = usePayerSearch(mode === "ESPECES" ? undefined : payerScope, selectedPayer);
+  const requestedClient = useQuery({
+    queryKey: ["crm-client", payerId],
+    queryFn: () => clientApi.getClientCrm(payerId),
+    enabled: Boolean(payerId) && payerType === "CLIENT" && mode !== "ESPECES",
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     setSearch(appliedSearch);
   }, [appliedSearch]);
 
   useEffect(() => {
+    if (payerType) setPayerScope(payerType);
+  }, [payerType]);
+
+  useEffect(() => {
+    if (!payerId) return;
+    if (selectedPayer?.id === payerId && selectedPayer.type === payerType) return;
+    if (payerType === "CLIENT" && requestedClient.data?.client) {
+      const client = requestedClient.data.client;
+      setSelectedPayer({
+        type: "CLIENT",
+        id: client.id,
+        name: client.nomAffichage || "Client",
+        identifier: client.codeClient || client.rc || client.cin || client.ice || "",
+        groupName: client.groupe?.libelle || undefined,
+      });
+      return;
+    }
+    if (payerType === "GROUPE") {
+      const group = payerSearch.groups.find((item) => item.id === payerId);
+      if (!group) return;
+      setSelectedPayer({
+        type: "GROUPE",
+        id: group.id,
+        name: group.libelle,
+        identifier: group.code,
+        treasuryName: group.clientTresorerieNom || undefined,
+        memberCount: group.membres.length,
+      });
+    }
+  }, [
+    payerId,
+    payerSearch.groups,
+    payerType,
+    requestedClient.data,
+    selectedPayer?.id,
+    selectedPayer?.type,
+  ]);
+
+  useEffect(() => {
     setSelectedInstruments([]);
     setSelectedCashDays([]);
-  }, [mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection]);
+  }, [mode, appliedSearch, payerId, payerType, dateFrom, dateTo, sortBy, sortDirection]);
 
   function updateUrl(patch: Partial<CollectionQueueUrlState>) {
     setSearchParams(collectionQueueSearchParams({ ...urlState, ...patch }), { replace: true });
   }
 
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "collection-queue", mode, appliedSearch, dateFrom, dateTo, sortBy, sortDirection, page],
+    queryKey: ["compta", "treasury", "collection-queue", mode, appliedSearch, payerType, payerId, dateFrom, dateTo, sortBy, sortDirection, page],
     queryFn: () => comptaApi.paymentInstruments({
       statuts: ["EN_ATTENTE", "REMIS_EN_BANQUE"],
       mode: mode === "ALL" ? undefined : mode,
+      payeurType,
+      payeurId: payerId || undefined,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
       dateAu: dateTo || undefined,
@@ -273,20 +330,35 @@ export default function EncaissementsEnAttentePage() {
   }
 
   function applyFilters() {
-    updateUrl({ search: search.trim(), page: 0 });
+    updateUrl({
+      search: search.trim(),
+      payerType: selectedPayer?.type,
+      payerId: selectedPayer?.id ?? "",
+      page: 0,
+    });
   }
 
   function resetFilters() {
     setSearch("");
+    setPayerScope("CLIENT");
+    payerSearch.clearQuery();
+    setSelectedPayer(undefined);
     setSelectedInstruments([]);
     setSelectedCashDays([]);
     setSearchParams(new URLSearchParams(), { replace: true });
   }
 
   function changeMode(nextMode: ModeFilter) {
+    if (nextMode === "ESPECES") {
+      setPayerScope("CLIENT");
+      payerSearch.clearQuery();
+      setSelectedPayer(undefined);
+    }
     updateUrl({
       mode: nextMode,
       search: appliedSearch,
+      payerType: nextMode === "ESPECES" ? undefined : payerType,
+      payerId: nextMode === "ESPECES" ? "" : payerId,
       dateFrom,
       dateTo,
       page: 0,
@@ -309,7 +381,7 @@ export default function EncaissementsEnAttentePage() {
     return [day.compteTresorerie, day.caissier, day.dateJournee]
       .some((value) => value?.toLocaleLowerCase("fr").includes(cashSearch));
   });
-  const showCashWorkflow = mode === "ALL" || mode === "ESPECES";
+  const showCashWorkflow = mode === "ESPECES" || (mode === "ALL" && !payerId);
   const showInstrumentWorkflow = mode !== "ESPECES";
   const dateFilterLabel = mode === "ESPECES"
     ? "Journée"
@@ -393,7 +465,7 @@ export default function EncaissementsEnAttentePage() {
         </div>
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 xl:grid-cols-[210px_1fr_170px_170px_auto]">
+      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
         <div className="grid gap-2">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => changeMode(value as ModeFilter)}>
@@ -409,7 +481,56 @@ export default function EncaissementsEnAttentePage() {
           </Select>
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="collection-search">Payeur, règlement, caisse, banque ou référence</Label>
+          <Label>Type de payeur</Label>
+          <div className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
+            {(["CLIENT", "GROUPE"] as const).map((scope) => (
+              <button
+                key={scope}
+                type="button"
+                disabled={mode === "ESPECES"}
+                className={`h-8 flex-1 rounded-sm px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                  payerScope === scope
+                    ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
+                    : "text-slate-600 hover:bg-background/70 hover:text-foreground dark:text-slate-300"
+                }`}
+                onClick={() => {
+                  setPayerScope(scope);
+                  payerSearch.clearQuery();
+                  setSelectedPayer(undefined);
+                  updateUrl({ payerType: undefined, payerId: "", page: 0 });
+                }}
+              >
+                {scope === "CLIENT" ? "Client" : "Groupe"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-2 xl:col-span-2">
+          <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
+          <AutocompleteSelect
+            options={payerSearch.options}
+            value={selectedPayer?.type === payerScope ? selectedPayer.id : ""}
+            onValueChange={(value) => {
+              const payer = payerSearch.resolve(value);
+              setSelectedPayer(payer);
+              updateUrl({
+                payerType: payer?.type,
+                payerId: payer?.id ?? "",
+                page: 0,
+              });
+            }}
+            onQueryChange={payerScope === "CLIENT" ? payerSearch.setQuery : undefined}
+            placeholder={mode === "ESPECES"
+              ? "Non applicable aux journées de caisse"
+              : payerScope === "CLIENT"
+                ? "Nom, RC, CIN, ICE ou code"
+                : "Code, groupe ou membre"}
+            emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
+            disabled={mode === "ESPECES"}
+          />
+        </div>
+        <div className="grid gap-2 xl:col-span-2">
+          <Label htmlFor="collection-search">Règlement, caisse, banque ou référence</Label>
           <Input id="collection-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} />
         </div>
         <div className="grid gap-2">
@@ -538,7 +659,7 @@ export default function EncaissementsEnAttentePage() {
               <CollectionSortHeader column="PAYMENT" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Règlement</CollectionSortHeader>
               <CollectionSortHeader column="MODE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Mode</CollectionSortHeader>
               <CollectionSortHeader column="RECEIVED" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Reçu le</CollectionSortHeader>
-              <CollectionSortHeader column="DUE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Date portée / échéance</CollectionSortHeader>
+              <CollectionSortHeader column="DUE" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Date d’échéance</CollectionSortHeader>
               <th className="px-4 py-3 text-left">Traitement</th>
               <CollectionSortHeader column="AMOUNT" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="right">Montant</CollectionSortHeader>
               <th className="w-44 px-4 py-3 text-right">Action</th>
@@ -866,6 +987,8 @@ function isSelectableForSlip(instrument: PaymentInstrument) {
 type CollectionQueueUrlState = {
   mode: ModeFilter;
   search: string;
+  payerType?: PayerScope;
+  payerId: string;
   dateFrom: string;
   dateTo: string;
   page: number;
@@ -878,6 +1001,10 @@ function collectionQueueStateFromParams(params: URLSearchParams): CollectionQueu
   return {
     mode,
     search: params.get("search")?.trim() ?? "",
+    payerType: params.get("payeurId")
+      ? params.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT"
+      : undefined,
+    payerId: params.get("payeurId") ?? "",
     dateFrom: validQueueDate(params.get("dateDu")),
     dateTo: validQueueDate(params.get("dateAu")),
     page: queuePageFromParam(params.get("page")),
@@ -890,6 +1017,10 @@ function collectionQueueSearchParams(state: CollectionQueueUrlState) {
   const params = new URLSearchParams();
   if (state.mode !== "ALL") params.set("mode", state.mode);
   if (state.search) params.set("search", state.search);
+  if (state.payerId && state.payerType) {
+    params.set("cible", state.payerType);
+    params.set("payeurId", state.payerId);
+  }
   if (state.dateFrom) params.set("dateDu", state.dateFrom);
   if (state.dateTo) params.set("dateAu", state.dateTo);
   if (state.page > 0) params.set("page", String(state.page + 1));

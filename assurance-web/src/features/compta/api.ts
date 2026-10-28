@@ -568,6 +568,8 @@ export const comptaApi = {
   async clientPayments(params: {
     dateDu?: string;
     dateAu?: string;
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
     search?: string;
     statut?: ClientPayment["statut"];
     mode?: PaymentInstrument["mode"];
@@ -658,6 +660,8 @@ export const comptaApi = {
     modes?: PaymentInstrument["mode"][];
     dateDu?: string;
     dateAu?: string;
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
     search?: string;
     sortBy?: "REFERENCE" | "PAYER" | "PAYMENT" | "MODE" | "RECEIVED" | "STATUS_DATE" | "DUE" | "AMOUNT";
     sortDirection?: "ASC" | "DESC";

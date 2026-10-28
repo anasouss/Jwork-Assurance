@@ -7,6 +7,7 @@ import {
   Edit,
   ExternalLink,
   Eye,
+  EyeOff,
   ImageIcon,
   KeyRound,
   Laptop,
@@ -3344,10 +3345,19 @@ function ResetPasswordDialog({
   scope?: "agency" | "platform";
 }) {
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
 
   useEffect(() => {
-    if (user) setPassword("");
+    if (!user) return;
+    setPassword("");
+    setConfirmation("");
+    setPasswordVisible(false);
+    setConfirmationVisible(false);
   }, [user]);
+
+  const passwordsMatch = password === confirmation;
 
   const reset = useMutation({
     mutationFn: () => user
@@ -3370,13 +3380,77 @@ function ResetPasswordDialog({
           <DialogTitle>Réinitialiser le mot de passe</DialogTitle>
           <DialogDescription>{user?.fullName}</DialogDescription>
         </DialogHeader>
-        <LabeledInput label="Nouveau mot de passe" type="password" value={password} onChange={setPassword} />
+        <div className="grid gap-3">
+          <PasswordInput
+            label="Nouveau mot de passe"
+            value={password}
+            visible={passwordVisible}
+            onChange={setPassword}
+            onVisibilityChange={setPasswordVisible}
+          />
+          <PasswordInput
+            label="Confirmer le mot de passe"
+            value={confirmation}
+            visible={confirmationVisible}
+            onChange={setConfirmation}
+            onVisibilityChange={setConfirmationVisible}
+          />
+          {confirmation.length > 0 && !passwordsMatch && (
+            <p className="text-sm text-destructive">Les mots de passe ne correspondent pas.</p>
+          )}
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button onClick={() => reset.mutate()} disabled={reset.isPending || password.length < 8}>Enregistrer</Button>
+          <Button
+            onClick={() => reset.mutate()}
+            disabled={reset.isPending || password.length < 8 || confirmation.length === 0 || !passwordsMatch}
+          >
+            Enregistrer
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PasswordInput({
+  label,
+  value,
+  visible,
+  onChange,
+  onVisibilityChange,
+}: {
+  label: string;
+  value: string;
+  visible: boolean;
+  onChange: (value: string) => void;
+  onVisibilityChange: (visible: boolean) => void;
+}) {
+  return (
+    <div className="grid gap-1.5 text-sm">
+      <span className="font-medium">{label}</span>
+      <div className="relative">
+        <Input
+          aria-label={label}
+          type={visible ? "text" : "password"}
+          autoComplete="new-password"
+          className="pr-10"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-1 top-1/2 size-8 -translate-y-1/2"
+          aria-label={visible ? `Masquer ${label.toLowerCase()}` : `Afficher ${label.toLowerCase()}`}
+          title={visible ? "Masquer" : "Afficher"}
+          onClick={() => onVisibilityChange(!visible)}
+        >
+          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </Button>
+      </div>
+    </div>
   );
 }
 

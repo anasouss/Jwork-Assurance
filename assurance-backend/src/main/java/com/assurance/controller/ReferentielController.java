@@ -1919,10 +1919,6 @@ public class ReferentielController {
         CategorieTransport categorieTransport = request.getCategorieTransportId() == null ? null :
                 categorieTransportRepository.findById(request.getCategorieTransportId())
                         .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", request.getCategorieTransportId()));
-        SousClasse sousClasse = resolveSousClasse(request.getSousClasseId());
-        if (usage != null && !Boolean.TRUE.equals(usage.getBySousClasse())) {
-            sousClasse = null;
-        }
         ligne.setGarantie(garantie);
         ligne.setUsage(usage);
         ligne.setCategorieTransport(categorieTransport);
@@ -1932,7 +1928,7 @@ public class ReferentielController {
         ligne.setNombrePlacesMax(request.getNombrePlacesMax());
         ligne.setPtcMin(request.getPtcMin());
         ligne.setPtcMax(request.getPtcMax());
-        ligne.setSousClasse(sousClasse);
+        ligne.setSousClasse(null);
         ligne.setCarburant(request.getCarburant());
         ligne.setTaux(request.getTaux());
         ligne.setTauxFranchise(request.getTauxFranchise());
@@ -2182,15 +2178,6 @@ public class ReferentielController {
                 .putValue("ordreAffichage", ligne.getOrdreAffichage())
                 .putValue("actif", ligne.getActif())
                 .map();
-    }
-
-    private SousClasse resolveSousClasse(Long sousClasseId) {
-        if (sousClasseId == null) {
-            return null;
-        }
-        return sousClasseRepository.findById(sousClasseId)
-                .filter(sousClasse -> Boolean.TRUE.equals(sousClasse.getActif()))
-                .orElseThrow(() -> new BadRequestException("Sous-classe inactive ou inconnue"));
     }
 
     private CritereSelectionTarif effectiveCritereSelectionTarif(Garantie garantie) {

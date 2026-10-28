@@ -16,7 +16,6 @@ export function LigneGrilleTarifaireDialog({
   garanties,
   usages,
   categoriesTransport,
-  sousClasses,
   onSubmit,
   submitting,
   defaultUsageId,
@@ -27,7 +26,6 @@ export function LigneGrilleTarifaireDialog({
   garanties: ReferenceOption[];
   usages: ReferenceOption[];
   categoriesTransport: ReferenceOption[];
-  sousClasses: ReferenceOption[];
   onSubmit: (payload: UpsertLigneGrilleTarifaireRequest) => void;
   submitting?: boolean;
   defaultUsageId?: string;
@@ -55,7 +53,6 @@ export function LigneGrilleTarifaireDialog({
       nombrePlacesMax: toNumber(ligne?.nombrePlacesMax),
       ptcMin: toNumber(ligne?.ptcMin),
       ptcMax: toNumber(ligne?.ptcMax),
-      sousClasseId: ligne?.sousClasseId ? String(ligne.sousClasseId) : "",
       carburant: ligne?.carburant ? String(ligne.carburant) : "",
       libelleOption: ligne?.libelle ?? "",
       prime: toNumber(ligne?.prime),
@@ -104,7 +101,6 @@ export function LigneGrilleTarifaireDialog({
               value={payload.usageId ?? ""}
               onValueChange={(value) => update({
                 usageId: value,
-                sousClasseId: undefined,
                 carburant: undefined,
                 puissanceFiscaleMin: undefined,
                 puissanceFiscaleMax: undefined,
@@ -166,22 +162,6 @@ export function LigneGrilleTarifaireDialog({
                 <NumberField label="PTC min" value={payload.ptcMin} onChange={(value) => update({ ptcMin: value })} />
                 <NumberField label="PTC max" value={payload.ptcMax} onChange={(value) => update({ ptcMax: value })} />
               </> : null}
-              {selectedUsage?.bySousClasse ? <Field label="Sous-classe">
-                <Select
-                  value={payload.sousClasseId || "__none"}
-                  onValueChange={(value) => update({ sousClasseId: value === "__none" ? undefined : value })}
-                >
-                  <SelectTrigger><SelectValue placeholder="Toutes" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">Toutes</SelectItem>
-                    {sousClasses.filter((item) => item.actif !== false).map((sousClasse) => (
-                      <SelectItem key={sousClasse.id} value={sousClasse.id}>
-                        {sousClasse.code ? `${sousClasse.code} - ` : ""}{sousClasse.libelle}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field> : null}
               {selectedUsage?.byCarburant ? <Field label="Carburant">
                 <Input value={payload.carburant ?? ""} onChange={(event) => update({ carburant: event.target.value })} />
               </Field> : null}
@@ -228,7 +208,7 @@ function cleanPayload(payload: UpsertLigneGrilleTarifaireRequest): UpsertLigneGr
     usageId: payload.usageId || undefined,
     categorieTransportId: payload.categorieTransportId || undefined,
     modeTarification: payload.modeTarification || undefined,
-    sousClasseId: payload.sousClasseId || undefined,
+    sousClasseId: undefined,
     carburant: payload.carburant || undefined,
     libelleOption: payload.libelleOption || undefined,
     prime: mode === "TAUX" ? undefined : payload.prime,

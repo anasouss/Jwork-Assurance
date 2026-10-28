@@ -115,7 +115,7 @@ public class JournalReglementsPdfService {
 
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(output));
-            Document document = new Document(pdf, PageSize.A4.rotate());
+            Document document = new Document(pdf, PageSize.A4);
             document.setMargins(22, PAGE_MARGIN, 46, PAGE_MARGIN);
             PdfFont regular = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
@@ -326,8 +326,8 @@ public class JournalReglementsPdfService {
     ) {
         document.add(sectionTitle("Détail des règlements", bold));
         float[] columns = showUser
-                ? new float[]{1.05f, 1.55f, 1.1f, 0.9f, 1.25f, 0.85f, 1.1f, 0.9f, 0.9f}
-                : new float[]{1.05f, 1.65f, 1.15f, 0.95f, 0.9f, 1.15f, 0.95f, 0.9f};
+                ? new float[]{1.05f, 1.6f, 1.1f, 0.8f, 1.2f, 0.8f, 1.15f, 0.8f, 0.9f}
+                : new float[]{1.05f, 1.75f, 1.2f, 0.85f, 0.85f, 1.2f, 0.85f, 0.95f};
         Table table = new Table(columns)
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N° RÈGLEMENT", bold, TextAlignment.LEFT);

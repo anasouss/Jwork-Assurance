@@ -484,17 +484,15 @@ export default function ReglementsEnregistresPage() {
 
       <section className="overflow-hidden rounded-md border bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1480px] text-sm">
+          <table className="w-full min-w-[1240px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
                 <PaymentSortHeader column="numero" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>N° règlement</PaymentSortHeader>
                 <PaymentSortHeader column="dateReglement" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Date</PaymentSortHeader>
                 <PaymentSortHeader column="payeurNom" activeColumn={sortBy} direction={sortDirection} onSort={changeSort}>Payeur</PaymentSortHeader>
-                <th className="px-4 py-3 text-left">Déposant</th>
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3 text-left">Moyen</th>
                 <th className="px-4 py-3 text-left">Référence</th>
-                <th className="px-4 py-3 text-left">Date portée / échéance</th>
                 <th className="px-4 py-3 text-left">Date de valeur</th>
                 <th className="px-4 py-3 text-center">État de valeur</th>
                 <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Règlement</PaymentSortHeader>
@@ -503,7 +501,7 @@ export default function ReglementsEnregistresPage() {
             </thead>
             <tbody className="divide-y">
               {hasAppliedFilters && payments.isLoading ? (
-                <TableRowsSkeleton colSpan={12} rows={8} />
+                <TableRowsSkeleton colSpan={10} rows={8} />
               ) : hasAppliedFilters ? (payments.data?.rows ?? []).flatMap((payment) => {
                 const expanded = expandedPayments.has(payment.id);
                 return [
@@ -531,12 +529,10 @@ export default function ReglementsEnregistresPage() {
                   <td className="px-4 py-3">
                     <div className="max-w-64">{payment.payeurNom}</div>
                   </td>
-                  <td className="px-4 py-3">{payment.deposantNom || "-"}</td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(payment.montantTotal)}</td>
                   <td className="px-4 py-3"><InstrumentModesSummary instruments={payment.instruments} /></td>
                   <td className="px-4 py-3 font-medium">{instrumentReferencesSummary(payment.instruments)}</td>
-                  <td className="px-4 py-3">{instrumentDatesSummary(payment.instruments, "dateEcheance")}</td>
-                  <td className="px-4 py-3">{instrumentDatesSummary(payment.instruments, "dateStatut")}</td>
+                  <td className="px-4 py-3">{instrumentDatesSummary(payment.instruments)}</td>
                   <td className="px-4 py-3 text-center"><InstrumentStatusesSummary instruments={payment.instruments} /></td>
                   <td className="px-4 py-3 text-center">
                     <PaymentStatusBadge value={payment.statut} />
@@ -564,7 +560,7 @@ export default function ReglementsEnregistresPage() {
                 </tr>,
                 expanded ? (
                   <tr key={`${payment.id}-details`} className="bg-muted/20">
-                    <td colSpan={12} className="px-10 py-3">
+                    <td colSpan={10} className="px-10 py-3">
                       <PaymentInstrumentDetails payment={payment} />
                     </td>
                   </tr>
@@ -573,13 +569,13 @@ export default function ReglementsEnregistresPage() {
               }) : null}
               {!hasAppliedFilters ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                     Renseignez au moins un critère puis lancez la recherche.
                   </td>
                 </tr>
               ) : !payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun règlement ne correspond à la recherche.
                   </td>
                 </tr>
@@ -1084,13 +1080,12 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
         Moyens du règlement {payment.numero}
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[860px] text-sm">
           <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
             <tr>
               <th className="px-3 py-2 text-left">Payeur</th>
               <th className="px-3 py-2 text-left">Moyen</th>
               <th className="px-3 py-2 text-left">Référence</th>
-              <th className="px-3 py-2 text-left">Date portée / échéance</th>
               <th className="px-3 py-2 text-left">Date de valeur</th>
               <th className="px-3 py-2 text-center">État</th>
               <th className="px-3 py-2 text-right">Montant</th>
@@ -1103,7 +1098,6 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
                 <td className="px-3 py-2">{MODE_LABELS[instrument.mode]}</td>
                 <td className="px-3 py-2 font-medium">{instrument.referenceInstrument || "-"}</td>
                 <td className="px-3 py-2">{formatDate(instrument.dateEcheance)}</td>
-                <td className="px-3 py-2">{formatDate(instrument.dateStatut)}</td>
                 <td className="px-3 py-2 text-center"><InstrumentStatusIndicator value={instrument.statut} /></td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums">
                   {formatAccountingAmount(instrument.montant)}
@@ -1126,13 +1120,10 @@ function instrumentReferencesSummary(instruments: PaymentInstrument[]) {
   return `${references.length} référence${references.length > 1 ? "s" : ""}`;
 }
 
-function instrumentDatesSummary(
-  instruments: PaymentInstrument[],
-  field: "dateEcheance" | "dateStatut"
-) {
+function instrumentDatesSummary(instruments: PaymentInstrument[]) {
   const dates = Array.from(new Set(
     instruments
-      .map((instrument) => instrument[field])
+      .map((instrument) => instrument.dateEcheance)
       .filter((date): date is string => Boolean(date))
   )).sort();
   if (dates.length === 0) return "-";

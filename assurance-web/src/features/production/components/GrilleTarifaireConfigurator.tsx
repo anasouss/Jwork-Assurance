@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -87,6 +88,7 @@ export function GrilleTarifaireConfigurator({
 
   const activeUsageId = selectedUsageId || usageTabs[0]?.id || "";
   const activeUsage = usageTabs.find((usage) => usage.id === activeUsageId) ?? null;
+  const configurationLoading = lignes.isLoading || formules.isLoading;
   const vehicleGaranties = useMemo(
     () => garanties
       .filter(isConfigurableVehicleGarantie)
@@ -308,7 +310,8 @@ export function GrilleTarifaireConfigurator({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {draftGroups.map(({ garantie, drafts: groupDrafts }) => {
+            {configurationLoading ? <TableRowsSkeleton rows={6} colSpan={9} /> : null}
+            {!configurationLoading ? draftGroups.map(({ garantie, drafts: groupDrafts }) => {
               const baseDraft = groupDrafts.find((draft) => draft.baseRow) ?? emptyDraft(garantie);
               const mode = baseDraft.modeTarification || defaultMode(garantie);
               const enabled = baseDraft.checked;
@@ -412,7 +415,7 @@ export function GrilleTarifaireConfigurator({
                   </TableRow>
                 );
               });
-            })}
+            }) : null}
           </TableBody>
         </Table>
       </div>
@@ -425,11 +428,12 @@ export function GrilleTarifaireConfigurator({
           setGarantieEnabled={setPersonneGarantieEnabled}
           addDraft={addPersonneDraft}
           removeDraft={removePersonneDraft}
+          loading={configurationLoading}
         />
       ) : null}
 
       <div className="flex justify-end border-t pt-4">
-        <Button type="button" disabled={!activeUsageId || saveConfiguration.isPending} onClick={submitMatrix}>
+        <Button type="button" disabled={!activeUsageId || configurationLoading || saveConfiguration.isPending} onClick={submitMatrix}>
           <Save className="size-4" />
           Enregistrer l'usage
         </Button>
@@ -445,6 +449,7 @@ function PersonnesLinesTable({
   setGarantieEnabled,
   addDraft,
   removeDraft,
+  loading,
 }: {
   groups: { garantie: ReferenceOption; drafts: PersonneMatrixLine[] }[];
   activeUsage: ReferenceOption | null;
@@ -452,6 +457,7 @@ function PersonnesLinesTable({
   setGarantieEnabled: (garantie: ReferenceOption, checked: boolean) => void;
   addDraft: (garantie: ReferenceOption) => void;
   removeDraft: (draft: PersonneMatrixLine) => void;
+  loading: boolean;
 }) {
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -477,7 +483,7 @@ function PersonnesLinesTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {groups.length === 0 ? (
+          {loading ? <TableRowsSkeleton rows={4} colSpan={12} /> : groups.length === 0 ? (
             <TableRow>
               <TableCell colSpan={12} className="py-8 text-center text-muted-foreground">Aucune garantie personne disponible.</TableCell>
             </TableRow>

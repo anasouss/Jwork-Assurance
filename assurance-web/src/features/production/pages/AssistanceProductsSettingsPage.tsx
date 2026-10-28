@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Check, ChevronsUpDown, Edit, Plus, PowerOff, Search, Tags, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import {
   AlertDialog,
@@ -342,11 +343,7 @@ export default function AssistanceProductsSettingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">Chargement des produits...</TableCell>
-                </TableRow>
-              ) : null}
+              {products.isLoading ? <TableRowsSkeleton rows={6} colSpan={10} /> : null}
               {filteredProducts.map((product) => {
                 const voyage = isVoyageProduct(product);
                 return <TableRow key={product.id}>
@@ -580,6 +577,9 @@ export default function AssistanceProductsSettingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {tarifs.isLoading ? (
+                  <TableRowsSkeleton rows={5} colSpan={tarifProduct && isVoyageProduct(tarifProduct) ? 6 : 5} />
+                ) : null}
                 {sortedTariffs.map((tarif) => (
                   <TableRow key={tarif.id}>
                     <TableCell>{periodLabelFromDates(refString(tarif, "dateDebut"), refString(tarif, "dateFin"))}</TableCell>
@@ -661,6 +661,7 @@ export default function AssistanceProductsSettingsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {promos.isLoading ? <TableRowsSkeleton rows={4} colSpan={5} /> : null}
                     {(promos.data ?? []).map((promo) => (
                       <TableRow key={promo.id}>
                         <TableCell className="font-medium">{promo.code || promo.libelle}</TableCell>

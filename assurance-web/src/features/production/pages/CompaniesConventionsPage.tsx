@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -214,6 +215,7 @@ export default function CompaniesConventionsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {conventions.isLoading ? <TableRowsSkeleton rows={6} colSpan={9} /> : null}
               {filtered.map((convention) => (
                 <TableRow key={convention.id}>
                   <TableCell className="font-medium">{convention.code ?? "-"}</TableCell>

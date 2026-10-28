@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit, Handshake, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
+import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -146,6 +147,7 @@ export default function CompaniesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {compagnies.isLoading ? <TableRowsSkeleton rows={6} colSpan={12} /> : null}
               {filtered.map((compagnie) => (
                 <TableRow key={compagnie.id}>
                   <TableCell className="font-medium">{companyField(compagnie, "codeIntermediaire") || "-"}</TableCell>

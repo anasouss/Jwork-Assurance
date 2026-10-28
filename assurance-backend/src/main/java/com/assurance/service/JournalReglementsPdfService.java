@@ -10,7 +10,6 @@ import com.assurance.entity.ReglementClient;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.RoleClientContrat;
-import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
@@ -327,8 +326,8 @@ public class JournalReglementsPdfService {
     ) {
         document.add(sectionTitle("Détail des règlements", bold));
         float[] columns = showUser
-                ? new float[]{1.05f, 1.45f, 1.05f, 0.85f, 1.25f, 0.8f, 1.05f, 0.85f, 1.05f, 0.85f}
-                : new float[]{1.05f, 1.55f, 1.1f, 0.9f, 0.85f, 1.1f, 0.9f, 1.1f, 0.9f};
+                ? new float[]{1.05f, 1.55f, 1.1f, 0.9f, 1.25f, 0.85f, 1.1f, 0.9f, 0.9f}
+                : new float[]{1.05f, 1.65f, 1.15f, 0.95f, 0.9f, 1.15f, 0.95f, 0.9f};
         Table table = new Table(columns)
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N° RÈGLEMENT", bold, TextAlignment.LEFT);
@@ -341,7 +340,6 @@ public class JournalReglementsPdfService {
         addHeader(table, "MODE", bold, TextAlignment.LEFT);
         addHeader(table, "RÉFÉRENCE", bold, TextAlignment.LEFT);
         addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
-        addHeader(table, "STATUT", bold, TextAlignment.LEFT);
         addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
 
         int index = 0;
@@ -361,13 +359,10 @@ public class JournalReglementsPdfService {
             addBody(table, modeLabel(instrument.getMode()), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getReferenceInstrument()), regular, TextAlignment.LEFT, background);
             addBody(table, instrumentDueDate(instrument), regular, TextAlignment.CENTER, background);
-            addBody(table, payment.getStatut() == StatutReglementClient.ANNULE
-                    ? "Annulé"
-                    : instrumentStatus(instrument), regular, TextAlignment.LEFT, background);
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         if (instruments.isEmpty()) {
-            table.addCell(new Cell(1, showUser ? 10 : 9)
+            table.addCell(new Cell(1, showUser ? 9 : 8)
                     .add(new Paragraph("Aucun règlement pour les critères sélectionnés")
                             .setFont(regular).setFontSize(8).setMargin(0))
                     .setTextAlignment(TextAlignment.CENTER)
@@ -574,17 +569,6 @@ public class JournalReglementsPdfService {
             case EFFET -> "Effet";
             case VIREMENT -> "Virement";
             case VERSEMENT_BANCAIRE -> "Versement bancaire";
-        };
-    }
-
-    private String instrumentStatus(InstrumentReglementClient instrument) {
-        return switch (instrument.getStatut()) {
-            case EN_ATTENTE -> Boolean.TRUE.equals(instrument.getReglementBureau())
-                    ? "Règlement au bureau" : "À remettre";
-            case REMIS_EN_BANQUE -> "Remis en banque";
-            case CONFIRME -> "Confirmé";
-            case REJETE -> "Impayé";
-            case REMPLACE -> "Remplacé";
         };
     }
 

@@ -235,7 +235,7 @@ export default function BordereauRemiseDetailPage() {
             <td className="px-4 py-3 font-medium">{formatTreasuryDate(day.dateJournee)}</td>
             <td className="px-4 py-3">{day.compteSource}</td><td className="px-4 py-3">{day.caissier || "-"}</td>
             <td className="px-4 py-3 text-center">{day.count}</td><td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(day.montant)}</td>
-            <td className="px-4 py-3">{day.operationTresorerieId ? "Enregistré" : "À remettre"}</td>
+            <td className="px-4 py-3">{day.operationTresorerieId ? "Enregistré" : "À enregistrer"}</td>
           </tr>)}</tbody>
         </table></div> : <div className="grid gap-3 p-4 sm:grid-cols-3">
           <Summary label="Caisse source" value={data.compteSource || "-"} />

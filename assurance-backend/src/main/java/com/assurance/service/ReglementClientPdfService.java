@@ -482,7 +482,7 @@ public class ReglementClientPdfService {
     private String instrumentStatus(InstrumentReglementClient instrument) {
         return switch (instrument.getStatut()) {
             case EN_ATTENTE -> Boolean.TRUE.equals(instrument.getReglementBureau())
-                    ? "Règlement au bureau" : "À remettre";
+                    ? "Règlement au bureau" : "En attente de bordereau";
             case REMIS_EN_BANQUE -> "Remis en banque";
             case CONFIRME -> "Confirmé";
             case REJETE -> "Impayé";

@@ -804,7 +804,7 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
     return <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-200">Bordereau provisoire {instrument.numeroBordereauRemise}</Badge>;
   }
   if (instrument.mode === "CHEQUE" || instrument.mode === "EFFET") {
-    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">À remettre</Badge>;
+    return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">En attente de bordereau</Badge>;
   }
   return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">À rapprocher</Badge>;
 }

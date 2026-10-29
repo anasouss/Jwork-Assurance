@@ -106,8 +106,8 @@ export default function CompaniesPage() {
       </div>
 
       <div className="rounded-lg border bg-card p-4">
-        <div className="mb-4 grid gap-3 md:grid-cols-[1fr_220px]">
-          <div className="relative">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="relative min-w-0 flex-[1_1_320px] sm:max-w-2xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               className="pl-9"
@@ -117,7 +117,7 @@ export default function CompaniesPage() {
             />
           </div>
           <Select value={status} onValueChange={(value) => setStatus(value as typeof status)}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full sm:w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

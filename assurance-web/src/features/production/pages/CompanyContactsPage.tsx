@@ -134,8 +134,8 @@ export default function CompanyContactsPage() {
 
       <Card className="border-border/70 shadow-none">
         <CardContent className="pt-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_260px_230px_190px_auto]">
-            <Field label="Recherche">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="Recherche" className="min-w-0 flex-[1_1_280px] sm:max-w-xl">
               <Input
                 value={filters.q}
                 placeholder="Nom, fonction, téléphone ou e-mail"
@@ -143,7 +143,7 @@ export default function CompanyContactsPage() {
                 onKeyDown={(event) => { if (event.key === "Enter") applyFilters(filters); }}
               />
             </Field>
-            <Field label="Compagnie">
+            <Field label="Compagnie" className="w-full sm:w-64">
               <Select value={filters.compagnieId} onValueChange={(value) => setFilters((current) => ({ ...current, compagnieId: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -154,7 +154,7 @@ export default function CompanyContactsPage() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Service">
+            <Field label="Service" className="w-full sm:w-56">
               <Select value={filters.service} onValueChange={(value) => setFilters((current) => ({ ...current, service: value }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -165,7 +165,7 @@ export default function CompanyContactsPage() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Statut">
+            <Field label="Statut" className="w-full sm:w-48">
               <Select value={filters.status} onValueChange={(value) => setFilters((current) => ({ ...current, status: value as StatusFilter }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -175,7 +175,7 @@ export default function CompanyContactsPage() {
                 </SelectContent>
               </Select>
             </Field>
-            <div className="flex items-end gap-2">
+            <div className="ml-auto flex shrink-0 items-end gap-2">
               <Button type="button" size="icon" aria-label="Rechercher" onClick={() => applyFilters(filters)}><Search className="size-4" /></Button>
               <Button type="button" variant="outline" size="icon" aria-label="Réinitialiser" onClick={reset}><X className="size-4" /></Button>
             </div>

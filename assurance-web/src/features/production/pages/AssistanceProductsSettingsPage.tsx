@@ -277,17 +277,17 @@ export default function AssistanceProductsSettingsPage() {
       </div>
 
       <section className="rounded-lg border bg-card p-4">
-        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_240px_220px_210px_210px]">
-          <div>
+        <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="mr-auto min-w-[220px]">
             <h2 className="font-semibold">Liste des produits</h2>
             <p className="text-sm text-muted-foreground">Les tarifs se gèrent depuis l'action Tarifs de chaque produit.</p>
           </div>
-          <div className="relative self-start">
+          <div className="relative min-w-0 flex-[1_1_240px] sm:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-9" placeholder="Filtrer produit" value={productSearch} onChange={(event) => setProductSearch(event.target.value)} />
           </div>
           <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full sm:w-60">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -301,7 +301,7 @@ export default function AssistanceProductsSettingsPage() {
             setSelectedType(value);
             if (value === "Assistance Voyage") setSelectedCategoryId(ALL);
           }}>
-            <SelectTrigger>
+            <SelectTrigger className="w-full sm:w-56">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -313,7 +313,7 @@ export default function AssistanceProductsSettingsPage() {
           </Select>
           {!voyageListSelected ? (
             <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full sm:w-56">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

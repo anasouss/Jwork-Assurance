@@ -141,8 +141,9 @@ export default function CompaniesPricingGridsPage() {
       </div>
 
       <section className="grid gap-3 rounded-lg border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.5fr)_repeat(4,minmax(170px,1fr))]">
+        <div className="flex flex-wrap items-center gap-3">
           <Input
+            className="min-w-0 flex-[1_1_300px] sm:max-w-xl"
             aria-label="Rechercher une grille tarifaire"
             placeholder="Grille, compagnie ou convention"
             value={draftFilters.query}
@@ -157,7 +158,7 @@ export default function CompaniesPricingGridsPage() {
               conventionId: ALL,
             }))}
           >
-            <SelectTrigger><SelectValue placeholder="Compagnie" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Compagnie" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Toutes les compagnies</SelectItem>
               {(compagnies.data ?? []).map((compagnie) => (
@@ -166,7 +167,7 @@ export default function CompaniesPricingGridsPage() {
             </SelectContent>
           </Select>
           <Select value={draftFilters.conventionId} onValueChange={(value) => setDraftFilters((current) => ({ ...current, conventionId: value }))}>
-            <SelectTrigger><SelectValue placeholder="Convention" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Convention" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Toutes les conventions</SelectItem>
               {conventionOptions.map((convention) => (
@@ -177,7 +178,7 @@ export default function CompaniesPricingGridsPage() {
             </SelectContent>
           </Select>
           <Select value={draftFilters.usageId} onValueChange={(value) => setDraftFilters((current) => ({ ...current, usageId: value }))}>
-            <SelectTrigger><SelectValue placeholder="Usage" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-52"><SelectValue placeholder="Usage" /></SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Tous les usages</SelectItem>
               {(usages.data ?? []).map((usage) => (
@@ -186,22 +187,22 @@ export default function CompaniesPricingGridsPage() {
             </SelectContent>
           </Select>
           <Select value={draftFilters.status} onValueChange={(value) => setDraftFilters((current) => ({ ...current, status: value }))}>
-            <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Statut" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="active">Actives</SelectItem>
               <SelectItem value="inactive">Inactives</SelectItem>
               <SelectItem value={ALL}>Tous les statuts</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="icon" title="Réinitialiser" onClick={resetFilters}>
-            <RotateCcw className="size-4" />
-          </Button>
-          <Button onClick={applyFilters}>
-            <Search className="size-4" />
-            Rechercher
-          </Button>
+          <div className="ml-auto flex shrink-0 gap-2">
+            <Button variant="outline" size="icon" title="Réinitialiser" onClick={resetFilters}>
+              <RotateCcw className="size-4" />
+            </Button>
+            <Button onClick={applyFilters}>
+              <Search className="size-4" />
+              Rechercher
+            </Button>
+          </div>
         </div>
       </section>
 

@@ -13,6 +13,21 @@ import java.util.Optional;
 
 public interface LigneBordereauRemiseRepository extends JpaRepository<LigneBordereauRemise, Long> {
 
+    @EntityGraph(attributePaths = {"bordereau", "instrument"})
+    @Query("""
+            select l from LigneBordereauRemise l
+            where l.instrument.id in :instrumentIds
+              and l.instrument.agence.id = :agenceId
+              and l.bordereau.agence.id = :agenceId
+              and l.bordereau.statut <> com.assurance.enums.StatutBordereauRemise.ANNULE
+              and l.statut = com.assurance.enums.StatutLigneBordereauRemise.REJETEE
+            order by l.id desc
+            """)
+    List<LigneBordereauRemise> findRejectionsByAgenceIdAndInstrumentIds(
+            @Param("agenceId") Long agenceId,
+            @Param("instrumentIds") Collection<Long> instrumentIds
+    );
+
     @Query("""
             select (count(l) > 0)
             from LigneBordereauRemise l

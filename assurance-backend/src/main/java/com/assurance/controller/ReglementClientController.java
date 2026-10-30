@@ -16,6 +16,7 @@ import com.assurance.dto.response.ReglementClientPolicyResponse;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.dto.response.UtilisateurTresorerieResponse;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.ResolutionRejetBancaire;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.TypeContrat;
@@ -340,6 +341,39 @@ public class ReglementClientController {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.pendingInstruments(
                 TenantContext.getCurrentAgence()
         )));
+    }
+
+    @GetMapping("/instruments/rejets-bancaires")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> bankRejections(
+            @RequestParam(required = false) ModeReglementClient mode,
+            @RequestParam(required = false) Long banqueId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) String payeurType,
+            @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) ResolutionRejetBancaire resolution,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchBankRejections(
+                TenantContext.getCurrentAgence(), mode, banqueId, dateDu, dateAu,
+                payeurType, payeurId, resolution, search, page, size
+        )));
+    }
+
+    @PostMapping("/instruments/{instrumentId}/rejet-bancaire")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    public ResponseEntity<ApiResponse<ReglementClientResponse>> registerBankRejection(
+            @PathVariable Long instrumentId,
+            @Valid @RequestBody ChangerStatutInstrumentReglementRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.registerBankRejection(
+                TenantContext.getCurrentAgence(), instrumentId, request
+        ), "Rejet bancaire enregistré"));
     }
 
     @GetMapping("/instruments")

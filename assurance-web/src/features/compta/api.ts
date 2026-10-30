@@ -677,6 +677,31 @@ export const comptaApi = {
     };
   },
 
+  async bankRejections(params: {
+    mode?: "CHEQUE" | "EFFET";
+    banqueId?: string;
+    dateDu?: string;
+    dateAu?: string;
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
+    resolution?: "A_TRAITER" | "REMPLACE" | "REPRESENTE";
+    search?: string;
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<PaymentInstrumentPage>>(
+      `/api/v1/compta/reglements-clients/instruments/rejets-bancaires${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(normalizePaymentInstrument) };
+  },
+
+  async registerBankRejection(id: string, request: { dateOperation: string; motif: string }) {
+    return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/rejet-bancaire`,
+      { method: "POST", body: JSON.stringify({ ...request, statut: "REJETE" }) }
+    )));
+  },
+
   async changePaymentInstrumentStatus(
     id: string,
     request: {

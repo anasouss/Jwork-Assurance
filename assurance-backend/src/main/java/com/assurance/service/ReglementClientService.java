@@ -36,6 +36,7 @@ import com.assurance.entity.SequenceReglementClient;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.ResolutionRejetBancaire;
 import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutAffectationReglement;
@@ -981,6 +982,9 @@ public class ReglementClientService {
         if (replacementDate.isAfter(LocalDate.now())) {
             throw new BadRequestException("La date du remplacement ne peut pas être future");
         }
+        if (!pendingReplacement && replaced.getDateStatut() != null && replacementDate.isBefore(replaced.getDateStatut())) {
+            throw new BadRequestException("Le remplacement ne peut pas précéder le rejet bancaire");
+        }
 
         CreerReglementClientRequest.Instrument replacementRequest = new CreerReglementClientRequest.Instrument();
         replacementRequest.setMode(request.getMode());
@@ -1206,6 +1210,76 @@ public class ReglementClientService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public InstrumentReglementPageResponse searchBankRejections(
+            Long agenceId,
+            ModeReglementClient mode,
+            Long bankId,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String payeurType,
+            Long payeurId,
+            ResolutionRejetBancaire resolution,
+            String search,
+            int page,
+            int size
+    ) {
+        validateOptionalPayer(payeurType, payeurId);
+        if (mode != null && mode != ModeReglementClient.CHEQUE && mode != ModeReglementClient.EFFET) {
+            throw new BadRequestException("Seuls les chèques et effets sont concernés par les rejets bancaires");
+        }
+        if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
+            throw new BadRequestException("La date de début doit précéder la date de fin");
+        }
+        Page<InstrumentReglementClient> result = instrumentRepository.searchBankRejections(
+                agenceId, mode, bankId, dateDu, dateAu, payeurType, payeurId, resolution == null ? null : resolution.name(),
+                trimToNull(search),
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
+        );
+        Map<Long, LigneBordereauRemise> rejections = new LinkedHashMap<>();
+        if (!result.isEmpty()) {
+            remittanceLineRepository.findRejectionsByAgenceIdAndInstrumentIds(
+                    agenceId, result.getContent().stream().map(InstrumentReglementClient::getId).toList()
+            ).forEach(line -> rejections.putIfAbsent(line.getInstrument().getId(), line));
+        }
+        return InstrumentReglementPageResponse.builder()
+                .page(SourceDocumentClientPageResponse.PageInfo.builder()
+                        .number(result.getNumber()).size(result.getSize())
+                        .totalElements(result.getTotalElements()).totalPages(result.getTotalPages())
+                        .first(result.isFirst()).last(result.isLast()).build())
+                .rows(result.getContent().stream()
+                        .map(instrument -> toInstrumentRegisterResponse(instrument, rejections.get(instrument.getId())))
+                        .toList())
+                .build();
+    }
+
+    @Transactional
+    public ReglementClientResponse registerBankRejection(
+            Long agenceId,
+            Long instrumentId,
+            ChangerStatutInstrumentReglementRequest request
+    ) {
+        InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(instrumentId, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Instrument de règlement", instrumentId));
+        if (!bankRejectionPossible(instrument)) {
+            throw new BadRequestException("Seul un chèque ou effet remis en banque ou encaissé peut être rejeté");
+        }
+        LocalDate date = request.getDateOperation();
+        if (date == null || date.isAfter(LocalDate.now())
+                || (instrument.getDateStatut() != null && date.isBefore(instrument.getDateStatut()))) {
+            throw new BadRequestException("La date du rejet doit être comprise entre la remise ou l'encaissement et aujourd'hui");
+        }
+        request.setStatut(StatutInstrumentReglement.REJETE);
+        return changeInstrumentStatus(agenceId, instrumentId, request);
+    }
+
+    private boolean bankRejectionPossible(InstrumentReglementClient instrument) {
+        return instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
+                && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
+                && (instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
+                || instrument.getStatut() == StatutInstrumentReglement.CONFIRME);
+    }
+
     private String instrumentSortBy(String sortBy) {
         return switch (sortBy == null ? "" : sortBy.trim().toUpperCase(Locale.ROOT)) {
             case "REFERENCE", "PAYER", "PAYMENT", "MODE", "RECEIVED", "STATUS_DATE", "AMOUNT" ->
@@ -1224,6 +1298,11 @@ public class ReglementClientService {
             InstrumentReglementClient instrument,
             LigneBordereauRemise remittanceLine
     ) {
+        boolean rejected = instrument.getStatut() == StatutInstrumentReglement.REJETE;
+        boolean rejectedLine = remittanceLine != null && remittanceLine.getStatut() == StatutLigneBordereauRemise.REJETEE;
+        boolean hasRejection = instrument.getDateRejet() != null || rejected || rejectedLine;
+        boolean canResolve = rejected && instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
+                && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET);
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
@@ -1246,6 +1325,18 @@ public class ReglementClientService {
                         ? null : instrument.getBanqueEmettriceReference().getLibelle())
                 .reglementBureau(instrument.getReglementBureau())
                 .motifStatut(instrument.getMotifStatut())
+                .dateRejet(instrument.getDateRejet() != null ? instrument.getDateRejet()
+                        : rejectedLine ? remittanceLine.getDateTraitement() : rejected ? instrument.getDateStatut() : null)
+                .motifRejet(instrument.getDateRejet() != null ? instrument.getMotifRejet()
+                        : rejectedLine ? remittanceLine.getMotifRejet() : rejected ? instrument.getMotifStatut() : null)
+                .resolutionRejet(hasRejection
+                        ? rejected ? ResolutionRejetBancaire.A_TRAITER
+                                : instrument.getStatut() == StatutInstrumentReglement.REMPLACE
+                                        ? ResolutionRejetBancaire.REMPLACE : ResolutionRejetBancaire.REPRESENTE
+                        : null)
+                .rejetBancairePossible(bankRejectionPossible(instrument))
+                .representationPossible(canResolve)
+                .remplacementPossible(canResolve && !Boolean.TRUE.equals(instrument.getReglement().getMultiPayeur()))
                 .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
                         ? null : instrument.getInstrumentRemplace().getId())
                 .modeInstrumentRemplace(instrument.getInstrumentRemplace() == null
@@ -1566,6 +1657,8 @@ public class ReglementClientService {
             tresorerieService.reverseInstrumentEntry(instrument, reason.trim(), operationDate);
         }
         instrument.setStatut(StatutInstrumentReglement.REJETE);
+        instrument.setDateRejet(operationDate);
+        instrument.setMotifRejet(reason.trim());
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.ANNULEE));
     }

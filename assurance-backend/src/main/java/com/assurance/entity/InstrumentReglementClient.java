@@ -29,6 +29,7 @@ import java.util.List;
         name = "instruments_reglements_clients",
         indexes = {
                 @Index(name = "idx_instrument_reglement_statut", columnList = "agence_id,statut"),
+                @Index(name = "idx_instrument_agence_rejet", columnList = "agence_id,date_rejet"),
                 @Index(name = "idx_instrument_reglement_reference", columnList = "reference_instrument")
         }
 )
@@ -88,6 +89,13 @@ public class InstrumentReglementClient extends BaseEntity {
 
     @Column(name = "motif_statut", length = 500)
     private String motifStatut;
+
+    // Preserve rejection evidence when representation or replacement changes the current status.
+    @Column(name = "date_rejet")
+    private LocalDate dateRejet;
+
+    @Column(name = "motif_rejet", length = 500)
+    private String motifRejet;
 
     @OneToMany(mappedBy = "instrument", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, MoreHorizontal, RefreshCcw, RotateCcw, Search } from "lucide-react";
+import { ArrowRight, Banknote, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -27,21 +28,38 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
+import { clientApi } from "@/features/production/api/clients";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { BankRejectionDialog } from "../components/BankRejectionDialog";
+import { usePayerSearch, type PayerSelection, type PayerType } from "../components/use-payer-search";
 import type { PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type ModeFilter = "ALL" | "CHEQUE" | "EFFET";
+type ResolutionFilter = "ALL" | NonNullable<PaymentInstrument["resolutionRejet"]>;
 
 export default function ImpayesClientsPage() {
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
+  const canReject = permissions.includes("tresorerie:manage");
   const mode = parseMode(params.get("mode"));
   const appliedSearch = params.get("search")?.trim() ?? "";
   const page = parsePage(params.get("page"));
+  const dateFrom = parseDate(params.get("dateDu"));
+  const dateTo = parseDate(params.get("dateAu"));
+  const bankId = params.get("banqueId") ?? "";
+  const resolution = parseResolution(params.get("resolution"));
+  const payerType: PayerType = params.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT";
+  const payerId = params.get("payeurId") ?? "";
+  const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
+  const payerSearch = usePayerSearch(payerType, selectedPayer);
+  const [rejectionOpen, setRejectionOpen] = useState(false);
+  const [cashTarget, setCashTarget] = useState<PaymentInstrument>();
+  const [cashDate, setCashDate] = useState(TODAY);
+  const [cashReason, setCashReason] = useState("");
   const [search, setSearch] = useState(appliedSearch);
   const [instrumentToRepresent, setInstrumentToRepresent] = useState<PaymentInstrument>();
   const [representationDate, setRepresentationDate] = useState(TODAY);
@@ -49,17 +67,46 @@ export default function ImpayesClientsPage() {
 
   useEffect(() => setSearch(appliedSearch), [appliedSearch]);
 
+  const banks = useQuery({ queryKey: ["compta", "banks", "all"], queryFn: () => comptaApi.banks(true) });
+  const requestedClient = useQuery({
+    queryKey: ["crm-client", payerId], queryFn: () => clientApi.getClientCrm(payerId),
+    enabled: Boolean(payerId) && payerType === "CLIENT",
+  });
+  useEffect(() => {
+    if (!payerId) { setSelectedPayer(undefined); return; }
+    if (selectedPayer?.id === payerId && selectedPayer.type === payerType) return;
+    if (payerType === "CLIENT" && requestedClient.data?.client) {
+      const client = requestedClient.data.client;
+      setSelectedPayer({ type: "CLIENT", id: client.id, name: client.nomAffichage || "Client", identifier: client.codeClient || "" });
+    } else if (payerType === "GROUPE") {
+      const group = payerSearch.groups.find((item) => item.id === payerId);
+      if (group) setSelectedPayer({ type: "GROUPE", id: group.id, name: group.libelle, identifier: group.code });
+    }
+  }, [payerId, payerType, selectedPayer?.id, selectedPayer?.type, requestedClient.data, payerSearch.groups]);
+
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "unpaid-instruments", mode, appliedSearch, page],
-    queryFn: () => comptaApi.paymentInstruments({
-      statut: "REJETE",
-      modes: mode === "ALL" ? ["CHEQUE", "EFFET"] : [mode],
+    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, bankId, resolution, payerType, payerId, page],
+    queryFn: () => comptaApi.bankRejections({
+      mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
-      sortBy: "STATUS_DATE",
-      sortDirection: "DESC",
+      dateDu: dateFrom || undefined, dateAu: dateTo || undefined,
+      banqueId: bankId || undefined,
+      resolution: resolution === "ALL" ? undefined : resolution,
+      payeurType: payerId ? payerType : undefined, payeurId: payerId || undefined,
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+  });
+
+  const replaceWithCash = useMutation({
+    mutationFn: () => comptaApi.replacePaymentInstrument(cashTarget!.id, {
+      mode: "ESPECES", montant: cashTarget!.montant, dateInstrument: cashDate, motif: cashReason.trim(),
+    }),
+    onSuccess: async () => {
+      setCashTarget(undefined); toast.success("Règlement en espèces enregistré");
+      await queryClient.invalidateQueries({ queryKey: ["compta"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Remplacement impossible"),
   });
 
   const representInstrument = useMutation({
@@ -78,8 +125,14 @@ export default function ImpayesClientsPage() {
     ),
   });
 
-  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number }) {
+  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; banqueId?: string; resolution?: ResolutionFilter; cible?: PayerType; payeurId?: string }) {
     const nextParams = new URLSearchParams(params);
+    for (const key of ["dateDu", "dateAu", "banqueId", "resolution", "cible", "payeurId"] as const) {
+      const value = next[key];
+      if (value === undefined) continue;
+      if (!value || value === "ALL") nextParams.delete(key);
+      else nextParams.set(key, value);
+    }
     if (next.mode !== undefined) {
       if (next.mode === "ALL") nextParams.delete("mode");
       else nextParams.set("mode", next.mode);
@@ -105,13 +158,16 @@ export default function ImpayesClientsPage() {
 
   return (
     <div className="grid gap-5">
-      <header>
-        <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
-        <h1 className="mt-1 text-xl font-semibold">Rejets bancaires</h1>
-        <p className="text-sm text-muted-foreground">Suivi des chèques et effets rejetés par la banque.</p>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
+          <h1 className="mt-1 text-xl font-semibold">Rejets bancaires</h1>
+          <p className="text-sm text-muted-foreground">Suivi des chèques et effets rejetés par la banque.</p>
+        </div>
+        {canReject && <Button onClick={() => setRejectionOpen(true)}><Plus className="size-4" /> Enregistrer un rejet</Button>}
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 lg:grid-cols-[220px_1fr_auto]">
+      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <div className="grid gap-2">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => updateUrl({ mode: value as ModeFilter })}>
@@ -123,7 +179,16 @@ export default function ImpayesClientsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
+        <div className="grid gap-2"><Label>Traitement</Label><Select value={resolution} onValueChange={(value) => updateUrl({ resolution: value as ResolutionFilter })}>
+          <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
+            <SelectItem value="ALL">Tous les traitements</SelectItem><SelectItem value="A_TRAITER">À traiter</SelectItem>
+            <SelectItem value="REMPLACE">Remplacés</SelectItem><SelectItem value="REPRESENTE">Représentés</SelectItem>
+          </SelectContent></Select></div>
+        <div className="grid gap-2"><Label>Banque émettrice</Label><Select value={bankId || "ALL"} disabled={banks.isLoading} onValueChange={(value) => updateUrl({ banqueId: value === "ALL" ? "" : value })}>
+          <SelectTrigger><SelectValue placeholder="Toutes les banques" /></SelectTrigger><SelectContent>
+            <SelectItem value="ALL">Toutes les banques</SelectItem>{(banks.data ?? []).map((bank) => <SelectItem key={bank.id} value={bank.id}>{bank.libelle}</SelectItem>)}
+          </SelectContent></Select></div>
+        <div className="grid gap-2 xl:col-span-2">
           <Label htmlFor="unpaid-search">Référence, payeur ou règlement</Label>
           <Input
             id="unpaid-search"
@@ -132,10 +197,23 @@ export default function ImpayesClientsPage() {
             onKeyDown={(event) => event.key === "Enter" && updateUrl({ search: search.trim() })}
           />
         </div>
+        <div className="grid gap-2"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid gap-2"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid gap-2"><Label>Type de payeur</Label><Select value={payerType} onValueChange={(value) => {
+          setSelectedPayer(undefined); payerSearch.clearQuery(); updateUrl({ cible: value as PayerType, payeurId: "" });
+        }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="CLIENT">Client</SelectItem><SelectItem value="GROUPE">Groupe</SelectItem></SelectContent></Select></div>
+        <div className="grid gap-2"><Label>{payerType === "CLIENT" ? "Client" : "Groupe"}</Label><AutocompleteSelect
+          options={payerSearch.options} value={payerId}
+          onValueChange={(value) => { setSelectedPayer(payerSearch.resolve(value)); updateUrl({ payeurId: value }); }}
+          onQueryChange={payerType === "CLIENT" ? payerSearch.setQuery : undefined}
+          placeholder={payerType === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
+          emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
+        /></div>
         <div className="flex items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={() => updateUrl({ search: search.trim() })}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={() => {
             setSearch("");
+            setSelectedPayer(undefined); payerSearch.clearQuery();
             setParams(new URLSearchParams(), { replace: true });
           }}><RotateCcw className="size-4" /></Button>
         </div>
@@ -149,44 +227,62 @@ export default function ImpayesClientsPage() {
               <th className="px-4 py-3 text-left">Payeur</th>
               <th className="px-4 py-3 text-left">Règlement</th>
               <th className="px-4 py-3 text-left">Mode</th>
+              <th className="px-4 py-3 text-left">Banque</th>
               <th className="px-4 py-3 text-left">Rejeté le</th>
               <th className="px-4 py-3 text-left">Motif du rejet</th>
               <th className="px-4 py-3 text-left">Bordereau d’origine</th>
               <th className="px-4 py-3 text-right">Montant</th>
+              <th className="px-4 py-3 text-left">Traitement</th>
               <th className="w-20 px-4 py-3"><span className="sr-only">Actions</span></th>
             </tr></thead>
             <tbody className="divide-y">
-              {instruments.isLoading ? <TableRowsSkeleton colSpan={9} rows={6} /> : (instruments.data?.rows ?? []).map((instrument) => (
+              {instruments.isLoading ? <TableRowsSkeleton colSpan={11} rows={6} /> : (instruments.data?.rows ?? []).map((instrument) => (
                 <tr key={instrument.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{instrument.referenceInstrument || "-"}</td>
                   <td className="px-4 py-3">{instrument.payeurNom}</td>
                   <td className="px-4 py-3">{instrument.numeroReglement}</td>
                   <td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
-                  <td className="px-4 py-3">{formatTreasuryDate(instrument.dateStatut)}</td>
-                  <td className="max-w-72 px-4 py-3"><span className="line-clamp-2">{instrument.motifStatut || "-"}</span></td>
+                  <td className="px-4 py-3">{instrument.banqueEmettrice || "-"}</td>
+                  <td className="px-4 py-3">{formatTreasuryDate(instrument.dateRejet)}</td>
+                  <td className="max-w-72 px-4 py-3"><span className="line-clamp-2" title={instrument.motifRejet || undefined}>{instrument.motifRejet || "-"}</span></td>
                   <td className="px-4 py-3">{instrument.bordereauRemiseId ? <Link className="font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>{instrument.numeroBordereauRemise}</Link> : "-"}</td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatTreasuryMoney(instrument.montant)}</td>
+                  <td className="px-4 py-3"><Badge variant={instrument.resolutionRejet === "A_TRAITER" ? "destructive" : "secondary"}>{instrument.resolutionRejet === "A_TRAITER" ? "À traiter" : instrument.resolutionRejet === "REMPLACE" ? "Remplacé" : instrument.resolutionRejet === "REPRESENTE" ? "Représenté" : "-"}</Badge></td>
                   <td className="px-4 py-3 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" title="Actions"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-60">
                         <DropdownMenuItem asChild><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></DropdownMenuItem>
-                        {canManage && <DropdownMenuSeparator />}
-                        {canManage && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Représenter l’instrument</DropdownMenuItem>}
-                        {canManage && <DropdownMenuItem asChild><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}&remplacer=${instrument.id}`}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Remplacer le moyen de paiement</Link></DropdownMenuItem>}
+                        {canManage && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
+                        {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Représenter l’instrument</DropdownMenuItem>}
+                        {canManage && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => { setCashTarget(instrument); setCashDate(TODAY); setCashReason(""); }}><Banknote className="size-4" /> Remplacer par espèces</DropdownMenuItem>}
+                        {canManage && instrument.remplacementPossible && <DropdownMenuItem asChild><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}&remplacer=${instrument.id}`}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Autre moyen de remplacement</Link></DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
                 </tr>
               ))}
-              {!instruments.isLoading && (instruments.data?.rows.length ?? 0) === 0 && <tr><td colSpan={9} className="px-4 py-14 text-center text-muted-foreground">Aucun impayé ne correspond aux filtres.</td></tr>}
+              {instruments.isError && <tr><td colSpan={11} className="px-4 py-14 text-center text-destructive">Chargement des rejets impossible. <Button variant="link" onClick={() => void instruments.refetch()}>Réessayer</Button></td></tr>}
+              {!instruments.isLoading && !instruments.isError && (instruments.data?.rows.length ?? 0) === 0 && <tr><td colSpan={11} className="px-4 py-14 text-center text-muted-foreground">Aucun rejet ne correspond aux filtres.</td></tr>}
             </tbody>
           </table>
         </div>
         {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
       </section>
 
-      <Dialog open={Boolean(instrumentToRepresent)} onOpenChange={(open) => !open && setInstrumentToRepresent(undefined)}>
+      {rejectionOpen && <BankRejectionDialog onClose={() => setRejectionOpen(false)} />}
+
+      <Dialog open={Boolean(cashTarget)} onOpenChange={(open) => !open && !replaceWithCash.isPending && setCashTarget(undefined)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Remplacer par des espèces</DialogTitle><DialogDescription>Confirmez uniquement après réception des espèces. Le rejet et l’instrument d’origine sont conservés.</DialogDescription></DialogHeader>
+          <div className="text-sm font-medium">{cashTarget?.referenceInstrument || cashTarget?.numeroReglement} · {cashTarget?.payeurNom} · {formatTreasuryMoney(cashTarget?.montant ?? 0)}</div>
+          <div className="grid gap-2"><Label>Date de réception des espèces</Label><DatePicker date={cashDate} disabled={replaceWithCash.isPending} minDate={cashTarget?.dateRejet ? new Date(`${cashTarget.dateRejet}T00:00:00`) : undefined} maxDate={new Date(`${TODAY}T00:00:00`)} onSelect={(value) => setCashDate(toDateOnly(value) ?? "")} /></div>
+          <div className="grid gap-2"><Label htmlFor="unpaid-cash-reason">Motif du remplacement</Label><Textarea id="unpaid-cash-reason" value={cashReason} maxLength={500} disabled={replaceWithCash.isPending} onChange={(event) => setCashReason(event.target.value)} /></div>
+          <DialogFooter><Button variant="outline" disabled={replaceWithCash.isPending} onClick={() => setCashTarget(undefined)}>Annuler</Button><Button disabled={!cashDate || cashDate > TODAY || Boolean(cashTarget?.dateRejet && cashDate < cashTarget.dateRejet) || !cashReason.trim() || replaceWithCash.isPending} onClick={() => replaceWithCash.mutate()}><Banknote className="size-4" />{replaceWithCash.isPending ? "Enregistrement..." : "Confirmer les espèces reçues"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(instrumentToRepresent)} onOpenChange={(open) => !open && !representInstrument.isPending && setInstrumentToRepresent(undefined)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Représenter l’instrument</DialogTitle>
@@ -199,8 +295,8 @@ export default function ImpayesClientsPage() {
             <div className="mt-1 text-muted-foreground">{instrumentToRepresent?.payeurNom} · {formatTreasuryMoney(instrumentToRepresent?.montant ?? 0)}</div>
           </div>
           <div className="grid gap-4">
-            <div className="grid gap-2"><Label>Date de représentation</Label><DatePicker date={representationDate} minDate={instrumentToRepresent?.dateStatut ? new Date(`${instrumentToRepresent.dateStatut}T00:00:00`) : undefined} onSelect={(value) => setRepresentationDate(toDateOnly(value) ?? "")} /></div>
-            <div className="grid gap-2"><Label htmlFor="representation-reason">Justification</Label><Textarea id="representation-reason" value={representationReason} onChange={(event) => setRepresentationReason(event.target.value)} placeholder="Ex. Provision reconstituée confirmée par le client" /></div>
+            <div className="grid gap-2"><Label>Date de représentation</Label><DatePicker date={representationDate} disabled={representInstrument.isPending} maxDate={new Date(`${TODAY}T00:00:00`)} minDate={instrumentToRepresent?.dateRejet ? new Date(`${instrumentToRepresent.dateRejet}T00:00:00`) : undefined} onSelect={(value) => setRepresentationDate(toDateOnly(value) ?? "")} /></div>
+            <div className="grid gap-2"><Label htmlFor="representation-reason">Justification</Label><Textarea id="representation-reason" value={representationReason} maxLength={500} disabled={representInstrument.isPending} onChange={(event) => setRepresentationReason(event.target.value)} placeholder="Ex. Provision reconstituée confirmée par le client" /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" disabled={representInstrument.isPending} onClick={() => setInstrumentToRepresent(undefined)}>Annuler</Button>
@@ -214,6 +310,14 @@ export default function ImpayesClientsPage() {
 
 function parseMode(value: string | null): ModeFilter {
   return value === "CHEQUE" || value === "EFFET" ? value : "ALL";
+}
+
+function parseResolution(value: string | null): ResolutionFilter {
+  return value === "A_TRAITER" || value === "REMPLACE" || value === "REPRESENTE" ? value : "ALL";
+}
+
+function parseDate(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
 function parsePage(value: string | null) {

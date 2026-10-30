@@ -515,6 +515,12 @@ export type PaymentInstrument = {
   banqueEmettrice?: string | null;
   reglementBureau?: boolean;
   motifStatut?: string | null;
+  dateRejet?: string | null;
+  motifRejet?: string | null;
+  resolutionRejet?: "A_TRAITER" | "REMPLACE" | "REPRESENTE" | null;
+  rejetBancairePossible?: boolean;
+  representationPossible?: boolean;
+  remplacementPossible?: boolean;
   instrumentRemplaceId?: string | null;
   modeInstrumentRemplace?: ClientPaymentMode | null;
   referenceInstrumentRemplace?: string | null;

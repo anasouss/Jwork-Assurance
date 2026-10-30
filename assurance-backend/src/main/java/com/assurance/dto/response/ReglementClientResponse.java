@@ -1,6 +1,7 @@
 package com.assurance.dto.response;
 
 import com.assurance.enums.ModeReglementClient;
+import com.assurance.enums.ResolutionRejetBancaire;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
@@ -58,6 +59,12 @@ public class ReglementClientResponse {
         private String banqueEmettrice;
         private Boolean reglementBureau;
         private String motifStatut;
+        private LocalDate dateRejet;
+        private String motifRejet;
+        private ResolutionRejetBancaire resolutionRejet;
+        private Boolean rejetBancairePossible;
+        private Boolean representationPossible;
+        private Boolean remplacementPossible;
         private Long instrumentRemplaceId;
         private ModeReglementClient modeInstrumentRemplace;
         private String referenceInstrumentRemplace;

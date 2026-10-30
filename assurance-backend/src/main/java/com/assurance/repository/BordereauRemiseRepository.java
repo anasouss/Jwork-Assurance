@@ -25,7 +25,9 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
             from BordereauRemise b
             where b.agence.id = :agenceId
               and (:type is null or b.type = :type)
-              and (:statut is null or b.statut = :statut)
+              and (:statut is null or b.statut = :statut
+                   or (:statut = com.assurance.enums.StatutBordereauRemise.DEPOSE
+                       and b.statut = com.assurance.enums.StatutBordereauRemise.PARTIELLEMENT_TRAITE))
               and (:definitif is null
                    or (:definitif = false and b.statut = com.assurance.enums.StatutBordereauRemise.BROUILLON)
                    or (:definitif = true and b.statut in (

@@ -35,7 +35,7 @@ import type { RemittanceSlip, RemittanceSlipStatus, RemittanceSlipType } from ".
 import { formatTreasuryDate, formatTreasuryMoney, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type TypeFilter = RemittanceSlipType | "ALL";
-type StatusFilter = "BROUILLON" | "DEFINITIF" | "ALL";
+type StatusFilter = "BROUILLON" | "DEPOSE" | "CLOTURE" | "ALL";
 
 const TYPE_LABELS: Record<RemittanceSlipType, string> = {
   CHEQUE: "Chèques",
@@ -62,6 +62,8 @@ export default function InstrumentsTresoreriePage() {
   const dateFrom = parseDateFilter(searchParams.get("dateDu"));
   const dateTo = parseDateFilter(searchParams.get("dateAu"));
   const page = parsePage(searchParams.get("page"));
+  const searchSubmitted = searchParams.get("recherche") === "1"
+    && Boolean(type !== "ALL" || status !== "ALL" || appliedSearch.trim() || dateFrom || dateTo);
   const [search, setSearch] = useState(appliedSearch);
   const [deleteTarget, setDeleteTarget] = useState<RemittanceSlip>();
   const [depositTarget, setDepositTarget] = useState<RemittanceSlip>();
@@ -73,16 +75,17 @@ export default function InstrumentsTresoreriePage() {
     setSearch(appliedSearch);
   }, [appliedSearch]);
   const slips = useQuery({
-    queryKey: ["compta", "treasury", "remittance-slips", type, status, appliedSearch, dateFrom, dateTo, page],
+    queryKey: ["compta", "treasury", "remittance-slips", "by-status", type, status, appliedSearch, dateFrom, dateTo, page],
     queryFn: () => comptaApi.remittanceSlips({
       type: type === "ALL" ? undefined : type,
-      definitif: status === "ALL" ? undefined : status === "DEFINITIF",
+      statut: status === "ALL" ? undefined : status,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
       dateAu: dateTo || undefined,
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+    enabled: searchSubmitted,
   });
   const deleteDraft = useMutation({
     mutationFn: (id: string) => comptaApi.deleteRemittanceSlipDraft(id),
@@ -117,7 +120,11 @@ export default function InstrumentsTresoreriePage() {
   }
 
   function applyFilters() {
-    updateFilter("search", search.trim());
+    if (!(type !== "ALL" || status !== "ALL" || search.trim() || dateFrom || dateTo)) {
+      toast.error("Renseignez au moins un critère de recherche");
+      return;
+    }
+    updateFilter("search", search.trim(), true, true);
   }
 
   function resetFilters() {
@@ -125,11 +132,13 @@ export default function InstrumentsTresoreriePage() {
     setSearchParams({}, { replace: true });
   }
 
-  function updateFilter(name: string, value: string, resetPage = true) {
+  function updateFilter(name: string, value: string, resetPage = true, submit = false) {
     const next = new URLSearchParams(searchParams);
     if (!value || value === "ALL" || (name === "page" && value === "0")) next.delete(name);
     else next.set(name, value);
     if (resetPage) next.delete("page");
+    if (submit) next.set("recherche", "1");
+    else if (name !== "page") next.delete("recherche");
     setSearchParams(next, { replace: true });
   }
 
@@ -193,7 +202,8 @@ export default function InstrumentsTresoreriePage() {
         <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => updateFilter("statut", value)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">Provisoires</SelectItem>
-            <SelectItem value="DEFINITIF">Définitifs</SelectItem>
+            <SelectItem value="DEPOSE">Remis à la banque</SelectItem>
+            <SelectItem value="CLOTURE">Clôturés</SelectItem>
           </SelectContent>
         </Select></div>
         <div className="grid gap-2"><Label htmlFor="slip-search">Réf. interne, n° banque ou compte</Label><Input id="slip-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
@@ -212,7 +222,7 @@ export default function InstrumentsTresoreriePage() {
             <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-left">Statut</th><th className="w-24 px-4 py-3"><span className="sr-only">Actions</span></th>
           </tr></thead>
           <tbody className="divide-y">
-            {slips.isLoading ? <TableRowsSkeleton colSpan={10} rows={6} /> : (slips.data?.rows ?? []).map((slip) => <tr key={slip.id} className="hover:bg-muted/30">
+            {searchSubmitted && (slips.isLoading ? <TableRowsSkeleton colSpan={10} rows={6} /> : (slips.data?.rows ?? []).map((slip) => <tr key={slip.id} className="hover:bg-muted/30">
               <td className="px-4 py-3 font-semibold">{slip.numero}</td><td className="px-4 py-3">{slip.referenceBancaire || "-"}</td><td className="px-4 py-3">{TYPE_LABELS[slip.type]}</td>
               <td className="px-4 py-3">{formatTreasuryDate(slip.dateBordereau)}</td><td className="px-4 py-3">{formatTreasuryDate(slip.dateDepot)}</td>
               <td className="px-4 py-3">{slip.compteDestination}</td><td className="px-4 py-3 text-center">{slip.type === "VERSEMENT_ESPECES" ? "-" : slip.nombreLignes}</td>
@@ -256,11 +266,13 @@ export default function InstrumentsTresoreriePage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </td>
-            </tr>)}
-            {!slips.isLoading && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
+            </tr>))}
+            {!searchSubmitted && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Renseignez au moins un critère puis lancez la recherche.</td></tr>}
+            {searchSubmitted && slips.isError && <tr><td colSpan={10} className="px-4 py-14 text-center text-destructive">Chargement des bordereaux impossible.</td></tr>}
+            {searchSubmitted && !slips.isLoading && !slips.isError && (slips.data?.rows.length ?? 0) === 0 && <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun bordereau ne correspond aux filtres.</td></tr>}
           </tbody>
         </table></div>
-        {slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={(nextPage) => updateFilter("page", String(nextPage), false)} />}
+        {searchSubmitted && slips.data && <ServerPagination page={slips.data.page.number} totalPages={slips.data.page.totalPages} totalElements={slips.data.page.totalElements} loading={slips.isFetching} onPageChange={(nextPage) => updateFilter("page", String(nextPage), false)} />}
       </section>
 
       <Dialog open={Boolean(depositTarget)} onOpenChange={(open) => !open && setDepositTarget(undefined)}>
@@ -330,8 +342,8 @@ function parseTypeFilter(value: string | null): TypeFilter {
 
 function parseStatusFilter(value: string | null): StatusFilter {
   if (value === "BROUILLON") return "BROUILLON";
-  return value === "DEFINITIF" || value === "DEPOSE" || value === "PARTIELLEMENT_TRAITE" || value === "CLOTURE"
-    ? "DEFINITIF" : "ALL";
+  if (value === "DEPOSE" || value === "PARTIELLEMENT_TRAITE") return "DEPOSE";
+  return value === "CLOTURE" || value === "DEFINITIF" ? "CLOTURE" : "ALL";
 }
 
 function parseDateFilter(value: string | null) {

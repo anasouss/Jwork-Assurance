@@ -53,6 +53,8 @@ export default function EncaissementsEnAttentePage() {
     mode, search: appliedSearch, payerType, payerId,
     dateFrom, dateTo, page, sortBy, sortDirection,
   } = urlState;
+  const searchSubmitted = searchParams.get("recherche") === "1"
+    && Boolean(mode !== "ALL" || appliedSearch || payerId || dateFrom || dateTo);
   const [search, setSearch] = useState(appliedSearch);
   const [payerScope, setPayerScope] = useState<PayerScope>(payerType ?? "CLIENT");
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
@@ -126,8 +128,12 @@ export default function EncaissementsEnAttentePage() {
     setSelectedCashDays([]);
   }, [mode, appliedSearch, payerId, payerType, dateFrom, dateTo, sortBy, sortDirection]);
 
-  function updateUrl(patch: Partial<CollectionQueueUrlState>) {
-    setSearchParams(collectionQueueSearchParams({ ...urlState, ...patch }), { replace: true });
+  function updateUrl(patch: Partial<CollectionQueueUrlState>, submit = false) {
+    const next = collectionQueueSearchParams({ ...urlState, ...patch });
+    const changesFilters = Object.keys(patch).some((key) =>
+      key !== "page" && key !== "sortBy" && key !== "sortDirection");
+    if (submit || (searchSubmitted && !changesFilters)) next.set("recherche", "1");
+    setSearchParams(next, { replace: true });
   }
 
   const instruments = useQuery({
@@ -145,7 +151,7 @@ export default function EncaissementsEnAttentePage() {
       page,
       size: TREASURY_PAGE_SIZE,
     }),
-    enabled: mode !== "ESPECES",
+    enabled: searchSubmitted && mode !== "ESPECES",
   });
   const accounts = useQuery({
     queryKey: ["compta", "treasury-accounts"],
@@ -154,7 +160,7 @@ export default function EncaissementsEnAttentePage() {
   const eligibleCashDays = useQuery({
     queryKey: ["compta", "treasury", "eligible-cash-days"],
     queryFn: comptaApi.eligibleCashRemittanceDays,
-    enabled: mode === "ALL" || mode === "ESPECES",
+    enabled: searchSubmitted && (mode === "ALL" || mode === "ESPECES"),
   });
   const bankAccounts = useMemo(
     () => (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE"),
@@ -330,12 +336,16 @@ export default function EncaissementsEnAttentePage() {
   }
 
   function applyFilters() {
+    if (!(mode !== "ALL" || search.trim() || selectedPayer || dateFrom || dateTo)) {
+      toast.error("Renseignez au moins un critère de recherche");
+      return;
+    }
     updateUrl({
       search: search.trim(),
       payerType: selectedPayer?.type,
       payerId: selectedPayer?.id ?? "",
       page: 0,
-    });
+    }, true);
   }
 
   function resetFilters() {
@@ -374,7 +384,7 @@ export default function EncaissementsEnAttentePage() {
   }
 
   const cashSearch = appliedSearch.toLocaleLowerCase("fr");
-  const cashDays = (eligibleCashDays.data ?? []).filter((day) => {
+  const cashDays = (searchSubmitted ? eligibleCashDays.data ?? [] : []).filter((day) => {
     if (dateFrom && day.dateJournee < dateFrom) return false;
     if (dateTo && day.dateJournee > dateTo) return false;
     if (!cashSearch) return true;
@@ -392,7 +402,7 @@ export default function EncaissementsEnAttentePage() {
         : mode === "ALL"
           ? "Date de référence"
           : "Date de réception";
-  const rows = instruments.data?.rows ?? [];
+  const rows = searchSubmitted ? instruments.data?.rows ?? [] : [];
   const selectedMode = selectedInstruments[0]?.mode;
   const pageSelectable = rows.filter((instrument) => isSelectableForSlip(instrument)
     && (!selectedMode || instrument.mode === selectedMode));
@@ -595,7 +605,7 @@ export default function EncaissementsEnAttentePage() {
               <th className="px-4 py-3 text-right">Montant à verser</th>
             </tr></thead>
             <tbody className="divide-y">
-              {eligibleCashDays.isLoading ? <TableRowsSkeleton colSpan={6} rows={3} /> : cashDays.map((day) => (
+              {searchSubmitted && eligibleCashDays.isLoading ? <TableRowsSkeleton colSpan={6} rows={3} /> : cashDays.map((day) => (
                 <tr key={day.cle} className="hover:bg-muted/30">
                   <td className="px-3 py-2.5 text-center">
                     <Checkbox
@@ -611,10 +621,13 @@ export default function EncaissementsEnAttentePage() {
                   <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{formatTreasuryMoney(day.montantAVerser)}</td>
                 </tr>
               ))}
-              {!eligibleCashDays.isLoading && !eligibleCashDays.isError && cashDays.length === 0 && (
+              {!searchSubmitted && (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Renseignez au moins un critère puis lancez la recherche.</td></tr>
+              )}
+              {searchSubmitted && !eligibleCashDays.isLoading && !eligibleCashDays.isError && cashDays.length === 0 && (
                 <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Aucune journée de caisse à verser.</td></tr>
               )}
-              {eligibleCashDays.isError && (
+              {searchSubmitted && eligibleCashDays.isError && (
                 <tr><td colSpan={6} className="px-4 py-10 text-center text-destructive">Chargement des journées de caisse impossible.</td></tr>
               )}
             </tbody>
@@ -665,7 +678,7 @@ export default function EncaissementsEnAttentePage() {
               <th className="w-44 px-4 py-3 text-right">Action</th>
             </tr></thead>
             <tbody className="divide-y">
-              {instruments.isLoading ? <TableRowsSkeleton colSpan={10} rows={6} /> : rows.map((instrument) => (
+              {searchSubmitted && instruments.isLoading ? <TableRowsSkeleton colSpan={10} rows={6} /> : rows.map((instrument) => (
                 <tr key={instrument.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 text-center">
                     {isSelectableForSlip(instrument) ? (
@@ -700,13 +713,19 @@ export default function EncaissementsEnAttentePage() {
                   </td>
                 </tr>
               ))}
-              {!instruments.isLoading && (instruments.data?.rows.length ?? 0) === 0 && (
+              {!searchSubmitted && (
+                <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Renseignez au moins un critère puis lancez la recherche.</td></tr>
+              )}
+              {searchSubmitted && instruments.isError && (
+                <tr><td colSpan={10} className="px-4 py-14 text-center text-destructive">Chargement des moyens de paiement impossible.</td></tr>
+              )}
+              {searchSubmitted && !instruments.isLoading && !instruments.isError && rows.length === 0 && (
                 <tr><td colSpan={10} className="px-4 py-14 text-center text-muted-foreground">Aucun moyen de paiement ne correspond aux filtres.</td></tr>
               )}
             </tbody>
           </table>
         </div>
-        {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
+        {searchSubmitted && instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
       </section>}
 
       <Dialog open={slipDialogOpen} onOpenChange={setSlipDialogOpen}>

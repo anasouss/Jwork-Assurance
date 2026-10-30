@@ -668,8 +668,7 @@ public class BordereauRemiseService {
 
     private StatutBordereauRemise responseStatus(BordereauRemise slip) {
         if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES
-                && (slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE
-                || slip.getStatut() == StatutBordereauRemise.CLOTURE)) {
+                && slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE) {
             return StatutBordereauRemise.DEPOSE;
         }
         return slip.getStatut();

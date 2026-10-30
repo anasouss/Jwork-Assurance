@@ -31,7 +31,6 @@ import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
-import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
@@ -67,7 +66,6 @@ public class BordereauRemisePdfService {
     private static final DeviceRgb SOFT_BLUE = new DeviceRgb(248, 250, 252);
     private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
     private static final DeviceRgb MUTED = new DeviceRgb(71, 85, 105);
-    private static final DeviceRgb SUCCESS = new DeviceRgb(5, 150, 105);
     private static final float PAGE_MARGIN = 24f;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -132,14 +130,6 @@ public class BordereauRemisePdfService {
                 .setFontColor(ACCENT)
                 .setMarginTop(5)
                 .setMarginBottom(0));
-        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES) {
-            title.add(new Paragraph(statusLabel(slip))
-                    .setFont(regular)
-                    .setFontSize(7.5f)
-                    .setFontColor(statusColor(slip))
-                    .setMarginTop(3)
-                    .setMarginBottom(0));
-        }
         if (slip.getReferenceBancaire() != null && !slip.getReferenceBancaire().isBlank()) {
             title.add(new Paragraph("Réf. banque : " + slip.getReferenceBancaire().trim())
                     .setFont(regular)
@@ -157,30 +147,11 @@ public class BordereauRemisePdfService {
     }
 
     private void writeOverview(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
-        boolean cashDeposit = slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES;
-        if (!cashDeposit) {
-            Table overview = new Table(new float[]{1.15f, 1.15f, 0.9f})
-                    .setWidth(UnitValue.createPercentValue(100))
-                    .setMarginBottom(4);
-            overview.addCell(compactInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
-            overview.addCell(compactInfoCell("DATE DE REMISE",
-                    slip.getDateDepot() == null ? "À confirmer" : date(slip.getDateDepot()), regular, bold));
-            overview.addCell(compactInfoCell(
-                    "NOMBRE DE PIÈCES",
-                    String.valueOf(slip.getLignes().size()),
-                    regular,
-                    bold
-            ));
-            document.add(overview);
-        }
-
         CompteTresorerie destination = slip.getCompteDestination();
-        Table bank = new Table(cashDeposit ? new float[]{1.1f, 1.5f, 1.3f, 2.4f} : new float[]{1.5f, 1.3f, 2.4f})
+        Table bank = new Table(new float[]{1.1f, 1.5f, 1.3f, 2.4f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(8);
-        if (cashDeposit) {
-            bank.addCell(compactStackedInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
-        }
+        bank.addCell(compactStackedInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
         bank.addCell(compactStackedInfoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
         bank.addCell(compactStackedInfoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
                 ? null : destination.getBanqueReference().getLibelle(), regular, bold));
@@ -199,7 +170,7 @@ public class BordereauRemisePdfService {
                 .setFont(bold)
                 .setFontSize(11)
                 .setMarginBottom(5));
-        Table table = new Table(new float[]{0.35f, 1.45f, 1.55f, 1.35f, 0.85f, 0.85f, 1f})
+        Table table = new Table(new float[]{0.35f, 1.45f, 1.55f, 1.35f, 0.95f, 1f})
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N°", bold, TextAlignment.CENTER);
         addHeader(table, slip.getType() == TypeBordereauRemise.CHEQUE
@@ -208,8 +179,8 @@ public class BordereauRemisePdfService {
                 ? "TIREUR / PAYEUR" : "TIRÉ / PAYEUR", bold, TextAlignment.LEFT);
         addHeader(table, slip.getType() == TypeBordereauRemise.CHEQUE
                 ? "BANQUE TIRÉE" : "BANQUE DOMICILIATAIRE", bold, TextAlignment.LEFT);
-        addHeader(table, "REÇU LE", bold, TextAlignment.CENTER);
-        addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
+        addHeader(table, slip.getType() == TypeBordereauRemise.CHEQUE
+                ? "DATE CHÈQUE" : "ÉCHÉANCE", bold, TextAlignment.CENTER);
         addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
 
         int index = 1;
@@ -223,7 +194,6 @@ public class BordereauRemisePdfService {
             addBody(table, instrument.getReglement().getPayeurNom(), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getBanqueEmettriceReference() == null
                     ? null : instrument.getBanqueEmettriceReference().getLibelle()), regular, TextAlignment.LEFT, background);
-            addBody(table, date(instrument.getDateInstrument()), regular, TextAlignment.CENTER, background);
             addBody(table, date(instrument.getDateEcheance()), regular, TextAlignment.CENTER, background);
             addBody(table, amount(line.getMontant()), bold, TextAlignment.RIGHT, background);
             index++;
@@ -367,19 +337,6 @@ public class BordereauRemisePdfService {
         return cell;
     }
 
-    private Cell compactInfoCell(String label, String content, PdfFont valueFont, PdfFont bold) {
-        Paragraph line = new Paragraph()
-                .add(new Text(label + " :  ").setFont(bold).setFontSize(6.2f).setFontColor(MUTED))
-                .add(new Text(value(content)).setFont(valueFont).setFontSize(7.2f).setFontColor(INK))
-                .setMargin(0)
-                .setMultipliedLeading(1);
-        return new Cell()
-                .add(line)
-                .setBorder(new SolidBorder(BORDER, 0.6f))
-                .setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .setPadding(5);
-    }
-
     private Cell compactStackedInfoCell(String label, String content, PdfFont regular, PdfFont bold) {
         return new Cell()
                 .add(new Paragraph(label)
@@ -432,35 +389,6 @@ public class BordereauRemisePdfService {
             case CHEQUE -> "BORDEREAU DE REMISE DE CHÈQUES";
             case EFFET -> "BORDEREAU DE REMISE D’EFFETS";
             case VERSEMENT_ESPECES -> "BORDEREAU DE VERSEMENT D’ESPÈCES";
-        };
-    }
-
-    private String statusLabel(BordereauRemise slip) {
-        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES
-                && (slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE
-                || slip.getStatut() == StatutBordereauRemise.CLOTURE)) {
-            return "REMIS À LA BANQUE";
-        }
-        return switch (slip.getStatut()) {
-            case BROUILLON -> "PROVISOIRE";
-            case DEPOSE -> "REMIS À LA BANQUE";
-            case PARTIELLEMENT_TRAITE -> "PARTIELLEMENT TRAITÉ";
-            case CLOTURE -> "CLÔTURÉ";
-            case ANNULE -> "ANNULÉ";
-        };
-    }
-
-    private DeviceRgb statusColor(BordereauRemise slip) {
-        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES
-                && (slip.getStatut() == StatutBordereauRemise.PARTIELLEMENT_TRAITE
-                || slip.getStatut() == StatutBordereauRemise.CLOTURE)) {
-            return new DeviceRgb(37, 99, 235);
-        }
-        return switch (slip.getStatut()) {
-            case CLOTURE -> SUCCESS;
-            case ANNULE -> new DeviceRgb(220, 38, 38);
-            case BROUILLON -> MUTED;
-            default -> new DeviceRgb(37, 99, 235);
         };
     }
 

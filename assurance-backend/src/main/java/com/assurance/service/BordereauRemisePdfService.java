@@ -158,11 +158,11 @@ public class BordereauRemisePdfService {
 
     private void writeOverview(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
         boolean cashDeposit = slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES;
-        Table overview = new Table(cashDeposit ? new float[]{1} : new float[]{1.15f, 1.15f, 0.9f})
-                .setWidth(UnitValue.createPercentValue(100))
-                .setMarginBottom(4);
-        overview.addCell(compactInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
         if (!cashDeposit) {
+            Table overview = new Table(new float[]{1.15f, 1.15f, 0.9f})
+                    .setWidth(UnitValue.createPercentValue(100))
+                    .setMarginBottom(4);
+            overview.addCell(compactInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
             overview.addCell(compactInfoCell("DATE DE REMISE",
                     slip.getDateDepot() == null ? "À confirmer" : date(slip.getDateDepot()), regular, bold));
             overview.addCell(compactInfoCell(
@@ -171,13 +171,16 @@ public class BordereauRemisePdfService {
                     regular,
                     bold
             ));
+            document.add(overview);
         }
-        document.add(overview);
 
         CompteTresorerie destination = slip.getCompteDestination();
-        Table bank = new Table(new float[]{1.5f, 1.3f, 2.4f})
+        Table bank = new Table(cashDeposit ? new float[]{1.1f, 1.5f, 1.3f, 2.4f} : new float[]{1.5f, 1.3f, 2.4f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(8);
+        if (cashDeposit) {
+            bank.addCell(compactStackedInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
+        }
         bank.addCell(compactStackedInfoCell("REMETTANT", slip.getAgence().getNom(), regular, bold));
         bank.addCell(compactStackedInfoCell("BANQUE DESTINATAIRE", destination.getBanqueReference() == null
                 ? null : destination.getBanqueReference().getLibelle(), regular, bold));

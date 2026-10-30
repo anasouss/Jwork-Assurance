@@ -1,7 +1,6 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { MoneyInput } from "./MoneyInput";
-import { moneyAmount } from "../utils/format";
+import { moneyAmount, numberOrZero, roundMoney } from "../utils/format";
 import type { QuittanceInput, QuittancePreview } from "../types";
 
 const columns = [
@@ -27,9 +26,15 @@ export function AvenantManualQuittanceTable({
   preview?: QuittancePreview | null;
   loading?: boolean;
 }) {
-  const amount = (value?: number | null) => loading
-    ? <Skeleton className="ml-auto h-4 w-20" />
-    : value == null ? "-" : moneyAmount(value);
+  const confirmedPreview = loading ? null : preview;
+  const lineTotal = (ligne: QuittanceInput) => roundMoney(columns.reduce(
+    (total, [key]) => total + roundMoney(numberOrZero(ligne[key])), 0
+  ));
+  const columnTotal = (key: typeof columns[number][0]) => roundMoney(lignes.reduce(
+    (total, ligne) => total + roundMoney(numberOrZero(ligne[key])), 0
+  ));
+  const draftTotal = roundMoney(lignes.reduce((total, ligne) => total + lineTotal(ligne), 0));
+  const amount = (value?: number | null) => value == null ? "-" : moneyAmount(value);
   return (
     <div className="overflow-x-auto rounded-md border bg-background" aria-busy={loading}>
       <Table className="min-w-[980px] table-fixed">
@@ -64,14 +69,14 @@ export function AvenantManualQuittanceTable({
                 </TableCell>
               ))}
               <TableCell className="px-3 py-2 text-right font-semibold tabular-nums">
-                {amount(preview?.lignes.find((item) => item.categorie === ligne.categorie)?.primeTotale)}
+                {amount(confirmedPreview?.lignes.find((item) => item.categorie === ligne.categorie)?.primeTotale ?? lineTotal(ligne))}
               </TableCell>
             </TableRow>
           ))}
           <TableRow className="bg-muted/50 font-semibold">
             <TableCell className="px-3 py-3">Total assurance</TableCell>
-            {columns.map(([key]) => <TableCell key={key} className="px-3 py-3 text-right tabular-nums">{amount(preview?.[key])}</TableCell>)}
-            <TableCell className="px-3 py-3 text-right tabular-nums">{amount(preview?.primeTotale)}</TableCell>
+            {columns.map(([key]) => <TableCell key={key} className="px-3 py-3 text-right tabular-nums">{amount(confirmedPreview?.[key] ?? columnTotal(key))}</TableCell>)}
+            <TableCell className="px-3 py-3 text-right tabular-nums">{amount(confirmedPreview?.primeTotale ?? draftTotal)}</TableCell>
           </TableRow>
           {(preview?.assistances ?? []).map((assistance, index) => (
             <TableRow key={index}>

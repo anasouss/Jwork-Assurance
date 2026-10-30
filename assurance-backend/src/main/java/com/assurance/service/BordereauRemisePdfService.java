@@ -125,18 +125,21 @@ public class BordereauRemisePdfService {
                 .setFontSize(13)
                 .setFontColor(INK)
                 .setMargin(0));
-        title.add(new Paragraph("Réf. interne : " + slip.getNumero())
+        title.add(new Paragraph((slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
+                        ? "Réf. cabinet : " : "Réf. interne : ") + slip.getNumero())
                 .setFont(bold)
                 .setFontSize(10)
                 .setFontColor(ACCENT)
                 .setMarginTop(5)
                 .setMarginBottom(0));
-        title.add(new Paragraph(statusLabel(slip))
-                .setFont(regular)
-                .setFontSize(7.5f)
-                .setFontColor(statusColor(slip))
-                .setMarginTop(3)
-                .setMarginBottom(0));
+        if (slip.getType() != TypeBordereauRemise.VERSEMENT_ESPECES) {
+            title.add(new Paragraph(statusLabel(slip))
+                    .setFont(regular)
+                    .setFontSize(7.5f)
+                    .setFontColor(statusColor(slip))
+                    .setMarginTop(3)
+                    .setMarginBottom(0));
+        }
         if (slip.getReferenceBancaire() != null && !slip.getReferenceBancaire().isBlank()) {
             title.add(new Paragraph("Réf. banque : " + slip.getReferenceBancaire().trim())
                     .setFont(regular)
@@ -154,20 +157,21 @@ public class BordereauRemisePdfService {
     }
 
     private void writeOverview(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
-        Table overview = new Table(new float[]{1.15f, 1.15f, 0.9f})
+        boolean cashDeposit = slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES;
+        Table overview = new Table(cashDeposit ? new float[]{1} : new float[]{1.15f, 1.15f, 0.9f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(4);
         overview.addCell(compactInfoCell("DATE DU BORDEREAU", date(slip.getDateBordereau()), regular, bold));
-        overview.addCell(compactInfoCell("DATE DE REMISE",
-                slip.getDateDepot() == null ? "À confirmer" : date(slip.getDateDepot()), regular, bold));
-        overview.addCell(compactInfoCell(
-                slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
-                        ? "ENCAISSEMENTS" : "NOMBRE DE PIÈCES",
-                String.valueOf(slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
-                        ? slip.getLignesEspeces().size() : slip.getLignes().size()),
-                regular,
-                bold
-        ));
+        if (!cashDeposit) {
+            overview.addCell(compactInfoCell("DATE DE REMISE",
+                    slip.getDateDepot() == null ? "À confirmer" : date(slip.getDateDepot()), regular, bold));
+            overview.addCell(compactInfoCell(
+                    "NOMBRE DE PIÈCES",
+                    String.valueOf(slip.getLignes().size()),
+                    regular,
+                    bold
+            ));
+        }
         document.add(overview);
 
         CompteTresorerie destination = slip.getCompteDestination();
@@ -237,11 +241,6 @@ public class BordereauRemisePdfService {
     }
 
     private void writeCashTransfer(Document document, BordereauRemise slip, PdfFont regular, PdfFont bold) {
-        document.add(new Paragraph("Journées de caisse versées")
-                .setFont(bold)
-                .setFontSize(11)
-                .setMarginBottom(7));
-
         if (slip.getLignesEspeces().isEmpty()) {
             Table legacyTransfer = new Table(new float[]{1, 0.28f, 1})
                     .setWidth(UnitValue.createPercentValue(100));
@@ -265,12 +264,10 @@ public class BordereauRemisePdfService {
                             LinkedHashMap::new,
                             Collectors.toList()
                     ));
-            Table days = new Table(new float[]{1.1f, 2.2f, 2.1f, 0.8f, 1.2f})
+            Table days = new Table(new float[]{1.6f, 3.6f, 1.2f})
                     .setWidth(UnitValue.createPercentValue(100));
-            addHeader(days, "DATE", bold, TextAlignment.LEFT);
-            addHeader(days, "CAISSE", bold, TextAlignment.LEFT);
-            addHeader(days, "CAISSIER", bold, TextAlignment.LEFT);
-            addHeader(days, "ENCAISS.", bold, TextAlignment.CENTER);
+            addHeader(days, "DATE D’ENCAISSEMENT", bold, TextAlignment.LEFT);
+            addHeader(days, "OPÉRATEUR", bold, TextAlignment.LEFT);
             addHeader(days, "MONTANT", bold, TextAlignment.RIGHT);
             byDay.values().forEach(lines -> {
                 LigneBordereauEspeces first = lines.get(0);
@@ -280,11 +277,9 @@ public class BordereauRemisePdfService {
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
                 addBody(days, date(first.getMouvementTresorerie().getDateOperation()), regular,
                         TextAlignment.LEFT, null);
-                addBody(days, source.getLibelle(), regular, TextAlignment.LEFT, null);
                 addBody(days, source.getUtilisateurTitulaire() == null
                         ? "-" : source.getUtilisateurTitulaire().getFullName(), regular,
                         TextAlignment.LEFT, null);
-                addBody(days, String.valueOf(lines.size()), regular, TextAlignment.CENTER, null);
                 addBody(days, amount(dayTotal), bold, TextAlignment.RIGHT, null);
             });
             document.add(days);
@@ -292,13 +287,16 @@ public class BordereauRemisePdfService {
                     .setFont(regular).setFontSize(8.5f).setMarginTop(6));
         }
 
-        Table amountTable = new Table(new float[]{1, 1})
-                .setWidth(UnitValue.createPercentValue(55))
+        Table amountTable = new Table(new float[]{1, 1.4f})
+                .setWidth(UnitValue.createPercentValue(45))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
                 .setMarginTop(10);
-        amountTable.addCell(infoCell("MONTANT VERSÉ", amount(slip.getMontantTotal()) + " "
-                + slip.getCompteDestination().getDevise(), regular, bold).setBackgroundColor(SOFT_ACCENT));
-        amountTable.addCell(infoCell("DATE DE VALEUR", date(slip.getDateDepot()), regular, bold));
+        amountTable.addCell(new Cell().add(new Paragraph("TOTAL").setFont(bold).setFontSize(8).setMargin(0))
+                .setBorder(new SolidBorder(BORDER, 0.6f)).setBackgroundColor(SOFT_ACCENT).setPadding(6));
+        amountTable.addCell(new Cell().add(new Paragraph(amount(slip.getMontantTotal()) + " "
+                        + slip.getCompteDestination().getDevise()).setFont(bold).setFontSize(10).setMargin(0))
+                .setBorder(new SolidBorder(BORDER, 0.6f)).setBackgroundColor(SOFT_ACCENT)
+                .setTextAlignment(TextAlignment.RIGHT).setPadding(6));
         document.add(amountTable);
     }
 

@@ -84,7 +84,7 @@ describe("amendment form adapters", () => {
       taux: 1,
     }] as NonNullable<ContratSummary["garanties"]>;
 
-    expect(mapCurrentGaranties(garanties, [{ vehiculeId: "22", typeVehicule: "AUTOMOBILE" }], [])).toEqual([
+    expect(mapCurrentGaranties(garanties, [{ vehiculeId: "22" }], [])).toEqual([
       expect.objectContaining({
         garantieId: "1",
         vehiculeIndex: 0,

@@ -5,9 +5,10 @@ import { numberValue } from "../utils/format";
 type MoneyInputProps = Omit<ComponentProps<typeof Input>, "type" | "value" | "onChange" | "inputMode"> & {
   value?: number | null;
   onValueChange: (value: number | undefined) => void;
+  allowNegative?: boolean;
 };
 
-export function MoneyInput({ value, onValueChange, onBlur, onFocus, ...props }: MoneyInputProps) {
+export function MoneyInput({ value, onValueChange, onBlur, onFocus, allowNegative = false, ...props }: MoneyInputProps) {
   const [focused, setFocused] = useState(false);
   const [display, setDisplay] = useState(() => formatAmount(value));
 
@@ -33,7 +34,7 @@ export function MoneyInput({ value, onValueChange, onBlur, onFocus, ...props }: 
         onBlur?.(event);
       }}
       onChange={(event) => {
-        const nextDisplay = formatEditableAmount(event.target.value);
+        const nextDisplay = formatEditableAmount(event.target.value, allowNegative);
         setDisplay(nextDisplay);
         onValueChange(numberValue(nextDisplay));
       }}
@@ -50,10 +51,11 @@ function formatAmount(value?: number | null) {
   }).format(Number(value));
 }
 
-function formatEditableAmount(value: string) {
+function formatEditableAmount(value: string, allowNegative: boolean) {
+  const sign = allowNegative && value.trimStart().startsWith("-") ? "-" : "";
   const compact = value.replace(/\s/g, "").replace(/[^\d,.]/g, "");
   if (!compact) {
-    return "";
+    return sign;
   }
   const separatorIndex = compact.search(/[,.]/);
   const hasDecimal = separatorIndex >= 0;
@@ -61,7 +63,7 @@ function formatEditableAmount(value: string) {
   const decimalPart = hasDecimal ? compact.slice(separatorIndex + 1).replace(/[,.]/g, "") : "";
   const separator = hasDecimal ? compact[separatorIndex] : "";
   const groupedInteger = groupThousands(integerPart);
-  return hasDecimal ? `${groupedInteger}${separator}${decimalPart}` : groupedInteger;
+  return sign + (hasDecimal ? `${groupedInteger}${separator}${decimalPart}` : groupedInteger);
 }
 
 function groupThousands(value: string) {

@@ -1134,7 +1134,6 @@ export default function AvenantContratPage() {
         </CardHeader>
         <CardContent>
           {supportsManualQuittance ? (
-            <div className="mb-4 grid gap-3">
               <AvenantManualQuittanceTable
                 lignes={quittanceLines}
                 onChange={(lines) => {
@@ -1144,10 +1143,10 @@ export default function AvenantContratPage() {
                 }}
                 disabled={saveMutation.isPending || draftMutation.isPending}
                 allowNegative={movementCode !== "EXG_M"}
+                preview={preview}
+                loading={previewMutation.isPending}
               />
-            </div>
-          ) : null}
-          <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />
+          ) : <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />}
         </CardContent>
       </Card>
 

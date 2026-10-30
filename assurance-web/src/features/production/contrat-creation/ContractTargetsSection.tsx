@@ -594,14 +594,14 @@ export function ContractTargetsSection({
                   layout={guaranteeLayout}
                   primeColumnLabel={primeColumnLabel}
                 />
-                <QuittanceTotalsSummary
+                {guaranteeLayout !== "particulier" ? <QuittanceTotalsSummary
                   preview={activeVehiculePreview}
                   target={activeVehiculeTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeVehiculeTarget)}
                   showAssistanceTotal={showAssistance && Boolean(assistances[targetKey(activeVehiculeTarget)]?.enabled)}
                   assistanceNet={activeVehiculeAssistanceNet}
-                />
+                /> : null}
               </TargetSubsection>
               </div>
             ) : null}
@@ -766,14 +766,14 @@ export function ContractTargetsSection({
                   layout={guaranteeLayout}
                   primeColumnLabel={primeColumnLabel}
                 />
-                <QuittanceTotalsSummary
+                {guaranteeLayout !== "particulier" ? <QuittanceTotalsSummary
                   preview={activeRemorquePreview}
                   target={activeRemorqueTarget}
                   loading={previewing}
                   showPersonneTotals={hasTargetPersonneGaranties(selectedGaranties, personneGaranties, activeRemorqueTarget)}
                   showAssistanceTotal={showAssistance && Boolean(assistances[targetKey(activeRemorqueTarget)]?.enabled)}
                   assistanceNet={activeRemorqueAssistanceNet}
-                />
+                /> : null}
               </TargetSubsection>
               </div>
             ) : (

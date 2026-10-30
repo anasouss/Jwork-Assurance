@@ -752,6 +752,7 @@ export const comptaApi = {
   async remittanceSlips(params: {
     type?: RemittanceSlipType;
     statut?: RemittanceSlipStatus;
+    definitif?: boolean;
     dateDu?: string;
     dateAu?: string;
     search?: string;

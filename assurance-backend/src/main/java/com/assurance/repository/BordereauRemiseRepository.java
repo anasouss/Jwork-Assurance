@@ -26,6 +26,12 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
             where b.agence.id = :agenceId
               and (:type is null or b.type = :type)
               and (:statut is null or b.statut = :statut)
+              and (:definitif is null
+                   or (:definitif = false and b.statut = com.assurance.enums.StatutBordereauRemise.BROUILLON)
+                   or (:definitif = true and b.statut in (
+                       com.assurance.enums.StatutBordereauRemise.DEPOSE,
+                       com.assurance.enums.StatutBordereauRemise.PARTIELLEMENT_TRAITE,
+                       com.assurance.enums.StatutBordereauRemise.CLOTURE)))
               and (:dateDu is null or b.dateBordereau >= :dateDu)
               and (:dateAu is null or b.dateBordereau <= :dateAu)
               and (:search is null
@@ -38,6 +44,7 @@ public interface BordereauRemiseRepository extends JpaRepository<BordereauRemise
             @Param("agenceId") Long agenceId,
             @Param("type") TypeBordereauRemise type,
             @Param("statut") StatutBordereauRemise statut,
+            @Param("definitif") Boolean definitif,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu,
             @Param("search") String search,

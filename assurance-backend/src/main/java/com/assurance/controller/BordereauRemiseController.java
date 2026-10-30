@@ -83,6 +83,7 @@ public class BordereauRemiseController {
     public ResponseEntity<ApiResponse<BordereauRemisePageResponse>> search(
             @RequestParam(required = false) TypeBordereauRemise type,
             @RequestParam(required = false) StatutBordereauRemise statut,
+            @RequestParam(required = false) Boolean definitif,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam(required = false)
@@ -95,6 +96,7 @@ public class BordereauRemiseController {
                 TenantContext.getCurrentAgence(),
                 type,
                 statut,
+                definitif,
                 dateDu,
                 dateAu,
                 search,

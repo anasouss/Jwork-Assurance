@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Landmark, Printer, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Landmark, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,7 +64,7 @@ export default function BordereauRemiseDetailPage() {
       referenceBancaire: depositReference.trim(),
     }),
     onSuccess: async () => {
-      toast.success("Bordereau remis à la banque");
+      toast.success("Bordereau validé");
       setDepositOpen(false);
       await invalidate();
     },
@@ -165,7 +165,7 @@ export default function BordereauRemiseDetailPage() {
             <Button disabled={!canManage || (instrumentSlip && data.lignes.length === 0)} onClick={() => {
               setDepositReference(data.referenceBancaire ?? "");
               setDepositOpen(true);
-            }}><Send className="size-4" /> Remettre à la banque</Button>
+            }}><CheckCircle2 className="size-4" /> Valider le bordereau</Button>
           </>}
           {(data.operationTresorerieId || data.lignesEspeces.some((line) => line.operationTresorerieId)) && <Button asChild variant="outline"><Link to={`/app/compta/tresorerie/operations?search=${data.numero}`}><Landmark className="size-4" /> Voir les opérations</Link></Button>}
         </div>
@@ -245,10 +245,10 @@ export default function BordereauRemiseDetailPage() {
       </section>}
 
       <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
-        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Confirmer la remise à la banque</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
+        <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Valider le bordereau</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
           <div className="grid gap-4"><div className="grid gap-2"><Label>Date de remise</Label><DatePicker date={depositDate} onSelect={(value) => setDepositDate(toDateOnly(value) ?? "")} /></div>
             <div className="grid gap-2"><Label htmlFor="deposit-reference">N° bordereau banque *</Label><Input id="deposit-reference" value={depositReference} onChange={(event) => setDepositReference(event.target.value)} /></div></div>
-          <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><Button disabled={!depositDate || !depositReference.trim() || deposit.isPending} onClick={() => deposit.mutate()}>Confirmer la remise</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><Button disabled={!depositDate || !depositReference.trim() || deposit.isPending} onClick={() => deposit.mutate()}>{deposit.isPending ? "Validation en cours..." : "Valider le bordereau"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

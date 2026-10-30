@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, MoreHorizontal, Printer, RotateCcw, Search, Send, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, Eye, MoreHorizontal, Printer, RotateCcw, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import {
@@ -35,12 +35,12 @@ import type { RemittanceSlip, RemittanceSlipStatus, RemittanceSlipType } from ".
 import { formatTreasuryDate, formatTreasuryMoney, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type TypeFilter = RemittanceSlipType | "ALL";
-type StatusFilter = RemittanceSlipStatus | "ALL";
+type StatusFilter = "BROUILLON" | "DEFINITIF" | "ALL";
 
 const TYPE_LABELS: Record<RemittanceSlipType, string> = {
   CHEQUE: "Chèques",
   EFFET: "Effets",
-  VERSEMENT_ESPECES: "Versement d’espèces",
+  VERSEMENT_ESPECES: "Espèces",
 };
 
 const STATUS_LABELS: Record<RemittanceSlipStatus, string> = {
@@ -76,7 +76,7 @@ export default function InstrumentsTresoreriePage() {
     queryKey: ["compta", "treasury", "remittance-slips", type, status, appliedSearch, dateFrom, dateTo, page],
     queryFn: () => comptaApi.remittanceSlips({
       type: type === "ALL" ? undefined : type,
-      statut: status === "ALL" ? undefined : status,
+      definitif: status === "ALL" ? undefined : status === "DEFINITIF",
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined,
       dateAu: dateTo || undefined,
@@ -100,14 +100,14 @@ export default function InstrumentsTresoreriePage() {
     }),
     onSuccess: async () => {
       setDepositTarget(undefined);
-      toast.success("Bordereau remis à la banque");
+      toast.success("Bordereau validé");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
       ]);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Remise à la banque impossible"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Validation du bordereau impossible"),
   });
 
   function openDeposit(slip: RemittanceSlip) {
@@ -187,14 +187,13 @@ export default function InstrumentsTresoreriePage() {
         <div className="grid gap-2"><Label>Type</Label><Select value={type} onValueChange={(value) => updateFilter("type", value)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Tous les types</SelectItem><SelectItem value="CHEQUE">Chèques</SelectItem>
-            <SelectItem value="EFFET">Effets</SelectItem><SelectItem value="VERSEMENT_ESPECES">Versements d’espèces</SelectItem>
+            <SelectItem value="EFFET">Effets</SelectItem><SelectItem value="VERSEMENT_ESPECES">Espèces</SelectItem>
           </SelectContent>
         </Select></div>
         <div className="grid gap-2"><Label>Statut</Label><Select value={status} onValueChange={(value) => updateFilter("statut", value)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="BROUILLON">Provisoires</SelectItem>
-            <SelectItem value="DEPOSE">Remis à la banque</SelectItem>
-            <SelectItem value="CLOTURE">Clôturés</SelectItem><SelectItem value="ANNULE">Annulés</SelectItem>
+            <SelectItem value="DEFINITIF">Définitifs</SelectItem>
           </SelectContent>
         </Select></div>
         <div className="grid gap-2"><Label htmlFor="slip-search">Réf. interne, n° banque ou compte</Label><Input id="slip-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} /></div>
@@ -207,9 +206,9 @@ export default function InstrumentsTresoreriePage() {
         <div className="border-b px-4 py-3"><h2 className="font-semibold">Tous les bordereaux</h2><p className="text-sm text-muted-foreground">Ouvrez un bordereau pour consulter sa remise et les instruments associés.</p></div>
         <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
-            <th className="px-4 py-3 text-left">Réf. interne</th><th className="px-4 py-3 text-left">N° banque</th><th className="px-4 py-3 text-left">Type</th>
+            <th className="px-4 py-3 text-left">Réf. interne</th><th className="px-4 py-3 text-left">N° BD banque</th><th className="px-4 py-3 text-left">Type</th>
             <th className="px-4 py-3 text-left">Date</th><th className="px-4 py-3 text-left">Remis le</th>
-            <th className="px-4 py-3 text-left">Destination</th><th className="px-4 py-3 text-center">Instruments</th>
+            <th className="px-4 py-3 text-left">Destination</th><th className="px-4 py-3 text-center">Nombre</th>
             <th className="px-4 py-3 text-right">Total</th><th className="px-4 py-3 text-left">Statut</th><th className="w-24 px-4 py-3"><span className="sr-only">Actions</span></th>
           </tr></thead>
           <tbody className="divide-y">
@@ -233,7 +232,7 @@ export default function InstrumentsTresoreriePage() {
                     </DropdownMenuItem>
                     {slip.statut === "BROUILLON" && canManage ? (
                       <DropdownMenuItem onSelect={() => openDeposit(slip)}>
-                        <Send className="size-4 text-blue-600 dark:text-blue-400" /> Remettre à la banque
+                        <CheckCircle2 className="size-4 text-blue-600 dark:text-blue-400" /> Valider le bordereau
                       </DropdownMenuItem>
                     ) : null}
                     <DropdownMenuItem disabled={Boolean(pdfAction)} onSelect={() => void previewPdf(slip)}>
@@ -267,7 +266,7 @@ export default function InstrumentsTresoreriePage() {
       <Dialog open={Boolean(depositTarget)} onOpenChange={(open) => !open && setDepositTarget(undefined)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirmer la remise à la banque</DialogTitle>
+            <DialogTitle>Valider le bordereau</DialogTitle>
             <DialogDescription>
               {depositTarget?.type === "VERSEMENT_ESPECES"
                 ? "Le transfert de la caisse vers la banque sera enregistré."
@@ -294,7 +293,7 @@ export default function InstrumentsTresoreriePage() {
               disabled={!depositTarget || !depositDate || !depositReference.trim() || deposit.isPending}
               onClick={() => depositTarget && deposit.mutate(depositTarget)}
             >
-              {deposit.isPending ? "Remise en cours..." : "Confirmer la remise"}
+              {deposit.isPending ? "Validation en cours..." : "Valider le bordereau"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -330,13 +329,9 @@ function parseTypeFilter(value: string | null): TypeFilter {
 }
 
 function parseStatusFilter(value: string | null): StatusFilter {
-  if (value === "PARTIELLEMENT_TRAITE") return "DEPOSE";
-  return value === "BROUILLON"
-    || value === "DEPOSE"
-    || value === "CLOTURE"
-    || value === "ANNULE"
-    ? value
-    : "ALL";
+  if (value === "BROUILLON") return "BROUILLON";
+  return value === "DEFINITIF" || value === "DEPOSE" || value === "PARTIELLEMENT_TRAITE" || value === "CLOTURE"
+    ? "DEFINITIF" : "ALL";
 }
 
 function parseDateFilter(value: string | null) {

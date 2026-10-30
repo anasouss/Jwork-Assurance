@@ -167,7 +167,42 @@ export default function ImpayesClientsPage() {
         {canReject && <Button onClick={() => setRejectionOpen(true)}><Plus className="size-4" /> Enregistrer un rejet</Button>}
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
+        <div className="grid gap-2">
+          <Label id="unpaid-payer-scope">Cible</Label>
+          <div role="group" aria-labelledby="unpaid-payer-scope" className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
+            {(["CLIENT", "GROUPE"] as const).map((scope) => (
+              <button
+                key={scope}
+                type="button"
+                aria-pressed={payerType === scope}
+                className={`h-8 flex-1 rounded-sm px-3 text-sm font-medium ${
+                  payerType === scope
+                    ? "bg-amber-100 text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:ring-amber-700"
+                    : "text-slate-600 hover:bg-background/70 hover:text-foreground dark:text-slate-300"
+                }`}
+                onClick={() => {
+                  if (payerType === scope) return;
+                  setSelectedPayer(undefined);
+                  payerSearch.clearQuery();
+                  updateUrl({ cible: scope, payeurId: "" });
+                }}
+              >
+                {scope === "CLIENT" ? "Client" : "Groupe"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-2 xl:col-span-2">
+          <Label>{payerType === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}</Label>
+          <AutocompleteSelect
+            options={payerSearch.options} value={payerId}
+            onValueChange={(value) => { setSelectedPayer(payerSearch.resolve(value)); updateUrl({ payeurId: value }); }}
+            onQueryChange={payerType === "CLIENT" ? payerSearch.setQuery : undefined}
+            placeholder={payerType === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
+            emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
+          />
+        </div>
         <div className="grid gap-2">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => updateUrl({ mode: value as ModeFilter })}>
@@ -188,6 +223,8 @@ export default function ImpayesClientsPage() {
           <SelectTrigger><SelectValue placeholder="Toutes les banques" /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Toutes les banques</SelectItem>{(banks.data ?? []).map((bank) => <SelectItem key={bank.id} value={bank.id}>{bank.libelle}</SelectItem>)}
           </SelectContent></Select></div>
+        <div className="grid gap-2"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid gap-2"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
         <div className="grid gap-2 xl:col-span-2">
           <Label htmlFor="unpaid-search">Référence, payeur ou règlement</Label>
           <Input
@@ -197,18 +234,6 @@ export default function ImpayesClientsPage() {
             onKeyDown={(event) => event.key === "Enter" && updateUrl({ search: search.trim() })}
           />
         </div>
-        <div className="grid gap-2"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
-        <div className="grid gap-2"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
-        <div className="grid gap-2"><Label>Type de payeur</Label><Select value={payerType} onValueChange={(value) => {
-          setSelectedPayer(undefined); payerSearch.clearQuery(); updateUrl({ cible: value as PayerType, payeurId: "" });
-        }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="CLIENT">Client</SelectItem><SelectItem value="GROUPE">Groupe</SelectItem></SelectContent></Select></div>
-        <div className="grid gap-2"><Label>{payerType === "CLIENT" ? "Client" : "Groupe"}</Label><AutocompleteSelect
-          options={payerSearch.options} value={payerId}
-          onValueChange={(value) => { setSelectedPayer(payerSearch.resolve(value)); updateUrl({ payeurId: value }); }}
-          onQueryChange={payerType === "CLIENT" ? payerSearch.setQuery : undefined}
-          placeholder={payerType === "CLIENT" ? "Nom, RC, CIN, ICE ou code" : "Code, groupe ou membre"}
-          emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
-        /></div>
         <div className="flex items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={() => updateUrl({ search: search.trim() })}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={() => {

@@ -51,13 +51,9 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -75,12 +71,10 @@ public class JournalReglementsPdfService {
     private static final DeviceRgb TABLE_HEADER = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb ACCENT = new DeviceRgb(0, 147, 211);
     private static final DeviceRgb SOFT_BLUE = new DeviceRgb(248, 250, 252);
-    private static final DeviceRgb SOFT_ACCENT = new DeviceRgb(232, 244, 250);
     private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
     private static final DeviceRgb MUTED = new DeviceRgb(71, 85, 105);
     private static final float PAGE_MARGIN = 24f;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-    private static final DateTimeFormatter DATE_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
 
     private final InstrumentReglementClientRepository instrumentRepository;
     private final AssistanceContratRepository assistanceContratRepository;
@@ -127,10 +121,8 @@ public class JournalReglementsPdfService {
                             regular
                     ));
 
-            writeHeader(document, agency, dateDu, dateAu, regular, bold);
-            writeFilters(document, dateDu, dateAu, selectedUser, mode, statutReglement, regular, bold);
-            writeOverview(document, instruments, regular, bold);
-            writeModeSummary(document, instruments, regular, bold);
+            writeHeader(document, agency, dateDu, regular, bold);
+            writeFilters(document, selectedUser, mode, regular, bold);
             writeDetails(
                     document,
                     instruments,
@@ -151,13 +143,10 @@ public class JournalReglementsPdfService {
 
     private void validatePeriod(LocalDate dateDu, LocalDate dateAu) {
         if (dateDu == null || dateAu == null) {
-            throw new BadRequestException("La période de l'état d'encaissement est obligatoire");
+            throw new BadRequestException("La date de l'état d'encaissement est obligatoire");
         }
-        if (dateDu.isAfter(dateAu)) {
-            throw new BadRequestException("La date de début doit précéder la date de fin");
-        }
-        if (ChronoUnit.DAYS.between(dateDu, dateAu) > 366) {
-            throw new BadRequestException("La période de l'état d'encaissement ne peut pas dépasser 366 jours");
+        if (!dateDu.equals(dateAu)) {
+            throw new BadRequestException("L'état d'encaissement journalier doit porter sur une seule date");
         }
     }
 
@@ -177,7 +166,6 @@ public class JournalReglementsPdfService {
             Document document,
             Agence agency,
             LocalDate dateDu,
-            LocalDate dateAu,
             PdfFont regular,
             PdfFont bold
     ) {
@@ -195,19 +183,13 @@ public class JournalReglementsPdfService {
         }
         header.addCell(identity);
 
-        String period = dateDu.equals(dateAu)
-                ? DATE_FORMAT.format(dateDu)
-                : DATE_FORMAT.format(dateDu) + " au " + DATE_FORMAT.format(dateAu);
         Cell title = cell().setTextAlignment(TextAlignment.RIGHT)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE);
         title.add(new Paragraph("ÉTAT D’ENCAISSEMENT JOURNALIER")
                 .setFont(bold).setFontSize(15).setMargin(0));
-        title.add(new Paragraph("Période de saisie : " + period)
+        title.add(new Paragraph("Date de l’état : " + date(dateDu))
                 .setFont(regular).setFontSize(9).setFontColor(MUTED)
                 .setMarginTop(5).setMarginBottom(0));
-        title.add(new Paragraph("Généré le " + DATE_TIME_FORMAT.format(LocalDateTime.now()))
-                .setFont(regular).setFontSize(7.5f).setFontColor(MUTED)
-                .setMarginTop(3).setMarginBottom(0));
         header.addCell(title);
         document.add(header);
         document.add(new Paragraph("")
@@ -217,102 +199,17 @@ public class JournalReglementsPdfService {
 
     private void writeFilters(
             Document document,
-            LocalDate dateDu,
-            LocalDate dateAu,
             Utilisateur user,
             ModeReglementClient mode,
-            StatutReglementClient status,
             PdfFont regular,
             PdfFont bold
     ) {
-        Table filters = new Table(new float[]{1, 1.5f, 1.2f, 1.2f})
+        Table filters = new Table(new float[]{1.5f, 1.2f})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(10);
-        filters.addCell(infoCell("PÉRIODE DE SAISIE", date(dateDu) + " - " + date(dateAu), regular, bold));
         filters.addCell(infoCell("UTILISATEUR", user == null ? "Tous les utilisateurs" : user.getFullName(), regular, bold));
         filters.addCell(infoCell("MODE", mode == null ? "Tous les modes" : modeLabel(mode), regular, bold));
-        filters.addCell(infoCell("STATUT DU RÈGLEMENT", paymentFilterLabel(status), regular, bold));
         document.add(filters);
-    }
-
-    private void writeOverview(
-            Document document,
-            List<InstrumentReglementClient> instruments,
-            PdfFont regular,
-            PdfFont bold
-    ) {
-        Set<Long> validPayments = new HashSet<>();
-        Set<Long> cancelledPayments = new HashSet<>();
-        BigDecimal validAmount = BigDecimal.ZERO;
-        BigDecimal cancelledAmount = BigDecimal.ZERO;
-        for (InstrumentReglementClient instrument : instruments) {
-            ReglementClient payment = instrument.getReglement();
-            if (payment.getStatut() == StatutReglementClient.ANNULE) {
-                cancelledPayments.add(payment.getId());
-                cancelledAmount = cancelledAmount.add(instrument.getMontant());
-            } else {
-                validPayments.add(payment.getId());
-                validAmount = validAmount.add(instrument.getMontant());
-            }
-        }
-
-        Table overview = new Table(new float[]{1, 1, 1, 1})
-                .setWidth(UnitValue.createPercentValue(100))
-                .setMarginBottom(12);
-        overview.addCell(metricCell("RÈGLEMENTS ACTIFS", String.valueOf(validPayments.size()), regular, bold));
-        overview.addCell(metricCell("MONTANT ENREGISTRÉ", amount(validAmount) + " MAD", regular, bold)
-                .setBackgroundColor(SOFT_ACCENT));
-        overview.addCell(metricCell("RÈGLEMENTS ANNULÉS", String.valueOf(cancelledPayments.size()), regular, bold));
-        overview.addCell(metricCell("MONTANT ANNULÉ", amount(cancelledAmount) + " MAD", regular, bold));
-        document.add(overview);
-    }
-
-    private void writeModeSummary(
-            Document document,
-            List<InstrumentReglementClient> instruments,
-            PdfFont regular,
-            PdfFont bold
-    ) {
-        Map<ModeReglementClient, ModeTotals> totals = new EnumMap<>(ModeReglementClient.class);
-        instruments.stream()
-                .filter(instrument -> instrument.getReglement().getStatut() == StatutReglementClient.VALIDE)
-                .forEach(instrument -> totals.computeIfAbsent(instrument.getMode(), ignored -> new ModeTotals())
-                        .add(instrument));
-
-        document.add(sectionTitle("Synthèse par moyen de paiement", bold));
-        Table table = new Table(new float[]{1.5f, 0.5f, 1, 1, 1, 1})
-                .setWidth(UnitValue.createPercentValue(100))
-                .setMarginBottom(12);
-        addHeader(table, "MODE", bold, TextAlignment.LEFT);
-        addHeader(table, "NB", bold, TextAlignment.CENTER);
-        addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
-        addHeader(table, "EN COURS", bold, TextAlignment.RIGHT);
-        addHeader(table, "CONFIRMÉ", bold, TextAlignment.RIGHT);
-        addHeader(table, "IMPAYÉ", bold, TextAlignment.RIGHT);
-
-        int index = 0;
-        for (ModeReglementClient mode : ModeReglementClient.values()) {
-            ModeTotals row = totals.get(mode);
-            if (row == null) {
-                continue;
-            }
-            DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
-            addBody(table, modeLabel(mode), regular, TextAlignment.LEFT, background);
-            addBody(table, String.valueOf(row.count), regular, TextAlignment.CENTER, background);
-            addBody(table, amount(row.total), bold, TextAlignment.RIGHT, background);
-            addBody(table, amount(row.pending), regular, TextAlignment.RIGHT, background);
-            addBody(table, amount(row.confirmed), regular, TextAlignment.RIGHT, background);
-            addBody(table, amount(row.rejected), regular, TextAlignment.RIGHT, background);
-        }
-        if (totals.isEmpty()) {
-            table.addCell(new Cell(1, 6)
-                    .add(new Paragraph("Aucun règlement enregistré pour les critères sélectionnés")
-                            .setFont(regular).setFontSize(8).setMargin(0))
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setBorder(new SolidBorder(BORDER, 0.45f))
-                    .setPadding(8));
-        }
-        document.add(table);
     }
 
     private void writeDetails(
@@ -340,7 +237,7 @@ public class JournalReglementsPdfService {
         addHeader(table, "MODE", bold, TextAlignment.LEFT);
         addHeader(table, "RÉFÉRENCE", bold, TextAlignment.LEFT);
         addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
-        addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
+        addHeader(table, "MONTANT (MAD)", bold, TextAlignment.RIGHT);
 
         int index = 0;
         for (InstrumentReglementClient instrument : instruments) {
@@ -369,6 +266,14 @@ public class JournalReglementsPdfService {
                     .setBorder(new SolidBorder(BORDER, 0.45f))
                     .setPadding(10));
         }
+        BigDecimal total = instruments.stream()
+                .map(InstrumentReglementClient::getMontant)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        table.addCell(new Cell(1, columns.length - 1)
+                .add(new Paragraph("TOTAL").setFont(bold).setFontSize(7).setMargin(0))
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setBorder(new SolidBorder(BORDER, 0.4f)).setPadding(4));
+        addBody(table, amount(total), bold, TextAlignment.RIGHT, null);
         document.add(table);
         document.add(new Paragraph(
                 "Les chèques et effets en attente ou remis en banque sont enregistrés, mais ne sont pas encore définitivement encaissés."
@@ -519,12 +424,6 @@ public class JournalReglementsPdfService {
         return result;
     }
 
-    private Cell metricCell(String label, String content, PdfFont regular, PdfFont bold) {
-        Cell result = infoCell(label, content, regular, bold);
-        result.setTextAlignment(TextAlignment.CENTER);
-        return result;
-    }
-
     private Paragraph sectionTitle(String text, PdfFont bold) {
         return new Paragraph(text).setFont(bold).setFontSize(9.5f).setMarginBottom(6);
     }
@@ -550,16 +449,6 @@ public class JournalReglementsPdfService {
 
     private Cell cell() {
         return new Cell().setBorder(Border.NO_BORDER).setPadding(0);
-    }
-
-    private String paymentFilterLabel(StatutReglementClient status) {
-        if (status == null) {
-            return "Tous les statuts";
-        }
-        return switch (status) {
-            case VALIDE -> "Enregistrés";
-            case ANNULE -> "Annulés";
-        };
     }
 
     private String modeLabel(ModeReglementClient mode) {
@@ -606,24 +495,4 @@ public class JournalReglementsPdfService {
                 .orElse("");
     }
 
-    private static final class ModeTotals {
-        private int count;
-        private BigDecimal total = BigDecimal.ZERO;
-        private BigDecimal pending = BigDecimal.ZERO;
-        private BigDecimal confirmed = BigDecimal.ZERO;
-        private BigDecimal rejected = BigDecimal.ZERO;
-
-        private void add(InstrumentReglementClient instrument) {
-            count++;
-            total = total.add(instrument.getMontant());
-            switch (instrument.getStatut()) {
-                case EN_ATTENTE, REMIS_EN_BANQUE -> pending = pending.add(instrument.getMontant());
-                case CONFIRME -> confirmed = confirmed.add(instrument.getMontant());
-                case REJETE -> rejected = rejected.add(instrument.getMontant());
-                case REMPLACE -> {
-                    // Replaced instruments are excluded by the repository query.
-                }
-            }
-        }
-    }
 }

@@ -131,7 +131,6 @@ export default function ReglementsEnregistresPage() {
   const requestedPayerType: PayerScope = searchParams.get("cible") === "GROUPE"
     ? "GROUPE"
     : "CLIENT";
-  const journalView = searchParams.get("vue") === "journal" || searchParams.get("journal") === "1";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
   const canManageTreasury = permissions.includes("tresorerie:manage");
@@ -174,12 +173,6 @@ export default function ReglementsEnregistresPage() {
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
-  const [journalDateFrom, setJournalDateFrom] = useState(TODAY);
-  const [journalDateTo, setJournalDateTo] = useState(TODAY);
-  const [journalUserId, setJournalUserId] = useState("ALL");
-  const [journalMode, setJournalMode] = useState<ClientPaymentMode | "ALL">("ALL");
-  const [journalStatus, setJournalStatus] = useState<ClientPayment["statut"] | "ALL">("ALL");
-  const [journalLoading, setJournalLoading] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [replacementCandidates, setReplacementCandidates] = useState<PaymentInstrument[]>([]);
@@ -187,11 +180,11 @@ export default function ReglementsEnregistresPage() {
   const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
   const [replacementReason, setReplacementReason] = useState("");
   const replacementTargetId = searchParams.get("remplacer");
-  const payerSearch = usePayerSearch(journalView ? undefined : payerScope, selectedPayer);
+  const payerSearch = usePayerSearch(payerScope, selectedPayer);
   const requestedClient = useQuery({
     queryKey: ["crm-client", requestedPayerId],
     queryFn: () => clientApi.getClientCrm(requestedPayerId),
-    enabled: !journalView && Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
+    enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
   const payments = useQuery({
@@ -213,7 +206,7 @@ export default function ReglementsEnregistresPage() {
       page,
       size: PAGE_SIZE,
     }),
-    enabled: !journalView && hasAppliedFilters,
+    enabled: hasAppliedFilters,
   });
 
   useEffect(() => {
@@ -276,12 +269,6 @@ export default function ReglementsEnregistresPage() {
     next.delete("remplacer");
     setSearchParams(next, { replace: true });
   }, [instrumentToReplace, payments.data, replacementTargetId, searchParams, setSearchParams]);
-
-  const journalUsers = useQuery({
-    queryKey: ["compta", "client-payment-journal-users"],
-    queryFn: comptaApi.clientPaymentJournalUsers,
-    enabled: journalView,
-  });
 
   const cancelPayment = useMutation({
     mutationFn: () => comptaApi.cancelClientPayment(paymentToCancel!.id, cancelReason.trim()),
@@ -477,52 +464,14 @@ export default function ReglementsEnregistresPage() {
     }
   }
 
-  async function previewJournal() {
-    if (!journalDateFrom || !journalDateTo) {
-      toast.error("Renseignez la période de l’état d’encaissement");
-      return;
-    }
-    if (journalDateFrom > journalDateTo) {
-      toast.error("La date de début doit précéder la date de fin");
-      return;
-    }
-    const previewWindow = window.open("about:blank", "_blank");
-    if (!previewWindow) {
-      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
-      return;
-    }
-    previewWindow.opener = null;
-    setJournalLoading(true);
-    try {
-      const blob = await comptaApi.clientPaymentJournalPdf({
-        dateDu: journalDateFrom,
-        dateAu: journalDateTo,
-        utilisateurId: journalUserId === "ALL" ? undefined : journalUserId,
-        mode: journalMode === "ALL" ? undefined : journalMode,
-        statut: journalStatus === "ALL" ? undefined : journalStatus,
-      });
-      const url = URL.createObjectURL(blob);
-      previewWindow.location.href = url;
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch (error) {
-      previewWindow.close();
-      toast.error(error instanceof Error ? error.message : "Génération du journal impossible");
-    } finally {
-      setJournalLoading(false);
-    }
-  }
-
   return (
     <div className="grid gap-5">
       <ClientPaymentsWorkspaceHeader
-        title={journalView ? "État d’encaissement journalier" : "Règlements enregistrés"}
-        description={journalView
-          ? "Générez l’état PDF selon la période, l’utilisateur, le moyen et le statut."
-          : "Recherchez les règlements et suivez chaque moyen de paiement jusqu’à son dénouement."}
+        title="Règlements enregistrés"
+        description="Recherchez les règlements et suivez chaque moyen de paiement jusqu’à son dénouement."
         canCreate={canCreate}
       />
 
-      {!journalView ? <>
       <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
         <div className="grid gap-2">
           <Label>Type de payeur</Label>
@@ -739,90 +688,6 @@ export default function ReglementsEnregistresPage() {
         open={instrumentsToRemit.length > 0}
         onOpenChange={(open) => !open && setInstrumentsToRemit([])}
       />
-
-      </> : null}
-
-      {journalView ? (
-        <section className="grid gap-4 rounded-md border bg-card p-4">
-          <div>
-            <h2 className="font-semibold">Paramètres de l’état</h2>
-            <p className="text-sm text-muted-foreground">
-              Le PDF reprend uniquement les règlements correspondant aux critères ci-dessous.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Date du</Label>
-              <DatePicker
-                date={journalDateFrom}
-                onSelect={(value) => setJournalDateFrom(toDateOnly(value) ?? "")}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Date au</Label>
-              <DatePicker
-                date={journalDateTo}
-                onSelect={(value) => setJournalDateTo(toDateOnly(value) ?? "")}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Utilisateur</Label>
-              <Select value={journalUserId} onValueChange={setJournalUserId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tous les utilisateurs</SelectItem>
-                  {(journalUsers.data ?? []).map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.nomComplet}{user.actif ? "" : " (inactif)"}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Mode de règlement</Label>
-              <Select
-                value={journalMode}
-                onValueChange={(value) => setJournalMode(value as ClientPaymentMode | "ALL")}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tous les modes</SelectItem>
-                  {Object.entries(MODE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2 sm:col-span-2">
-              <Label>Statut du règlement</Label>
-              <Select
-                value={journalStatus}
-                onValueChange={(value) => setJournalStatus(value as ClientPayment["statut"] | "ALL")}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Tous les statuts</SelectItem>
-                  <SelectItem value="VALIDE">Enregistrés</SelectItem>
-                  <SelectItem value="ANNULE">Annulés</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-            Les chèques et effets en attente restent distingués des montants définitivement encaissés.
-          </div>
-          <div className="flex justify-end">
-            <Button
-              disabled={journalLoading || !journalDateFrom || !journalDateTo}
-              onClick={() => void previewJournal()}
-            >
-              <Printer className="size-4" />
-              {journalLoading ? "Génération..." : "Imprimer l’état PDF"}
-            </Button>
-          </div>
-        </section>
-      ) : null}
 
       <Dialog
         open={Boolean(paymentToInvoice)}

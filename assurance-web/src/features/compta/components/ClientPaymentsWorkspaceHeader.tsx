@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Landmark } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { ClientPaymentJournalDialog } from "./ClientPaymentJournalDialog";
 import {
   Select,
   SelectContent,
@@ -11,12 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type PaymentsView = "receivables" | "saved" | "journal";
+type PaymentsView = "receivables" | "saved";
 
 const VIEW_PATHS: Record<PaymentsView, string> = {
   receivables: "/app/compta/reglements",
   saved: "/app/compta/reglements/historique",
-  journal: "/app/compta/reglements/historique?vue=journal",
 };
 
 export function ClientPaymentsWorkspaceHeader({
@@ -34,7 +34,17 @@ export function ClientPaymentsWorkspaceHeader({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const view = currentView(location.pathname, location.search);
+  const view = currentView(location.pathname);
+  const [journalOpen, setJournalOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("vue") !== "journal" && params.get("journal") !== "1") return;
+    setJournalOpen(true);
+    params.delete("vue");
+    params.delete("journal");
+    navigate({ pathname: location.pathname, search: params.toString(), hash: location.hash }, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
@@ -50,7 +60,13 @@ export function ClientPaymentsWorkspaceHeader({
           <Label htmlFor="client-payments-view" className="text-xs text-muted-foreground">
             Vue
           </Label>
-          <Select value={view} onValueChange={(value) => navigate(VIEW_PATHS[value as PaymentsView])}>
+          <Select value={view} onValueChange={(value) => {
+            if (value === "journal") {
+              setJournalOpen(true);
+              return;
+            }
+            navigate(VIEW_PATHS[value as PaymentsView]);
+          }}>
             <SelectTrigger id="client-payments-view" aria-label="Changer la vue des règlements clients">
               <SelectValue />
             </SelectTrigger>
@@ -71,16 +87,14 @@ export function ClientPaymentsWorkspaceHeader({
         ) : null}
         {actions}
       </div>
+      <ClientPaymentJournalDialog open={journalOpen} onOpenChange={setJournalOpen} />
     </header>
   );
 }
 
-function currentView(pathname: string, search: string): PaymentsView {
+function currentView(pathname: string): PaymentsView {
   if (pathname.endsWith("/historique")) {
-    const params = new URLSearchParams(search);
-    return params.get("vue") === "journal" || params.get("journal") === "1"
-      ? "journal"
-      : "saved";
+    return "saved";
   }
   return "receivables";
 }

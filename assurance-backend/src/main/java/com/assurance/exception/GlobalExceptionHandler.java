@@ -65,8 +65,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ApiResponse<Void>> methodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        var supportedMethods = ex.getSupportedHttpMethods();
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .allow(ex.getSupportedHttpMethods() == null ? java.util.Set.of() : ex.getSupportedHttpMethods())
+                .allow(supportedMethods == null ? new org.springframework.http.HttpMethod[0]
+                        : supportedMethods.toArray(org.springframework.http.HttpMethod[]::new))
                 .body(ApiResponse.error("Methode HTTP non autorisee pour cette ressource"));
     }
 

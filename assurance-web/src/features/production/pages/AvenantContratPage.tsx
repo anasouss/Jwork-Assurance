@@ -1135,7 +1135,8 @@ export default function AvenantContratPage() {
         <CardContent>
           {supportsManualQuittance ? (
             <div className="mb-4 grid gap-3">
-              <Field label="Mode de quittance" className="max-w-xs">
+              <div className="max-w-xs">
+              <Field label="Mode de quittance">
                 <Select value={manualQuittance ? "MANUELLE" : "AUTOMATIQUE"} onValueChange={(value) => {
                   setManualQuittance(value === "MANUELLE");
                   setPreview(null);
@@ -1149,6 +1150,7 @@ export default function AvenantContratPage() {
                   </SelectContent>
                 </Select>
               </Field>
+              </div>
               {manualQuittance ? <AvenantManualQuittanceTable
                 lignes={quittanceLines}
                 onChange={(lines) => {

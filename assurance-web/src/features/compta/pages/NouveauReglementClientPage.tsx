@@ -383,7 +383,7 @@ export default function NouveauReglementClientPage() {
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="mx-auto grid w-full max-w-[1440px] gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">

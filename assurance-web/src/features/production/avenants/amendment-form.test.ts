@@ -3,11 +3,19 @@ import {
   buildAvenantAssistances,
   ensureRcGaranties,
   mapCurrentGaranties,
+  restoreExtensionGaranties,
   scopeGarantiesForTarget,
 } from "./amendment-form";
 import type { ContratSummary, GarantieInput, ReferenceOption } from "../types";
 
 describe("amendment form adapters", () => {
+  it("retains existing person guarantees when restoring an old extension draft", () => {
+    const pp: GarantieInput = { garantieId: "PP", modeSelectionne: "PROTECTION", montantDeces: 20000 };
+    const pc: GarantieInput = { garantieId: "PC", modeSelectionne: "PROTECTION", montantDeces: 50000 };
+    const added: GarantieInput = { garantieId: "V", vehiculeIndex: 0 };
+    expect(restoreExtensionGaranties([pp, pc], [added])).toEqual([pp, pc, added]);
+    expect(restoreExtensionGaranties([pp], [{ garantieId: "PP", vehiculeIndex: 0 }])).toEqual([pp]);
+  });
   it("adds one mandatory RC guarantee per target without duplicating existing RC", () => {
     const rc: ReferenceOption = {
       id: "1",

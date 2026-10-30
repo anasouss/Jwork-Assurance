@@ -23,6 +23,7 @@ import {
   isDuplicataCode,
   isEcheanceClosureCode,
   isGuaranteeModificationCode,
+  restoreExtensionGaranties,
   isPrecisionCode,
   isSingleVehicleTargetCreationCode,
   isTargetCreationCode,
@@ -358,7 +359,14 @@ export default function AvenantContratPage() {
       setVehicules([]);
       setRemorques(request.remorques?.length ? request.remorques : [{}]);
     }
-    setSelectedGaranties(request.garanties ?? []);
+    const draftGaranties = request.garanties ?? [];
+    setSelectedGaranties(movementCode === "EXG_M" && !validatedMovementId
+      ? restoreExtensionGaranties(mapCurrentGaranties(
+          contrat.garanties ?? [],
+          (contrat.vehicules ?? []).map((item) => ({ vehiculeId: item.vehiculeId })),
+          (contrat.remorques ?? []).map((item) => ({ remorqueId: item.remorqueId }))
+        ), draftGaranties)
+      : draftGaranties);
     const currentAssistances = isGuaranteeModificationCode(movementCode)
       ? mapCurrentAssistances(
           contrat?.assistances ?? [],

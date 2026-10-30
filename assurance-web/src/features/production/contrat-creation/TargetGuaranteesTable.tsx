@@ -14,6 +14,7 @@ import { validateValeurVenale } from "../utils/vehicle-validation";
 import {
   removeGuaranteeExclusionConflicts as withoutExclusionConflicts,
   sameGuaranteeTarget as sameTarget,
+  samePersonneGuaranteeTarget,
   targetedGuaranteeInput,
 } from "./guarantee-selection";
 import { previewGuaranteeLine } from "./target-calculation";
@@ -111,11 +112,14 @@ export function TargetGuaranteesTable({
   layout: "tariff" | "particulier";
   primeColumnLabel: string;
 }) {
+  const matchesPersonne = (item: GarantieInput) => samePersonneGuaranteeTarget(item, target, layout === "particulier");
   const update = (garantieId: string, patch: Partial<GarantieInput>) => {
-    const next = selected.map((item) => (item.garantieId === garantieId && sameTarget(item, target) ? { ...item, ...patch } : item));
+    const personne = personneGaranties.some((garantie) => garantie.id === garantieId);
+    const matches = (item: GarantieInput) => personne ? matchesPersonne(item) : sameTarget(item, target);
+    const next = selected.map((item) => (item.garantieId === garantieId && matches(item) ? { ...item, ...patch } : item));
     setSelected(next);
     const garantie = garanties.find((item) => item.id === garantieId);
-    const updatedItem = next.find((item) => item.garantieId === garantieId && sameTarget(item, target));
+    const updatedItem = next.find((item) => item.garantieId === garantieId && matches(item));
     const selectedLine = garantie
       ? selectedLineFor(matchingLines(lignes, garantie, target), updatedItem)
       : undefined;
@@ -155,6 +159,8 @@ export function TargetGuaranteesTable({
   };
 
   const togglePersonne = (garantie: ReferenceOption, checked: boolean) => {
+    if (locked.some((item) => item.garantieId === garantie.id && matchesPersonne(item))) return;
+    if (checked && selected.some((item) => item.garantieId === garantie.id && matchesPersonne(item))) return;
     const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
     const baseSelection = checked ? withoutExclusionConflicts(selected, personneGaranties, target, garantie) : selected;
     if (checked && !preservesLockedGuarantees(baseSelection, locked)) {
@@ -173,7 +179,7 @@ export function TargetGuaranteesTable({
               prime: numberValue(String(formules[0]?.primeNette ?? "")),
             },
           ]
-        : selected.filter((item) => !(item.garantieId === garantie.id && sameTarget(item, target)));
+        : selected.filter((item) => !(item.garantieId === garantie.id && matchesPersonne(item)));
     setSelected(next);
     onRequestCalculation?.(target, garantie.id, next);
   };
@@ -449,9 +455,9 @@ export function TargetGuaranteesTable({
             </thead>
             <tbody className="block xl:table-row-group">
               {configuredPersonneGaranties.map((garantie) => {
-                const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && sameTarget(selectedItem, target));
+                const item = selected.find((selectedItem) => selectedItem.garantieId === garantie.id && matchesPersonne(selectedItem));
                 const checked = Boolean(item);
-                const guaranteeLocked = locked.some((lockedItem) => lockedItem.garantieId === garantie.id && sameTarget(lockedItem, target));
+                const guaranteeLocked = locked.some((lockedItem) => lockedItem.garantieId === garantie.id && matchesPersonne(lockedItem));
                 const editable = checked && !guaranteeLocked;
                 const formules = automaticPricing ? matchingPersonneFormules(formulesPersonne, garantie, target) : [];
                 const selectedFormule = formules.find((formule) => formule.id === item?.formuleGarantiePersonneId) ?? formules[0];

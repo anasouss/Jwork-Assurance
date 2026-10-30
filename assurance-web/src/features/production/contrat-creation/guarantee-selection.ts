@@ -26,6 +26,14 @@ export function sameGuaranteeTarget(item: GarantieInput, target?: GuaranteeTarge
     : item.remorqueIndex === target.index;
 }
 
+export function samePersonneGuaranteeTarget(item: GarantieInput, target: GuaranteeTarget, includeContractScoped = false) {
+  return sameGuaranteeTarget(item, target) || (includeContractScoped
+    && target.kind === "vehicule"
+    && item.vehiculeIndex == null
+    && item.remorqueIndex == null
+    && item.clientId == null);
+}
+
 export function isGuaranteeSelectionComplete(item: GarantieInput) {
   if (String(item.modeSelectionne ?? "").toUpperCase() === "PROTECTION") {
     return Boolean(item.formuleGarantiePersonneId);

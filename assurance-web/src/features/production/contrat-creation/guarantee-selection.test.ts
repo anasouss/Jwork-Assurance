@@ -4,10 +4,23 @@ import {
   isGuaranteeSelectionComplete,
   removeGuaranteeExclusionConflicts,
   sameGuaranteeTarget,
+  samePersonneGuaranteeTarget,
   targetedGuaranteeInput,
 } from "./guarantee-selection";
 
 describe("guarantee target selection", () => {
+  it("shows a contract-level person guarantee in the particulier vehicle editor without changing its target", () => {
+    const pp: GarantieInput = { garantieId: "PP", modeSelectionne: "PROTECTION", montantDeces: 20000 };
+    expect(samePersonneGuaranteeTarget(pp, { kind: "vehicule", index: 0 }, true)).toBe(true);
+    expect(samePersonneGuaranteeTarget(pp, { kind: "vehicule", index: 0 })).toBe(false);
+    expect(samePersonneGuaranteeTarget(pp, { kind: "remorque", index: 0 }, true)).toBe(false);
+    expect(pp.vehiculeIndex).toBeUndefined();
+  });
+
+  it("does not match another vehicle or client-specific person coverage", () => {
+    expect(samePersonneGuaranteeTarget({ garantieId: "PP", vehiculeIndex: 1 }, { kind: "vehicule", index: 0 }, true)).toBe(false);
+    expect(samePersonneGuaranteeTarget({ garantieId: "PC", clientId: "42" }, { kind: "vehicule", index: 0 }, true)).toBe(false);
+  });
   it("builds a guarantee input for the requested target", () => {
     const garantie: ReferenceOption = { id: "4", libelle: "Bris de glace", modeParDefaut: "CAPITAL" };
 

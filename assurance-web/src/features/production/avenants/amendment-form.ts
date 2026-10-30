@@ -300,6 +300,15 @@ export function mapCurrentGaranties(
     .filter((garantie): garantie is GarantieInput => Boolean(garantie));
 }
 
+export function restoreExtensionGaranties(existing: GarantieInput[], draft: GarantieInput[]): GarantieInput[] {
+  return [...existing, ...draft.filter((item) => !existing.some((locked) =>
+    locked.garantieId === item.garantieId
+    && locked.clientId === item.clientId
+    && ((locked.vehiculeIndex == null && locked.remorqueIndex == null)
+      || (locked.vehiculeIndex === item.vehiculeIndex && locked.remorqueIndex === item.remorqueIndex))
+  ))];
+}
+
 export function targetKey(target: AmendmentTarget) {
   return `${target.kind}:${target.id}`;
 }

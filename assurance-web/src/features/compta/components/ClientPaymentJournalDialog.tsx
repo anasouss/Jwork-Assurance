@@ -20,8 +20,7 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [dateFrom, setDateFrom] = useState(() => toDateOnly(new Date())!);
-  const [dateTo, setDateTo] = useState(() => toDateOnly(new Date())!);
+  const [reportDate, setReportDate] = useState(() => toDateOnly(new Date())!);
   const [userId, setUserId] = useState("ALL");
   const [mode, setMode] = useState<ClientPaymentMode | "ALL">("ALL");
   const [status, setStatus] = useState<ClientPayment["statut"] | "ALL">("ALL");
@@ -34,8 +33,8 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
 
   async function previewJournal() {
     if (loading) return;
-    if (!dateFrom || !dateTo || dateFrom > dateTo) {
-      toast.error("Renseignez une période valide pour l’état d’encaissement");
+    if (!reportDate) {
+      toast.error("Renseignez la date de l’état d’encaissement");
       return;
     }
     const previewWindow = window.open("about:blank", "_blank");
@@ -47,8 +46,8 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
     setLoading(true);
     try {
       const blob = await comptaApi.clientPaymentJournalPdf({
-        dateDu: dateFrom,
-        dateAu: dateTo,
+        dateDu: reportDate,
+        dateAu: reportDate,
         utilisateurId: userId === "ALL" ? undefined : userId,
         mode: mode === "ALL" ? undefined : mode,
         statut: status === "ALL" ? undefined : status,
@@ -70,12 +69,8 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
         <DialogHeader><DialogTitle>État d’encaissement journalier</DialogTitle></DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
-            <Label>Date du</Label>
-            <DatePicker date={dateFrom} onSelect={(date) => setDateFrom(toDateOnly(date) ?? "")} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Date au</Label>
-            <DatePicker date={dateTo} onSelect={(date) => setDateTo(toDateOnly(date) ?? "")} />
+            <Label>Date de l’état</Label>
+            <DatePicker date={reportDate} onSelect={(date) => setReportDate(toDateOnly(date) ?? "")} />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="journal-user">Utilisateur</Label>
@@ -103,7 +98,7 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2 sm:col-span-2">
+          <div className="grid gap-2">
             <Label htmlFor="journal-status">Statut du règlement</Label>
             <Select value={status} onValueChange={(value) => setStatus(value as ClientPayment["statut"] | "ALL")}>
               <SelectTrigger id="journal-status"><SelectValue /></SelectTrigger>
@@ -117,7 +112,7 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Fermer</Button>
-          <Button type="button" disabled={loading || !dateFrom || !dateTo || dateFrom > dateTo} onClick={() => void previewJournal()}>
+          <Button type="button" disabled={loading || !reportDate} onClick={() => void previewJournal()}>
             <Printer className="size-4" />{loading ? "Génération..." : "Imprimer l’état PDF"}
           </Button>
         </DialogFooter>

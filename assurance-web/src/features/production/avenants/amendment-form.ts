@@ -256,8 +256,8 @@ export function splitTargets(targets: AmendmentTarget[], selectedTargetIds: stri
 
 export function mapCurrentGaranties(
   garanties: NonNullable<ContratSummary["garanties"]>,
-  vehicules: VehiculeInput[],
-  remorques: RemorqueInput[]
+  vehicules: Pick<VehiculeInput, "vehiculeId">[],
+  remorques: Pick<RemorqueInput, "remorqueId">[]
 ): GarantieInput[] {
   return garanties
     .map<GarantieInput | null>((garantie) => {

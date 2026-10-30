@@ -44,7 +44,7 @@ class JournalReglementsPdfServiceTest {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
             assertThat(text).contains("Date de l’état : 30/10/2026", "UTILISATEUR", "MODE", "Détail des règlements", "TOTAL")
-                    .doesNotContain("Généré le", "Période", "PÉRIODE", "STATUT DU RÈGLEMENT",
+                    .doesNotContain("Tous les modes", "Généré le", "Période", "PÉRIODE", "STATUT DU RÈGLEMENT",
                             "RÈGLEMENTS ACTIFS", "RÈGLEMENTS ANNULÉS", "MONTANT ANNULÉ", "Synthèse par moyen de paiement");
         }
     }

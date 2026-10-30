@@ -122,7 +122,7 @@ public class JournalReglementsPdfService {
                     ));
 
             writeHeader(document, agency, dateDu, regular, bold);
-            writeFilters(document, selectedUser, mode, regular, bold);
+            writeFilters(document, selectedUser, regular, bold);
             writeDetails(
                     document,
                     instruments,
@@ -200,15 +200,13 @@ public class JournalReglementsPdfService {
     private void writeFilters(
             Document document,
             Utilisateur user,
-            ModeReglementClient mode,
             PdfFont regular,
             PdfFont bold
     ) {
-        Table filters = new Table(new float[]{1.5f, 1.2f})
+        Table filters = new Table(new float[]{1})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(10);
         filters.addCell(infoCell("UTILISATEUR", user == null ? "Tous les utilisateurs" : user.getFullName(), regular, bold));
-        filters.addCell(infoCell("MODE", mode == null ? "Tous les modes" : modeLabel(mode), regular, bold));
         document.add(filters);
     }
 

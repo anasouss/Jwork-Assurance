@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
-import type { ClientPayment, ClientPaymentMode } from "../types";
+import type { ClientPaymentMode } from "../types";
 
 const modes: Record<ClientPaymentMode, string> = {
   ESPECES: "Espèces", CHEQUE: "Chèque", EFFET: "Effet",
@@ -23,7 +23,6 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
   const [reportDate, setReportDate] = useState(() => toDateOnly(new Date())!);
   const [userId, setUserId] = useState("ALL");
   const [mode, setMode] = useState<ClientPaymentMode | "ALL">("ALL");
-  const [status, setStatus] = useState<ClientPayment["statut"] | "ALL">("ALL");
   const [loading, setLoading] = useState(false);
   const users = useQuery({
     queryKey: ["compta", "client-payment-journal-users"],
@@ -50,7 +49,7 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
         dateAu: reportDate,
         utilisateurId: userId === "ALL" ? undefined : userId,
         mode: mode === "ALL" ? undefined : mode,
-        statut: status === "ALL" ? undefined : status,
+        statut: "VALIDE",
       });
       const url = URL.createObjectURL(blob);
       previewWindow.location.href = url;
@@ -88,24 +87,13 @@ export function ClientPaymentJournalDialog({ open, onOpenChange }: {
               <Button type="button" variant="link" size="sm" onClick={() => void users.refetch()}>Réessayer</Button>
             </div> : null}
           </div>
-          <div className="grid gap-2">
+          <div className="grid gap-2 sm:col-span-2">
             <Label htmlFor="journal-mode">Mode de règlement</Label>
             <Select value={mode} onValueChange={(value) => setMode(value as ClientPaymentMode | "ALL")}>
               <SelectTrigger id="journal-mode"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Tous les modes</SelectItem>
                 {Object.entries(modes).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="journal-status">Statut du règlement</Label>
-            <Select value={status} onValueChange={(value) => setStatus(value as ClientPayment["statut"] | "ALL")}>
-              <SelectTrigger id="journal-status"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tous les statuts</SelectItem>
-                <SelectItem value="VALIDE">Enregistrés</SelectItem>
-                <SelectItem value="ANNULE">Annulés</SelectItem>
               </SelectContent>
             </Select>
           </div>

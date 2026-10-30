@@ -978,11 +978,15 @@ export default function AvenantContratPage() {
   };
 
   if (initialLoading) {
-    return <ProductionFormSkeleton variant="avenant" />;
+    return (
+      <div className="mx-auto w-full max-w-[1440px]">
+        <ProductionFormSkeleton variant="avenant" />
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="mx-auto grid w-full max-w-[1440px] gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Button asChild variant="ghost" size="sm" className="-ml-2">

@@ -95,6 +95,7 @@ public class ContratService {
     private final LigneQuittanceRepository ligneQuittanceRepository;
     private final AffectationQuittanceCompagnieRepository affectationQuittanceCompagnieRepository;
     private final LigneDocumentClientRepository ligneDocumentClientRepository;
+    private final AffectationReglementClientRepository affectationReglementClientRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final ElementFacturableCibleRepository elementFacturableCibleRepository;
     private final PieceJointeRepository pieceJointeRepository;
@@ -1369,10 +1370,35 @@ public class ContratService {
         List<ElementFacturable> assistanceElements = assistances.stream()
                 .map(AssistanceContrat::getElementFacturable)
                 .filter(element -> element != null)
+                .distinct()
                 .toList();
+        List<Quittance> assistanceQuittances = new ArrayList<>();
+        for (ElementFacturable element : assistanceElements) {
+            if (ligneDocumentClientRepository.existsByElementFacturableId(element.getId())
+                    || affectationReglementClientRepository.existsByElementFacturableId(element.getId())) {
+                throw new BadRequestException("Impossible de reconstruire le brouillon : une assistance est liee a un document client ou un reglement.");
+            }
+            for (Quittance quittance : quittanceRepository
+                    .findByContrat_IdAndElementFacturable_IdOrderByCreatedAtDesc(contrat.getId(), element.getId())) {
+                if (Boolean.TRUE.equals(quittance.getPayee())
+                        || ligneDocumentClientRepository.existsByQuittanceId(quittance.getId())
+                        || affectationQuittanceCompagnieRepository.existsByQuittanceId(quittance.getId())) {
+                    throw new BadRequestException("Impossible de reconstruire le brouillon : une quittance assistance est deja utilisee en comptabilite.");
+                }
+                assistanceQuittances.add(quittance);
+            }
+        }
+        // Remove unused generated quittances before their billable sources.
+        quittanceRepository.deleteAll(assistanceQuittances);
+        quittanceRepository.flush();
+        contrat.getQuittances().removeAll(assistanceQuittances);
         assistanceContratRepository.deleteAll(assistances);
         assistanceContratRepository.flush();
         if (!assistanceElements.isEmpty()) {
+            for (ElementFacturable element : assistanceElements) {
+                elementFacturableCibleRepository.deleteByElementFacturableId(element.getId());
+            }
+            elementFacturableCibleRepository.flush();
             elementFacturableRepository.deleteAll(assistanceElements);
             elementFacturableRepository.flush();
         }

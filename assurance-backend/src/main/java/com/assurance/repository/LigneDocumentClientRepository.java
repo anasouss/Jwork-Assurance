@@ -13,6 +13,10 @@ import java.util.List;
 
 public interface LigneDocumentClientRepository extends JpaRepository<LigneDocumentClient, Long> {
 
+    boolean existsByElementFacturableId(Long elementId);
+
+    boolean existsByQuittanceId(Long quittanceId);
+
     @Query("""
             select distinct line.elementFacturable.contrat.id
             from LigneDocumentClient line

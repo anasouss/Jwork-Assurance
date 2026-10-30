@@ -76,6 +76,8 @@ public interface AffectationReglementClientRepository extends JpaRepository<Affe
 
     List<AffectationReglementClient> findByInstrumentId(Long instrumentId);
 
+    boolean existsByElementFacturableId(Long elementId);
+
     long countByElementFacturableIdAndStatut(Long elementId, StatutAffectationReglement statut);
 
     boolean existsByDocumentClientIdAndStatutIn(

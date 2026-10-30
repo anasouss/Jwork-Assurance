@@ -30,8 +30,14 @@ class AvenantManualQuittanceServiceTest {
     }
 
     @Test
-    void preservesAutomaticModeWhenNoManualLinesAreProvided() {
-        assertThat(service.calculate(contrat, new AvenantRequest())).isNull();
+    void requiresManualLinesForParticulierGuaranteeAmendments() {
+        var request = new AvenantRequest();
+        request.setCodeTypeMouvement("EXG_M");
+        assertThatThrownBy(() -> service.calculate(contrat, request))
+                .isInstanceOf(BadRequestException.class);
+        contrat.setTypeContrat(TypeContrat.FLOTTE);
+        request.setCodeTypeMouvement("MOG_F");
+        assertThat(service.calculate(contrat, request)).isNull();
     }
 
     @Test

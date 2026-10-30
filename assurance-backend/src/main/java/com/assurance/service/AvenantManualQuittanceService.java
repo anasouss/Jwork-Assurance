@@ -19,15 +19,16 @@ import java.util.Set;
 public class AvenantManualQuittanceService {
 
     public QuittanceCalculService.Resultat calculate(Contrat contrat, AvenantRequest request) {
-        if (request.getQuittances() == null) {
-            return null;
-        }
-        if (contrat.getTypeContrat() != TypeContrat.PARTICULIER
-                || !("EXG_M".equalsIgnoreCase(request.getCodeTypeMouvement())
-                || "MOG_M".equalsIgnoreCase(request.getCodeTypeMouvement()))) {
+        boolean manualRequired = contrat.getTypeContrat() == TypeContrat.PARTICULIER
+                && ("EXG_M".equalsIgnoreCase(request.getCodeTypeMouvement())
+                || "MOG_M".equalsIgnoreCase(request.getCodeTypeMouvement()));
+        if (!manualRequired) {
+            if (request.getQuittances() == null) {
+                return null;
+            }
             throw new BadRequestException("La quittance manuelle est reservee aux extensions et modifications de garanties particulier.");
         }
-        if (request.getQuittances().isEmpty()) {
+        if (request.getQuittances() == null || request.getQuittances().isEmpty()) {
             throw new BadRequestException("Renseignez la quittance differentielle de l'avenant.");
         }
         Set<CategorieQuittance> categories = EnumSet.noneOf(CategorieQuittance.class);

@@ -74,7 +74,6 @@ export default function AvenantContratPage() {
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
-  const [manualQuittance, setManualQuittance] = useState(true);
   const [quittanceLines, setQuittanceLines] = useState<QuittanceInput[]>(emptyAvenantQuittance);
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
@@ -238,7 +237,6 @@ export default function AvenantContratPage() {
 
   useEffect(() => {
     setDateEffet(undefined);
-    setManualQuittance(true);
     setQuittanceLines(emptyAvenantQuittance());
     setPreview(null);
     setTargetPreview(null);
@@ -348,7 +346,6 @@ export default function AvenantContratPage() {
       return;
     }
     setDateEffet(request.dateEffet ?? undefined);
-    setManualQuittance(request.quittances != null);
     setQuittanceLines(request.quittances?.length ? request.quittances : emptyAvenantQuittance());
     setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
     if (isVehicleTargetCreationCode(movementCode)) {
@@ -483,7 +480,7 @@ export default function AvenantContratPage() {
       codeTypeMouvement: movementCode,
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
-      quittances: supportsManualQuittance && manualQuittance ? quittanceLines : undefined,
+      quittances: supportsManualQuittance ? quittanceLines : undefined,
     };
     if (isVehicleTargetCreationCode(movementCode)) {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
@@ -557,7 +554,7 @@ export default function AvenantContratPage() {
       return null;
     }
     const request = buildDraftRequest(currentGaranties);
-    if (supportsManualQuittance && manualQuittance && !hasAvenantQuittanceAmounts(quittanceLines)) {
+    if (supportsManualQuittance && !hasAvenantQuittanceAmounts(quittanceLines)) {
       notify("Renseignez au moins un montant pour la quittance de l'avenant");
       return null;
     }
@@ -806,7 +803,6 @@ export default function AvenantContratPage() {
     remorques,
     selectedGaranties,
     targetAssistances,
-    manualQuittance,
     quittanceLines,
   ]);
 
@@ -1139,23 +1135,7 @@ export default function AvenantContratPage() {
         <CardContent>
           {supportsManualQuittance ? (
             <div className="mb-4 grid gap-3">
-              <div className="max-w-xs">
-              <Field label="Mode de quittance">
-                <Select value={manualQuittance ? "MANUELLE" : "AUTOMATIQUE"} onValueChange={(value) => {
-                  setManualQuittance(value === "MANUELLE");
-                  setPreview(null);
-                  autoPreviewKeyRef.current = "";
-                  globalPreviewRequestKeyRef.current = "";
-                }} disabled={saveMutation.isPending || draftMutation.isPending}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MANUELLE">Saisie manuelle</SelectItem>
-                    <SelectItem value="AUTOMATIQUE">Calcul automatique</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              </div>
-              {manualQuittance ? <AvenantManualQuittanceTable
+              <AvenantManualQuittanceTable
                 lignes={quittanceLines}
                 onChange={(lines) => {
                   setQuittanceLines(lines);
@@ -1164,7 +1144,7 @@ export default function AvenantContratPage() {
                 }}
                 disabled={saveMutation.isPending || draftMutation.isPending}
                 allowNegative={movementCode !== "EXG_M"}
-              /> : null}
+              />
             </div>
           ) : null}
           <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />

@@ -72,6 +72,15 @@ public class AvenantController {
         ));
     }
 
+    @GetMapping("/{code}/brouillon")
+    @PreAuthorize("hasAnyAuthority('PERM_avenant:view', 'PERM_contrat:view')")
+    public ResponseEntity<ApiResponse<AvenantDraftResponse>> draftByCode(
+            @PathVariable Long contratId,
+            @PathVariable String code
+    ) {
+        return draft(contratId, code);
+    }
+
     @PutMapping({"/brouillon", "/{code}/brouillon"})
     @PreAuthorize("hasAnyAuthority('PERM_avenant:draft', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<AvenantDraftResponse>> saveDraft(

@@ -10,6 +10,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 
 import java.util.stream.Collectors;
 
@@ -60,6 +61,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> typeMismatch(MethodArgumentTypeMismatchException ex) {
         String name = ex.getName() != null ? ex.getName() : "parametre";
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("Valeur invalide pour " + name));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> methodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .allow(ex.getSupportedHttpMethods() == null ? java.util.Set.of() : ex.getSupportedHttpMethods())
+                .body(ApiResponse.error("Methode HTTP non autorisee pour cette ressource"));
     }
 
     @ExceptionHandler(Exception.class)

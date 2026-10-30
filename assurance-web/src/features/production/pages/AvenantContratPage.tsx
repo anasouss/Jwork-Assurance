@@ -55,8 +55,9 @@ import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfig
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
 import { AvenantTargetsSection } from "../components/AvenantTargetsSections";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
+import { AvenantManualQuittanceTable, emptyAvenantQuittance, hasAvenantQuittanceAmounts } from "../components/AvenantManualQuittanceTable";
 import { toDateOnly } from "../date";
-import type { AssistanceDraft, AvenantRequest, GarantieInput, QuittancePreview, RemorqueInput, VehiculeInput } from "../types";
+import type { AssistanceDraft, AvenantRequest, GarantieInput, QuittanceInput, QuittancePreview, RemorqueInput, VehiculeInput } from "../types";
 
 export default function AvenantContratPage() {
   const { contratId = "", code = "INC_F" } = useParams();
@@ -73,6 +74,8 @@ export default function AvenantContratPage() {
   const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
+  const [manualQuittance, setManualQuittance] = useState(true);
+  const [quittanceLines, setQuittanceLines] = useState<QuittanceInput[]>(emptyAvenantQuittance);
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
   const [targetPreview, setTargetPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
@@ -120,6 +123,7 @@ export default function AvenantContratPage() {
   }, [rectificationQuery.error]);
   const contrat = contextQuery.data?.contrat;
   const grilleTarifaireId = contrat?.grilleTarifaireId ? String(contrat.grilleTarifaireId) : undefined;
+  const supportsManualQuittance = contrat?.typeContrat === "PARTICULIER" && isGuaranteeModificationCode(movementCode);
   const {
     usages,
     compagnies,
@@ -234,6 +238,8 @@ export default function AvenantContratPage() {
 
   useEffect(() => {
     setDateEffet(undefined);
+    setManualQuittance(true);
+    setQuittanceLines(emptyAvenantQuittance());
     setPreview(null);
     setTargetPreview(null);
     setSelectedTargetIds([]);
@@ -342,6 +348,8 @@ export default function AvenantContratPage() {
       return;
     }
     setDateEffet(request.dateEffet ?? undefined);
+    setManualQuittance(request.quittances != null);
+    setQuittanceLines(request.quittances?.length ? request.quittances : emptyAvenantQuittance());
     setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
     if (isVehicleTargetCreationCode(movementCode)) {
       setVehicules(request.vehicules?.length ? request.vehicules : [{ ...DEFAULT_VEHICLE }]);
@@ -475,6 +483,7 @@ export default function AvenantContratPage() {
       codeTypeMouvement: movementCode,
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
+      quittances: supportsManualQuittance && manualQuittance ? quittanceLines : undefined,
     };
     if (isVehicleTargetCreationCode(movementCode)) {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
@@ -548,6 +557,10 @@ export default function AvenantContratPage() {
       return null;
     }
     const request = buildDraftRequest(currentGaranties);
+    if (supportsManualQuittance && manualQuittance && !hasAvenantQuittanceAmounts(quittanceLines)) {
+      notify("Renseignez au moins un montant pour la quittance de l'avenant");
+      return null;
+    }
     if (isVehicleTargetCreationCode(movementCode)) {
       const allNormalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
       const normalizedVehicules = isSingleVehicleTargetCreationCode(movementCode)
@@ -793,6 +806,8 @@ export default function AvenantContratPage() {
     remorques,
     selectedGaranties,
     targetAssistances,
+    manualQuittance,
+    quittanceLines,
   ]);
 
   useEffect(() => {
@@ -1118,6 +1133,34 @@ export default function AvenantContratPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {supportsManualQuittance ? (
+            <div className="mb-4 grid gap-3">
+              <Field label="Mode de quittance" className="max-w-xs">
+                <Select value={manualQuittance ? "MANUELLE" : "AUTOMATIQUE"} onValueChange={(value) => {
+                  setManualQuittance(value === "MANUELLE");
+                  setPreview(null);
+                  autoPreviewKeyRef.current = "";
+                  globalPreviewRequestKeyRef.current = "";
+                }} disabled={saveMutation.isPending || draftMutation.isPending}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MANUELLE">Saisie manuelle</SelectItem>
+                    <SelectItem value="AUTOMATIQUE">Calcul automatique</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {manualQuittance ? <AvenantManualQuittanceTable
+                lignes={quittanceLines}
+                onChange={(lines) => {
+                  setQuittanceLines(lines);
+                  setPreview(null);
+                  globalPreviewRequestKeyRef.current = "";
+                }}
+                disabled={saveMutation.isPending || draftMutation.isPending}
+                allowNegative={movementCode !== "EXG_M"}
+              /> : null}
+            </div>
+          ) : null}
           <QuittancePreviewCard preview={preview} loading={previewMutation.isPending} />
         </CardContent>
       </Card>

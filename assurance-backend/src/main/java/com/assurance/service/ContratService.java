@@ -83,6 +83,7 @@ public class ContratService {
     private final CalculGarantieService calculGarantieService;
     private final ParametreApplicationService parametreApplicationService;
     private final QuittanceCalculService quittanceCalculService;
+    private final AvenantManualQuittanceService avenantManualQuittanceService;
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final MouvementContratService mouvementContratService;
     private final MouvementContratRepository mouvementContratRepository;
@@ -2623,6 +2624,23 @@ public class ContratService {
         request.setDateEffet(mouvement.getDateEffet());
         request.setDateEcheance(mouvement.getDateEcheance());
         request.setNotes(mouvement.getNotes());
+        if (mouvement.getContrat().getTypeContrat() == TypeContrat.PARTICULIER
+                && isModificationGarantiesAvenant(request)) {
+            quittanceRepository.findFirstByMouvementContratIdOrderByCreatedAtAsc(mouvement.getId())
+                    .ifPresent(quittance -> request.setQuittances(quittance.getLignes().stream()
+                            .filter(ligne -> ligne.getCategorie() != CategorieQuittance.TOTAL)
+                            .map(ligne -> {
+                                CreateContratRequest.QuittanceInput input = new CreateContratRequest.QuittanceInput();
+                                input.setCategorie(ligne.getCategorie());
+                                input.setOrdre(ligne.getOrdre());
+                                input.setPrimeNette(ligne.getPrimeNette());
+                                input.setTaxe(ligne.getTaxe());
+                                input.setTaxeParafiscale(ligne.getTaxeParafiscale());
+                                input.setAccessoire(ligne.getAccessoire());
+                                input.setCnpac(ligne.getCnpac());
+                                return input;
+                            }).toList()));
+        }
 
         List<MouvementVehicule> vehiculeSnapshots = mouvementVehiculeRepository
                 .findByMouvementContratId(mouvement.getId()).stream()
@@ -3202,6 +3220,9 @@ public class ContratService {
             AvenantRequest request,
             Long mouvementId
     ) {
+        if (request.getQuittances() != null && !isModificationGarantiesAvenant(request)) {
+            throw new BadRequestException("La quittance manuelle n'est pas applicable a ce type d'avenant.");
+        }
         if (isModificationGarantiesAvenant(request)) {
             AvenantModificationGraph graph = resolveModificationGarantiesAvenantForPreview(
                     agenceId, contratId, request, mouvementId
@@ -3271,6 +3292,9 @@ public class ContratService {
 
     @Transactional
     public QuittanceResponse creerAvenant(Long agenceId, Long contratId, AvenantRequest request) {
+        if (request.getQuittances() != null && !isModificationGarantiesAvenant(request)) {
+            throw new BadRequestException("La quittance manuelle n'est pas applicable a ce type d'avenant.");
+        }
         if (isModificationGarantiesAvenant(request)) {
             AvenantModificationGraph graph = resolveModificationGarantiesAvenant(agenceId, contratId, request, true);
             validateAvenantAssistances(request, graph.vehicules());
@@ -4152,28 +4176,26 @@ public class ContratService {
         List<ContratGarantie> nouvellesGarantiesRestantes = nouvellesGaranties.stream()
                 .map(garantie -> garantieRetourPrime(contrat, request, garantie))
                 .toList();
-        QuittanceCalculService.Resultat avant = calculerMontantsAvenant(
-                contrat,
-                typeMouvement,
-                anciennesGarantiesRestantes,
-                vehicules,
-                remorques,
-                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
-        );
-        QuittanceCalculService.Resultat apres = calculerMontantsAvenant(
-                contrat,
-                typeMouvement,
-                nouvellesGarantiesRestantes,
-                vehicules,
-                remorques,
-                firstNonNull(request.getDateEffet(), contrat.getDateEffet())
-        );
-        QuittanceCalculService.Resultat differentiel = quittanceCalculService.differenceGaranties(apres, avant);
+        QuittanceCalculService.Resultat manual = avenantManualQuittanceService.calculate(contrat, request);
+        QuittanceCalculService.Resultat differentiel = manual;
+        if (differentiel == null) {
+            QuittanceCalculService.Resultat avant = calculerMontantsAvenant(
+                    contrat, typeMouvement, anciennesGarantiesRestantes, vehicules, remorques,
+                    firstNonNull(request.getDateEffet(), contrat.getDateEffet())
+            );
+            QuittanceCalculService.Resultat apres = calculerMontantsAvenant(
+                    contrat, typeMouvement, nouvellesGarantiesRestantes, vehicules, remorques,
+                    firstNonNull(request.getDateEffet(), contrat.getDateEffet())
+            );
+            differentiel = quittanceCalculService.differenceGaranties(apres, avant);
+        }
         List<ContratGarantie> garantiesDifferentielles = garantiesDifferentielles(
                 anciennesGarantiesRestantes,
                 nouvellesGarantiesRestantes
         );
-        List<QuittanceResponse.TargetSummary> targetSummaries = reconcileTargetSummaries(
+        List<QuittanceResponse.TargetSummary> targetSummaries = manual != null
+                ? buildDifferentialTargetSummaries(manual, vehicules, remorques)
+                : reconcileTargetSummaries(
                 elementFacturableCibleService.calculerDifference(
                         contrat,
                         anciennesGarantiesRestantes,

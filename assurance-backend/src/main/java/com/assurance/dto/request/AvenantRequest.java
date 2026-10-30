@@ -21,6 +21,9 @@ public class AvenantRequest {
     private LocalDate dateEcheance;
     private String notes;
 
+    @Valid
+    private List<CreateContratRequest.QuittanceInput> quittances;
+
     private List<Long> vehiculeIds;
     private List<Long> remorqueIds;
 

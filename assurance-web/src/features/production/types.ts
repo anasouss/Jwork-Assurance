@@ -289,6 +289,7 @@ export type MouvementContratRequest = {
 
 export type AvenantRequest = {
   codeTypeMouvement: string;
+  quittances?: QuittanceInput[];
   numeroMouvement?: string;
   dateEffet?: string;
   dateEcheance?: string;

@@ -75,6 +75,7 @@ export default function AvenantContratPage() {
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [quittanceLines, setQuittanceLines] = useState<QuittanceInput[]>(emptyAvenantQuittance);
+  const [saisiePrimeNette, setSaisiePrimeNette] = useState<boolean | undefined>();
   const [targetAssistances, setTargetAssistances] = useState<Record<string, AssistanceDraft>>({});
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
   const [targetPreview, setTargetPreview] = useState<Awaited<ReturnType<typeof avenantApi.previewAvenant>> | null>(null);
@@ -238,6 +239,7 @@ export default function AvenantContratPage() {
   useEffect(() => {
     setDateEffet(undefined);
     setQuittanceLines(emptyAvenantQuittance());
+    setSaisiePrimeNette(undefined);
     setPreview(null);
     setTargetPreview(null);
     setSelectedTargetIds([]);
@@ -346,6 +348,7 @@ export default function AvenantContratPage() {
       return;
     }
     setDateEffet(request.dateEffet ?? undefined);
+    setSaisiePrimeNette(request.saisiePrimeNette ?? Boolean(contrat?.saisiePrimeNette));
     setQuittanceLines(request.quittances?.length ? request.quittances : emptyAvenantQuittance());
     setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
     if (isVehicleTargetCreationCode(movementCode)) {
@@ -481,6 +484,8 @@ export default function AvenantContratPage() {
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
       quittances: supportsManualQuittance ? quittanceLines : undefined,
+      saisiePrimeNette: contrat?.typeContrat === "PARTICULIER"
+        ? saisiePrimeNette ?? Boolean(contrat.saisiePrimeNette) : undefined,
     };
     if (isVehicleTargetCreationCode(movementCode)) {
       const normalizedVehicules = vehicules.map((item) => normalizeVehicle(item, dateEffet, request.dateEcheance, sharedCrm));
@@ -804,6 +809,7 @@ export default function AvenantContratPage() {
     selectedGaranties,
     targetAssistances,
     quittanceLines,
+    saisiePrimeNette,
   ]);
 
   useEffect(() => {
@@ -1069,7 +1075,16 @@ export default function AvenantContratPage() {
           compagniesAssistance={compagniesAssistance.data ?? []}
           produitsAssistance={produitsAssistance.data ?? []}
           grilleSelected={Boolean(grilleTarifaireId)}
-          pricingMode={contrat?.modeSaisieGaranties ?? "AUTOMATIQUE_GRILLE"}
+          pricingMode={contrat?.typeContrat === "PARTICULIER"
+            ? (saisiePrimeNette ?? Boolean(contrat.saisiePrimeNette)) ? "MANUELLE_AVEC_PRIME_NETTE" : "MANUELLE"
+            : contrat?.modeSaisieGaranties ?? "AUTOMATIQUE_GRILLE"}
+          onSaisiePrimeNetteChange={contrat?.typeContrat === "PARTICULIER" ? (value) => {
+            setSaisiePrimeNette(value);
+            setPreview(null);
+            setTargetPreview(null);
+            globalPreviewRequestKeyRef.current = "";
+            targetPreviewRequestKeyRef.current = "";
+          } : undefined}
           preview={preview}
           targetPreview={targetPreview}
           previewing={previewMutation.isPending || targetPreviewMutation.isPending}
@@ -1088,7 +1103,8 @@ export default function AvenantContratPage() {
           onPreviewQuittance={isTargetCreationCode(movementCode) ? requestTargetCreationCalculation : undefined}
           targetActionMode="save"
           previewAfterInfoSave={false}
-          primeColumnLabel={isDifferentialCode(movementCode) ? "Prime différentielle" : undefined}
+          primeColumnLabel={contrat?.typeContrat === "PARTICULIER" ? "Prime nette"
+            : isDifferentialCode(movementCode) ? "Prime différentielle" : undefined}
           guaranteesAction={isVehicleTargetCreationCode(movementCode) ? (
             <Button
               type="button"

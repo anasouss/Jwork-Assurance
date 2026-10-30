@@ -71,6 +71,7 @@ export type ContractTargetsSectionProps = {
   produitsAssistance: ReferenceOption[];
   grilleSelected: boolean;
   pricingMode?: ContractPricingMode | string | null;
+  onSaisiePrimeNetteChange?: (enabled: boolean) => void;
   preview?: QuittancePreview | null;
   targetPreview?: QuittancePreview | null;
   previewing?: boolean;
@@ -142,6 +143,7 @@ export function ContractTargetsSection({
   produitsAssistance,
   grilleSelected,
   pricingMode = "AUTOMATIQUE_GRILLE",
+  onSaisiePrimeNetteChange,
   preview,
   targetPreview,
   previewing = false,
@@ -587,6 +589,7 @@ export function ContractTargetsSection({
                   showAssistanceContractReference={!prospectionMode}
                   grilleSelected={grilleSelected}
                   pricingMode={normalizedPricingMode}
+                  onSaisiePrimeNetteChange={onSaisiePrimeNetteChange}
                   preview={activeVehiculePreview}
                   previewing={previewing}
                   dirtyCalculationKeys={dirtyCalculationKeys}
@@ -759,6 +762,7 @@ export function ContractTargetsSection({
                   showAssistanceContractReference={!prospectionMode}
                   grilleSelected={grilleSelected}
                   pricingMode={normalizedPricingMode}
+                  onSaisiePrimeNetteChange={onSaisiePrimeNetteChange}
                   preview={activeRemorquePreview}
                   previewing={previewing}
                   dirtyCalculationKeys={dirtyCalculationKeys}

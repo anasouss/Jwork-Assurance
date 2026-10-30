@@ -2140,6 +2140,17 @@ public class ContratService {
             List<Vehicule> vehiculesCrees,
             List<Remorque> remorquesCreees
     ) {
+        return replaceFinalGaranties(contrat, request, vehiculesCrees, remorquesCreees, List.of());
+    }
+
+    private List<ContratGarantie> replaceFinalGaranties(
+            Contrat contrat,
+            CreateContratRequest request,
+            List<Vehicule> vehiculesCrees,
+            List<Remorque> remorquesCreees,
+            List<ContratGarantie> preserved
+    ) {
+        Contrat pricingContext = garantiePricingContext(contrat, request);
         List<ContratGarantie> garantiesCreees = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, request.getGaranties())) {
@@ -2149,15 +2160,19 @@ public class ContratService {
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
             Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehiculesCrees, input.getVehiculeIndex(), "Garantie");
             Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorquesCreees, input.getRemorqueIndex(), "Garantie");
+            ContratGarantie existing = preservedGarantie(preserved, garantie, vehicule, remorque, client);
+            Contrat linePricing = existing == null ? pricingContext : primeEntryContext(pricingContext, true);
             Usage usageCible = resolveUsageCible(contrat, vehicule, remorque);
             LigneGrilleTarifaire ligneGrilleTarifaire = resolveLigneGrilleTarifaire(contrat, garantie, input, usageCible, vehicule, remorque);
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
-            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garantiesCreees);
+            GarantieMontants montants = resolveGarantieMontants(linePricing, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garantiesCreees);
             validateGarantieTarget(garantie, vehicule, remorque, client);
             registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
-            validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
+            validateGarantieConfiguration(existing != null && existing.getPrime() == null
+                    ? primeEntryContext(linePricing, false) : linePricing,
+                    garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
             validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
             ContratGarantie contratGarantie = saveContratGarantie(
                     contrat,
@@ -2624,6 +2639,8 @@ public class ContratService {
         request.setDateEffet(mouvement.getDateEffet());
         request.setDateEcheance(mouvement.getDateEcheance());
         request.setNotes(mouvement.getNotes());
+        request.setSaisiePrimeNette(mouvement.getSaisiePrimeNette() != null
+                ? mouvement.getSaisiePrimeNette() : mouvement.getContrat().getSaisiePrimeNette());
         if (mouvement.getContrat().getTypeContrat() == TypeContrat.PARTICULIER
                 && isModificationGarantiesAvenant(request)) {
             quittanceRepository.findFirstByMouvementContratIdOrderByCreatedAtAsc(mouvement.getId())
@@ -3309,6 +3326,10 @@ public class ContratService {
                     graph.differentiel()
             );
             if (quittance.getMouvementContratId() != null) {
+                mouvementContratRepository.findByContratIdAndId(graph.contrat().getId(), quittance.getMouvementContratId()).ifPresent(mouvement -> {
+                    mouvement.setSaisiePrimeNette(createAmendmentPrimeSetting(graph.contrat(), request));
+                    mouvementContratRepository.save(mouvement);
+                });
                 mouvementContratService.remplacerSnapshotsGaranties(
                         quittance.getMouvementContratId(),
                         graph.anciennesGaranties(),
@@ -3418,6 +3439,12 @@ public class ContratService {
             mouvementContratService.finaliserAttestationsDifferees(
                     quittance.getMouvementContratId(), graph.contrat(), graph.vehicules(), graph.remorques()
             );
+        }
+        if (quittance.getMouvementContratId() != null) {
+            mouvementContratRepository.findByContratIdAndId(graph.contrat().getId(), quittance.getMouvementContratId()).ifPresent(mouvement -> {
+                mouvement.setSaisiePrimeNette(createAmendmentPrimeSetting(graph.contrat(), request));
+                mouvementContratRepository.save(mouvement);
+            });
         }
         deleteAvenantDraft(graph.contrat(), request);
         return quittance;
@@ -4160,7 +4187,9 @@ public class ContratService {
             throw new BadRequestException("Aucune cible active disponible pour cet avenant");
         }
         CreateContratRequest createRequest = avenantCreateRequest(contrat, request);
-        List<ContratGarantie> nouvellesGaranties = buildGarantiesPreview(createRequest, contrat, vehicules, remorques);
+        List<ContratGarantie> preserved = "EXG_M".equalsIgnoreCase(request.getCodeTypeMouvement())
+                ? anciennesGaranties : List.of();
+        List<ContratGarantie> nouvellesGaranties = buildGarantiesPreview(createRequest, contrat, vehicules, remorques, preserved);
         if (nouvellesGaranties.isEmpty()) {
             throw new BadRequestException("Au moins une garantie est obligatoire pour la modification");
         }
@@ -4211,7 +4240,7 @@ public class ContratService {
                 garantie.setActif(false);
             }
             contratGarantieRepository.saveAll(anciennesGaranties);
-            nouvellesGaranties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
+            nouvellesGaranties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques, preserved);
         }
         return new AvenantModificationGraph(
                 contrat,
@@ -4608,8 +4637,11 @@ public class ContratService {
         createRequest.setUsageId(contrat.getUsage() != null ? contrat.getUsage().getId() : null);
         createRequest.setDateEffet(request.getDateEffet());
         createRequest.setDateEcheance(contrat.getDateEcheance());
-        createRequest.setModeSaisieGaranties(contrat.getModeSaisieGaranties());
-        createRequest.setSaisiePrimeNette(contrat.getSaisiePrimeNette());
+        Boolean saisiePrimeNette = createAmendmentPrimeSetting(contrat, request);
+        createRequest.setModeSaisieGaranties(contrat.getTypeContrat() == TypeContrat.PARTICULIER
+                ? Boolean.TRUE.equals(saisiePrimeNette) ? ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE
+                : ModeSaisieGarantieContrat.MANUELLE : contrat.getModeSaisieGaranties());
+        createRequest.setSaisiePrimeNette(saisiePrimeNette);
         createRequest.setTauxRc(contrat.getTauxRc());
         createRequest.setCrmPartage(contrat.getCrmPartage());
         createRequest.setCrmPartageValeur(contrat.getCrmPartageValeur());
@@ -4618,6 +4650,41 @@ public class ContratService {
         createRequest.setRemorques(request.getRemorques());
         createRequest.setGaranties(request.getGaranties());
         return createRequest;
+    }
+
+    private Boolean createAmendmentPrimeSetting(Contrat contrat, AvenantRequest request) {
+        if (contrat.getTypeContrat() != TypeContrat.PARTICULIER) {
+            if (Boolean.TRUE.equals(request.getSaisiePrimeNette())) {
+                throw new BadRequestException("La saisie des primes par garantie est reservee aux contrats particuliers.");
+            }
+            return contrat.getSaisiePrimeNette();
+        }
+        return request.getSaisiePrimeNette() != null ? request.getSaisiePrimeNette()
+                : Boolean.TRUE.equals(contrat.getSaisiePrimeNette());
+    }
+
+    private Contrat garantiePricingContext(Contrat contrat, CreateContratRequest request) {
+        if (contrat.getTypeContrat() != TypeContrat.PARTICULIER || request.getSaisiePrimeNette() == null) {
+            return contrat;
+        }
+        return primeEntryContext(contrat, Boolean.TRUE.equals(request.getSaisiePrimeNette()));
+    }
+
+    private Contrat primeEntryContext(Contrat contrat, boolean enabled) {
+        // Pricing overrides must not dirty the managed contract during preview.
+        Contrat context = new Contrat();
+        org.springframework.beans.BeanUtils.copyProperties(contrat, context);
+        context.setSaisiePrimeNette(enabled);
+        context.setModeSaisieGaranties(enabled
+                ? ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE : ModeSaisieGarantieContrat.MANUELLE);
+        return context;
+    }
+
+    private ContratGarantie preservedGarantie(List<ContratGarantie> preserved, Garantie garantie,
+            Vehicule vehicule, Remorque remorque, Client client) {
+        ContratGarantie target = ContratGarantie.builder().garantie(garantie).vehicule(vehicule)
+                .remorque(remorque).client(client).build();
+        return preserved.stream().filter(existing -> sameGarantieCible(existing, target)).findFirst().orElse(null);
     }
 
     private void normalizeAvenantTargetEcheances(Contrat contrat, AvenantRequest request) {
@@ -5285,6 +5352,17 @@ public class ContratService {
             List<Vehicule> vehicules,
             List<Remorque> remorques
     ) {
+        return buildGarantiesPreview(request, contrat, vehicules, remorques, List.of());
+    }
+
+    private List<ContratGarantie> buildGarantiesPreview(
+            CreateContratRequest request,
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            List<Remorque> remorques,
+            List<ContratGarantie> preserved
+    ) {
+        Contrat pricingContext = garantiePricingContext(contrat, request);
         List<ContratGarantie> garanties = new ArrayList<>();
         Map<String, Garantie> exclusions = new LinkedHashMap<>();
         for (CreateContratRequest.GarantieInput input : orderGarantieInputsByPrimeDependency(contrat, request.getGaranties())) {
@@ -5294,15 +5372,19 @@ public class ContratService {
                             .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
             Vehicule vehicule = input.getVehiculeIndex() == null ? null : resolveVehicule(vehicules, input.getVehiculeIndex(), "Garantie");
             Remorque remorque = input.getRemorqueIndex() == null ? null : resolveRemorque(remorques, input.getRemorqueIndex(), "Garantie");
+            ContratGarantie existing = preservedGarantie(preserved, garantie, vehicule, remorque, client);
+            Contrat linePricing = existing == null ? pricingContext : primeEntryContext(pricingContext, true);
             Usage usageCible = resolveUsageCible(contrat, vehicule, remorque);
             LigneGrilleTarifaire ligneGrilleTarifaire = resolveLigneGrilleTarifaire(contrat, garantie, input, usageCible, vehicule, remorque);
             ModeTarificationGarantie modeSelectionne = resolveModeSelectionne(garantie, ligneGrilleTarifaire, input);
             SourceValeurGarantie sourceValeurSelectionnee = resolveSourceValeurSelectionnee(garantie, input, modeSelectionne, remorque);
             FormuleGarantiePersonne formuleGarantiePersonne = resolveFormuleGarantiePersonne(input.getFormuleGarantiePersonneId(), contrat, garantie, usageCible);
-            GarantieMontants montants = resolveGarantieMontants(contrat, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garanties);
+            GarantieMontants montants = resolveGarantieMontants(linePricing, input, garantie, ligneGrilleTarifaire, vehicule, remorque, client, usageCible, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, garanties);
             validateGarantieTarget(garantie, vehicule, remorque, client);
             registerGarantieExclusion(exclusions, garantie, vehicule, remorque, client);
-            validateGarantieConfiguration(contrat, garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
+            validateGarantieConfiguration(existing != null && existing.getPrime() == null
+                    ? primeEntryContext(linePricing, false) : linePricing,
+                    garantie, input, modeSelectionne, sourceValeurSelectionnee, formuleGarantiePersonne, ligneGrilleTarifaire, montants);
             validateLigneGrilleTarifaire(contrat, garantie, ligneGrilleTarifaire, modeSelectionne, usageCible, vehicule);
             garanties.add(ContratGarantie.builder()
                     .contrat(contrat)

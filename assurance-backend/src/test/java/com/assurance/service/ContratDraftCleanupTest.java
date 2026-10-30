@@ -4,6 +4,10 @@ import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.Quittance;
+import com.assurance.dto.request.AvenantRequest;
+import com.assurance.dto.request.CreateContratRequest;
+import com.assurance.enums.ModeSaisieGarantieContrat;
+import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,7 +57,7 @@ class ContratDraftCleanupTest {
         contrat.getQuittances().add(quittance);
         contrat.getElementsFacturables().add(element);
         contrat.getAssistances().add(assistance);
-        when(assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(10L))
+        lenient().when(assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(10L))
                 .thenReturn(List.of(assistance));
     }
 
@@ -114,5 +118,46 @@ class ContratDraftCleanupTest {
         verify(quittanceRepository, never()).deleteAll(anyIterable());
         verify(assistanceContratRepository, never()).deleteAll(anyIterable());
         verifyNoInteractions(elementFacturableRepository);
+    }
+
+    @Test
+    void amendmentPrimeEntryOverridesDoNotMutateManagedContract() {
+        contrat.setTypeContrat(TypeContrat.PARTICULIER);
+        contrat.setSaisiePrimeNette(false);
+        contrat.setModeSaisieGaranties(ModeSaisieGarantieContrat.MANUELLE);
+        var request = new CreateContratRequest();
+        request.setSaisiePrimeNette(true);
+
+        Contrat pricing = ReflectionTestUtils.invokeMethod(service, "garantiePricingContext", contrat, request);
+
+        assertThat(pricing).isNotSameAs(contrat);
+        assertThat(pricing.getId()).isEqualTo(contrat.getId());
+        assertThat(pricing.getSaisiePrimeNette()).isTrue();
+        assertThat(pricing.getModeSaisieGaranties()).isEqualTo(ModeSaisieGarantieContrat.MANUELLE_AVEC_PRIME_NETTE);
+        assertThat(contrat.getSaisiePrimeNette()).isFalse();
+        assertThat(contrat.getModeSaisieGaranties()).isEqualTo(ModeSaisieGarantieContrat.MANUELLE);
+    }
+
+    @Test
+    void amendmentCanDisableInheritedPrimeEntry() {
+        contrat.setTypeContrat(TypeContrat.PARTICULIER);
+        contrat.setSaisiePrimeNette(true);
+        var request = new AvenantRequest();
+        request.setSaisiePrimeNette(false);
+
+        Boolean enabled = ReflectionTestUtils.invokeMethod(service, "createAmendmentPrimeSetting", contrat, request);
+
+        assertThat(enabled).isFalse();
+        assertThat(contrat.getSaisiePrimeNette()).isTrue();
+    }
+
+    @Test
+    void primeEntryOverrideRejectsFleetContract() {
+        contrat.setTypeContrat(TypeContrat.FLOTTE);
+        var request = new AvenantRequest();
+        request.setSaisiePrimeNette(true);
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "createAmendmentPrimeSetting", contrat, request))
+                .isInstanceOf(BadRequestException.class);
     }
 }

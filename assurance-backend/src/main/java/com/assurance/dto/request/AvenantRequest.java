@@ -20,6 +20,7 @@ public class AvenantRequest {
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String notes;
+    private Boolean saisiePrimeNette;
 
     @Valid
     private List<CreateContratRequest.QuittanceInput> quittances;

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { MoneyInput } from "../components/MoneyInput";
@@ -76,6 +77,7 @@ export function TargetGuaranteesTable({
   showAssistanceContractReference,
   grilleSelected,
   pricingMode,
+  onSaisiePrimeNetteChange,
   preview,
   previewing,
   dirtyCalculationKeys,
@@ -101,6 +103,7 @@ export function TargetGuaranteesTable({
   showAssistanceContractReference?: boolean;
   grilleSelected: boolean;
   pricingMode: PricingMode;
+  onSaisiePrimeNetteChange?: (enabled: boolean) => void;
   preview?: QuittancePreview | null;
   previewing?: boolean;
   dirtyCalculationKeys?: string[];
@@ -186,6 +189,12 @@ export function TargetGuaranteesTable({
 
   return (
     <div className="grid gap-4">
+      {layout === "particulier" && onSaisiePrimeNetteChange ? (
+        <label className="flex items-center gap-2 text-sm">
+          <Switch checked={primeInputEnabled} onCheckedChange={onSaisiePrimeNetteChange} disabled={previewing} />
+          <span>Saisie avec primes</span>
+        </label>
+      ) : null}
       <div className="overflow-x-auto rounded-md border">
         <div className="border-b px-3 py-2 text-sm font-semibold">
           {target.kind === "vehicule" ? "Garanties véhicule" : "Garanties remorque"}
@@ -205,7 +214,7 @@ export function TargetGuaranteesTable({
               ) : (
                 <th className="w-28 px-2 py-3 text-right xl:w-56">Franchise</th>
               )}
-              {layout === "tariff" ? <th className="w-24 px-2 py-3 text-right xl:w-40">{primeColumnLabel}</th> : null}
+              {layout === "tariff" || primeInputEnabled ? <th className="w-24 px-2 py-3 text-right xl:w-40">{primeColumnLabel}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -396,11 +405,11 @@ export function TargetGuaranteesTable({
                       Boolean(garantie.avecFranchiseMinimale)
                     )}
                   </GuaranteeTableCell>}
-                  {layout === "tariff" ? <GuaranteeTableCell className="text-right font-medium">
-                    {primeInputEnabled && !isRc ? (
+                  {layout === "tariff" || primeInputEnabled ? <GuaranteeTableCell className="text-right font-medium">
+                    {primeInputEnabled && (layout === "particulier" || !isRc) ? (
                       <MoneyInput
-                        disabled={!editable}
-                        className={cn(controlClass(editable), "text-right")}
+                        disabled={!checked || guaranteeLocked}
+                        className={cn(controlClass(checked && !guaranteeLocked), "text-right")}
                         value={item?.prime}
                         onValueChange={(value) => update(garantie.id, { prime: value })}
                       />
@@ -411,7 +420,7 @@ export function TargetGuaranteesTable({
             })}
             {configuredGaranties.length === 0 ? (
               <tr>
-                <td colSpan={layout === "particulier" ? 5 : 6} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={layout === "particulier" ? primeInputEnabled ? 6 : 5 : 6} className="px-3 py-8 text-center text-sm text-muted-foreground">
                   Aucune garantie véhicule configurée pour cet usage.
                 </td>
               </tr>
@@ -435,7 +444,7 @@ export function TargetGuaranteesTable({
                 <th className="w-40 px-3 py-3 text-left">Hospitalisation</th>
                 <th className="w-40 px-3 py-3 text-left">Frais funéraires</th>
                 <th className="w-48 px-3 py-3 text-left">Chirurgie</th>
-                {layout === "tariff" ? <th className="w-32 px-3 py-3 text-right">{primeColumnLabel}</th> : null}
+                {layout === "tariff" || primeInputEnabled ? <th className="w-32 px-3 py-3 text-right">{primeColumnLabel}</th> : null}
               </tr>
             </thead>
             <tbody className="block xl:table-row-group">
@@ -504,7 +513,7 @@ export function TargetGuaranteesTable({
                     <ResponsiveRecordCell label="Hospitalisation">{automaticPricing ? money(selectedFormule?.montantFraisHospitalisation) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisHospitalisation} onValueChange={(value) => update(garantie.id, { montantFraisHospitalisation: value })} />}</ResponsiveRecordCell>
                     <ResponsiveRecordCell label="Frais funéraires">{automaticPricing ? money(selectedFormule?.montantFraisFuneraires) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisFuneraires} onValueChange={(value) => update(garantie.id, { montantFraisFuneraires: value })} />}</ResponsiveRecordCell>
                     <ResponsiveRecordCell label="Chirurgie">{automaticPricing ? money(selectedFormule?.montantFraisChirurgie) : <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.montantFraisChirurgie} onValueChange={(value) => update(garantie.id, { montantFraisChirurgie: value })} />}</ResponsiveRecordCell>
-                    {layout === "tariff" ? <ResponsiveRecordCell label={primeColumnLabel} valueClassName="text-right">
+                    {layout === "tariff" || primeInputEnabled ? <ResponsiveRecordCell label={primeColumnLabel} valueClassName="text-right">
                       {primeInputEnabled ? (
                         <MoneyInput disabled={!editable} className={controlClass(editable)} value={item?.prime} onValueChange={(value) => update(garantie.id, { prime: value })} />
                       ) : checked || previewLine ? <CalculationValue value={calculatedPrime} loading={rowCalculating} /> : "-"}

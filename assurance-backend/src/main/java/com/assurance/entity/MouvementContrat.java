@@ -90,6 +90,9 @@ public class MouvementContrat extends BaseEntity {
     @Column(length = 1000)
     private String notes;
 
+    @Column(name = "saisie_prime_nette")
+    private Boolean saisiePrimeNette;
+
     @OneToMany(mappedBy = "mouvementContrat", orphanRemoval = true)
     @Builder.Default
     private List<MouvementVehicule> vehicules = new ArrayList<>();

@@ -22,6 +22,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -70,6 +71,8 @@ export default function ClientCrmPage() {
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [assignmentOpen, setAssignmentOpen] = useState(false);
+  const hasClientSearch = query.trim().length > 0;
+  const clientSearchReady = hasClientSearch && query.trim() === deferredQuery;
 
   const groupesQuery = useQuery({
     queryKey: ["groupes-clients"],
@@ -91,7 +94,7 @@ export default function ClientCrmPage() {
       page,
       size: 25,
     }),
-    placeholderData: (previous) => previous,
+    enabled: clientSearchReady && (!selectedClientId || clientPickerOpen),
   });
   const detailQuery = useQuery({
     queryKey: ["crm-client", selectedClientId],
@@ -163,9 +166,12 @@ export default function ClientCrmPage() {
             collaborateurId={collaborateurId}
             onCollaboratorChange={(value) => { setCollaborateurId(value); setPage(0); }}
             acquisitionOptions={acquisitionOptionsQuery.data}
-            clients={clientsQuery.data?.items ?? []}
-            loading={clientsQuery.isLoading}
-            page={clientsQuery.data?.page}
+            clients={clientSearchReady && !clientsQuery.isError ? clientsQuery.data?.items ?? [] : []}
+            searchActive={hasClientSearch}
+            loading={hasClientSearch && (!clientSearchReady || clientsQuery.isLoading)}
+            error={clientSearchReady && clientsQuery.isError ? clientsQuery.error.message : undefined}
+            onRetry={() => void clientsQuery.refetch()}
+            page={clientSearchReady && !clientsQuery.isError ? clientsQuery.data?.page : undefined}
             onPageChange={setPage}
             onSelect={selectClient}
           />
@@ -204,9 +210,12 @@ export default function ClientCrmPage() {
             collaborateurId={collaborateurId}
             onCollaboratorChange={(value) => { setCollaborateurId(value); setPage(0); }}
             acquisitionOptions={acquisitionOptionsQuery.data}
-            clients={clientsQuery.data?.items ?? []}
-            loading={clientsQuery.isLoading}
-            page={clientsQuery.data?.page}
+            clients={clientSearchReady && !clientsQuery.isError ? clientsQuery.data?.items ?? [] : []}
+            searchActive={hasClientSearch}
+            loading={hasClientSearch && (!clientSearchReady || clientsQuery.isLoading)}
+            error={clientSearchReady && clientsQuery.isError ? clientsQuery.error.message : undefined}
+            onRetry={() => void clientsQuery.refetch()}
+            page={clientSearchReady && !clientsQuery.isError ? clientsQuery.data?.page : undefined}
             onPageChange={setPage}
             onSelect={selectClient}
           />
@@ -254,7 +263,10 @@ function ClientPicker({
   onCollaboratorChange,
   acquisitionOptions,
   clients,
+  searchActive,
   loading,
+  error,
+  onRetry,
   page,
   onPageChange,
   onSelect,
@@ -270,59 +282,85 @@ function ClientPicker({
   onCollaboratorChange: (value: string) => void;
   acquisitionOptions?: AcquisitionOptions;
   clients: ClientResponse[];
+  searchActive: boolean;
   loading: boolean;
+  error?: string;
+  onRetry: () => void;
   page?: ClientPage["page"];
   onPageChange: (page: number) => void;
   onSelect: (clientId: string) => void;
 }) {
   return (
     <div className="min-w-0">
-      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="relative min-w-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            className="pl-9"
-            placeholder="Nom, code client, RC, CIN ou ICE"
-            onChange={(event) => onQueryChange(event.target.value)}
-          />
+      <div className="grid gap-3 border-b p-4 sm:grid-cols-2 xl:grid-cols-5">
+        <label className="grid min-w-0 gap-1.5 text-sm sm:col-span-2">
+          <span className="font-medium">Client</span>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              className="pl-9"
+              placeholder="Nom, code client, RC, CIN ou ICE"
+              onChange={(event) => onQueryChange(event.target.value)}
+            />
+          </div>
         </label>
-        <Select value={groupeId} onValueChange={onGroupChange}>
-          <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="TOUS">Tous les groupes</SelectItem>
-            {groupes.map((groupe) => (
-              <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={origineId} onValueChange={onOriginChange}>
-          <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="TOUTES">Toutes les origines</SelectItem>
-            {(acquisitionOptions?.origines ?? []).map((origin) => (
-              <SelectItem key={origin.id} value={origin.id}>{origin.libelle}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={collaborateurId} onValueChange={onCollaboratorChange}>
-          <SelectTrigger className="min-w-0"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="TOUS">Tous les membres de l’équipe</SelectItem>
-            {(acquisitionOptions?.collaborateurs ?? []).filter((user) => user.actif).map((user) => (
-              <SelectItem key={user.id} value={user.id}>{user.nom}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Field label="Groupe" className="min-w-0">
+          <Combobox
+            value={groupeId}
+            options={[
+              { value: "TOUS", label: "Tous les groupes" },
+              ...groupes.map(groupe => ({ value: groupe.id, label: `${groupe.code} - ${groupe.libelle}` })),
+            ]}
+            onValueChange={value => onGroupChange(value ? String(value) : "TOUS")}
+            placeholder="Tous les groupes"
+            searchPlaceholder="Rechercher un groupe..."
+            emptyText="Aucun groupe trouvé."
+            className="min-w-0 [&>svg]:shrink-0"
+          />
+        </Field>
+        <Field label="Origine" className="min-w-0">
+          <Combobox
+            value={origineId}
+            options={[
+              { value: "TOUTES", label: "Toutes les origines" },
+              ...(acquisitionOptions?.origines ?? []).map(origin => ({ value: origin.id, label: origin.libelle })),
+            ]}
+            onValueChange={value => onOriginChange(value ? String(value) : "TOUTES")}
+            placeholder="Toutes les origines"
+            searchPlaceholder="Rechercher une origine..."
+            emptyText="Aucune origine trouvée."
+            className="min-w-0 [&>svg]:shrink-0"
+          />
+        </Field>
+        <Field label="Collaborateur" className="min-w-0">
+          <Combobox
+            value={collaborateurId}
+            options={[
+              { value: "TOUS", label: "Toute l'équipe" },
+              ...(acquisitionOptions?.collaborateurs ?? []).filter(user => user.actif).map(user => ({ value: user.id, label: user.nom })),
+            ]}
+            onValueChange={value => onCollaboratorChange(value ? String(value) : "TOUS")}
+            placeholder="Toute l'équipe"
+            searchPlaceholder="Rechercher un collaborateur..."
+            emptyText="Aucun collaborateur trouvé."
+            className="min-w-0 [&>svg]:shrink-0"
+          />
+        </Field>
       </div>
-      <div className="max-h-[54vh] divide-y overflow-y-auto">
+      <div className="max-h-[54vh] min-h-40 divide-y overflow-y-auto">
+        {!searchActive ? <div className="p-10 text-center text-sm text-muted-foreground">Aucune recherche en cours.</div> : null}
         {loading ? Array.from({ length: 5 }, (_, index) => (
           <div key={index} className="flex items-center gap-3 p-4">
             <Skeleton className="size-10 rounded-md" />
             <div className="grid flex-1 gap-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-3 w-64 max-w-full" /></div>
           </div>
         )) : null}
-        {!loading && clients.map((client) => (
+        {searchActive && !loading && error ? <div role="alert" className="grid justify-items-center gap-3 p-10 text-center text-sm">
+          <p className="text-destructive">{error}</p>
+          <Button type="button" variant="outline" onClick={onRetry}>Réessayer</Button>
+        </div> : null}
+        {searchActive && !loading && !error && clients.map((client) => (
           <button
             key={client.id}
             type="button"
@@ -341,21 +379,21 @@ function ClientPicker({
             </div>
           </button>
         ))}
-        {!loading && clients.length === 0 ? (
+        {searchActive && !loading && !error && clients.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted-foreground">Aucun client trouvé.</div>
         ) : null}
       </div>
-      <div className="flex items-center justify-between border-t p-3 text-sm">
+      {searchActive && !loading && !error && page ? <div className="flex items-center justify-between border-t p-3 text-sm">
         <span className="text-muted-foreground">{page?.totalElements ?? 0} client(s)</span>
         <div className="flex gap-1">
-          <Button type="button" size="icon" variant="outline" disabled={page?.first ?? true} onClick={() => onPageChange(Math.max((page?.number ?? 0) - 1, 0))}>
+          <Button type="button" size="icon" variant="outline" aria-label="Page précédente" disabled={page?.first ?? true} onClick={() => onPageChange(Math.max((page?.number ?? 0) - 1, 0))}>
             <ChevronLeft className="size-4" />
           </Button>
-          <Button type="button" size="icon" variant="outline" disabled={page?.last ?? true} onClick={() => onPageChange((page?.number ?? 0) + 1)}>
+          <Button type="button" size="icon" variant="outline" aria-label="Page suivante" disabled={page?.last ?? true} onClick={() => onPageChange((page?.number ?? 0) + 1)}>
             <ChevronRight className="size-4" />
           </Button>
         </div>
-      </div>
+      </div> : null}
     </div>
   );
 }
@@ -1417,13 +1455,15 @@ function Field({
   label: fieldLabel,
   children,
   required = false,
+  className = "",
 }: {
   label: string;
   children: ReactNode;
   required?: boolean;
+  className?: string;
 }) {
   return (
-    <label className="grid gap-1.5 text-sm">
+    <label className={`grid gap-1.5 text-sm ${className}`}>
       <span className="font-medium">
         {fieldLabel}
         {required ? <span className="text-red-600"> *</span> : null}

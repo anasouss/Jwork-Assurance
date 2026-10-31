@@ -38,7 +38,6 @@ import type { PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type ModeFilter = "ALL" | "CHEQUE" | "EFFET";
-type ResolutionFilter = "ALL" | NonNullable<PaymentInstrument["resolutionRejet"]>;
 
 export default function ImpayesClientsPage() {
   const [params, setParams] = useSearchParams();
@@ -52,7 +51,6 @@ export default function ImpayesClientsPage() {
   const dateFrom = parseDate(params.get("dateDu"));
   const dateTo = parseDate(params.get("dateAu"));
   const bankId = params.get("banqueId") ?? "";
-  const resolution = parseResolution(params.get("resolution"));
   const payerType: PayerType = params.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT";
   const payerId = params.get("payeurId") ?? "";
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
@@ -65,6 +63,14 @@ export default function ImpayesClientsPage() {
   const [representationReason, setRepresentationReason] = useState("");
 
   useEffect(() => setSearch(appliedSearch), [appliedSearch]);
+
+  useEffect(() => {
+    if (!params.has("resolution")) return;
+    const next = new URLSearchParams(params);
+    next.delete("resolution");
+    next.delete("page");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
 
   const banks = useQuery({ queryKey: ["compta", "banks", "all"], queryFn: () => comptaApi.banks(true) });
   const requestedClient = useQuery({
@@ -84,13 +90,12 @@ export default function ImpayesClientsPage() {
   }, [payerId, payerType, selectedPayer?.id, selectedPayer?.type, requestedClient.data, payerSearch.groups]);
 
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, bankId, resolution, payerType, payerId, page],
+    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, bankId, payerType, payerId, page],
     queryFn: () => comptaApi.bankRejections({
       mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined, dateAu: dateTo || undefined,
       banqueId: bankId || undefined,
-      resolution: resolution === "ALL" ? undefined : resolution,
       payeurType: payerId ? payerType : undefined, payeurId: payerId || undefined,
       page,
       size: TREASURY_PAGE_SIZE,
@@ -113,9 +118,10 @@ export default function ImpayesClientsPage() {
     ),
   });
 
-  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; banqueId?: string; resolution?: ResolutionFilter; cible?: PayerType; payeurId?: string }) {
+  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; banqueId?: string; cible?: PayerType; payeurId?: string }) {
     const nextParams = new URLSearchParams(params);
-    for (const key of ["dateDu", "dateAu", "banqueId", "resolution", "cible", "payeurId"] as const) {
+    nextParams.delete("resolution");
+    for (const key of ["dateDu", "dateAu", "banqueId", "cible", "payeurId"] as const) {
       const value = next[key];
       if (value === undefined) continue;
       if (!value || value === "ALL") nextParams.delete(key);
@@ -155,8 +161,8 @@ export default function ImpayesClientsPage() {
         {canReject && <Button onClick={() => setRejectionOpen(true)}><Plus className="size-4" /> Enregistrer un rejet</Button>}
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
-        <div className="grid gap-2">
+      <section className="flex flex-wrap items-end gap-3 rounded-md border bg-card p-4">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44">
           <Label id="unpaid-payer-scope">Cible</Label>
           <div role="group" aria-labelledby="unpaid-payer-scope" className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
             {(["CLIENT", "GROUPE"] as const).map((scope) => (
@@ -181,7 +187,7 @@ export default function ImpayesClientsPage() {
             ))}
           </div>
         </div>
-        <div className="grid gap-2 xl:col-span-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-60">
           <Label>{payerType === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}</Label>
           <AutocompleteSelect
             options={payerSearch.options} value={payerId}
@@ -191,7 +197,7 @@ export default function ImpayesClientsPage() {
             emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
           />
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => updateUrl({ mode: value as ModeFilter })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -202,18 +208,13 @@ export default function ImpayesClientsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2"><Label>Traitement</Label><Select value={resolution} onValueChange={(value) => updateUrl({ resolution: value as ResolutionFilter })}>
-          <SelectTrigger><SelectValue /></SelectTrigger><SelectContent>
-            <SelectItem value="ALL">Tous les traitements</SelectItem><SelectItem value="A_TRAITER">À traiter</SelectItem>
-            <SelectItem value="REMPLACE">Remplacés</SelectItem><SelectItem value="REPRESENTE">Représentés</SelectItem>
-          </SelectContent></Select></div>
-        <div className="grid gap-2"><Label>Banque émettrice</Label><Select value={bankId || "ALL"} disabled={banks.isLoading} onValueChange={(value) => updateUrl({ banqueId: value === "ALL" ? "" : value })}>
+        <div className="grid w-full min-w-0 gap-2 sm:w-48"><Label>Banque émettrice</Label><Select value={bankId || "ALL"} disabled={banks.isLoading} onValueChange={(value) => updateUrl({ banqueId: value === "ALL" ? "" : value })}>
           <SelectTrigger><SelectValue placeholder="Toutes les banques" /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Toutes les banques</SelectItem>{(banks.data ?? []).map((bank) => <SelectItem key={bank.id} value={bank.id}>{bank.libelle}</SelectItem>)}
           </SelectContent></Select></div>
-        <div className="grid gap-2"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
-        <div className="grid gap-2"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
-        <div className="grid gap-2 xl:col-span-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid w-full min-w-0 gap-2 sm:w-44"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid w-full min-w-0 gap-2 sm:w-64">
           <Label htmlFor="unpaid-search">Référence, payeur ou règlement</Label>
           <Input
             id="unpaid-search"
@@ -222,7 +223,7 @@ export default function ImpayesClientsPage() {
             onKeyDown={(event) => event.key === "Enter" && updateUrl({ search: search.trim() })}
           />
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex shrink-0 items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={() => updateUrl({ search: search.trim() })}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={() => {
             setSearch("");
@@ -313,10 +314,6 @@ export default function ImpayesClientsPage() {
 
 function parseMode(value: string | null): ModeFilter {
   return value === "CHEQUE" || value === "EFFET" ? value : "ALL";
-}
-
-function parseResolution(value: string | null): ResolutionFilter {
-  return value === "A_TRAITER" || value === "REMPLACE" || value === "REPRESENTE" ? value : "ALL";
 }
 
 function parseDate(value: string | null) {

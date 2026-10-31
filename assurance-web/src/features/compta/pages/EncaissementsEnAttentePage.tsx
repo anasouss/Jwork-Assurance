@@ -426,8 +426,8 @@ export default function EncaissementsEnAttentePage() {
         </div>
       </header>
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
-        <div className="grid gap-2">
+      <section className="flex flex-wrap items-end gap-3 rounded-md border bg-card p-4">
+        <div className="grid w-full min-w-0 gap-2 sm:w-48">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => changeMode(value as ModeFilter)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -441,7 +441,7 @@ export default function EncaissementsEnAttentePage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44">
           <Label>Type de payeur</Label>
           <div className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
             {(["CLIENT", "GROUPE"] as const).map((scope) => (
@@ -466,7 +466,7 @@ export default function EncaissementsEnAttentePage() {
             ))}
           </div>
         </div>
-        <div className="grid gap-2 xl:col-span-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-60">
           <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
           <AutocompleteSelect
             options={payerSearch.options}
@@ -482,7 +482,7 @@ export default function EncaissementsEnAttentePage() {
             }}
             onQueryChange={payerScope === "CLIENT" ? payerSearch.setQuery : undefined}
             placeholder={mode === "ESPECES"
-              ? "Non applicable aux journées de caisse"
+              ? "Non applicable en espèces"
               : payerScope === "CLIENT"
                 ? "Nom, RC, CIN, ICE ou code"
                 : "Code, groupe ou membre"}
@@ -490,11 +490,11 @@ export default function EncaissementsEnAttentePage() {
             disabled={mode === "ESPECES"}
           />
         </div>
-        <div className="grid gap-2 xl:col-span-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-72">
           <Label htmlFor="collection-search">Règlement, caisse, banque ou référence</Label>
           <Input id="collection-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44">
           <Label>{dateFilterLabel} du</Label>
           <DatePicker
             date={dateFrom}
@@ -502,7 +502,7 @@ export default function EncaissementsEnAttentePage() {
             onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
           />
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44">
           <Label>{dateFilterLabel} au</Label>
           <DatePicker
             date={dateTo}
@@ -510,7 +510,7 @@ export default function EncaissementsEnAttentePage() {
             onSelect={(value) => updateUrl({ dateTo: toDateOnly(value) ?? "", page: 0 })}
           />
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex shrink-0 items-end gap-2">
           <Button size="icon" title="Rechercher" onClick={applyFilters}><Search className="size-4" /></Button>
           <Button size="icon" variant="outline" title="Réinitialiser" onClick={resetFilters}><RotateCcw className="size-4" /></Button>
         </div>

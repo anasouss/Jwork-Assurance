@@ -21,6 +21,7 @@ import type {
   CreateClientDocumentRequest,
   CreateInvoiceFromStatementRequest,
   ClientPayment,
+  PremiumReceiptOptions,
   ClientPaymentPolicy,
   ClientPaymentPage,
   ClientReceivable,
@@ -612,9 +613,19 @@ export const comptaApi = {
     return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/pdf`);
   },
 
-  async premiumReceiptPdf(id: string, issue = false) {
+  async premiumReceiptOptions(id: string) {
+    return unwrap(await apiFetch<ApiResponse<PremiumReceiptOptions>>(
+      `/api/v1/compta/reglements-clients/${id}/quittance-prime/options`
+    ));
+  },
+
+  async premiumReceiptPdf(id: string, issue = false, policyKeys?: string[]) {
     return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/quittance-prime/pdf`,
-      issue ? { method: "POST" } : undefined);
+      issue ? { method: "POST", body: JSON.stringify({ policyKeys }) } : undefined);
+  },
+
+  async selectedPremiumReceiptPdf(id: string, receiptId: string) {
+    return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/quittance-prime/${receiptId}/pdf`);
   },
 
   async createClientPayment(request: CreateClientPaymentRequest) {

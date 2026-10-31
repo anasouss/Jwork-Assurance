@@ -58,29 +58,48 @@ public class QuittancePrimePdfService {
     private final AssistanceContratRepository assistanceRepository;
 
     public byte[] render(ReglementClient payment, String reference, LocalDate issuedOn) {
+        return render(payment, reference, issuedOn, null);
+    }
+
+    public byte[] render(ReglementClient payment, String reference, LocalDate issuedOn, Set<String> policyKeys) {
         List<InstrumentReglementClient> instruments = payment.getInstruments().stream()
                 .filter(i -> i.getStatut() != StatutInstrumentReglement.REMPLACE)
                 .sorted(Comparator.comparing(InstrumentReglementClient::getId)).toList();
-        if (instruments.isEmpty() || instruments.stream().anyMatch(i -> i.getStatut() == StatutInstrumentReglement.REJETE)) {
+        if (instruments.isEmpty()) {
             throw new BadRequestException("Régularisez les moyens impayés avant d'émettre la quittance de prime");
         }
         BigDecimal received = instruments.stream().map(InstrumentReglementClient::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (received.compareTo(payment.getMontantTotal()) != 0) {
             throw new BadRequestException("Le total des moyens actifs est incohérent avec le règlement");
         }
+        for (InstrumentReglementClient instrument : instruments) {
+            BigDecimal instrumentAllocated = instrument.getAffectations().stream()
+                    .filter(a -> a.getStatut() != StatutAffectationReglement.ANNULEE)
+                    .map(AffectationReglementClient::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (instrumentAllocated.signum() < 0 || instrumentAllocated.compareTo(instrument.getMontant()) > 0) {
+                throw new BadRequestException("Les affectations dépassent le montant d'un moyen de règlement");
+            }
+        }
         List<PrimeRow> rows = rows(payment, instruments);
+        Map<Long, AssistanceContrat> assistance = assistance(payment, rows);
+        if (policyKeys != null) {
+            Set<String> available = new LinkedHashSet<>();
+            rows.forEach(row -> available.add(row.selectionKey()));
+            if (policyKeys.isEmpty() || !available.containsAll(policyKeys)) {
+                throw new BadRequestException("Sélection de polices invalide pour ce règlement");
+            }
+            rows = rows.stream().filter(row -> policyKeys.contains(row.selectionKey())).toList();
+        }
+        if (instruments.stream().anyMatch(i -> i.getStatut() == StatutInstrumentReglement.REJETE
+                && (policyKeys == null || selectedAmount(i, policyKeys).signum() > 0))) {
+            throw new BadRequestException("Régularisez les moyens impayés avant d'émettre la quittance de prime");
+        }
         BigDecimal allocated = rows.stream().map(row -> row.applied).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (allocated.compareTo(received) > 0) throw new BadRequestException("Les affectations dépassent le montant du règlement");
-        Set<Long> ids = new LinkedHashSet<>();
-        rows.forEach(row -> row.elements().forEach(e -> {
-            if (e.getAgence() == null || !Objects.equals(e.getAgence().getId(), payment.getAgence().getId())) {
-                throw new BadRequestException("Une prime n'appartient pas à l'agence");
-            }
-            ids.add(e.getId());
-        }));
-        Map<Long, AssistanceContrat> assistance = new HashMap<>();
-        if (!ids.isEmpty()) assistanceRepository.findByElementFacturableIds(ids)
-                .forEach(a -> assistance.put(a.getElementFacturable().getId(), a));
+        BigDecimal receiptTotal = policyKeys == null ? received : allocated;
+        if (policyKeys != null && receiptTotal.signum() <= 0) {
+            throw new BadRequestException("La sélection ne comporte aucun montant à quittancer");
+        }
 
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(out));
@@ -103,14 +122,14 @@ public class QuittancePrimePdfService {
                 footer.close();
             });
             writeHeader(document, payment, reference, issuedOn, normal, bold);
-            Table detail = new Table(new float[]{2.5f, 1.05f, 0.85f, 0.8f, 0.8f, 0.95f, 1f}).useAllAvailableWidth();
-            for (String column : List.of("POLICE / ASSUREUR", "PÉRIODE", "PRIME NETTE", "TAXES / TPF", "FRAIS / CNPAC", "PRIME TTC", "VERSEMENT")) {
+            Table detail = new Table(new float[]{1.9f, 2.1f, 1, 1, 1, 1, 1}).useAllAvailableWidth();
+            for (String column : List.of("POLICE / ASSUREUR", "BRANCHE / MOUVEMENT", "PRIME NETTE", "TAXES / TPF", "ACC. / CNPAC", "PRIME TOTALE", "VERSEMENT")) {
                 detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
                         .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5));
             }
             for (PrimeRow row : rows) {
                 add(detail, row.description(assistance), normal, false);
-                add(detail, row.period(), normal, false);
+                add(detail, row.riskDescription(assistance), normal, false);
                 add(detail, amount(row.net()), normal, true);
                 add(detail, amount(row.taxes()), normal, true);
                 add(detail, amount(row.fees()), normal, true);
@@ -121,32 +140,36 @@ public class QuittancePrimePdfService {
             detail.addCell(new Cell(1, 6).add(new Paragraph("TOTAL IMPUTÉ AUX PRIMES").setFont(bold).setMargin(0))
                     .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5));
             add(detail, amount(allocated), bold, true);
-            document.add(new Paragraph("Détail des primes · Montants en MAD").setFont(bold).setMarginTop(12));
+            document.add(new Paragraph("Montants en MAD").setFontSize(7).setTextAlignment(TextAlignment.RIGHT).setMarginTop(10).setMarginBottom(4));
             document.add(detail);
             document.add(new Paragraph("Les primes TTC ci-dessus sont les montants des créances concernées. La colonne Versement correspond uniquement au présent règlement.")
                     .setFontSize(7).setMarginTop(5));
-            document.add(new Paragraph("Moyens de règlement").setFont(bold).setMarginTop(12));
-            Table methods = new Table(new float[]{1.2f, 1.7f, 1.6f, 1f, 1.1f}).useAllAvailableWidth();
-            for (String name : List.of("MODE", "RÉFÉRENCE", "BANQUE", "DATE", "MONTANT (MAD)")) {
-                methods.addHeaderCell(new Cell().add(new Paragraph(name).setFont(bold).setFontSize(6).setMargin(0)).setBackgroundColor(PALE).setPadding(5));
-            }
+            document.add(new Paragraph(policyKeys == null ? "Moyen(s) de règlement" : "Moyen(s) de règlement · Part affectée à la sélection")
+                    .setFont(bold).setMarginTop(12).setMarginBottom(4));
             for (InstrumentReglementClient i : instruments) {
-                add(methods, mode(i), normal, false);
-                add(methods, value(i.getReferenceInstrument()), normal, false);
-                add(methods, i.getBanqueEmettriceReference() == null ? "-" : i.getBanqueEmettriceReference().getLibelle(), normal, false);
-                add(methods, date(i.getDateEcheance() == null ? i.getDateInstrument() : i.getDateEcheance()), normal, false);
-                add(methods, amount(i.getMontant()), bold, true);
+                BigDecimal instrumentAmount = policyKeys == null ? i.getMontant() : selectedAmount(i, policyKeys);
+                if (instrumentAmount.signum() == 0) continue;
+                String instrumentDate = switch (i.getMode()) {
+                    case CHEQUE -> label("Date du chèque", i.getDateInstrument() == null ? null : date(i.getDateInstrument()));
+                    case EFFET -> label("Échéance", i.getDateEcheance() == null ? null : date(i.getDateEcheance()));
+                    default -> label("Date", i.getDateInstrument() == null ? null : date(i.getDateInstrument()));
+                };
+                document.add(new Paragraph(join(mode(i), label("N°", i.getReferenceInstrument()),
+                        i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle(),
+                        instrumentDate, amount(instrumentAmount) + " MAD")).setFontSize(8).setMarginTop(0).setMarginBottom(4));
             }
-            document.add(methods);
             BigDecimal confirmed = instruments.stream().filter(i -> i.getStatut() == StatutInstrumentReglement.CONFIRME)
-                    .map(InstrumentReglementClient::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add);
-            Table totals = new Table(new float[]{3, 1}).useAllAvailableWidth().setMarginTop(12);
-            for (var total : List.of(Map.entry("Montant du règlement", received), Map.entry("Dont encaissé", confirmed),
-                    Map.entry("Dont sous réserve d'encaissement", received.subtract(confirmed)), Map.entry("Dont acompte non affecté", received.subtract(allocated)))) {
-                add(totals, total.getKey(), bold, false);
-                add(totals, amount(total.getValue()) + " MAD", bold, true);
+                    .map(i -> policyKeys == null ? i.getMontant() : selectedAmount(i, policyKeys)).reduce(BigDecimal.ZERO, BigDecimal::add);
+            document.add(new Paragraph((policyKeys == null ? "Total du règlement : " : "Total de la sélection : ") + amount(receiptTotal) + " MAD")
+                    .setFont(bold).setFontSize(11).setTextAlignment(TextAlignment.RIGHT).setMarginTop(12).setMarginBottom(4));
+            if (receiptTotal.compareTo(confirmed) > 0) {
+                document.add(new Paragraph("Dont sous réserve d'encaissement : " + amount(receiptTotal.subtract(confirmed)) + " MAD")
+                        .setFontSize(7).setTextAlignment(TextAlignment.RIGHT).setMargin(0));
             }
-            document.add(totals);
+            if (policyKeys == null && received.compareTo(allocated) > 0) {
+                document.add(new Paragraph("Dont acompte non affecté : " + amount(received.subtract(allocated)) + " MAD")
+                        .setFontSize(7).setTextAlignment(TextAlignment.RIGHT).setMargin(0));
+            }
             document.add(new Paragraph("Reçu établi par le cabinet pour le règlement référencé, dans la limite des montants imputés. "
                     + "Les valeurs non définitivement encaissées sont reçues sous réserve d'encaissement. "
                     + "Ce document ne vaut ni attestation d'assurance ni confirmation du règlement intégral des polices.")
@@ -159,6 +182,43 @@ public class QuittancePrimePdfService {
         }
     }
 
+    public List<PolicyOption> policies(ReglementClient payment) {
+        List<InstrumentReglementClient> instruments = payment.getInstruments().stream()
+                .filter(i -> i.getStatut() != StatutInstrumentReglement.REMPLACE).toList();
+        List<PrimeRow> rows = rows(payment, instruments);
+        Map<Long, AssistanceContrat> assistance = assistance(payment, rows);
+        Map<String, List<PrimeRow>> grouped = new LinkedHashMap<>();
+        rows.forEach(row -> grouped.computeIfAbsent(row.selectionKey(), ignored -> new ArrayList<>()).add(row));
+        return grouped.entrySet().stream().map(entry -> new PolicyOption(entry.getKey(),
+                entry.getValue().stream().map(row -> row.description(assistance)).distinct().toList(),
+                entry.getValue().stream().map(row -> row.applied).reduce(BigDecimal.ZERO, BigDecimal::add)))
+                .toList();
+    }
+
+    private Map<Long, AssistanceContrat> assistance(ReglementClient payment, List<PrimeRow> rows) {
+        Set<Long> ids = new LinkedHashSet<>();
+        rows.forEach(row -> row.elements().forEach(e -> {
+            if (e.getAgence() == null || !Objects.equals(e.getAgence().getId(), payment.getAgence().getId())) {
+                throw new BadRequestException("Une prime n'appartient pas à l'agence");
+            }
+            ids.add(e.getId());
+        }));
+        Map<Long, AssistanceContrat> assistance = new HashMap<>();
+        if (!ids.isEmpty()) assistanceRepository.findByElementFacturableIds(ids)
+                .forEach(a -> assistance.put(a.getElementFacturable().getId(), a));
+        return assistance;
+    }
+
+    private static BigDecimal selectedAmount(InstrumentReglementClient instrument, Set<String> policyKeys) {
+        return instrument.getAffectations().stream()
+                .filter(a -> a.getStatut() != StatutAffectationReglement.ANNULEE)
+                .filter(a -> policyKeys.contains(new PrimeRow(a.getElementFacturable(), a.getDocumentClient()).selectionKey()))
+                .map(AffectationReglementClient::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public record PolicyOption(String key, List<String> descriptions, BigDecimal montant) {
+    }
+
     private void writeHeader(Document document, ReglementClient payment, String reference, LocalDate issuedOn, PdfFont normal, PdfFont bold) {
         Table header = new Table(new float[]{1, 2}).useAllAvailableWidth();
         Cell brand = new Cell().setBorder(Border.NO_BORDER);
@@ -169,13 +229,21 @@ public class QuittancePrimePdfService {
         header.addCell(new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT)
                 .add(new Paragraph("QUITTANCE DE PRIME").setFont(bold).setFontSize(17).setMargin(0))
                 .add(new Paragraph("Reçu de règlement émis par le cabinet").setFontSize(8).setMargin(0))
-                .add(new Paragraph("N° " + reference).setFont(bold).setMarginTop(5).setMarginBottom(0))
-                .add(new Paragraph("Date d'émission : " + date(issuedOn)).setMargin(0)));
+                .add(new Paragraph("N° " + reference).setFont(bold).setMarginTop(5).setMarginBottom(0)));
         document.add(header);
-        Table identity = new Table(new float[]{1.6f, 1}).useAllAvailableWidth().setMarginTop(10);
-        add(identity, "REÇU DE\n" + value(payment.getPayeurNom()) + "\n" + payerAddress(payment), normal, false);
-        add(identity, "RÈGLEMENT\n" + payment.getNumero() + "\nDate : " + date(payment.getDateReglement()), normal, false);
+        Table identity = new Table(new float[]{1.15f, 2.5f, 1.25f, 1.8f}).useAllAvailableWidth().setMarginTop(12).setKeepTogether(true);
+        addIdentity(identity, "Payeur", value(payment.getPayeurNom()), "Date d'émission", date(issuedOn), normal, bold);
+        addIdentity(identity, "Adresse", payerAddress(payment), "Réf. règlement", value(payment.getNumero()), normal, bold);
+        addIdentity(identity, "Intermédiaire", value(payment.getAgence().getNom()), "Date du règlement", date(payment.getDateReglement()), normal, bold);
         document.add(identity);
+    }
+
+    private static void addIdentity(Table table, String leftLabel, String leftValue, String rightLabel, String rightValue,
+                                    PdfFont normal, PdfFont bold) {
+        add(table, leftLabel, bold, false);
+        add(table, leftValue, normal, false);
+        add(table, rightLabel, bold, false);
+        add(table, rightValue, normal, false);
     }
 
     private List<PrimeRow> rows(ReglementClient payment, List<InstrumentReglementClient> instruments) {
@@ -207,6 +275,17 @@ public class QuittancePrimePdfService {
             this.element = element;
             this.document = document;
         }
+
+        private String selectionKey() {
+            if (element == null && document != null) return "D:" + document.getId();
+            if (element != null && element.getNature() == com.assurance.enums.NatureElementFacturable.ASSISTANCE) {
+                return "A:" + element.getId();
+            }
+            if (element == null || element.getContrat() == null || element.getContrat().getId() == null) {
+                throw new BadRequestException("La police de l'affectation est introuvable");
+            }
+            return "C:" + element.getContrat().getId();
+        }
         private List<LigneDocumentClient> lines() {
             if (document == null) return List.of();
             List<LigneDocumentClient> lines = document.getLignes().stream()
@@ -232,11 +311,20 @@ public class QuittancePrimePdfService {
                     policy = first(snapshot.getNumeroPolice(), policy);
                     company = first(snapshot.getCompagnie(), company);
                 }
-                String branch = a != null && a.getBrancheAssurance() != null ? a.getBrancheAssurance().getLibelle()
-                        : e.getContrat().getBrancheAssurance() == null ? null : e.getContrat().getBrancheAssurance().getLibelle();
-                descriptions.add(join(value(policy), company, branch, e.getLibelle()));
+                descriptions.add(value(policy) + "\n" + value(company));
             }
             return String.join("\n", descriptions);
+        }
+
+        private String riskDescription(Map<Long, AssistanceContrat> assistance) {
+            List<String> descriptions = new ArrayList<>();
+            for (ElementFacturable e : elements()) {
+                AssistanceContrat a = assistance.get(e.getId());
+                String branch = a != null && a.getBrancheAssurance() != null ? a.getBrancheAssurance().getLibelle()
+                        : e.getContrat().getBrancheAssurance() == null ? null : e.getContrat().getBrancheAssurance().getLibelle();
+                descriptions.add(join(branch, e.getLibelle()));
+            }
+            return String.join("\n", descriptions) + "\n" + period();
         }
         private String period() {
             return String.join("\n", elements().stream().map(e -> date(e.getDateDebut()) + "\n" + date(e.getDateFin())).distinct().toList());

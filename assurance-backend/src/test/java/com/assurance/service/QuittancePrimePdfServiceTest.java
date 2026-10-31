@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.mock;
@@ -30,7 +31,76 @@ class QuittancePrimePdfServiceTest {
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
             assertThat(text).contains("QUITTANCE DE PRIME", "2026000001", "POLICE-1", "POLICE-2", "200,00", "100,00");
             assertThat(text).contains("sous réserve d'encaissement", "cabinet", "VERSEMENT");
+            assertThat(text).contains("Payeur", "Adresse", "Intermédiaire", "Réf. règlement", "Date du règlement",
+                    "BRANCHE / MOUVEMENT", "Moyen(s) de règlement", "Chèque", "CH-001", "Total du règlement");
+            assertThat(text).doesNotContain("Dont encaissé", "Dont acompte non affecté", "MONTANT (MAD)");
             assertThat(text).doesNotContain("0,25%", "TVA", "FICHE DE RÈGLEMENT CLIENT");
+        }
+    }
+
+    @Test
+    void selectionOnlyIncludesItsPoliciesAndAllocatedAmounts() throws Exception {
+        ReglementClient payment = payment(2);
+        assertThat(service.policies(payment)).hasSize(2);
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))) {
+            String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
+            assertThat(text).contains("POLICE-1", "Total de la sélection : 50,00 MAD", "CH-001", "200,00");
+            assertThat(text).doesNotContain("POLICE-2", "100,00 MAD");
+        }
+    }
+
+    @Test
+    void selectionRejectsUnknownPoliciesAndKeepsRepeatedPolicyMovementsTogether() {
+        ReglementClient payment = payment(2);
+        assertThatThrownBy(() -> service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:999")))
+                .isInstanceOf(BadRequestException.class);
+        var allocations = payment.getInstruments().get(0).getAffectations();
+        allocations.get(1).getElementFacturable().setContrat(allocations.get(0).getElementFacturable().getContrat());
+        assertThat(service.policies(payment)).singleElement().satisfies(option -> {
+            assertThat(option.key()).isEqualTo("C:1");
+            assertThat(option.montant()).isEqualByComparingTo("100.00");
+        });
+    }
+
+    @Test
+    void selectedAmountsCannotExceedTheirPaymentInstrument() {
+        ReglementClient payment = payment(2);
+        var instrument = payment.getInstruments().get(0);
+        instrument.setMontant(new BigDecimal("50.00"));
+        var unallocated = InstrumentReglementClient.builder().reglement(payment).mode(ModeReglementClient.CHEQUE)
+                .statut(StatutInstrumentReglement.EN_ATTENTE).montant(new BigDecimal("50.00")).build();
+        unallocated.setId(2L);
+        payment.getInstruments().add(unallocated);
+        assertThatThrownBy(() -> service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void documentLevelAllocationsRemainOneIndivisibleSelection() throws Exception {
+        ReglementClient payment = payment(2);
+        var instrument = payment.getInstruments().get(0);
+        DocumentClient document = DocumentClient.builder().agence(payment.getAgence()).numero("DOC-1").build();
+        document.setId(10L);
+        for (var allocation : instrument.getAffectations()) {
+            ElementFacturable element = allocation.getElementFacturable();
+            document.getLignes().add(LigneDocumentClient.builder().document(document).elementFacturable(element)
+                    .ordre(document.getLignes().size()).numeroPolice(element.getContrat().getNumeroPolice())
+                    .primeNette(element.getPrimeNette()).taxes(element.getTaxe()).accessoires(element.getAccessoire())
+                    .montantTtc(element.getPrimeTotale()).build());
+        }
+        var allocation = instrument.getAffectations().get(0);
+        allocation.setElementFacturable(null);
+        allocation.setDocumentClient(document);
+        allocation.setMontant(new BigDecimal("100.00"));
+        instrument.getAffectations().remove(1);
+        assertThat(service.policies(payment)).singleElement().satisfies(option -> {
+            assertThat(option.key()).isEqualTo("D:10");
+            assertThat(option.montant()).isEqualByComparingTo("100.00");
+        });
+        assertThatThrownBy(() -> service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))
+                .isInstanceOf(BadRequestException.class);
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "920260000000001", LocalDate.now(), Set.of("D:10")))) {
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "POLICE-2", "DOC-1");
         }
     }
 
@@ -76,6 +146,7 @@ class QuittancePrimePdfServiceTest {
         payment.getInstruments().add(cheque);
         for (int n = 1; n <= policyCount; n++) {
             Contrat contract = Contrat.builder().numeroPolice("POLICE-" + n).build();
+            contract.setId((long) n);
             ElementFacturable element = ElementFacturable.builder().agence(agency).contrat(contract).libelle("Prime assurance")
                     .dateDebut(LocalDate.of(2026, 10, 1)).dateFin(LocalDate.of(2027, 9, 30))
                     .primeNette(new BigDecimal("160.00")).taxe(new BigDecimal("30.00"))

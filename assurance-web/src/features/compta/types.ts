@@ -622,6 +622,11 @@ export type CreateRemittanceSlipRequest = {
   mouvementEspecesIds?: string[];
 };
 
+export type PremiumReceiptOptions = {
+  policies: { key: string; descriptions: string[]; montant: number }[];
+  archives: { id: string; numero: string; dateEmission: string; policyKeys: string[] | null }[];
+};
+
 export type ClientPayment = {
   id: string;
   numero: string;

@@ -7,6 +7,7 @@ import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
 import com.assurance.dto.request.RepresenterInstrumentReglementRequest;
 import com.assurance.dto.request.SelectionCreancesClientRequest;
 import com.assurance.dto.request.UpdateReglementClientPolicyRequest;
+import com.assurance.dto.request.QuittancePrimeSelectionRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.DocumentClientResponse;
@@ -24,6 +25,7 @@ import com.assurance.security.TenantContext;
 import com.assurance.service.JournalReglementsPdfService;
 import com.assurance.service.ReglementClientPdfService;
 import com.assurance.service.QuittancePrimeClientService;
+import com.assurance.service.QuittancePrimeSelectionService;
 import com.assurance.service.ReglementClientService;
 import com.assurance.service.TresorerieAccessService;
 import jakarta.validation.Valid;
@@ -57,6 +59,7 @@ public class ReglementClientController {
     private final ReglementClientService reglementClientService;
     private final ReglementClientPdfService reglementClientPdfService;
     private final QuittancePrimeClientService quittancePrimeClientService;
+    private final QuittancePrimeSelectionService quittancePrimeSelectionService;
     private final JournalReglementsPdfService journalReglementsPdfService;
     private final TresorerieAccessService tresorerieAccessService;
 
@@ -252,8 +255,24 @@ public class ReglementClientController {
 
     @PostMapping("/{paymentId}/quittance-prime/pdf")
     @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
-    public ResponseEntity<byte[]> issuePremiumReceipt(@PathVariable Long paymentId) {
-        return premiumReceiptResponse(quittancePrimeClientService.issue(TenantContext.getCurrentAgence(), paymentId));
+    public ResponseEntity<byte[]> issuePremiumReceipt(@PathVariable Long paymentId,
+            @Valid @RequestBody(required = false) QuittancePrimeSelectionRequest request) {
+        Long agencyId = TenantContext.getCurrentAgence();
+        return premiumReceiptResponse(request == null || request.policyKeys() == null
+                ? quittancePrimeClientService.issue(agencyId, paymentId)
+                : quittancePrimeSelectionService.issue(agencyId, paymentId, request.policyKeys()));
+    }
+
+    @GetMapping("/{paymentId}/quittance-prime/options")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<ApiResponse<QuittancePrimeSelectionService.Options>> premiumReceiptOptions(@PathVariable Long paymentId) {
+        return ResponseEntity.ok(ApiResponse.success(quittancePrimeSelectionService.options(TenantContext.getCurrentAgence(), paymentId)));
+    }
+
+    @GetMapping("/{paymentId}/quittance-prime/{receiptId}/pdf")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<byte[]> selectedPremiumReceipt(@PathVariable Long paymentId, @PathVariable Long receiptId) {
+        return premiumReceiptResponse(quittancePrimeSelectionService.read(TenantContext.getCurrentAgence(), paymentId, receiptId));
     }
 
     @GetMapping("/{paymentId}/quittance-prime/pdf")

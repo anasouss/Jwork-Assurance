@@ -55,6 +55,7 @@ import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
+import { PremiumReceiptDialog } from "../components/PremiumReceiptDialog";
 import {
   usePayerSearch,
   type PayerSelection,
@@ -151,6 +152,7 @@ export default function ReglementsEnregistresPage() {
   ));
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
+  const [paymentToReceipt, setPaymentToReceipt] = useState<ClientPayment>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [cancelReason, setCancelReason] = useState("");
@@ -362,7 +364,7 @@ export default function ReglementsEnregistresPage() {
     });
   }
 
-  async function previewPayment(payment: ClientPayment, premiumReceipt = false) {
+  async function previewPayment(payment: ClientPayment) {
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
       toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
@@ -371,13 +373,10 @@ export default function ReglementsEnregistresPage() {
     previewWindow.opener = null;
     setOpeningPaymentId(payment.id);
     try {
-      const blob = premiumReceipt
-        ? await comptaApi.premiumReceiptPdf(payment.id, !payment.quittancePrimeNumero)
-        : await comptaApi.clientPaymentPdf(payment.id);
+      const blob = await comptaApi.clientPaymentPdf(payment.id);
       const url = URL.createObjectURL(blob);
       previewWindow.location.href = url;
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      if (premiumReceipt) await queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] });
     } catch (error) {
       previewWindow.close();
       toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
@@ -553,10 +552,9 @@ export default function ReglementsEnregistresPage() {
                         payment={payment}
                         canManage={canManage}
                         canIssueInvoice={canIssueInvoice}
-                        canIssueReceipt={canCreate}
                         pdfLoading={openingPaymentId === payment.id}
                         onPreview={() => void previewPayment(payment)}
-                        onPremiumReceipt={() => void previewPayment(payment, true)}
+                        onPremiumReceipt={() => setPaymentToReceipt(payment)}
                         onInvoice={() => setPaymentToInvoice(payment)}
                         onCancel={() => setPaymentToCancel(payment)}
                       />
@@ -598,6 +596,8 @@ export default function ReglementsEnregistresPage() {
           />
         )}
       </section>
+
+      {paymentToReceipt && <PremiumReceiptDialog key={paymentToReceipt.id} payment={paymentToReceipt} canIssue={canCreate} onClose={() => setPaymentToReceipt(undefined)} />}
 
       <Dialog
         open={Boolean(paymentToInvoice)}
@@ -686,7 +686,6 @@ function PaymentActionsMenu({
   payment,
   canManage,
   canIssueInvoice,
-  canIssueReceipt,
   pdfLoading,
   onPreview,
   onPremiumReceipt,
@@ -696,7 +695,6 @@ function PaymentActionsMenu({
   payment: ClientPayment;
   canManage: boolean;
   canIssueInvoice: boolean;
-  canIssueReceipt: boolean;
   pdfLoading: boolean;
   onPreview: () => void;
   onPremiumReceipt: () => void;
@@ -733,8 +731,8 @@ function PaymentActionsMenu({
           <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Fiche de règlement PDF"}
         </DropdownMenuItem>
-        {payment.statut === "VALIDE" && (payment.quittancePrimeNumero || canIssueReceipt) && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
-          <FileText className="size-4" /> {payment.quittancePrimeNumero ? "Quittance de prime PDF" : "Créer la quittance de prime"}
+        {payment.statut === "VALIDE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
+          <FileText className="size-4" /> Quittance de prime PDF
         </DropdownMenuItem>}
         {canCreateInvoice && (
           <DropdownMenuItem onSelect={onInvoice}>

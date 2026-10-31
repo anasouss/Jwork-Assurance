@@ -74,6 +74,7 @@ import {
   showsOriginatingBank,
 } from "../client-payment-methods";
 import { formatAccountingAmount, parseAccountingAmount } from "../format";
+import { distributeSettlementAdjustment } from "../settlement-adjustment";
 import {
   receivableCoverageReference,
   receivableDocumentReference,
@@ -128,6 +129,8 @@ export default function NouveauReglementClientPage() {
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");
+  const [settlementAdjustment, setSettlementAdjustment] = useState<number>();
+  const [adjustmentReason, setAdjustmentReason] = useState("");
   const [depositorName, setDepositorName] = useState("");
   const [receipt, setReceipt] = useState<File>();
   const [methods, setMethods] = useState<PaymentMethodDraft[]>([]);
@@ -169,8 +172,18 @@ export default function NouveauReglementClientPage() {
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
-  const remainingAmount = round(selectedTotal - paymentTotal);
-  const unallocatedCredit = Math.max(0, round(-remainingAmount));
+  const adjustmentAmount = settlementAdjustment ?? 0;
+  const adjustmentPlan = distributeSettlementAdjustment(rows.map(row => ({
+    elementFacturableId: row.source.elementFacturableId, documentClientId: row.source.documentClientId,
+    soldeOuvert: row.soldeOuvert, montantRegle: allocatedAmounts.get(receivableTargetKey(row)) ?? 0,
+  })), adjustmentAmount, adjustmentReason);
+  const remainingAmount = round(selectedTotal - paymentTotal - adjustmentPlan.total);
+  const unallocatedCredit = Math.max(0, round(paymentTotal - selectedTotal));
+  const maximumAdjustment = paymentPolicy.data?.ecartReglementMaximum ?? 0;
+  const canGrantAdjustment = permissions.includes("reglement-client:manage") && !multiClientDeposit;
+  const adjustmentInvalid = !Number.isFinite(adjustmentAmount) || adjustmentAmount < 0
+    || adjustmentAmount > maximumAdjustment || adjustmentPlan.unassigned > 0
+    || (adjustmentAmount > 0 && (!canGrantAdjustment || !adjustmentReason.trim()));
   const maximumUnallocatedCredit = paymentPolicy.data?.creditNonAffecteMaximum ?? 100;
   const creditExceedsMaximum = unallocatedCredit > maximumUnallocatedCredit + 0.001;
   const activeBankAccounts = (accounts.data ?? []).filter(
@@ -188,6 +201,13 @@ export default function NouveauReglementClientPage() {
   const visibleMethods = visiblePaymentMode == null
     ? []
     : methods.filter((method) => method.mode === visiblePaymentMode);
+
+  useEffect(() => {
+    if (multiClientDeposit) {
+      setSettlementAdjustment(undefined);
+      setAdjustmentReason("");
+    }
+  }, [multiClientDeposit]);
 
   useEffect(() => {
     setOrderedRows((receivables.data ?? []).filter(
@@ -245,6 +265,7 @@ export default function NouveauReglementClientPage() {
 
   const savePayment = useMutation({
     mutationFn: () => {
+      if (adjustmentInvalid) throw new Error("Vérifiez le montant, le plafond et le motif de l'écart de règlement");
       const request = buildRequest(
         rows,
         methods,
@@ -253,6 +274,7 @@ export default function NouveauReglementClientPage() {
         multiClientDeposit,
         depositorName
       );
+      request.ecarts = adjustmentPlan.ecarts;
       if (multiClientDeposit && receipt) {
         return comptaApi.createMultiClientBankDeposit(request, receipt);
       }
@@ -265,6 +287,9 @@ export default function NouveauReglementClientPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["crm-client"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
       navigate(`/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`, {
@@ -283,6 +308,7 @@ export default function NouveauReglementClientPage() {
     && paymentTotal > 0
     && paymentPolicy.isSuccess
     && !creditExceedsMaximum
+    && !adjustmentInvalid
     && (!multiClientDeposit || (
       remainingAmount >= -0.001
       && Boolean(depositorName.trim())
@@ -464,6 +490,8 @@ export default function NouveauReglementClientPage() {
                       row={row}
                       priority={index + 1}
                       allocatedAmount={allocatedAmounts.get(receivableTargetKey(row)) ?? 0}
+                      adjustmentAmount={adjustmentPlan.ecarts.find(ecart => ecart.elementFacturableId === row.source.elementFacturableId
+                        && (ecart.documentClientId ?? undefined) === (row.source.documentClientId ?? undefined))?.montant ?? 0}
                       recentlyMoved={recentlyMovedId === receivableTargetKey(row)}
                       onRemove={() => removeReceivable(row)}
                     />
@@ -488,7 +516,7 @@ export default function NouveauReglementClientPage() {
         </div>
 
         <div className="grid gap-4 bg-muted/10 p-4">
-          <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+          <div className="grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="grid gap-2">
               <Label>{multiClientDeposit ? "Date du versement" : "Date du règlement"}</Label>
               <DatePicker
@@ -510,7 +538,18 @@ export default function NouveauReglementClientPage() {
                 onToggle={togglePaymentMode}
               />
             )}
+            {!multiClientDeposit && <div className="grid gap-2">
+              <Label htmlFor="settlement-adjustment">Écart de règlement (MAD)</Label>
+              <MoneyInput id="settlement-adjustment" value={settlementAdjustment} onValueChange={setSettlementAdjustment}
+                disabled={!canGrantAdjustment || !paymentPolicy.isSuccess || maximumAdjustment === 0}
+                className="text-right tabular-nums" />
+              <span className="text-xs text-muted-foreground">Plafond : {money(maximumAdjustment)} MAD</span>
+            </div>}
           </div>
+          {adjustmentAmount > 0 && <div className="grid max-w-4xl gap-2">
+            <Label htmlFor="settlement-adjustment-reason">Motif de l'écart *</Label>
+            <Input id="settlement-adjustment-reason" maxLength={500} value={adjustmentReason} onChange={event => setAdjustmentReason(event.target.value)} />
+          </div>}
 
           {multiClientDeposit ? (
             <div className="grid gap-4 border-t pt-4 md:grid-cols-2">
@@ -611,7 +650,7 @@ export default function NouveauReglementClientPage() {
                             0
                           );
                           updateMethod(method.key, {
-                            montant: money(round(Math.max(0, selectedTotal - otherTotal))),
+                            montant: money(round(Math.max(0, selectedTotal - adjustmentAmount - otherTotal))),
                           });
                         }}
                       >
@@ -752,12 +791,14 @@ export default function NouveauReglementClientPage() {
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-3 border-t py-4">
-        <div className={creditExceedsMaximum || paymentPolicy.isError
+        <div className={creditExceedsMaximum || adjustmentInvalid || paymentPolicy.isError
           ? "text-sm font-medium text-destructive"
           : "text-sm text-muted-foreground"}
         >
           {paymentPolicy.isError
             ? "Impossible de vérifier la limite du montant restant à affecter. Réessayez avant d’enregistrer."
+            : adjustmentInvalid
+            ? "Vérifiez le plafond, le motif et les créances concernées par l'écart"
             : creditExceedsMaximum
             ? `Reste à affecter supérieur au maximum autorisé de ${money(maximumUnallocatedCredit)}`
             : remainingAmount > 0.001
@@ -814,12 +855,13 @@ function SortableReceivableRow(props: {
   row: ClientReceivable;
   priority: number;
   allocatedAmount: number;
+  adjustmentAmount: number;
   recentlyMoved: boolean;
   onRemove: () => void;
 }) {
   const id = receivableTargetKey(props.row);
   const isAllocated = props.allocatedAmount > 0.001;
-  const isFullyAllocated = props.allocatedAmount >= props.row.soldeOuvert - 0.001;
+  const isFullyAllocated = props.allocatedAmount + props.adjustmentAmount >= props.row.soldeOuvert - 0.001;
   const {
     attributes,
     listeners,

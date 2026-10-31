@@ -22,6 +22,7 @@ import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratClient;
 import com.assurance.entity.DocumentClient;
+import com.assurance.entity.EcartReglementClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.GroupeClient;
 import com.assurance.entity.InstrumentReglementClient;
@@ -55,6 +56,7 @@ import com.assurance.repository.AffectationReglementClientRepository;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
+import com.assurance.repository.EcartReglementClientRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
@@ -70,6 +72,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -140,11 +144,13 @@ public class ReglementClientService {
     private final BanqueService banqueService;
     private final ParametreApplicationService parametreApplicationService;
     private final StorageLayoutService storageLayoutService;
+    private final EcartReglementClientRepository ecartRepository;
 
     @Transactional(readOnly = true)
     public ReglementClientPolicyResponse paymentPolicy(Long agenceId) {
         return ReglementClientPolicyResponse.builder()
                 .creditNonAffecteMaximum(maxUnallocatedCredit(agenceId))
+                .ecartReglementMaximum(maxSettlementAdjustment(agenceId))
                 .build();
     }
 
@@ -153,10 +159,19 @@ public class ReglementClientService {
             Long agenceId,
             BigDecimal creditNonAffecteMaximum
     ) {
+        return updatePaymentPolicy(agenceId, creditNonAffecteMaximum, null);
+    }
+
+    @Transactional
+    public ReglementClientPolicyResponse updatePaymentPolicy(Long agenceId, BigDecimal creditNonAffecteMaximum,
+                                                             BigDecimal ecartReglementMaximum) {
         if (creditNonAffecteMaximum == null || creditNonAffecteMaximum.signum() < 0) {
             throw new BadRequestException("Le montant maximal restant à affecter doit être positif ou nul");
         }
         BigDecimal maximum = money(creditNonAffecteMaximum);
+        if (ecartReglementMaximum != null && ecartReglementMaximum.signum() < 0) {
+            throw new BadRequestException("Le plafond d'écart de règlement doit être positif ou nul");
+        }
         parametreApplicationService.setValeur(
                 agenceId,
                 MAX_UNALLOCATED_CREDIT_PARAMETER,
@@ -164,9 +179,12 @@ public class ReglementClientService {
                 maximum.toPlainString(),
                 "Montant maximal restant à affecter lors d'un règlement client"
         );
-        return ReglementClientPolicyResponse.builder()
-                .creditNonAffecteMaximum(maximum)
-                .build();
+        if (ecartReglementMaximum != null) {
+            parametreApplicationService.setValeur(agenceId, "REGLEMENT_CLIENT_ECART_MAX", "DECIMAL",
+                    money(ecartReglementMaximum).toPlainString(), "Écart de règlement maximal accordé par règlement client");
+        }
+        return ReglementClientPolicyResponse.builder().creditNonAffecteMaximum(maximum)
+                .ecartReglementMaximum(ecartReglementMaximum == null ? maxSettlementAdjustment(agenceId) : money(ecartReglementMaximum)).build();
     }
 
     @Transactional(readOnly = true)
@@ -216,7 +234,7 @@ public class ReglementClientService {
         List<Long> elementIds = sources.getRows().stream()
                 .map(SourceDocumentClientResponse::getElementFacturableId)
                 .toList();
-        Map<Long, AllocationAmounts> amounts = loadAllocationAmounts(elementIds);
+        Map<Long, AllocationAmounts> amounts = loadAllocationAmounts(agenceId, elementIds);
         List<CreanceClientPageResponse.Ligne> rows = sources.getRows().stream()
                 .filter(source -> !source.isDejaFacturee())
                 .map(source -> toReceivable(source, amounts.getOrDefault(
@@ -281,7 +299,7 @@ public class ReglementClientService {
         List<Long> documentIds = result.getContent().stream()
                 .map(DocumentClient::getId)
                 .toList();
-        Map<Long, AllocationAmounts> amounts = loadDocumentAllocationAmounts(documentIds);
+        Map<Long, AllocationAmounts> amounts = loadDocumentAllocationAmounts(agenceId, documentIds);
         List<CreanceClientPageResponse.Ligne> rows = result.getContent().stream()
                 .map(document -> toReceivable(
                         toInvoiceSource(document),
@@ -495,7 +513,7 @@ public class ReglementClientService {
         });
         allocationRepository.saveAll(directAllocations);
         allocationRepository.saveAll(invoiceAllocations);
-        recalculatePaymentFlags(elementIds, List.of(document.getId()));
+        recalculatePaymentFlags(agenceId, elementIds, List.of(document.getId()));
         return documentClientService.detail(agenceId, document.getId());
     }
 
@@ -526,7 +544,7 @@ public class ReglementClientService {
         Map<Long, DocumentClient> documentsById = documents.stream()
                 .collect(Collectors.toMap(DocumentClient::getId, Function.identity()));
 
-        Map<Long, AllocationAmounts> directAmounts = loadAllocationAmounts(elementIds);
+        Map<Long, AllocationAmounts> directAmounts = loadAllocationAmounts(agenceId, elementIds);
         List<CreanceClientPageResponse.Ligne> rows = new ArrayList<>();
         directSources.stream()
                 .map(source -> toReceivable(
@@ -682,9 +700,9 @@ public class ReglementClientService {
         }
         validateAllocations(requestedInstruments, elementsById, documentsById);
 
-        Map<Long, AllocationAmounts> existingAmounts = loadAllocationAmounts(elementIds);
+        Map<Long, AllocationAmounts> existingAmounts = loadAllocationAmounts(agenceId, elementIds);
         Map<Long, AllocationAmounts> existingDocumentAmounts =
-                loadDocumentAllocationAmounts(documentIds);
+                loadDocumentAllocationAmounts(agenceId, documentIds);
         Map<Long, BigDecimal> requestedByElement = requestedAmountsByElement(requestedInstruments);
         Map<Long, BigDecimal> requestedByDocument = requestedAmountsByDocument(requestedInstruments);
         Map<Long, Long> invoiceDocumentByElement = requestedInstruments.stream()
@@ -715,7 +733,7 @@ public class ReglementClientService {
                     ? existingAmounts.getOrDefault(elementId, AllocationAmounts.empty())
                     : invoiceLineAmounts.get(invoiceDocumentId)
                             .getOrDefault(elementId, AllocationAmounts.empty());
-            BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending());
+            BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending()).subtract(current.adjustment());
             if (requestedAmount.compareTo(available) > 0) {
                 throw new BadRequestException("Le montant affecté dépasse le solde de la créance " + elementId);
             }
@@ -726,7 +744,7 @@ public class ReglementClientService {
                     documentId,
                     AllocationAmounts.empty()
             );
-            BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending());
+            BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending()).subtract(current.adjustment());
             if (requestedAmount.compareTo(available) > 0) {
                 throw new BadRequestException(
                         "Le montant affecté dépasse le solde de la facture "
@@ -734,6 +752,9 @@ public class ReglementClientService {
                 );
             }
         });
+
+        validateSettlementAdjustments(agenceId, request, elementsById, documentsById, existingAmounts,
+                invoiceLineAmounts, requestedByElement, invoiceDocumentByElement);
 
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
@@ -805,14 +826,67 @@ public class ReglementClientService {
             }
         }
 
+        for (CreerReglementClientRequest.Ecart input : request.getEcarts() == null ? List.<CreerReglementClientRequest.Ecart>of() : request.getEcarts()) {
+            EcartReglementClient ecart = new EcartReglementClient();
+            ecart.setAgence(agence);
+            ecart.setReglement(payment);
+            ecart.setElementFacturable(elementsById.get(input.getElementFacturableId()));
+            ecart.setDocumentClient(documentsById.get(input.getDocumentClientId()));
+            ecart.setMontant(money(input.getMontant()));
+            ecart.setMotif(input.getMotif().trim());
+            payment.getEcarts().add(ecart);
+        }
         payment = reglementRepository.saveAndFlush(payment);
         if (receipt != null) {
             storeReceipt(payment, receipt);
         }
         confirmImmediateInstruments(payment);
         reglementRepository.save(payment);
-        recalculatePaymentFlags(elementIds, documentIds);
+        recalculatePaymentFlags(agenceId, elementIds, documentIds);
         return toResponse(payment);
+    }
+
+    private void validateSettlementAdjustments(Long agenceId, CreerReglementClientRequest request,
+            Map<Long, ElementFacturable> elements, Map<Long, DocumentClient> documents,
+            Map<Long, AllocationAmounts> existing, Map<Long, Map<Long, AllocationAmounts>> invoiceAmounts,
+            Map<Long, BigDecimal> requestedAmounts, Map<Long, Long> invoiceByElement) {
+        if (request.getEcarts() == null || request.getEcarts().isEmpty()) return;
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities().stream()
+                .noneMatch(authority -> "PERM_reglement-client:manage".equals(authority.getAuthority()))) {
+            throw new AccessDeniedException("La gestion des règlements est requise pour accorder un écart");
+        }
+        if (Boolean.TRUE.equals(request.getMultiPayeur())) {
+            throw new BadRequestException("Accordez les écarts séparément pour chaque payeur");
+        }
+        Set<Long> seen = new HashSet<>();
+        BigDecimal adjustmentTotal = ZERO;
+        for (CreerReglementClientRequest.Ecart input : request.getEcarts()) {
+            Long id = input.getElementFacturableId();
+            Long invoiceId = invoiceByElement.get(id);
+            if (id == null || !seen.add(id) || !elements.containsKey(id)
+                    || !requestedAmounts.containsKey(id) || !Objects.equals(invoiceId, input.getDocumentClientId())) {
+                throw new BadRequestException("L'écart doit concerner une créance effectivement réglée par ce paiement");
+            }
+            if (input.getMontant() == null || input.getMontant().signum() <= 0 || input.getMontant().scale() > 2
+                    || input.getMotif() == null || input.getMotif().isBlank() || input.getMotif().length() > 500) {
+                throw new BadRequestException("Renseignez un écart positif à deux décimales et son motif");
+            }
+            AllocationAmounts current = invoiceId == null ? existing.getOrDefault(id, AllocationAmounts.empty())
+                    : invoiceAmounts.get(invoiceId).getOrDefault(id, AllocationAmounts.empty());
+            BigDecimal total = invoiceId == null ? money(elements.get(id).getPrimeTotale())
+                    : documents.get(invoiceId).getLignes().stream().filter(line -> line.getElementFacturable().getId().equals(id))
+                    .map(LigneDocumentClient::getMontantTtc).map(this::money).findFirst().orElseThrow();
+            BigDecimal remaining = total.subtract(current.confirmed()).subtract(current.pending())
+                    .subtract(current.adjustment()).subtract(requestedAmounts.get(id));
+            if (money(input.getMontant()).compareTo(remaining) > 0) {
+                throw new BadRequestException("L'écart dépasse le solde restant de la créance");
+            }
+            adjustmentTotal = adjustmentTotal.add(money(input.getMontant()));
+        }
+        if (adjustmentTotal.compareTo(maxSettlementAdjustment(agenceId)) > 0) {
+            throw new BadRequestException("L'écart total dépasse le plafond autorisé dans les paramètres comptables");
+        }
     }
 
     private void confirmImmediateInstruments(ReglementClient payment) {
@@ -871,7 +945,7 @@ public class ReglementClientService {
         instrument.setMotifStatut(trimToNull(request.getMotif()));
         instrumentRepository.save(instrument);
         refreshUnallocatedAmount(instrument.getReglement());
-        recalculatePaymentFlags(instrument.getAffectations().stream()
+        recalculatePaymentFlags(agenceId, instrument.getAffectations().stream()
                 .map(AffectationReglementClient::getElementFacturable)
                 .filter(Objects::nonNull)
                 .map(ElementFacturable::getId)
@@ -933,6 +1007,7 @@ public class ReglementClientService {
         payment.setMontantNonAffecte(ZERO);
         reglementRepository.save(payment);
         recalculatePaymentFlags(
+                agenceId,
                 elementIds.stream().distinct().toList(),
                 documentIds.stream().distinct().toList()
         );
@@ -995,7 +1070,7 @@ public class ReglementClientService {
             throw new BadRequestException("Les affectations d'origine dépassent le montant à remplacer");
         }
         if (!pendingReplacement) {
-            validateReplacementBalances(sources);
+            validateReplacementBalances(agenceId, sources);
         }
 
         List<InstrumentReglementClient> replacements = new ArrayList<>();
@@ -1051,6 +1126,7 @@ public class ReglementClientService {
         }
         refreshUnallocatedAmount(payment);
         recalculatePaymentFlags(
+                agenceId,
                 sources.stream().map(AffectationReglementClient::getElementFacturable)
                         .filter(Objects::nonNull).map(ElementFacturable::getId).distinct().toList(),
                 sources.stream().map(AffectationReglementClient::getDocumentClient)
@@ -1186,7 +1262,7 @@ public class ReglementClientService {
                 && request.getDateRepresentation().isBefore(instrument.getDateStatut())) {
             throw new BadRequestException("La représentation ne peut pas précéder le rejet bancaire");
         }
-        validateReplacementBalances(instrument.getAffectations());
+        validateReplacementBalances(agenceId, instrument.getAffectations());
         instrument.setStatut(StatutInstrumentReglement.EN_ATTENTE);
         instrument.setDateStatut(request.getDateRepresentation());
         instrument.setMotifStatut("Représentation : " + request.getMotif().trim());
@@ -1197,6 +1273,7 @@ public class ReglementClientService {
         ReglementClient payment = reglementRepository.saveAndFlush(instrument.getReglement());
         refreshUnallocatedAmount(payment);
         recalculatePaymentFlags(
+                agenceId,
                 instrument.getAffectations().stream()
                         .map(AffectationReglementClient::getElementFacturable)
                         .filter(Objects::nonNull)
@@ -1543,7 +1620,7 @@ public class ReglementClientService {
                 .build();
     }
 
-    private void validateReplacementBalances(List<AffectationReglementClient> allocations) {
+    private void validateReplacementBalances(Long agenceId, List<AffectationReglementClient> allocations) {
         List<Long> elementIds = allocations.stream()
                 .map(AffectationReglementClient::getElementFacturable)
                 .filter(Objects::nonNull)
@@ -1556,8 +1633,8 @@ public class ReglementClientService {
                 .map(DocumentClient::getId)
                 .distinct()
                 .toList();
-        Map<Long, AllocationAmounts> elementAmounts = loadAllocationAmounts(elementIds);
-        Map<Long, AllocationAmounts> documentAmounts = loadDocumentAllocationAmounts(documentIds);
+        Map<Long, AllocationAmounts> elementAmounts = loadAllocationAmounts(agenceId, elementIds);
+        Map<Long, AllocationAmounts> documentAmounts = loadDocumentAllocationAmounts(agenceId, documentIds);
         for (AffectationReglementClient allocation : allocations) {
             if (allocation.getElementFacturable() != null) {
                 ElementFacturable element = allocation.getElementFacturable();
@@ -1567,7 +1644,7 @@ public class ReglementClientService {
                 );
                 BigDecimal available = money(element.getPrimeTotale())
                         .subtract(current.confirmed())
-                        .subtract(current.pending());
+                        .subtract(current.pending()).subtract(current.adjustment());
                 if (money(allocation.getMontant()).compareTo(available) > 0) {
                     throw new BadRequestException(
                             "La créance a été réglée depuis le rejet de l'instrument"
@@ -1581,7 +1658,7 @@ public class ReglementClientService {
                 );
                 BigDecimal available = money(document.getTotalDocument())
                         .subtract(current.confirmed())
-                        .subtract(current.pending());
+                        .subtract(current.pending()).subtract(current.adjustment());
                 if (money(allocation.getMontant()).compareTo(available) > 0) {
                     throw new BadRequestException(
                             "La facture a été réglée depuis le rejet de l'instrument"
@@ -1625,6 +1702,7 @@ public class ReglementClientService {
         );
         refreshUnallocatedAmount(instrument.getReglement());
         recalculatePaymentFlags(
+                agenceId,
                 instrument.getAffectations().stream()
                         .map(AffectationReglementClient::getElementFacturable)
                         .filter(Objects::nonNull)
@@ -1886,6 +1964,7 @@ public class ReglementClientService {
     private void refreshAfterInstrumentTransition(InstrumentReglementClient instrument) {
         refreshUnallocatedAmount(instrument.getReglement());
         recalculatePaymentFlags(
+                instrument.getReglement().getAgence().getId(),
                 instrument.getAffectations().stream()
                         .map(AffectationReglementClient::getElementFacturable)
                         .filter(Objects::nonNull)
@@ -2243,7 +2322,7 @@ public class ReglementClientService {
         return result;
     }
 
-    private Map<Long, AllocationAmounts> loadAllocationAmounts(Collection<Long> elementIds) {
+    private Map<Long, AllocationAmounts> loadAllocationAmounts(Long agenceId, Collection<Long> elementIds) {
         if (elementIds.isEmpty()) {
             return Map.of();
         }
@@ -2254,19 +2333,29 @@ public class ReglementClientService {
             BigDecimal amount = money((BigDecimal) row[2]);
             AllocationAmounts current = result.getOrDefault(elementId, AllocationAmounts.empty());
             result.put(elementId, status == StatutAffectationReglement.CONFIRMEE
-                    ? new AllocationAmounts(current.confirmed().add(amount), current.pending())
-                    : new AllocationAmounts(current.confirmed(), current.pending().add(amount)));
+                    ? new AllocationAmounts(current.confirmed().add(amount), current.pending(), current.adjustment())
+                    : new AllocationAmounts(current.confirmed(), current.pending().add(amount), current.adjustment()));
         }
+        mergeAdjustments(result, ecartRepository.sumByElementIds(agenceId, elementIds));
         return result;
     }
 
-    private Map<Long, AllocationAmounts> loadDocumentAllocationAmounts(Collection<Long> documentIds) {
+    private Map<Long, AllocationAmounts> loadDocumentAllocationAmounts(Long agenceId, Collection<Long> documentIds) {
         if (documentIds.isEmpty()) {
             return Map.of();
         }
         Map<Long, AllocationAmounts> result = new HashMap<>();
         mergeAllocationRows(result, allocationRepository.sumByDocumentIds(documentIds));
+        mergeAdjustments(result, ecartRepository.sumByDocumentIds(agenceId, documentIds));
         return result;
+    }
+
+    private void mergeAdjustments(Map<Long, AllocationAmounts> result, List<Object[]> rows) {
+        for (Object[] row : rows) {
+            Long id = (Long) row[0];
+            AllocationAmounts current = result.getOrDefault(id, AllocationAmounts.empty());
+            result.put(id, new AllocationAmounts(current.confirmed(), current.pending(), money((BigDecimal) row[1])));
+        }
     }
 
     private Map<Long, AllocationAmounts> loadParentDocumentAllocationAmounts(
@@ -2293,8 +2382,8 @@ public class ReglementClientService {
                     AllocationAmounts.empty()
             );
             result.put(documentId, status == StatutAffectationReglement.CONFIRMEE
-                    ? new AllocationAmounts(current.confirmed().add(amount), current.pending())
-                    : new AllocationAmounts(current.confirmed(), current.pending().add(amount)));
+                    ? new AllocationAmounts(current.confirmed().add(amount), current.pending(), current.adjustment())
+                    : new AllocationAmounts(current.confirmed(), current.pending().add(amount), current.adjustment()));
         }
     }
 
@@ -2305,7 +2394,7 @@ public class ReglementClientService {
         List<Long> elementIds = lines.stream()
                 .map(line -> line.getElementFacturable().getId())
                 .toList();
-        Map<Long, AllocationAmounts> result = new HashMap<>(loadAllocationAmounts(elementIds));
+        Map<Long, AllocationAmounts> result = new HashMap<>(loadAllocationAmounts(document.getAgence().getId(), elementIds));
         AllocationAmounts parent = loadParentDocumentAllocationAmounts(List.of(document.getId()))
                 .getOrDefault(document.getId(), AllocationAmounts.empty());
         distributeParentAmount(lines, result, parent.confirmed(), true);
@@ -2329,11 +2418,12 @@ public class ReglementClientService {
             BigDecimal capacity = money(line.getMontantTtc())
                     .subtract(current.confirmed())
                     .subtract(current.pending())
+                    .subtract(current.adjustment())
                     .max(ZERO);
             BigDecimal assigned = remaining.min(capacity);
             amounts.put(elementId, confirmed
-                    ? new AllocationAmounts(current.confirmed().add(assigned), current.pending())
-                    : new AllocationAmounts(current.confirmed(), current.pending().add(assigned)));
+                    ? new AllocationAmounts(current.confirmed().add(assigned), current.pending(), current.adjustment())
+                    : new AllocationAmounts(current.confirmed(), current.pending().add(assigned), current.adjustment()));
             remaining = remaining.subtract(assigned);
         }
     }
@@ -2407,11 +2497,11 @@ public class ReglementClientService {
             AllocationAmounts amounts
     ) {
         BigDecimal total = money(source.getMontantTtc());
-        BigDecimal open = total.subtract(amounts.confirmed()).subtract(amounts.pending()).max(ZERO);
+        BigDecimal open = total.subtract(amounts.confirmed()).subtract(amounts.pending()).subtract(amounts.adjustment()).max(ZERO);
         String status;
-        if (amounts.confirmed().compareTo(total) >= 0) {
+        if (amounts.confirmed().add(amounts.adjustment()).compareTo(total) >= 0) {
             status = "PAYEE";
-        } else if (amounts.confirmed().add(amounts.pending()).compareTo(total) >= 0) {
+        } else if (amounts.confirmed().add(amounts.pending()).add(amounts.adjustment()).compareTo(total) >= 0) {
             status = "COUVERTE_EN_ATTENTE";
         } else if (amounts.confirmed().signum() > 0 || amounts.pending().signum() > 0) {
             status = "PARTIELLEMENT_REGLEE";
@@ -2444,26 +2534,28 @@ public class ReglementClientService {
         reglementRepository.save(payment);
     }
 
-    private void recalculateQuittancePaymentFlags(Collection<Long> elementIds) {
+    private void recalculateQuittancePaymentFlags(Long agenceId, Collection<Long> elementIds) {
         if (elementIds.isEmpty()) {
             return;
         }
-        Map<Long, AllocationAmounts> amounts = loadAllocationAmounts(elementIds);
+        Map<Long, AllocationAmounts> amounts = loadAllocationAmounts(agenceId, elementIds);
         List<Quittance> quittances = quittanceRepository.findGlobalByElementFacturableIds(elementIds);
         for (Quittance quittance : quittances) {
             Long elementId = quittance.getElementFacturable().getId();
             BigDecimal total = money(quittance.getElementFacturable().getPrimeTotale());
-            BigDecimal confirmed = amounts.getOrDefault(elementId, AllocationAmounts.empty()).confirmed();
+            AllocationAmounts settled = amounts.getOrDefault(elementId, AllocationAmounts.empty());
+            BigDecimal confirmed = settled.confirmed().add(settled.adjustment());
             quittance.setPayee(confirmed.compareTo(total) >= 0);
         }
         quittanceRepository.saveAll(quittances);
     }
 
     private void recalculatePaymentFlags(
+            Long agenceId,
             Collection<Long> elementIds,
             Collection<Long> documentIds
     ) {
-        recalculateQuittancePaymentFlags(elementIds);
+        recalculateQuittancePaymentFlags(agenceId, elementIds);
         Set<Long> affectedDocumentIds = new HashSet<>(documentIds);
         if (!elementIds.isEmpty()) {
             documentLineRepository.findIssuedDocumentsByElementIds(
@@ -2487,7 +2579,7 @@ public class ReglementClientService {
                 BigDecimal confirmed = lineAmounts.getOrDefault(
                         elementId,
                         AllocationAmounts.empty()
-                ).confirmed();
+                ).confirmed().add(lineAmounts.getOrDefault(elementId, AllocationAmounts.empty()).adjustment());
                 boolean paid = confirmed.compareTo(money(line.getMontantTtc())) >= 0;
                 paidByElement.merge(elementId, paid, Boolean::logicalOr);
             });
@@ -2704,6 +2796,11 @@ public class ReglementClientService {
         return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 
+    private BigDecimal maxSettlementAdjustment(Long agenceId) {
+        BigDecimal configured = parametreApplicationService.getDecimal(agenceId, "REGLEMENT_CLIENT_ECART_MAX", ZERO);
+        return configured == null || configured.signum() < 0 ? ZERO : money(configured);
+    }
+
     private BigDecimal maxUnallocatedCredit(Long agenceId) {
         BigDecimal configured = parametreApplicationService.getDecimal(
                 agenceId,
@@ -2723,9 +2820,9 @@ public class ReglementClientService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private record AllocationAmounts(BigDecimal confirmed, BigDecimal pending) {
+    private record AllocationAmounts(BigDecimal confirmed, BigDecimal pending, BigDecimal adjustment) {
         private static AllocationAmounts empty() {
-            return new AllocationAmounts(ZERO, ZERO);
+            return new AllocationAmounts(ZERO, ZERO, ZERO);
         }
     }
 

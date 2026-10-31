@@ -557,12 +557,12 @@ export const comptaApi = {
     ));
   },
 
-  async updateClientPaymentPolicy(creditNonAffecteMaximum: number) {
+  async updateClientPaymentPolicy(creditNonAffecteMaximum: number, ecartReglementMaximum?: number) {
     return unwrap(await apiFetch<ApiResponse<ClientPaymentPolicy>>(
       "/api/v1/compta/reglements-clients/politique",
       {
         method: "PUT",
-        body: JSON.stringify({ creditNonAffecteMaximum }),
+        body: JSON.stringify({ creditNonAffecteMaximum, ecartReglementMaximum }),
       }
     ));
   },

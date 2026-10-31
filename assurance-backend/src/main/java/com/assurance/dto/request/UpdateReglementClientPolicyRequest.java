@@ -14,4 +14,8 @@ public class UpdateReglementClientPolicyRequest {
     @DecimalMin("0.00")
     @Digits(integer = 12, fraction = 2)
     private BigDecimal creditNonAffecteMaximum;
+
+    @DecimalMin("0.00")
+    @Digits(integer = 12, fraction = 2)
+    private BigDecimal ecartReglementMaximum;
 }

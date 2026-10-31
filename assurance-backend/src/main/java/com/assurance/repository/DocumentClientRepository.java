@@ -92,6 +92,12 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                     where paymentAllocation.documentClient = d
                       and paymentAllocation.statut = com.assurance.enums.StatutAffectationReglement.CONFIRMEE
                       and paymentAllocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              ), 0) + coalesce((
+                    select sum(adjustment.montant) from EcartReglementClient adjustment
+                    where adjustment.agence.id = :agenceId
+                      and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+                      and exists (select 1 from LigneDocumentClient adjustedLine
+                                  where adjustedLine.document = d and adjustedLine.elementFacturable = adjustment.elementFacturable)
               ), 0) < d.totalDocument
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
@@ -149,6 +155,12 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                     where paymentAllocation.documentClient = d
                       and paymentAllocation.statut = com.assurance.enums.StatutAffectationReglement.CONFIRMEE
                       and paymentAllocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              ), 0) + coalesce((
+                    select sum(adjustment.montant) from EcartReglementClient adjustment
+                    where adjustment.agence.id = :agenceId
+                      and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+                      and exists (select 1 from LigneDocumentClient adjustedLine
+                                  where adjustedLine.document = d and adjustedLine.elementFacturable = adjustment.elementFacturable)
               ), 0) < d.totalDocument
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)

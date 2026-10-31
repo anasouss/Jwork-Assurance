@@ -15,6 +15,7 @@ import com.assurance.enums.StatutReglementClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.InstrumentReglementClientRepository;
+import com.assurance.repository.EcartReglementClientRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,6 +39,8 @@ import static org.mockito.Mockito.when;
 class BankRejectionServiceTest {
     @Mock
     private InstrumentReglementClientRepository instrumentRepository;
+    @Mock
+    private EcartReglementClientRepository ecartRepository;
 
     @Spy
     @InjectMocks

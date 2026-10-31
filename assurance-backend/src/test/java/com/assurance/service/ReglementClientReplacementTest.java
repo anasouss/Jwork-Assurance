@@ -7,6 +7,7 @@ import com.assurance.exception.BadRequestException;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
 import com.assurance.repository.ReglementClientRepository;
+import com.assurance.repository.EcartReglementClientRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +37,8 @@ class ReglementClientReplacementTest {
     private TresorerieService tresorerieService;
     @Mock
     private BanqueService banqueService;
+    @Mock
+    private EcartReglementClientRepository ecartRepository;
     @InjectMocks
     private ReglementClientService service;
 

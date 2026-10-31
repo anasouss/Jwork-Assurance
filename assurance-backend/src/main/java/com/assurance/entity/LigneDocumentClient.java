@@ -78,6 +78,10 @@ public class LigneDocumentClient extends BaseEntity {
     @Column(nullable = false, precision = 16, scale = 2)
     private BigDecimal credit;
 
+    @Column(name = "ecart_reglement", nullable = false, precision = 16, scale = 2)
+    @Builder.Default
+    private BigDecimal ecartReglement = BigDecimal.ZERO;
+
     @Column(name = "prime_nette", nullable = false, precision = 16, scale = 2)
     private BigDecimal primeNette;
 

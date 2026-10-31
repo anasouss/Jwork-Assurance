@@ -656,6 +656,7 @@ export type ClientPayment = {
 
 export type ClientPaymentPolicy = {
   creditNonAffecteMaximum: number;
+  ecartReglementMaximum?: number;
 };
 
 export type ClientPaymentPage = {
@@ -664,6 +665,7 @@ export type ClientPaymentPage = {
 };
 
 export type CreateClientPaymentRequest = {
+  ecarts?: { elementFacturableId: string; documentClientId?: string; montant: number; motif: string }[];
   dateReglement: string;
   clientPayeurId?: string;
   groupePayeurId?: string;

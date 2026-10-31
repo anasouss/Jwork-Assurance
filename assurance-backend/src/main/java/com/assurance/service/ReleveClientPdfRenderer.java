@@ -397,7 +397,7 @@ public class ReleveClientPdfRenderer {
         addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null, fontSize, cellPadding);
-        addValue(table, positiveAmount(line.getCredit()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addValue(table, positiveAmount(money(line.getCredit()).subtract(money(line.getEcartReglement()))), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, amount(balance), TextAlignment.CENTER, bold, fontSize, cellPadding);
         addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null,
                 fontSize, cellPadding);
@@ -564,7 +564,8 @@ public class ReleveClientPdfRenderer {
                 .setMarginRight(0)
                 .setMarginTop(denseStatement ? 6 : 10);
         addTotalRow(total, "Total TTC", source.getTotalDebit(), bold);
-        addTotalRow(total, "Total acompte", source.getTotalCredit(), bold);
+        BigDecimal adjustment = source.getLignes().stream().map(line -> money(line.getEcartReglement())).reduce(BigDecimal.ZERO, BigDecimal::add);
+        addTotalRow(total, "Total acompte", money(source.getTotalCredit()).subtract(adjustment), bold);
         addTotalRow(total, "Total à payer", source.getTotalDocument(), bold);
         document.add(total);
     }

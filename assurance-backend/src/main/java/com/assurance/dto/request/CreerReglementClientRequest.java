@@ -6,6 +6,8 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -32,6 +34,24 @@ public class CreerReglementClientRequest {
     @Valid
     @NotEmpty
     private List<Instrument> instruments;
+
+    @Valid
+    @Size(max = 200)
+    private List<Ecart> ecarts = List.of();
+
+    @Data
+    public static class Ecart {
+        @NotNull
+        private Long elementFacturableId;
+        private Long documentClientId;
+        @NotNull
+        @DecimalMin("0.01")
+        @Digits(integer = 12, fraction = 2)
+        private BigDecimal montant;
+        @NotBlank
+        @Size(max = 500)
+        private String motif;
+    }
 
     @Data
     public static class Instrument {

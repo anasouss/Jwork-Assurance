@@ -39,6 +39,7 @@ import com.assurance.repository.AffectationReglementClientRepository;
 import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
+import com.assurance.repository.EcartReglementClientRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.QuittanceRepository;
@@ -87,6 +88,7 @@ public class DocumentClientService {
     private final AffectationReglementClientRepository affectationReglementClientRepository;
     private final ConditionPaiementClientService conditionPaiementClientService;
     private final DocumentClientLineLabelService documentClientLineLabelService;
+    private final EcartReglementClientRepository ecartRepository;
 
     @Transactional(readOnly = true)
     public PropositionEcheanceDocumentClientResponse proposeDueDate(
@@ -409,10 +411,12 @@ public class DocumentClientService {
         }
         List<Long> elementIds = elements.stream().map(ElementFacturable::getId).toList();
         Map<Long, BigDecimal> directPayments = loadActiveAllocationTotalsByElement(elementIds);
+        Long agenceId = elements.get(0).getAgence().getId();
+        Map<Long, BigDecimal> adjustments = loadAdjustments(agenceId, elementIds);
         Map<Long, SourceBalance> balances = new HashMap<>();
         elements.forEach(element -> balances.put(
                 element.getId(),
-                sourceBalance(element.getPrimeTotale(), directPayments.getOrDefault(element.getId(), ZERO))
+                sourceBalance(element.getPrimeTotale(), directPayments.getOrDefault(element.getId(), ZERO), adjustments.getOrDefault(element.getId(), ZERO))
         ));
 
         List<LigneDocumentClient> issuedInvoiceLines = ligneDocumentClientRepository
@@ -440,6 +444,8 @@ public class DocumentClientService {
                         .distinct()
                         .toList()
         );
+        Map<Long, BigDecimal> invoiceAdjustments = loadAdjustments(agenceId,
+                allInvoiceLines.stream().map(line -> line.getElementFacturable().getId()).distinct().toList());
         invoices.values().forEach(invoice -> {
             BigDecimal remainingPayment = parentPayments.getOrDefault(invoice.getId(), ZERO);
             for (LigneDocumentClient line : invoice.getLignes().stream()
@@ -449,10 +455,11 @@ public class DocumentClientService {
                 BigDecimal lineTotal = money(line.getMontantTtc()).max(ZERO);
                 BigDecimal directPaid = invoiceLinePayments.getOrDefault(elementId, ZERO)
                         .min(lineTotal);
-                BigDecimal available = lineTotal.subtract(directPaid).max(ZERO);
+                BigDecimal adjustment = invoiceAdjustments.getOrDefault(elementId, ZERO);
+                BigDecimal available = lineTotal.subtract(directPaid).subtract(adjustment).max(ZERO);
                 BigDecimal parentPaid = remainingPayment.min(available);
                 BigDecimal paid = directPaid.add(parentPaid);
-                balances.put(elementId, sourceBalance(lineTotal, paid));
+                balances.put(elementId, sourceBalance(lineTotal, paid, adjustment));
                 remainingPayment = remainingPayment.subtract(parentPaid).max(ZERO);
             }
         });
@@ -472,10 +479,18 @@ public class DocumentClientService {
         return totals;
     }
 
-    private SourceBalance sourceBalance(BigDecimal totalValue, BigDecimal paidValue) {
+    private Map<Long, BigDecimal> loadAdjustments(Long agenceId, Collection<Long> ids) {
+        Map<Long, BigDecimal> result = new HashMap<>();
+        if (!ids.isEmpty()) {
+            ecartRepository.sumByElementIds(agenceId, ids).forEach(row -> result.put((Long) row[0], money((BigDecimal) row[1])));
+        }
+        return result;
+    }
+
+    private SourceBalance sourceBalance(BigDecimal totalValue, BigDecimal paidValue, BigDecimal adjustment) {
         BigDecimal total = money(totalValue).max(ZERO);
         BigDecimal paid = money(paidValue).min(total).max(ZERO);
-        return new SourceBalance(paid, total.subtract(paid).max(ZERO));
+        return new SourceBalance(paid, total.subtract(paid).subtract(adjustment).max(ZERO));
     }
 
     @Transactional(readOnly = true)
@@ -685,9 +700,12 @@ public class DocumentClientService {
         Map<Long, BigDecimal> directPayments = request.getTypeDocument() == TypeDocumentClient.RELEVE
                 ? loadActiveAllocationTotalsByElement(requestedIds)
                 : Map.of();
+        Map<Long, BigDecimal> statementAdjustments = request.getTypeDocument() == TypeDocumentClient.RELEVE
+                ? loadAdjustments(agenceId, requestedIds) : Map.of();
         if (request.getTypeDocument() == TypeDocumentClient.RELEVE
                 && sources.stream().anyMatch(source -> money(source.element().getPrimeTotale())
                         .subtract(directPayments.getOrDefault(source.element().getId(), ZERO))
+                        .subtract(statementAdjustments.getOrDefault(source.element().getId(), ZERO))
                         .signum() <= 0)) {
             throw new BadRequestException(
                     "Une ou plusieurs écritures ne présentent plus de solde impayé"
@@ -763,7 +781,8 @@ public class DocumentClientService {
                     ? directPayments.getOrDefault(element.getId(), ZERO).min(originalTtc.max(ZERO))
                     : ZERO;
             BigDecimal lineDebit = originalTtc.signum() > 0 ? originalTtc : ZERO;
-            BigDecimal lineCredit = originalTtc.signum() < 0 ? originalTtc.abs() : paid;
+            BigDecimal adjustment = statementAdjustments.getOrDefault(element.getId(), ZERO);
+            BigDecimal lineCredit = originalTtc.signum() < 0 ? originalTtc.abs() : paid.add(adjustment).min(originalTtc);
             LigneDocumentClient line = LigneDocumentClient.builder()
                     .document(document)
                     .quittance(source.quittance())
@@ -778,6 +797,7 @@ public class DocumentClientService {
                     .compagnie(sourceCompany(source))
                     .debit(lineDebit)
                     .credit(lineCredit)
+                    .ecartReglement(adjustment)
                     .primeNette(money(element.getPrimeNette()))
                     .taxes(taxes(element))
                     .accessoires(accessories(element))

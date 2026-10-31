@@ -129,4 +129,8 @@ public class ReglementClient extends AuditedEntity {
     @OneToMany(mappedBy = "reglement", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InstrumentReglementClient> instruments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "reglement", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EcartReglementClient> ecarts = new ArrayList<>();
 }

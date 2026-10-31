@@ -51,6 +51,15 @@ class ReglementClientServicePolicyTest {
     }
 
     @Test
+    void adjustmentLimitDefaultsToDisabledAndCanBeConfiguredSeparately() {
+        assertThat(service.paymentPolicy(7L).getEcartReglementMaximum()).isZero();
+        var policy = service.updatePaymentPolicy(7L, new BigDecimal("100.00"), new BigDecimal("10.00"));
+        assertThat(policy.getEcartReglementMaximum()).isEqualByComparingTo("10.00");
+        verify(parametreApplicationService).setValeur(7L, "REGLEMENT_CLIENT_ECART_MAX", "DECIMAL", "10.00",
+                "Écart de règlement maximal accordé par règlement client");
+    }
+
+    @Test
     void rejectsANegativeLimit() {
         assertThatThrownBy(() -> service.updatePaymentPolicy(7L, new BigDecimal("-0.01")))
                 .isInstanceOf(BadRequestException.class);

@@ -17,6 +17,7 @@ export default function ClientPaymentSettingsPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
   const [maximumCredit, setMaximumCredit] = useState<number>();
+  const [maximumAdjustment, setMaximumAdjustment] = useState<number>();
 
   const policy = useQuery({
     queryKey: policyQueryKey,
@@ -26,13 +27,15 @@ export default function ClientPaymentSettingsPage() {
   useEffect(() => {
     if (policy.data) {
       setMaximumCredit(policy.data.creditNonAffecteMaximum);
+      setMaximumAdjustment(policy.data.ecartReglementMaximum ?? 0);
     }
   }, [policy.data]);
 
   const save = useMutation({
-    mutationFn: () => comptaApi.updateClientPaymentPolicy(maximumCredit ?? 0),
+    mutationFn: () => comptaApi.updateClientPaymentPolicy(maximumCredit ?? 0, maximumAdjustment ?? 0),
     onSuccess: async (updatedPolicy) => {
       setMaximumCredit(updatedPolicy.creditNonAffecteMaximum);
+      setMaximumAdjustment(updatedPolicy.ecartReglementMaximum ?? 0);
       queryClient.setQueryData(policyQueryKey, updatedPolicy);
       await queryClient.invalidateQueries({ queryKey: policyQueryKey });
       toast.success("Paramètres des règlements enregistrés");
@@ -43,8 +46,10 @@ export default function ClientPaymentSettingsPage() {
   });
 
   const currentMaximum = policy.data?.creditNonAffecteMaximum;
-  const isValid = maximumCredit != null && Number.isFinite(maximumCredit) && maximumCredit >= 0;
-  const isUnchanged = currentMaximum != null && maximumCredit === currentMaximum;
+  const isValid = maximumCredit != null && Number.isFinite(maximumCredit) && maximumCredit >= 0
+    && maximumAdjustment != null && Number.isFinite(maximumAdjustment) && maximumAdjustment >= 0;
+  const isUnchanged = currentMaximum != null && maximumCredit === currentMaximum
+    && maximumAdjustment === (policy.data?.ecartReglementMaximum ?? 0);
 
   return (
     <div className="grid gap-5">
@@ -86,6 +91,13 @@ export default function ClientPaymentSettingsPage() {
               Un règlement est bloqué lorsque le montant restant à affecter dépasse cette limite.
               Saisissez 0 pour interdire tout dépassement.
             </p>
+          </div>
+
+          <div className="grid max-w-md gap-2 border-t pt-4">
+            <Label htmlFor="maximum-settlement-adjustment">Écart de règlement maximal par règlement (MAD)</Label>
+            <MoneyInput id="maximum-settlement-adjustment" value={maximumAdjustment} onValueChange={setMaximumAdjustment}
+              disabled={!canManage || policy.isLoading || save.isPending} className="text-right tabular-nums" />
+            <p className="text-sm text-muted-foreground">Saisissez 0 pour désactiver les écarts accordés. Un motif et la permission de gestion des règlements sont requis.</p>
           </div>
 
           {policy.isError ? (

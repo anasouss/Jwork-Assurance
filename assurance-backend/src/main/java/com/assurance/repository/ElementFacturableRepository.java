@@ -128,6 +128,10 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     where paymentAllocation.elementFacturable = e
                       and paymentAllocation.statut = com.assurance.enums.StatutAffectationReglement.CONFIRMEE
                       and paymentAllocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              ), 0) + coalesce((
+                    select sum(adjustment.montant) from EcartReglementClient adjustment
+                    where adjustment.elementFacturable = e and adjustment.agence.id = :agenceId
+                      and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
               ), 0) < e.primeTotale
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
@@ -319,6 +323,10 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     where paymentAllocation.elementFacturable = e
                       and paymentAllocation.statut = com.assurance.enums.StatutAffectationReglement.CONFIRMEE
                       and paymentAllocation.instrument.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              ), 0) + coalesce((
+                    select sum(adjustment.montant) from EcartReglementClient adjustment
+                    where adjustment.elementFacturable = e and adjustment.agence.id = :agenceId
+                      and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
               ), 0) < e.primeTotale
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION

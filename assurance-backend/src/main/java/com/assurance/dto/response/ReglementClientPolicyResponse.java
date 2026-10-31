@@ -10,4 +10,5 @@ import java.math.BigDecimal;
 public class ReglementClientPolicyResponse {
 
     private BigDecimal creditNonAffecteMaximum;
+    private BigDecimal ecartReglementMaximum;
 }

@@ -171,7 +171,7 @@ public class ReglementClientController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.updatePaymentPolicy(
                 TenantContext.getCurrentAgence(),
-                request.getCreditNonAffecteMaximum()
+                request.getCreditNonAffecteMaximum(), request.getEcartReglementMaximum()
         )));
     }
 

@@ -680,7 +680,7 @@ export type CreateClientPaymentRequest = {
   }>;
 };
 
-export type ReplacePaymentInstrumentRequest = {
+export type ReplacementInstrumentInput = {
   mode: ClientPaymentMode;
   montant: number;
   dateInstrument?: string;
@@ -688,7 +688,12 @@ export type ReplacePaymentInstrumentRequest = {
   referenceInstrument?: string;
   banqueEmettriceId?: string;
   compteTresorerieId?: string;
-  motif?: string;
+};
+
+export type ReplacePaymentInstrumentRequest = (ReplacementInstrumentInput & { motif?: string }) | {
+  dateRemplacement: string;
+  motif: string;
+  instruments: ReplacementInstrumentInput[];
 };
 
 export type BankReference = {

@@ -87,6 +87,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -972,94 +973,186 @@ public class ReglementClientService {
         if (trimToNull(request.getMotif()) == null) {
             throw new BadRequestException("Le motif du remplacement est obligatoire");
         }
-        if (money(request.getMontant()).compareTo(money(replaced.getMontant())) != 0) {
-            throw new BadRequestException(
-                    "Le remplacement doit conserver le montant de l'instrument d'origine"
-            );
-        }
-        LocalDate replacementDate = request.getDateInstrument() == null
-                ? LocalDate.now() : request.getDateInstrument();
+        List<RemplacerInstrumentReglementRequest.Instrument> requested = replacementInstruments(request);
+        LocalDate replacementDate = request.getDateRemplacement() != null ? request.getDateRemplacement()
+                : request.getDateInstrument() != null ? request.getDateInstrument() : LocalDate.now();
         if (replacementDate.isAfter(LocalDate.now())) {
             throw new BadRequestException("La date du remplacement ne peut pas être future");
         }
         if (!pendingReplacement && replaced.getDateStatut() != null && replacementDate.isBefore(replaced.getDateStatut())) {
             throw new BadRequestException("Le remplacement ne peut pas précéder le rejet bancaire");
         }
-
-        CreerReglementClientRequest.Instrument replacementRequest = new CreerReglementClientRequest.Instrument();
-        replacementRequest.setMode(request.getMode());
-        replacementRequest.setMontant(request.getMontant());
-        replacementRequest.setDateInstrument(request.getDateInstrument());
-        replacementRequest.setDateEcheance(request.getDateEcheance());
-        replacementRequest.setReferenceInstrument(request.getReferenceInstrument());
-        replacementRequest.setBanqueEmettriceId(request.getBanqueEmettriceId());
-        replacementRequest.setReglementBureau(false);
-        replacementRequest.setCompteTresorerieId(request.getCompteTresorerieId());
-        replacementRequest.setAffectations(replaced.getAffectations().stream()
-                .map(this::copyReplacementAllocation)
-                .toList());
+        BigDecimal requestedTotal = requested.stream()
+                .map(row -> replacementAmount(row.getMontant()))
+                .reduce(ZERO, BigDecimal::add);
+        if (requestedTotal.compareTo(money(replaced.getMontant())) != 0) {
+            throw new BadRequestException("Le total des nouveaux moyens doit être égal au montant de l'instrument d'origine");
+        }
+        List<AffectationReglementClient> sources = replacementAllocationSources(replaced, pendingReplacement);
+        BigDecimal allocated = sources.stream().map(AffectationReglementClient::getMontant)
+                .map(this::money).reduce(ZERO, BigDecimal::add);
+        if (allocated.compareTo(requestedTotal) > 0) {
+            throw new BadRequestException("Les affectations d'origine dépassent le montant à remplacer");
+        }
         if (!pendingReplacement) {
-            validateReplacementBalances(replaced.getAffectations());
+            validateReplacementBalances(sources);
         }
 
-        InstrumentReglementClient replacement = buildInstrument(
-                replaced.getAgence(),
-                replaced.getReglement(),
-                replacementRequest,
-                false
-        );
-        replacement.setInstrumentRemplace(replaced);
-        replacement.setDateStatut(replacementDate);
-        replacementRequest.getAffectations().forEach(requestedAllocation -> {
-            AffectationReglementClient sourceAllocation = replaced.getAffectations().stream()
-                    .filter(allocation -> matchesAllocationTarget(allocation, requestedAllocation))
-                    .findFirst()
-                    .orElseThrow();
-            replacement.getAffectations().add(AffectationReglementClient.builder()
-                        .instrument(replacement)
-                        .elementFacturable(sourceAllocation.getElementFacturable())
-                        .documentClient(sourceAllocation.getDocumentClient())
-                        .clientPayeur(sourceAllocation.getClientPayeur())
-                        .groupePayeur(sourceAllocation.getGroupePayeur())
-                        .payeurNomSnapshot(sourceAllocation.getPayeurNomSnapshot())
-                        .montant(money(requestedAllocation.getMontant()))
-                        .statut(replacement.getStatut() == StatutInstrumentReglement.CONFIRME
-                                ? StatutAffectationReglement.CONFIRMEE
-                                : StatutAffectationReglement.EN_ATTENTE)
-                        .build());
-        });
-
-        if (pendingReplacement) {
-            replaced.getAffectations().forEach(allocation ->
-                    allocation.setStatut(StatutAffectationReglement.ANNULEE));
+        List<InstrumentReglementClient> replacements = new ArrayList<>();
+        Set<String> references = new HashSet<>();
+        for (RemplacerInstrumentReglementRequest.Instrument row : requested) {
+            if (row == null || row.getMode() == null) {
+                throw new BadRequestException("Le mode de chaque nouveau moyen est obligatoire");
+            }
+            LocalDate receiptDate = row.getDateInstrument() == null ? replacementDate : row.getDateInstrument();
+            if (receiptDate.isAfter(replacementDate)) {
+                throw new BadRequestException("La réception d'un nouveau moyen ne peut pas suivre la date du remplacement");
+            }
+            String reference = trimToNull(row.getReferenceInstrument());
+            if (reference != null && (row.getMode() == ModeReglementClient.CHEQUE
+                    || row.getMode() == ModeReglementClient.EFFET
+                    || row.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE)) {
+                String key = row.getMode() + ":" + (row.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE
+                        ? row.getCompteTresorerieId() : row.getBanqueEmettriceId())
+                        + ":" + reference.toLowerCase(Locale.ROOT);
+                if (!references.add(key)) {
+                    throw new BadRequestException("Un même chèque, effet ou bordereau bancaire figure plusieurs fois dans le remplacement");
+                }
+            }
+            CreerReglementClientRequest.Instrument entry = new CreerReglementClientRequest.Instrument();
+            entry.setMode(row.getMode());
+            entry.setMontant(replacementAmount(row.getMontant()));
+            entry.setDateInstrument(receiptDate);
+            entry.setDateEcheance(row.getDateEcheance());
+            entry.setReferenceInstrument(reference);
+            entry.setBanqueEmettriceId(row.getBanqueEmettriceId());
+            entry.setCompteTresorerieId(row.getCompteTresorerieId());
+            entry.setReglementBureau(false);
+            InstrumentReglementClient replacement = buildInstrument(replaced.getAgence(), replaced.getReglement(), entry, false);
+            replacement.setInstrumentRemplace(replaced);
+            replacement.setDateStatut(replacementDate);
+            if (replacement.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE) {
+                replacement.setStatut(StatutInstrumentReglement.CONFIRME);
+            }
+            replacements.add(replacement);
         }
-        String replacementReason = trimToNull(request.getMotif());
+        distributeReplacementAllocations(sources, replacements);
+
+        replaced.getAffectations().forEach(allocation -> allocation.setStatut(StatutAffectationReglement.ANNULEE));
         replaced.setStatut(StatutInstrumentReglement.REMPLACE);
         replaced.setDateStatut(replacementDate);
-        replaced.setMotifStatut(replacementReason);
-        replaced.getReglement().getInstruments().add(replacement);
+        replaced.setMotifStatut(request.getMotif().trim());
+        replaced.getReglement().getInstruments().addAll(replacements);
         ReglementClient payment = reglementRepository.saveAndFlush(replaced.getReglement());
-        if (replacement.getStatut() == StatutInstrumentReglement.CONFIRME) {
-            tresorerieService.recordInstrumentEntry(
-                    replacement,
-                    replacement.getCompteTresorerie(),
-                    replacement.getDateStatut()
-            );
+        for (InstrumentReglementClient replacement : replacements) {
+            if (replacement.getStatut() == StatutInstrumentReglement.CONFIRME) {
+                tresorerieService.recordInstrumentEntry(replacement, replacement.getCompteTresorerie(), replacementDate);
+            }
         }
         refreshUnallocatedAmount(payment);
         recalculatePaymentFlags(
-                replacement.getAffectations().stream()
-                        .map(AffectationReglementClient::getElementFacturable)
-                        .filter(Objects::nonNull)
-                        .map(ElementFacturable::getId)
-                        .toList(),
-                replacement.getAffectations().stream()
-                        .map(AffectationReglementClient::getDocumentClient)
-                        .filter(Objects::nonNull)
-                        .map(DocumentClient::getId)
-                        .toList()
+                sources.stream().map(AffectationReglementClient::getElementFacturable)
+                        .filter(Objects::nonNull).map(ElementFacturable::getId).distinct().toList(),
+                sources.stream().map(AffectationReglementClient::getDocumentClient)
+                        .filter(Objects::nonNull).map(DocumentClient::getId).distinct().toList()
         );
         return toResponse(payment);
+    }
+
+    private List<RemplacerInstrumentReglementRequest.Instrument> replacementInstruments(
+            RemplacerInstrumentReglementRequest request
+    ) {
+        if (request.getInstruments() != null) {
+            if (request.getInstruments().isEmpty() || request.getInstruments().size() > 50) {
+                throw new BadRequestException("Le remplacement doit contenir entre 1 et 50 moyens de paiement");
+            }
+            if (request.getMode() != null || request.getMontant() != null || request.getDateInstrument() != null
+                    || request.getDateEcheance() != null || request.getReferenceInstrument() != null
+                    || request.getBanqueEmettriceId() != null || request.getCompteTresorerieId() != null) {
+                throw new BadRequestException("Ne mélangez pas le format unitaire et les nouveaux moyens de remplacement");
+            }
+            if (request.getDateRemplacement() == null) {
+                throw new BadRequestException("La date du remplacement est obligatoire");
+            }
+            if (request.getInstruments().stream().anyMatch(Objects::isNull)) {
+                throw new BadRequestException("Un nouveau moyen de paiement est invalide");
+            }
+            return request.getInstruments();
+        }
+        var legacy = new RemplacerInstrumentReglementRequest.Instrument();
+        legacy.setMode(request.getMode());
+        legacy.setMontant(request.getMontant());
+        legacy.setDateInstrument(request.getDateInstrument());
+        legacy.setDateEcheance(request.getDateEcheance());
+        legacy.setReferenceInstrument(request.getReferenceInstrument());
+        legacy.setBanqueEmettriceId(request.getBanqueEmettriceId());
+        legacy.setCompteTresorerieId(request.getCompteTresorerieId());
+        return List.of(legacy);
+    }
+
+    private BigDecimal replacementAmount(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0 || amount.precision() - amount.scale() > 14) {
+            throw new BadRequestException("Chaque nouveau moyen doit avoir un montant strictement positif valide");
+        }
+        try {
+            return amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException exception) {
+            throw new BadRequestException("Les montants de remplacement doivent avoir au maximum deux décimales");
+        }
+    }
+
+    private List<AffectationReglementClient> replacementAllocationSources(
+            InstrumentReglementClient replaced,
+            boolean pending
+    ) {
+        return replaced.getAffectations().stream()
+                .filter(source -> !pending || source.getStatut() != StatutAffectationReglement.ANNULEE)
+                // Invoice issuance retains cancelled direct allocations alongside their new invoice allocation.
+                .filter(source -> pending || source.getElementFacturable() == null
+                        || replaced.getAffectations().stream().noneMatch(later -> later.getDocumentClient() != null
+                                && later.getId() != null && source.getId() != null && later.getId() > source.getId()
+                                && later.getDocumentClient().getLignes().stream().anyMatch(line ->
+                                        line.getElementFacturable() != null && Objects.equals(
+                                                line.getElementFacturable().getId(), source.getElementFacturable().getId()))))
+                .sorted(Comparator.comparing(AffectationReglementClient::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+    }
+
+    private void distributeReplacementAllocations(
+            List<AffectationReglementClient> sources,
+            List<InstrumentReglementClient> replacements
+    ) {
+        int sourceIndex = 0;
+        BigDecimal sourceRemaining = sources.isEmpty() ? ZERO : replacementAmount(sources.get(0).getMontant());
+        // Fill each replacement in order, preserving every source target and any unallocated remainder.
+        for (InstrumentReglementClient replacement : replacements) {
+            BigDecimal capacity = money(replacement.getMontant());
+            while (capacity.signum() > 0 && sourceIndex < sources.size()) {
+                AffectationReglementClient source = sources.get(sourceIndex);
+                BigDecimal slice = capacity.min(sourceRemaining);
+                replacement.getAffectations().add(AffectationReglementClient.builder()
+                        .instrument(replacement)
+                        .elementFacturable(source.getElementFacturable())
+                        .documentClient(source.getDocumentClient())
+                        .clientPayeur(source.getClientPayeur())
+                        .groupePayeur(source.getGroupePayeur())
+                        .payeurNomSnapshot(source.getPayeurNomSnapshot())
+                        .montant(slice)
+                        .statut(replacement.getStatut() == StatutInstrumentReglement.CONFIRME
+                                ? StatutAffectationReglement.CONFIRMEE : StatutAffectationReglement.EN_ATTENTE)
+                        .build());
+                capacity = capacity.subtract(slice);
+                sourceRemaining = sourceRemaining.subtract(slice);
+                if (sourceRemaining.signum() == 0) {
+                    sourceIndex++;
+                    sourceRemaining = sourceIndex < sources.size()
+                            ? replacementAmount(sources.get(sourceIndex).getMontant()) : ZERO;
+                }
+            }
+        }
+        if (sourceIndex < sources.size()) {
+            throw new BadRequestException("Les nouveaux moyens ne couvrent pas les affectations d'origine");
+        }
     }
 
     @Transactional
@@ -1448,30 +1541,6 @@ public class ReglementClientService {
                 .compteTresorerie(account)
                 .dateStatut(payment.getDateReglement())
                 .build();
-    }
-
-    private CreerReglementClientRequest.Affectation copyReplacementAllocation(
-            AffectationReglementClient allocation
-    ) {
-        CreerReglementClientRequest.Affectation copy = new CreerReglementClientRequest.Affectation();
-        copy.setElementFacturableId(allocation.getElementFacturable() == null
-                ? null : allocation.getElementFacturable().getId());
-        copy.setDocumentClientId(allocation.getDocumentClient() == null
-                ? null : allocation.getDocumentClient().getId());
-        copy.setMontant(allocation.getMontant());
-        return copy;
-    }
-
-    private boolean matchesAllocationTarget(
-            AffectationReglementClient allocation,
-            CreerReglementClientRequest.Affectation requested
-    ) {
-        Long elementId = allocation.getElementFacturable() == null
-                ? null : allocation.getElementFacturable().getId();
-        Long documentId = allocation.getDocumentClient() == null
-                ? null : allocation.getDocumentClient().getId();
-        return Objects.equals(elementId, requested.getElementFacturableId())
-                && Objects.equals(documentId, requested.getDocumentClientId());
     }
 
     private void validateReplacementBalances(List<AffectationReglementClient> allocations) {

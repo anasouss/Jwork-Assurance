@@ -73,27 +73,29 @@ export function BankRejectionDialog({ onClose }: { onClose: () => void }) {
       </form>
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full min-w-[650px] text-sm">
-          <thead className="bg-muted text-left text-xs uppercase"><tr>
+          <thead className="bg-orange-600 text-left text-xs uppercase text-white"><tr>
             <th className="w-12 p-3"><span className="sr-only">Sélection</span></th><th className="p-3">Référence</th>
             <th className="p-3">Payeur</th><th className="p-3">Mode / banque</th><th className="p-3 text-right">Montant</th>
           </tr></thead>
           <tbody className="divide-y">
             {candidates.isLoading ? <TableRowsSkeleton colSpan={5} rows={3} /> : (candidates.data?.rows ?? []).map((instrument) => <tr
               key={instrument.id}
-              className={`focus-within:bg-muted/60 ${selected?.id === instrument.id ? "bg-muted/60" : "hover:bg-muted/30"} ${instrument.rejetBancairePossible && !register.isPending ? "cursor-pointer" : "cursor-not-allowed"}`}
+              className={`transition-colors ${selected?.id === instrument.id
+                ? "bg-amber-50 shadow-[inset_3px_0_0_0] shadow-orange-500 dark:bg-amber-950/30"
+                : "odd:bg-background even:bg-muted/20 hover:bg-orange-50/70 focus-within:bg-orange-50/70 dark:hover:bg-orange-950/20 dark:focus-within:bg-orange-950/20"} ${instrument.rejetBancairePossible && !register.isPending ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
               onClick={(event) => {
                 if (!instrument.rejetBancairePossible || register.isPending) return;
                 setSelected(instrument);
                 event.currentTarget.querySelector("input")?.focus();
               }}
             >
-              <td className="p-3"><input type="radio" name="rejected-instrument" checked={selected?.id === instrument.id}
+              <td className="p-3"><input type="radio" className="size-4 cursor-[inherit] accent-orange-600" name="rejected-instrument" checked={selected?.id === instrument.id}
                 disabled={!instrument.rejetBancairePossible || register.isPending}
                 aria-label={`Sélectionner ${instrument.referenceInstrument || instrument.numeroReglement}`}
                 onChange={() => setSelected(instrument)} /></td>
               <td className="p-3 font-medium">{instrument.referenceInstrument || "-"}<div className="text-xs font-normal text-muted-foreground">{instrument.numeroReglement}</div></td>
               <td className="p-3">{instrument.payeurNom}</td><td className="p-3">{paymentModeLabel(instrument.mode)}<div className="text-xs text-muted-foreground">{instrument.banqueEmettrice || "-"}</div></td>
-              <td className="p-3 text-right tabular-nums">{formatTreasuryMoney(instrument.montant)}</td>
+              <td className="p-3 text-right font-semibold tabular-nums">{formatTreasuryMoney(instrument.montant)}</td>
             </tr>)}
             {!appliedSearch && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Recherchez un chèque ou un effet.</td></tr>}
             {appliedSearch && candidates.isError && <tr><td colSpan={5} className="p-6 text-center text-destructive">Recherche impossible. Relancez la recherche.</td></tr>}
@@ -102,7 +104,7 @@ export function BankRejectionDialog({ onClose }: { onClose: () => void }) {
         </table>
       </div>
       {candidates.data && <ServerPagination page={page} totalPages={candidates.data.page.totalPages} totalElements={candidates.data.page.totalElements} loading={candidates.isFetching || register.isPending} onPageChange={(next) => { setPage(next); setSelected(undefined); }} />}
-      {selected && <p className="text-sm font-medium">{selected.referenceInstrument || selected.numeroReglement} · {selected.payeurNom} · {formatTreasuryMoney(selected.montant)}
+      {selected && <p className="border-l-2 border-orange-500 bg-orange-50/70 px-3 py-2 text-sm font-medium dark:bg-orange-950/20">{selected.referenceInstrument || selected.numeroReglement} · {selected.payeurNom} · {formatTreasuryMoney(selected.montant)}
         <span className="ml-2 font-normal text-muted-foreground">{selected.statut === "CONFIRME" ? "Encaissé le" : "Remis le"} {formatTreasuryDate(selected.dateStatut)}</span>
       </p>}
       <div className="grid gap-4 sm:grid-cols-[220px_1fr]">

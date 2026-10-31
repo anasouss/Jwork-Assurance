@@ -78,7 +78,15 @@ export function BankRejectionDialog({ onClose }: { onClose: () => void }) {
             <th className="p-3">Payeur</th><th className="p-3">Mode / banque</th><th className="p-3 text-right">Montant</th>
           </tr></thead>
           <tbody className="divide-y">
-            {candidates.isLoading ? <TableRowsSkeleton colSpan={5} rows={3} /> : (candidates.data?.rows ?? []).map((instrument) => <tr key={instrument.id} className={selected?.id === instrument.id ? "bg-muted/60" : "hover:bg-muted/30"}>
+            {candidates.isLoading ? <TableRowsSkeleton colSpan={5} rows={3} /> : (candidates.data?.rows ?? []).map((instrument) => <tr
+              key={instrument.id}
+              className={`focus-within:bg-muted/60 ${selected?.id === instrument.id ? "bg-muted/60" : "hover:bg-muted/30"} ${instrument.rejetBancairePossible && !register.isPending ? "cursor-pointer" : "cursor-not-allowed"}`}
+              onClick={(event) => {
+                if (!instrument.rejetBancairePossible || register.isPending) return;
+                setSelected(instrument);
+                event.currentTarget.querySelector("input")?.focus();
+              }}
+            >
               <td className="p-3"><input type="radio" name="rejected-instrument" checked={selected?.id === instrument.id}
                 disabled={!instrument.rejetBancairePossible || register.isPending}
                 aria-label={`Sélectionner ${instrument.referenceInstrument || instrument.numeroReglement}`}

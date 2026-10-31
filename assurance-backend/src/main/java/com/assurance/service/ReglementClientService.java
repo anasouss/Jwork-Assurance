@@ -2561,6 +2561,8 @@ public class ReglementClientService {
                 .montantTotal(payment.getMontantTotal())
                 .montantNonAffecte(payment.getMontantNonAffecte())
                 .notes(payment.getNotes())
+                .quittancePrimeNumero(payment.getQuittancePrimeNumero())
+                .quittancePrimeDateEmission(payment.getQuittancePrimeDateEmission())
                 .creeParId(payment.getCreePar().getId())
                 .creePar(payment.getCreePar().getFullName())
                 .modifieParId(payment.getUpdatedByUserId())

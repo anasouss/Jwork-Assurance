@@ -31,6 +31,8 @@ public class ReglementClientResponse {
     private BigDecimal montantTotal;
     private BigDecimal montantNonAffecte;
     private String notes;
+    private String quittancePrimeNumero;
+    private LocalDate quittancePrimeDateEmission;
     private Long creeParId;
     private String creePar;
     private Long modifieParId;

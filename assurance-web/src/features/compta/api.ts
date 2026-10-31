@@ -612,6 +612,11 @@ export const comptaApi = {
     return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/pdf`);
   },
 
+  async premiumReceiptPdf(id: string, issue = false) {
+    return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/quittance-prime/pdf`,
+      issue ? { method: "POST" } : undefined);
+  },
+
   async createClientPayment(request: CreateClientPaymentRequest) {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       "/api/v1/compta/reglements-clients",

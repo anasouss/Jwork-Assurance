@@ -114,6 +114,11 @@ public class StorageLayoutService {
                 .normalize();
     }
 
+    public Path resolveClientPremiumReceipt(Long agenceId, String storageKey) {
+        Path paymentPath = resolveClientPaymentReceipt(agenceId, storageKey);
+        return paymentPath.getParent().resolve("premium-receipts").resolve(paymentPath.getFileName());
+    }
+
     public Path resolveClientPaymentCondition(Long agenceId, String storageKey) {
         if (agenceId == null) {
             throw new IllegalArgumentException("L'agence est obligatoire");

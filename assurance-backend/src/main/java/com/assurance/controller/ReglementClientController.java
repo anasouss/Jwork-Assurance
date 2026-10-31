@@ -23,6 +23,7 @@ import com.assurance.enums.TypeContrat;
 import com.assurance.security.TenantContext;
 import com.assurance.service.JournalReglementsPdfService;
 import com.assurance.service.ReglementClientPdfService;
+import com.assurance.service.QuittancePrimeClientService;
 import com.assurance.service.ReglementClientService;
 import com.assurance.service.TresorerieAccessService;
 import jakarta.validation.Valid;
@@ -55,6 +56,7 @@ public class ReglementClientController {
 
     private final ReglementClientService reglementClientService;
     private final ReglementClientPdfService reglementClientPdfService;
+    private final QuittancePrimeClientService quittancePrimeClientService;
     private final JournalReglementsPdfService journalReglementsPdfService;
     private final TresorerieAccessService tresorerieAccessService;
 
@@ -246,6 +248,25 @@ public class ReglementClientController {
                 TenantContext.getCurrentAgence(),
                 paymentId
         )));
+    }
+
+    @PostMapping("/{paymentId}/quittance-prime/pdf")
+    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
+    public ResponseEntity<byte[]> issuePremiumReceipt(@PathVariable Long paymentId) {
+        return premiumReceiptResponse(quittancePrimeClientService.issue(TenantContext.getCurrentAgence(), paymentId));
+    }
+
+    @GetMapping("/{paymentId}/quittance-prime/pdf")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<byte[]> premiumReceipt(@PathVariable Long paymentId) {
+        return premiumReceiptResponse(quittancePrimeClientService.read(TenantContext.getCurrentAgence(), paymentId));
+    }
+
+    private ResponseEntity<byte[]> premiumReceiptResponse(QuittancePrimeClientService.Receipt receipt) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=" + receipt.reference() + ".pdf")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .contentType(MediaType.APPLICATION_PDF).body(receipt.pdf());
     }
 
     @GetMapping("/{paymentId}/pdf")

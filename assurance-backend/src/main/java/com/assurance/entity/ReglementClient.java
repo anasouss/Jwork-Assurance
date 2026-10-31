@@ -28,10 +28,10 @@ import java.util.List;
 @Entity
 @Table(
         name = "reglements_clients",
-        uniqueConstraints = @UniqueConstraint(
+        uniqueConstraints = {@UniqueConstraint(
                 name = "uk_reglement_client_agence_numero",
                 columnNames = {"agence_id", "numero"}
-        ),
+        ), @UniqueConstraint(name = "uk_reglement_quittance_prime", columnNames = {"agence_id", "quittance_prime_numero"})},
         indexes = {
                 @Index(name = "idx_reglement_client_agence_date", columnList = "agence_id,date_reglement"),
                 @Index(name = "idx_reglement_client_agence_statut_date", columnList = "agence_id,statut,date_reglement"),
@@ -99,6 +99,15 @@ public class ReglementClient extends AuditedEntity {
 
     @Column(length = 1000)
     private String notes;
+
+    @Column(name = "quittance_prime_numero", length = 120)
+    private String quittancePrimeNumero;
+
+    @Column(name = "quittance_prime_date_emission")
+    private LocalDate quittancePrimeDateEmission;
+
+    @Column(name = "quittance_prime_chemin_stockage", length = 500)
+    private String quittancePrimeCheminStockage;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cree_par_id", nullable = false)

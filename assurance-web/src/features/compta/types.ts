@@ -625,6 +625,8 @@ export type CreateRemittanceSlipRequest = {
 export type ClientPayment = {
   id: string;
   numero: string;
+  quittancePrimeNumero?: string | null;
+  quittancePrimeDateEmission?: string | null;
   dateReglement: string;
   clientPayeurId?: string | null;
   groupePayeurId?: string | null;

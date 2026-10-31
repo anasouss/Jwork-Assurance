@@ -1,5 +1,6 @@
 import { apiFetch, apiFetchBlob, apiUpload, buildQueryString } from "@/lib/api/base";
 import type { ApiResponse } from "@/lib/types";
+import { normalizePremiumReceiptOptions } from "./premium-receipt-options";
 import type {
   AllocationRequest,
   BatchAllocationRequest,
@@ -614,9 +615,9 @@ export const comptaApi = {
   },
 
   async premiumReceiptOptions(id: string) {
-    return unwrap(await apiFetch<ApiResponse<PremiumReceiptOptions>>(
+    return normalizePremiumReceiptOptions(unwrap(await apiFetch<ApiResponse<PremiumReceiptOptions>>(
       `/api/v1/compta/reglements-clients/${id}/quittance-prime/options`
-    ));
+    )));
   },
 
   async premiumReceiptPdf(id: string, issue = false, policyKeys?: string[]) {

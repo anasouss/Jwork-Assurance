@@ -9,6 +9,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.QuittancePrimeSelectionRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,6 +43,13 @@ class QuittancePrimeSelectionServiceTest {
     private final StorageLayoutService storage = mock(StorageLayoutService.class);
     private final QuittancePrimeSelectionService service = new QuittancePrimeSelectionService(
             payments, receipts, renderer, storage, new ObjectMapper());
+
+    @Test
+    void fullPaymentArchiveKeepsAnExplicitNullSelectionEvenWhenNullFieldsAreNormallyOmitted() throws Exception {
+        ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        var archive = new QuittancePrimeSelectionService.Archive("all", "2026000009", null, null);
+        assertThat(mapper.writeValueAsString(archive)).contains("\"policyKeys\":null");
+    }
 
     @Test
     void issuesDistinctNumericArchivesAndReusesTheSameSelectionRegardlessOfOrder() {

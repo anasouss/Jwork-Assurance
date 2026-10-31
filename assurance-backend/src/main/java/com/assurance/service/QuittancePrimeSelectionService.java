@@ -8,6 +8,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.QuittancePrimeSelectionRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -158,6 +159,7 @@ public class QuittancePrimeSelectionService {
         }
     }
 
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Archive(String id, String numero, LocalDate dateEmission, List<String> policyKeys) {
     }
 

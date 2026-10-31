@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Eye,
   FileText,
-  Landmark,
   MoreHorizontal,
   Printer,
   RotateCcw,
@@ -55,39 +54,21 @@ import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import { BankSelect } from "../components/BankSelect";
-import { AddInstrumentToRemittanceDialog } from "../components/AddInstrumentToRemittanceDialog";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import {
   usePayerSearch,
   type PayerSelection,
 } from "../components/use-payer-search";
-import {
-  requiresBankAccountAtEntry,
-  requiresPaymentReference,
-  showsOriginatingBank,
-} from "../client-payment-methods";
 import { formatAccountingAmount } from "../format";
 import type {
   ClientPayment,
   ClientPaymentMode,
   PaymentInstrument,
-  TreasuryAccount,
 } from "../types";
 
 const PAGE_SIZE = 25;
-const TODAY = toDateOnly(new Date())!;
 type PaymentSortBy = "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
 type PayerScope = "CLIENT" | "GROUPE";
-
-type InstrumentDraft = {
-  mode: ClientPaymentMode;
-  dateInstrument: string;
-  dateEcheance: string;
-  referenceInstrument: string;
-  banqueEmettriceId: string;
-  compteTresorerieId: string;
-};
 
 const MODE_LABELS: Record<ClientPaymentMode, string> = {
   ESPECES: "Espèces",
@@ -133,7 +114,6 @@ export default function ReglementsEnregistresPage() {
     : "CLIENT";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
-  const canManageTreasury = permissions.includes("tresorerie:manage");
   const canCreate = permissions.includes("reglement-client:create") || canManage;
   const canIssueInvoice = permissions.includes("quittance:create")
     || permissions.includes("quittance:manage");
@@ -174,12 +154,6 @@ export default function ReglementsEnregistresPage() {
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [cancelReason, setCancelReason] = useState("");
-  const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
-  const [replacementCandidates, setReplacementCandidates] = useState<PaymentInstrument[]>([]);
-  const [instrumentsToRemit, setInstrumentsToRemit] = useState<PaymentInstrument[]>([]);
-  const [replacement, setReplacement] = useState<InstrumentDraft>(newReplacement());
-  const [replacementReason, setReplacementReason] = useState("");
-  const replacementTargetId = searchParams.get("remplacer");
   const payerSearch = usePayerSearch(payerScope, selectedPayer);
   const requestedClient = useQuery({
     queryKey: ["crm-client", requestedPayerId],
@@ -245,31 +219,6 @@ export default function ReglementsEnregistresPage() {
     selectedPayer?.type,
   ]);
 
-  const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
-  });
-  const banks = useQuery({
-    queryKey: ["compta", "banks", "active"],
-    queryFn: () => comptaApi.banks(),
-  });
-
-  useEffect(() => {
-    if (!replacementTargetId || instrumentToReplace || !payments.data) return;
-    const target = payments.data.rows
-      .flatMap((payment) => payment.instruments)
-      .find((instrument) => instrument.id === replacementTargetId
-        && instrument.statut === "REJETE");
-    if (!target) return;
-    setReplacementCandidates([target]);
-    setInstrumentToReplace(target);
-    setReplacement(newReplacement());
-    setReplacementReason("");
-    const next = new URLSearchParams(searchParams);
-    next.delete("remplacer");
-    setSearchParams(next, { replace: true });
-  }, [instrumentToReplace, payments.data, replacementTargetId, searchParams, setSearchParams]);
-
   const cancelPayment = useMutation({
     mutationFn: () => comptaApi.cancelClientPayment(paymentToCancel!.id, cancelReason.trim()),
     onSuccess: async (payment) => {
@@ -304,39 +253,9 @@ export default function ReglementsEnregistresPage() {
     ),
   });
 
-  const replaceInstrument = useMutation({
-    mutationFn: () => comptaApi.replacePaymentInstrument(instrumentToReplace!.id, {
-      mode: replacement.mode,
-      montant: instrumentToReplace!.montant,
-      dateInstrument: replacement.dateInstrument || TODAY,
-      dateEcheance: replacement.dateEcheance || undefined,
-      referenceInstrument: replacement.referenceInstrument.trim() || undefined,
-      banqueEmettriceId: replacement.banqueEmettriceId || undefined,
-      compteTresorerieId: replacement.mode === "ESPECES"
-        ? undefined
-        : replacement.compteTresorerieId || undefined,
-      motif: replacementReason.trim(),
-    }),
-    onSuccess: async () => {
-      toast.success("Instrument remplacé");
-      closeReplacement();
-      await invalidateAccountingQueries(queryClient);
-    },
-    onError: (error) => toast.error(
-      error instanceof Error ? error.message : "Remplacement impossible"
-    ),
-  });
-
   function closeCancellation() {
     setPaymentToCancel(undefined);
     setCancelReason("");
-  }
-
-  function closeReplacement() {
-    setInstrumentToReplace(undefined);
-    setReplacementCandidates([]);
-    setReplacement(newReplacement());
-    setReplacementReason("");
   }
 
   function applyPayerFilter(payer?: PayerSelection) {
@@ -630,19 +549,11 @@ export default function ReglementsEnregistresPage() {
                       <PaymentActionsMenu
                         payment={payment}
                         canManage={canManage}
-                        canManageTreasury={canManageTreasury}
                         canIssueInvoice={canIssueInvoice}
                         pdfLoading={openingPaymentId === payment.id}
                         onPreview={() => void previewPayment(payment)}
                         onInvoice={() => setPaymentToInvoice(payment)}
                         onCancel={() => setPaymentToCancel(payment)}
-                        onReplace={(instruments) => {
-                          setReplacementCandidates(instruments);
-                          setInstrumentToReplace(instruments[0]);
-                          setReplacement(newReplacement());
-                          setReplacementReason("");
-                        }}
-                        onAddToRemittance={setInstrumentsToRemit}
                       />
                     </div>
                   </td>
@@ -682,12 +593,6 @@ export default function ReglementsEnregistresPage() {
           />
         )}
       </section>
-
-      <AddInstrumentToRemittanceDialog
-        instruments={instrumentsToRemit}
-        open={instrumentsToRemit.length > 0}
-        onOpenChange={(open) => !open && setInstrumentsToRemit([])}
-      />
 
       <Dialog
         open={Boolean(paymentToInvoice)}
@@ -768,183 +673,6 @@ export default function ReglementsEnregistresPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={Boolean(instrumentToReplace)}
-        onOpenChange={(open) => {
-          if (!open) closeReplacement();
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remplacer le moyen de paiement</DialogTitle>
-            <DialogDescription>
-              Le montant et les affectations sont conservés :{" "}
-              {formatAccountingAmount(instrumentToReplace?.montant)}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {replacementCandidates.length > 1 && (
-              <div className="grid gap-2 sm:col-span-2">
-                <Label>Moyen à remplacer</Label>
-                <Select
-                  value={instrumentToReplace?.id}
-                  onValueChange={(value) => {
-                    setInstrumentToReplace(replacementCandidates.find((candidate) => candidate.id === value));
-                    setReplacement(newReplacement());
-                    setReplacementReason("");
-                  }}
-                >
-                  <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                  <SelectContent>
-                    {replacementCandidates.map((candidate) => (
-                      <SelectItem key={candidate.id} value={candidate.id}>
-                        {MODE_LABELS[candidate.mode]} {candidate.referenceInstrument || "sans référence"}
-                        {" · "}{formatAccountingAmount(candidate.montant)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="grid gap-2">
-              <Label>Mode</Label>
-              <Select
-                value={replacement.mode}
-                onValueChange={(value) => setReplacement((current) => ({
-                  ...current,
-                  mode: value as ClientPaymentMode,
-                  compteTresorerieId: "",
-                }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(MODE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Date</Label>
-              <DatePicker
-                date={replacement.dateInstrument}
-                onSelect={(value) => setReplacement((current) => ({
-                  ...current,
-                  dateInstrument: toDateOnly(value) ?? "",
-                }))}
-              />
-            </div>
-            {(replacement.mode === "EFFET" || replacement.mode === "CHEQUE") && (
-              <div className="grid gap-2">
-                <Label>{replacement.mode === "CHEQUE" ? "Date portée sur le chèque" : "Date d’échéance"}</Label>
-                <DatePicker
-                  date={replacement.dateEcheance}
-                  onSelect={(value) => setReplacement((current) => ({
-                    ...current,
-                    dateEcheance: toDateOnly(value) ?? "",
-                  }))}
-                />
-              </div>
-            )}
-            {replacement.mode !== "ESPECES" ? (
-              <>
-                <div className="grid gap-2">
-                  <Label>Référence</Label>
-                  <Input
-                    value={replacement.referenceInstrument}
-                    onChange={(event) => setReplacement((current) => ({
-                      ...current,
-                      referenceInstrument: event.target.value,
-                    }))}
-                  />
-                </div>
-                {requiresBankAccountAtEntry(replacement.mode) && (
-                  <AccountSelect
-                    accounts={accounts.data ?? []}
-                    type="BANQUE"
-                    label="Compte bancaire crédité"
-                    value={replacement.compteTresorerieId}
-                    onChange={(value) => setReplacement((current) => ({
-                      ...current,
-                      compteTresorerieId: value,
-                    }))}
-                  />
-                )}
-                {showsOriginatingBank(replacement.mode) && (
-                  <BankSelect
-                    banks={banks.data ?? []}
-                    value={replacement.banqueEmettriceId}
-                    label={replacement.mode === "CHEQUE" || replacement.mode === "EFFET"
-                      ? "Banque émettrice"
-                      : "Banque d’origine"}
-                    onChange={(value) => setReplacement((current) => ({
-                      ...current,
-                      banqueEmettriceId: value,
-                    }))}
-                    disabled={banks.isLoading}
-                  />
-                )}
-              </>
-            ) : null}
-            <div className="grid gap-2 sm:col-span-2">
-              <Label htmlFor="replacement-reason">Motif du remplacement *</Label>
-              <Textarea
-                id="replacement-reason"
-                value={replacementReason}
-                onChange={(event) => setReplacementReason(event.target.value)}
-                placeholder="Ex. chèque repris et remplacé par un paiement en espèces"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={closeReplacement}>Annuler</Button>
-            <Button
-              disabled={replaceInstrument.isPending
-                || !replacementReason.trim()
-                || !replacementValid(replacement, accounts.data ?? [])}
-              onClick={() => replaceInstrument.mutate()}
-            >
-              Enregistrer le remplacement
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function AccountSelect({
-  accounts,
-  type,
-  label,
-  value,
-  onChange,
-}: {
-  accounts: TreasuryAccount[];
-  type: TreasuryAccount["typeCompte"];
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const options = accounts.filter(
-    (account) => account.actif && account.typeCompte === type
-  );
-  return (
-    <div className="grid gap-2">
-      <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange} disabled={options.length === 0}>
-        <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-        <SelectContent>
-          {options.map((account) => (
-            <SelectItem key={account.id} value={account.id}>{account.libelle}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {options.length === 0 && (
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          Aucun {type === "CAISSE" ? "compte de caisse" : "compte bancaire"} actif disponible
-        </p>
-      )}
     </div>
   );
 }
@@ -952,44 +680,24 @@ function AccountSelect({
 function PaymentActionsMenu({
   payment,
   canManage,
-  canManageTreasury,
   canIssueInvoice,
   pdfLoading,
   onPreview,
   onInvoice,
   onCancel,
-  onReplace,
-  onAddToRemittance,
 }: {
   payment: ClientPayment;
   canManage: boolean;
-  canManageTreasury: boolean;
   canIssueInvoice: boolean;
   pdfLoading: boolean;
   onPreview: () => void;
   onInvoice: () => void;
   onCancel: () => void;
-  onReplace: (instruments: PaymentInstrument[]) => void;
-  onAddToRemittance: (instruments: PaymentInstrument[]) => void;
 }) {
-  const replaceableInstruments = canManage && payment.statut === "VALIDE" && !payment.multiPayeur
-    ? payment.instruments.filter((instrument) => (instrument.statut === "REJETE"
-      || (instrument.statut === "EN_ATTENTE" && !instrument.bordereauRemiseId))
-      && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET"))
-    : [];
   const canCreateInvoice = payment.statut === "VALIDE"
     && canIssueInvoice
     && !payment.multiPayeur
     && hasDirectActiveAllocations(payment);
-  const canReplaceInstrument = replaceableInstruments.length > 0;
-  const remittableInstruments = canManageTreasury && payment.statut === "VALIDE"
-    ? payment.instruments.filter((instrument) => instrument.statut === "EN_ATTENTE"
-      && !instrument.bordereauRemiseId
-      && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET"))
-    : [];
-  const remittableGroups = (["CHEQUE", "EFFET"] as const)
-    .map((mode) => remittableInstruments.filter((instrument) => instrument.mode === mode))
-    .filter((instruments) => instruments.length > 0);
   const canCancelPayment = payment.statut !== "ANNULE" && canManage;
 
   return (
@@ -1020,28 +728,6 @@ function PaymentActionsMenu({
           <DropdownMenuItem onSelect={onInvoice}>
             <FileText className="size-4 text-emerald-600 dark:text-emerald-400" />
             Créer la facture
-          </DropdownMenuItem>
-        )}
-        {remittableGroups.length > 0 && <DropdownMenuSeparator />}
-        {remittableGroups.map((instruments) => (
-          <DropdownMenuItem
-            key={instruments[0].mode}
-            onSelect={() => onAddToRemittance(instruments)}
-          >
-            <Landmark className="size-4 text-blue-600 dark:text-blue-400" />
-            Ajouter {instruments.length > 1 ? `${instruments.length} ` : ""}
-            {instruments[0].mode === "CHEQUE"
-              ? `chèque${instruments.length > 1 ? "s" : ""}`
-              : `effet${instruments.length > 1 ? "s" : ""}`} au bordereau
-          </DropdownMenuItem>
-        ))}
-        {canReplaceInstrument && <DropdownMenuSeparator />}
-        {canReplaceInstrument && (
-          <DropdownMenuItem onSelect={() => onReplace(replaceableInstruments)}>
-            <RotateCcw className="size-4 text-amber-600 dark:text-amber-400" />
-            Remplacer {replaceableInstruments.length > 1
-              ? `un moyen de paiement (${replaceableInstruments.length})`
-              : `${MODE_LABELS[replaceableInstruments[0].mode].toLowerCase()} ${replaceableInstruments[0].referenceInstrument || ""}`}
           </DropdownMenuItem>
         )}
         {canCancelPayment && <DropdownMenuSeparator />}
@@ -1164,35 +850,6 @@ function countBy(values: string[]) {
   const counts = new Map<string, number>();
   values.forEach((value) => counts.set(value, (counts.get(value) ?? 0) + 1));
   return counts;
-}
-
-function newReplacement(): InstrumentDraft {
-  return {
-    mode: "ESPECES",
-    dateInstrument: TODAY,
-    dateEcheance: "",
-    referenceInstrument: "",
-    banqueEmettriceId: "",
-    compteTresorerieId: "",
-  };
-}
-
-function replacementValid(row: InstrumentDraft, accounts: TreasuryAccount[]) {
-  if (row.mode === "ESPECES") {
-    return true;
-  }
-  if (requiresBankAccountAtEntry(row.mode)) {
-    const validBankAccount = accounts.some(
-      (account) => account.id === row.compteTresorerieId
-        && account.actif
-        && account.typeCompte === "BANQUE"
-    );
-    if (!validBankAccount) return false;
-  }
-  if (requiresPaymentReference(row.mode)
-    && !row.referenceInstrument.trim()) return false;
-  if (showsOriginatingBank(row.mode) && !row.banqueEmettriceId) return false;
-  return (row.mode !== "EFFET" && row.mode !== "CHEQUE") || Boolean(row.dateEcheance);
 }
 
 function formatDate(value?: string | null) {

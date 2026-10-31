@@ -1303,6 +1303,10 @@ public class ReglementClientService {
         boolean hasRejection = instrument.getDateRejet() != null || rejected || rejectedLine;
         boolean canResolve = rejected && instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
                 && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET);
+        boolean canReplacePending = instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
+                && instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
+                && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
+                && (remittanceLine == null || remittanceLine.getStatut() == StatutLigneBordereauRemise.REJETEE);
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
@@ -1336,7 +1340,8 @@ public class ReglementClientService {
                         : null)
                 .rejetBancairePossible(bankRejectionPossible(instrument))
                 .representationPossible(canResolve)
-                .remplacementPossible(canResolve && !Boolean.TRUE.equals(instrument.getReglement().getMultiPayeur()))
+                .remplacementPossible((canResolve || canReplacePending)
+                        && !Boolean.TRUE.equals(instrument.getReglement().getMultiPayeur()))
                 .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
                         ? null : instrument.getInstrumentRemplace().getId())
                 .modeInstrumentRemplace(instrument.getInstrumentRemplace() == null

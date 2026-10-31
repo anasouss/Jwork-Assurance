@@ -3,10 +3,14 @@ package com.assurance.service;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.response.ReglementClientResponse;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.BordereauRemise;
+import com.assurance.entity.LigneBordereauRemise;
 import com.assurance.entity.ReglementClient;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.ResolutionRejetBancaire;
 import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.enums.StatutBordereauRemise;
+import com.assurance.enums.StatutLigneBordereauRemise;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
@@ -90,6 +94,33 @@ class BankRejectionServiceTest {
         assertThat(service.registerBankRejection(7L, 9L, request)).isSameAs(expected);
         assertThat(request.getStatut()).isEqualTo(StatutInstrumentReglement.REJETE);
         verify(service).changeInstrumentStatus(7L, 9L, request);
+    }
+
+    @Test
+    void pendingChequeCanBeReplacedWithoutBeingMarkedAsOfficePayment() {
+        InstrumentReglementClient instrument = instrument();
+        instrument.setStatut(StatutInstrumentReglement.EN_ATTENTE);
+        instrument.setReglementBureau(false);
+        assertThat(service.toInstrumentRegisterResponse(instrument).getRemplacementPossible()).isTrue();
+        instrument.getReglement().setMultiPayeur(true);
+        assertThat(service.toInstrumentRegisterResponse(instrument).getRemplacementPossible()).isFalse();
+    }
+
+    @Test
+    void draftReservedChequeCannotBeOfferedForReplacement() {
+        InstrumentReglementClient instrument = instrument();
+        instrument.setStatut(StatutInstrumentReglement.EN_ATTENTE);
+        LigneBordereauRemise line = LigneBordereauRemise.builder()
+                .bordereau(BordereauRemise.builder().statut(StatutBordereauRemise.BROUILLON).build())
+                .instrument(instrument).statut(StatutLigneBordereauRemise.PREPAREE).build();
+        ReglementClientResponse.Instrument response = ReflectionTestUtils.invokeMethod(
+                service, "toInstrumentRegisterResponse", instrument, line);
+        assertThat(response.getRemplacementPossible()).isFalse();
+    }
+
+    @Test
+    void remittedChequeCannotBeOfferedForReplacement() {
+        assertThat(service.toInstrumentRegisterResponse(instrument()).getRemplacementPossible()).isFalse();
     }
 
     @Test

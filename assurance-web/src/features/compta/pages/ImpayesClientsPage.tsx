@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Banknote, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search } from "lucide-react";
+import { ArrowRight, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -32,6 +32,7 @@ import { clientApi } from "@/features/production/api/clients";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { BankRejectionDialog } from "../components/BankRejectionDialog";
+import { ReplacePaymentInstrumentDialog } from "../components/ReplacePaymentInstrumentDialog";
 import { usePayerSearch, type PayerSelection, type PayerType } from "../components/use-payer-search";
 import type { PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
@@ -57,9 +58,7 @@ export default function ImpayesClientsPage() {
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
   const payerSearch = usePayerSearch(payerType, selectedPayer);
   const [rejectionOpen, setRejectionOpen] = useState(false);
-  const [cashTarget, setCashTarget] = useState<PaymentInstrument>();
-  const [cashDate, setCashDate] = useState(TODAY);
-  const [cashReason, setCashReason] = useState("");
+  const [replacementTarget, setReplacementTarget] = useState<PaymentInstrument>();
   const [search, setSearch] = useState(appliedSearch);
   const [instrumentToRepresent, setInstrumentToRepresent] = useState<PaymentInstrument>();
   const [representationDate, setRepresentationDate] = useState(TODAY);
@@ -96,17 +95,6 @@ export default function ImpayesClientsPage() {
       page,
       size: TREASURY_PAGE_SIZE,
     }),
-  });
-
-  const replaceWithCash = useMutation({
-    mutationFn: () => comptaApi.replacePaymentInstrument(cashTarget!.id, {
-      mode: "ESPECES", montant: cashTarget!.montant, dateInstrument: cashDate, motif: cashReason.trim(),
-    }),
-    onSuccess: async () => {
-      setCashTarget(undefined); toast.success("Règlement en espèces enregistré");
-      await queryClient.invalidateQueries({ queryKey: ["compta"] });
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Remplacement impossible"),
   });
 
   const representInstrument = useMutation({
@@ -278,10 +266,9 @@ export default function ImpayesClientsPage() {
                       <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" title="Actions"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-60">
                         <DropdownMenuItem asChild><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></DropdownMenuItem>
-                        {canManage && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
+                        {canManage && instrument.statut === "REJETE" && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
                         {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Représenter l’instrument</DropdownMenuItem>}
-                        {canManage && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => { setCashTarget(instrument); setCashDate(TODAY); setCashReason(""); }}><Banknote className="size-4" /> Remplacer par espèces</DropdownMenuItem>}
-                        {canManage && instrument.remplacementPossible && <DropdownMenuItem asChild><Link to={`/app/compta/reglements/historique?search=${encodeURIComponent(instrument.numeroReglement)}&remplacer=${instrument.id}`}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Autre moyen de remplacement</Link></DropdownMenuItem>}
+                        {canManage && instrument.statut === "REJETE" && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => setReplacementTarget(instrument)}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Remplacer le moyen de paiement</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -296,16 +283,7 @@ export default function ImpayesClientsPage() {
       </section>
 
       {rejectionOpen && <BankRejectionDialog onClose={() => setRejectionOpen(false)} />}
-
-      <Dialog open={Boolean(cashTarget)} onOpenChange={(open) => !open && !replaceWithCash.isPending && setCashTarget(undefined)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Remplacer par des espèces</DialogTitle><DialogDescription>Confirmez uniquement après réception des espèces. Le rejet et l’instrument d’origine sont conservés.</DialogDescription></DialogHeader>
-          <div className="text-sm font-medium">{cashTarget?.referenceInstrument || cashTarget?.numeroReglement} · {cashTarget?.payeurNom} · {formatTreasuryMoney(cashTarget?.montant ?? 0)}</div>
-          <div className="grid gap-2"><Label>Date de réception des espèces</Label><DatePicker date={cashDate} disabled={replaceWithCash.isPending} minDate={cashTarget?.dateRejet ? new Date(`${cashTarget.dateRejet}T00:00:00`) : undefined} maxDate={new Date(`${TODAY}T00:00:00`)} onSelect={(value) => setCashDate(toDateOnly(value) ?? "")} /></div>
-          <div className="grid gap-2"><Label htmlFor="unpaid-cash-reason">Motif du remplacement</Label><Textarea id="unpaid-cash-reason" value={cashReason} maxLength={500} disabled={replaceWithCash.isPending} onChange={(event) => setCashReason(event.target.value)} /></div>
-          <DialogFooter><Button variant="outline" disabled={replaceWithCash.isPending} onClick={() => setCashTarget(undefined)}>Annuler</Button><Button disabled={!cashDate || cashDate > TODAY || Boolean(cashTarget?.dateRejet && cashDate < cashTarget.dateRejet) || !cashReason.trim() || replaceWithCash.isPending} onClick={() => replaceWithCash.mutate()}><Banknote className="size-4" />{replaceWithCash.isPending ? "Enregistrement..." : "Confirmer les espèces reçues"}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {replacementTarget && <ReplacePaymentInstrumentDialog instrument={replacementTarget} onClose={() => setReplacementTarget(undefined)} />}
 
       <Dialog open={Boolean(instrumentToRepresent)} onOpenChange={(open) => !open && !representInstrument.isPending && setInstrumentToRepresent(undefined)}>
         <DialogContent className="sm:max-w-md">

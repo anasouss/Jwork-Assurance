@@ -29,9 +29,10 @@ type Props = {
   instruments?: PaymentInstrument[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onAdded?: (instrumentIds: string[]) => void;
 };
 
-export function AddInstrumentToRemittanceDialog({ instrument, instruments, open, onOpenChange }: Props) {
+export function AddInstrumentToRemittanceDialog({ instrument, instruments, open, onOpenChange, onAdded }: Props) {
   const queryClient = useQueryClient();
   const candidates = useMemo(
     () => instruments?.length ? instruments : instrument ? [instrument] : [],
@@ -124,6 +125,7 @@ export function AddInstrumentToRemittanceDialog({ instrument, instruments, open,
       });
     },
     onSuccess: async (slip) => {
+      onAdded?.(selectedInstruments.map((selected) => selected.id));
       toast.success(`${selectedInstruments.length > 1 ? "Instruments ajoutés" : "Instrument ajouté"} au bordereau ${slip.numero}`);
       onOpenChange(false);
       await queryClient.invalidateQueries({ queryKey: ["compta"] });

@@ -1,13 +1,10 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Download, Landmark } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
-import { AddInstrumentToRemittanceDialog } from "../components/AddInstrumentToRemittanceDialog";
 import { formatAccountingAmount } from "../format";
 import type {
   ClientPayment,
@@ -60,9 +57,6 @@ const ALLOCATION_STATUS_BADGE_VARIANTS: Record<
 
 export default function ReglementClientDetailPage() {
   const { reglementId = "" } = useParams();
-  const user = useAuthStore((state) => state.user);
-  const canManageTreasury = user?.permissions.includes("tresorerie:manage") ?? false;
-  const [instrumentToRemit, setInstrumentToRemit] = useState<ClientPayment["instruments"][number]>();
   const payment = useQuery({
     queryKey: ["compta", "client-payment", reglementId],
     queryFn: () => comptaApi.clientPayment(reglementId),
@@ -205,14 +199,7 @@ export default function ReglementClientDetailPage() {
                           <Landmark className="size-4" /> {instrument.numeroBordereauRemise || "Voir le bordereau"}
                         </Link>
                       </Button>
-                    ) : data.statut === "VALIDE"
-                      && instrument.statut === "EN_ATTENTE"
-                      && (instrument.mode === "CHEQUE" || instrument.mode === "EFFET")
-                      && canManageTreasury ? (
-                        <Button variant="outline" size="sm" onClick={() => setInstrumentToRemit(instrument)}>
-                          <Landmark className="size-4" /> Ajouter au bordereau
-                        </Button>
-                      ) : "-"}
+                    ) : "-"}
                   </td>
                 </tr>
               ))}
@@ -272,11 +259,6 @@ export default function ReglementClientDetailPage() {
         </div>
       </section>
 
-      <AddInstrumentToRemittanceDialog
-        instrument={instrumentToRemit}
-        open={Boolean(instrumentToRemit)}
-        onOpenChange={(open) => !open && setInstrumentToRemit(undefined)}
-      />
     </div>
   );
 }

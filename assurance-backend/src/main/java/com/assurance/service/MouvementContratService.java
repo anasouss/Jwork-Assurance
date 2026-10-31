@@ -302,6 +302,7 @@ public class MouvementContratService {
                 .cnpac(montants.cnpac())
                 .primeTotale(montants.primeTotale())
                 .notes(request.getNotes())
+                .libelleReleve(normalizeStatementLabel(request.getLibelleReleve()))
                 .build());
         contrat.getMouvements().add(mouvement);
 
@@ -435,6 +436,7 @@ public class MouvementContratService {
                 .cnpac(montants.cnpac())
                 .primeTotale(montants.primeTotale())
                 .notes(request.getNotes())
+                .libelleReleve(normalizeStatementLabel(request.getLibelleReleve()))
                 .build());
         contrat.getMouvements().add(mouvement);
 
@@ -1005,6 +1007,12 @@ public class MouvementContratService {
             }
         }
         return null;
+    }
+
+    private String normalizeStatementLabel(String label) {
+        if (label == null) return null;
+        String normalized = label.replaceAll("[\\r\\n]+", " ").trim();
+        return normalized.isBlank() ? null : normalized;
     }
 
     private List<Vehicule> activeVehicules(Contrat contrat) {

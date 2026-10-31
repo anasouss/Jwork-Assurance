@@ -90,6 +90,9 @@ public class MouvementContrat extends BaseEntity {
     @Column(length = 1000)
     private String notes;
 
+    @Column(name = "libelle_releve", length = 180)
+    private String libelleReleve;
+
     @Column(name = "saisie_prime_nette")
     private Boolean saisiePrimeNette;
 

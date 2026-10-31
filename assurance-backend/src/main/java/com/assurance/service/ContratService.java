@@ -2639,6 +2639,7 @@ public class ContratService {
         request.setDateEffet(mouvement.getDateEffet());
         request.setDateEcheance(mouvement.getDateEcheance());
         request.setNotes(mouvement.getNotes());
+        request.setLibelleReleve(mouvement.getLibelleReleve());
         request.setSaisiePrimeNette(mouvement.getSaisiePrimeNette() != null
                 ? mouvement.getSaisiePrimeNette() : mouvement.getContrat().getSaisiePrimeNette());
         if (mouvement.getContrat().getTypeContrat() == TypeContrat.PARTICULIER
@@ -4569,6 +4570,7 @@ public class ContratService {
         mouvementRequest.setDateEffet(request.getDateEffet());
         mouvementRequest.setDateEcheance(contrat.getDateEcheance());
         mouvementRequest.setNotes(request.getNotes());
+        mouvementRequest.setLibelleReleve(request.getLibelleReleve());
         return mouvementRequest;
     }
 

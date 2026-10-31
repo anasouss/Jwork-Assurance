@@ -12,6 +12,7 @@ import com.assurance.entity.TypeMouvementContrat;
 import com.assurance.entity.Vehicule;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.enums.CategorieQuittance;
+import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.repository.ElementFacturableRepository;
@@ -79,7 +80,7 @@ public class QuittanceProductionService {
                 .statut(StatutElementFacturable.A_QUITTANCER)
                 .referenceSource(contrat.getNumeroContrat())
                 .libelle(typeMouvement.getLibelle())
-                .libelleReleve(contrat.getLibelleReleve())
+                .libelleReleve(statementLabel(contrat, mouvement, typeMouvement))
                 .dateDebut(mouvement.getDateEffet())
                 .dateFin(mouvement.getDateEcheance())
                 .primeNette(calcul.primeNette())
@@ -170,7 +171,7 @@ public class QuittanceProductionService {
         element.setNature(resolveNature(typeMouvement));
         element.setReferenceSource(contrat.getNumeroContrat());
         element.setLibelle(typeMouvement.getLibelle());
-        element.setLibelleReleve(contrat.getLibelleReleve());
+        element.setLibelleReleve(statementLabel(contrat, mouvement, typeMouvement));
         element.setDateDebut(mouvement.getDateEffet());
         element.setDateFin(mouvement.getDateEcheance());
         element.setPrimeNette(calcul.primeNette());
@@ -252,6 +253,15 @@ public class QuittanceProductionService {
                     .montantCalcule(application.montantCalcule())
                     .build();
         }).toList());
+    }
+
+    private String statementLabel(Contrat contrat, MouvementContrat mouvement, TypeMouvementContrat typeMouvement) {
+        String label = mouvement.getLibelleReleve();
+        if (label != null && !label.isBlank()) {
+            return label.replaceAll("[\\r\\n]+", " ").trim();
+        }
+        return typeMouvement.getCategorie() == CategorieMouvementContrat.AVENANT
+                ? null : contrat.getLibelleReleve();
     }
 
     private NatureElementFacturable resolveNature(TypeMouvementContrat typeMouvement) {

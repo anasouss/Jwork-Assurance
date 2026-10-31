@@ -1,6 +1,7 @@
 package com.assurance.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -18,4 +19,7 @@ public class MouvementContratRequest {
     private LocalDate dateEcheance;
 
     private String notes;
+
+    @Size(max = 180)
+    private String libelleReleve;
 }

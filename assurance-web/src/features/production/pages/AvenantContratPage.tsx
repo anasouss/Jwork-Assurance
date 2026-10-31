@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { avenantApi } from "../api/avenants";
@@ -69,6 +70,7 @@ export default function AvenantContratPage() {
   const validatedMovementId = searchParams.get("mouvementId");
   const [dateEffet, setDateEffet] = useState<string>();
   const [dateEcheance, setDateEcheance] = useState<string>();
+  const [libelleReleve, setLibelleReleve] = useState("");
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [precisionDrafts, setPrecisionDrafts] = useState<Record<string, PrecisionDraft>>({});
   const [duplicataAttestationDrafts, setDuplicataAttestationDrafts] = useState<Record<string, DuplicataAttestationDraft>>({});
@@ -239,6 +241,7 @@ export default function AvenantContratPage() {
 
   useEffect(() => {
     setDateEffet(undefined);
+    setLibelleReleve("");
     setQuittanceLines(emptyAvenantQuittance());
     setSaisiePrimeNette(undefined);
     setPreview(null);
@@ -349,6 +352,7 @@ export default function AvenantContratPage() {
       return;
     }
     setDateEffet(request.dateEffet ?? undefined);
+    setLibelleReleve(request.libelleReleve ?? "");
     setSaisiePrimeNette(request.saisiePrimeNette ?? Boolean(contrat?.saisiePrimeNette));
     setQuittanceLines(request.quittances?.length ? request.quittances : emptyAvenantQuittance());
     setDateEcheance(contrat?.dateEcheance ?? request.dateEcheance ?? undefined);
@@ -489,6 +493,7 @@ export default function AvenantContratPage() {
     const draftGaranties = guaranteesOverride ?? selectedGaranties;
     const request: AvenantRequest = {
       codeTypeMouvement: movementCode,
+      libelleReleve: libelleReleve.trim() || undefined,
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
       quittances: supportsManualQuittance ? quittanceLines : undefined,
@@ -1024,7 +1029,7 @@ export default function AvenantContratPage() {
           <CardTitle>Paramètres de l'avenant</CardTitle>
           <CardDescription>La quittance est calculée sur les cibles de cet avenant, puis sauvegardée avec le mouvement.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Field label="Type">
             <Select value={movementCode} disabled>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1040,6 +1045,14 @@ export default function AvenantContratPage() {
           </Field>
           <Field label="Date d'échéance">
             <DatePicker date={dateEcheance} disabled />
+          </Field>
+          <Field label="Libellé du relevé (facultatif)">
+            <Input
+              value={libelleReleve}
+              maxLength={180}
+              placeholder="Libellé généré automatiquement"
+              onChange={(event) => setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
+            />
           </Field>
         </CardContent>
       </Card>

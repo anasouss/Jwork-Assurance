@@ -20,6 +20,10 @@ public class AvenantRequest {
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String notes;
+
+    @Size(max = 180)
+    private String libelleReleve;
+
     private Boolean saisiePrimeNette;
 
     @Valid

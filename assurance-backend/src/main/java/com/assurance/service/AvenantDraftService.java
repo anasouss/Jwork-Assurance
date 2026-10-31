@@ -63,6 +63,13 @@ public class AvenantDraftService {
         if (request == null) {
             throw new BadRequestException("Le brouillon d'avenant est obligatoire");
         }
+        if (request.getLibelleReleve() != null) {
+            String label = request.getLibelleReleve().replaceAll("[\\r\\n]+", " ").trim();
+            if (label.length() > 180) {
+                throw new BadRequestException("Le libellé du relevé ne doit pas dépasser 180 caractères");
+            }
+            request.setLibelleReleve(label.isBlank() ? null : label);
+        }
         String code = requireCode(request.getCodeTypeMouvement());
         Contrat contrat = requireContrat(agenceId, contratId);
         if (Boolean.TRUE.equals(contrat.getBrouillon())

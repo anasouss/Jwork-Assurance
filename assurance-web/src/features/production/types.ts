@@ -281,6 +281,7 @@ export type ContratActions = {
 
 export type MouvementContratRequest = {
   codeTypeMouvement: string;
+  libelleReleve?: string;
   numeroMouvement?: string;
   dateEffet?: string;
   dateEcheance?: string;
@@ -289,6 +290,7 @@ export type MouvementContratRequest = {
 
 export type AvenantRequest = {
   codeTypeMouvement: string;
+  libelleReleve?: string;
   saisiePrimeNette?: boolean;
   quittances?: QuittanceInput[];
   numeroMouvement?: string;

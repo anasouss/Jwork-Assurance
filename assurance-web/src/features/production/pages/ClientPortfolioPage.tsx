@@ -414,7 +414,7 @@ function AccountingSection({
       : clientReceivablesUrl;
   const remainingToCollect = Math.max(
     0,
-    (summary?.montantInitial ?? 0) - (summary?.montantConfirme ?? 0),
+    (summary?.soldeOuvert ?? 0) + (summary?.montantEnAttente ?? 0),
   );
   const accountingDifference = (summary?.soldeOuvert ?? 0) - (companySummary?.netCompagnie ?? 0);
   const showDifference = canViewClient
@@ -868,8 +868,8 @@ function accountingClientStatus(summary?: { montantInitial: number; montantConfi
   if (!summary || summary.montantInitial <= 0) {
     return { label: "Aucune créance", tone: "slate", collectionState: "NONE" };
   }
-  if (summary.montantConfirme >= summary.montantInitial) {
-    return { label: "Encaissé", tone: "emerald", collectionState: "COLLECTED" };
+  if (summary.soldeOuvert <= 0 && summary.montantEnAttente <= 0) {
+    return { label: "Réglé", tone: "emerald", collectionState: "COLLECTED" };
   }
   if (summary.montantEnAttente > 0) {
     return { label: "Encaissement en cours", tone: "blue", collectionState: "IN_PROGRESS" };

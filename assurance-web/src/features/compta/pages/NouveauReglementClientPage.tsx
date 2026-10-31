@@ -860,8 +860,9 @@ function SortableReceivableRow(props: {
   onRemove: () => void;
 }) {
   const id = receivableTargetKey(props.row);
-  const isAllocated = props.allocatedAmount > 0.001;
-  const isFullyAllocated = props.allocatedAmount + props.adjustmentAmount >= props.row.soldeOuvert - 0.001;
+  const settledAmount = round(props.allocatedAmount + props.adjustmentAmount);
+  const isAllocated = settledAmount > 0.001;
+  const isFullyAllocated = settledAmount >= props.row.soldeOuvert - 0.001;
   const {
     attributes,
     listeners,
@@ -929,7 +930,7 @@ function SortableReceivableRow(props: {
             ? "font-semibold tabular-nums text-amber-700 dark:text-amber-300"
             : "tabular-nums text-muted-foreground"}
         >
-          {money(props.allocatedAmount)}
+          {money(settledAmount)}
         </div>
         <div className={isFullyAllocated
           ? "text-xs font-medium text-emerald-700 dark:text-emerald-300"

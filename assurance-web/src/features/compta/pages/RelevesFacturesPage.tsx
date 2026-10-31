@@ -557,7 +557,7 @@ export default function RelevesFacturesPage() {
                         <MoneyCell value={row.montantTtc} strong />
                         <td className="px-3 py-3 text-right">
                           <div className="font-semibold tabular-nums">{formatAmount(row.soldeRestant)}</div>
-                          {row.montantRegle > 0 ? (
+                          {row.montantRegle > 0 && row.soldeRestant > 0 ? (
                             <Badge variant="outline" className="mt-1">Partiel</Badge>
                           ) : null}
                         </td>
@@ -1050,6 +1050,9 @@ function IssueDialog(props: {
       + (type === "RELEVE" ? Math.max(row.montantRegle, 0) : 0),
     0
   );
+  const amountDue = type === "RELEVE"
+    ? props.rows.reduce((sum, row) => sum + (row.montantTtc < 0 ? row.montantTtc : row.soldeRestant), 0)
+    : debit - credit;
   const today = useMemo(() => startOfLocalDay(new Date()), []);
   const maximumDueDate = dueDateProposal.data?.dateEcheanceProposee
     ? parseLocalDate(dueDateProposal.data.dateEcheanceProposee)
@@ -1196,7 +1199,7 @@ function IssueDialog(props: {
               {type === "RELEVE" ? <SummaryLine label="Total acompte" value={credit} tone="credit" /> : null}
               <SummaryLine
                 label="Total à payer"
-                value={debit - credit}
+                value={amountDue}
                 tone="balance"
                 strong
               />

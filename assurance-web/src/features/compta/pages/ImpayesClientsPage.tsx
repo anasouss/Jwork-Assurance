@@ -162,7 +162,7 @@ export default function ImpayesClientsPage() {
       </header>
 
       <section className="flex flex-wrap items-end gap-3 rounded-md border bg-card p-4">
-        <div className="grid w-full min-w-0 gap-2 sm:w-44">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label id="unpaid-payer-scope">Cible</Label>
           <div role="group" aria-labelledby="unpaid-payer-scope" className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
             {(["CLIENT", "GROUPE"] as const).map((scope) => (
@@ -187,7 +187,7 @@ export default function ImpayesClientsPage() {
             ))}
           </div>
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-60">
+        <div className="grid w-full min-w-0 gap-2 sm:w-60 sm:grow">
           <Label>{payerType === "CLIENT" ? "Rechercher un client" : "Rechercher un groupe"}</Label>
           <AutocompleteSelect
             options={payerSearch.options} value={payerId}
@@ -197,7 +197,7 @@ export default function ImpayesClientsPage() {
             emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
           />
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-44">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => updateUrl({ mode: value as ModeFilter })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -208,13 +208,13 @@ export default function ImpayesClientsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-48"><Label>Banque émettrice</Label><Select value={bankId || "ALL"} disabled={banks.isLoading} onValueChange={(value) => updateUrl({ banqueId: value === "ALL" ? "" : value })}>
+        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow"><Label>Banque émettrice</Label><Select value={bankId || "ALL"} disabled={banks.isLoading} onValueChange={(value) => updateUrl({ banqueId: value === "ALL" ? "" : value })}>
           <SelectTrigger><SelectValue placeholder="Toutes les banques" /></SelectTrigger><SelectContent>
             <SelectItem value="ALL">Toutes les banques</SelectItem>{(banks.data ?? []).map((bank) => <SelectItem key={bank.id} value={bank.id}>{bank.libelle}</SelectItem>)}
           </SelectContent></Select></div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-44"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-44"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-64">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
+        <div className="grid w-full min-w-0 gap-2 sm:w-64 sm:grow">
           <Label htmlFor="unpaid-search">Référence, payeur ou règlement</Label>
           <Input
             id="unpaid-search"

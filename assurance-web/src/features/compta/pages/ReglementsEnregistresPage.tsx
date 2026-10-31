@@ -393,8 +393,8 @@ export default function ReglementsEnregistresPage() {
         canCreate={canCreate}
       />
 
-      <section className="grid gap-3 rounded-md border bg-card p-4 md:grid-cols-2 xl:grid-cols-6 xl:items-end">
-        <div className="grid gap-2">
+      <section className="flex flex-wrap items-end gap-3 rounded-md border bg-card p-4">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>Type de payeur</Label>
           <div className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
             {(["CLIENT", "GROUPE"] as const).map((scope) => (
@@ -417,7 +417,7 @@ export default function ReglementsEnregistresPage() {
             ))}
           </div>
         </div>
-        <div className="grid gap-2 xl:col-span-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-60 sm:grow">
           <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
           <AutocompleteSelect
             options={payerSearch.options}
@@ -430,7 +430,7 @@ export default function ReglementsEnregistresPage() {
             emptyText={payerSearch.loading ? "Chargement..." : "Aucun résultat"}
           />
         </div>
-        <div className="grid gap-2 xl:col-span-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-64 sm:grow">
           <Label htmlFor="payment-search">N° règlement ou référence</Label>
           <Input
             id="payment-search"
@@ -443,15 +443,15 @@ export default function ReglementsEnregistresPage() {
             }}
           />
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>Date du</Label>
           <DatePicker date={dateFrom} onSelect={(value) => setDateFrom(toDateOnly(value) ?? "")} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>Date au</Label>
           <DatePicker date={dateTo} onSelect={(value) => setDateTo(toDateOnly(value) ?? "")} />
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow">
           <Label>Moyen</Label>
           <Select value={paymentMode} onValueChange={(value) => setPaymentMode(value as ClientPaymentMode | "ALL")}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -463,7 +463,7 @@ export default function ReglementsEnregistresPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid gap-2">
+        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow">
           <Label>État du moyen</Label>
           <Select value={instrumentStatus} onValueChange={(value) => setInstrumentStatus(value as PaymentInstrument["statut"] | "ALL")}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -477,7 +477,7 @@ export default function ReglementsEnregistresPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex shrink-0 items-end gap-2">
           <Button
             size="icon"
             title="Rechercher"

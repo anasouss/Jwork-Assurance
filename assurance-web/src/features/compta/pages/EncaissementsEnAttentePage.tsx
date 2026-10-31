@@ -427,7 +427,7 @@ export default function EncaissementsEnAttentePage() {
       </header>
 
       <section className="flex flex-wrap items-end gap-3 rounded-md border bg-card p-4">
-        <div className="grid w-full min-w-0 gap-2 sm:w-48">
+        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow">
           <Label>Mode</Label>
           <Select value={mode} onValueChange={(value) => changeMode(value as ModeFilter)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
@@ -441,7 +441,7 @@ export default function EncaissementsEnAttentePage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-44">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>Type de payeur</Label>
           <div className="flex h-10 items-center rounded-md border bg-muted/40 p-1">
             {(["CLIENT", "GROUPE"] as const).map((scope) => (
@@ -466,7 +466,7 @@ export default function EncaissementsEnAttentePage() {
             ))}
           </div>
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-60">
+        <div className="grid w-full min-w-0 gap-2 sm:w-60 sm:grow">
           <Label>{payerScope === "GROUPE" ? "Rechercher un groupe" : "Rechercher un client"}</Label>
           <AutocompleteSelect
             options={payerSearch.options}
@@ -490,11 +490,11 @@ export default function EncaissementsEnAttentePage() {
             disabled={mode === "ESPECES"}
           />
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-72">
+        <div className="grid w-full min-w-0 gap-2 sm:w-72 sm:grow">
           <Label htmlFor="collection-search">Règlement, caisse, banque ou référence</Label>
           <Input id="collection-search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && applyFilters()} />
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-44">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>{dateFilterLabel} du</Label>
           <DatePicker
             date={dateFrom}
@@ -502,7 +502,7 @@ export default function EncaissementsEnAttentePage() {
             onSelect={(value) => updateUrl({ dateFrom: toDateOnly(value) ?? "", page: 0 })}
           />
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-44">
+        <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow">
           <Label>{dateFilterLabel} au</Label>
           <DatePicker
             date={dateTo}

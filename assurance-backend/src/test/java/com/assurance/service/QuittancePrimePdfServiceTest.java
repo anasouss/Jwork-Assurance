@@ -30,9 +30,11 @@ class QuittancePrimePdfServiceTest {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
             assertThat(text).contains("QUITTANCE DE PRIME", "2026000001", "POLICE-1", "POLICE-2", "200,00", "100,00");
-            assertThat(text).contains("sous réserve d'encaissement", "cabinet", "VERSEMENT");
+            assertThat(text).contains("sous réserve d'encaissement", "cabinet", "MONTANT RÉGLÉ");
             assertThat(text).contains("Payeur", "Adresse", "Intermédiaire", "Réf. règlement", "Date du règlement",
-                    "BRANCHE / MOUVEMENT", "Moyen(s) de règlement", "Chèque", "CH-001", "Total du règlement");
+                    "CATÉGORIE", "N° POLICE", "Moyen(s) de règlement", "Chèque", "CH-001", "Total :");
+            assertThat(text.indexOf("CATÉGORIE")).isLessThan(text.indexOf("N° POLICE"));
+            assertThat(text).doesNotContain("BRANCHE / MOUVEMENT", "Prime assurance", "Total de la sélection", "Montants en MAD");
             assertThat(text).doesNotContain("Dont encaissé", "Dont acompte non affecté", "MONTANT (MAD)");
             assertThat(text).doesNotContain("0,25%", "TVA", "FICHE DE RÈGLEMENT CLIENT");
         }
@@ -44,7 +46,7 @@ class QuittancePrimePdfServiceTest {
         assertThat(service.policies(payment)).hasSize(2);
         try (PDDocument pdf = PDDocument.load(service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
-            assertThat(text).contains("POLICE-1", "Total de la sélection : 50,00 MAD", "CH-001", "200,00");
+            assertThat(text).contains("POLICE-1", "Total : 50,00 MAD", "CH-001", "200,00");
             assertThat(text).doesNotContain("POLICE-2", "100,00 MAD");
         }
     }
@@ -100,7 +102,7 @@ class QuittancePrimePdfServiceTest {
         assertThatThrownBy(() -> service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))
                 .isInstanceOf(BadRequestException.class);
         try (PDDocument pdf = PDDocument.load(service.render(payment, "920260000000001", LocalDate.now(), Set.of("D:10")))) {
-            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "POLICE-2", "DOC-1");
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "POLICE-2");
         }
     }
 

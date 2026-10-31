@@ -122,14 +122,19 @@ public class QuittancePrimePdfService {
                 footer.close();
             });
             writeHeader(document, payment, reference, issuedOn, normal, bold);
-            Table detail = new Table(new float[]{1.9f, 2.1f, 1, 1, 1, 1, 1}).useAllAvailableWidth();
-            for (String column : List.of("POLICE / ASSUREUR", "BRANCHE / MOUVEMENT", "PRIME NETTE", "TAXES / TPF", "ACC. / CNPAC", "PRIME TOTALE", "VERSEMENT")) {
+            String companies = String.join(" · ", rows.stream().flatMap(row -> row.elements().stream()
+                    .map(e -> row.company(e, assistance.get(e.getId())))).distinct().toList());
+            if (!companies.isBlank()) {
+                document.add(new Paragraph("Assureur(s) : " + companies).setFontSize(7).setMarginTop(5).setMarginBottom(8));
+            }
+            Table detail = new Table(new float[]{1.5f, 2.5f, 1, 1, 1, 1, 1}).useAllAvailableWidth();
+            for (String column : List.of("CATÉGORIE", "N° POLICE", "PRIME NETTE", "TAXES / TPF", "ACC. / CNPAC", "PRIME TOTALE", "MONTANT RÉGLÉ")) {
                 detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
                         .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5));
             }
             for (PrimeRow row : rows) {
-                add(detail, row.description(assistance), normal, false);
-                add(detail, row.riskDescription(assistance), normal, false);
+                add(detail, row.branchNames(assistance), normal, false);
+                add(detail, row.policyNumbers(assistance), normal, false);
                 add(detail, amount(row.net()), normal, true);
                 add(detail, amount(row.taxes()), normal, true);
                 add(detail, amount(row.fees()), normal, true);
@@ -137,12 +142,11 @@ public class QuittancePrimePdfService {
                 add(detail, amount(row.applied), bold, true);
             }
             if (rows.isEmpty()) detail.addCell(new Cell(1, 7).add(new Paragraph("Aucune prime affectée : acompte non affecté").setMargin(0)).setPadding(7));
-            detail.addCell(new Cell(1, 6).add(new Paragraph("TOTAL IMPUTÉ AUX PRIMES").setFont(bold).setMargin(0))
+            detail.addCell(new Cell(1, 6).add(new Paragraph("TOTAL AFFECTÉ").setFont(bold).setMargin(0))
                     .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5));
             add(detail, amount(allocated), bold, true);
-            document.add(new Paragraph("Montants en MAD").setFontSize(7).setTextAlignment(TextAlignment.RIGHT).setMarginTop(10).setMarginBottom(4));
             document.add(detail);
-            document.add(new Paragraph("Les primes TTC ci-dessus sont les montants des créances concernées. La colonne Versement correspond uniquement au présent règlement.")
+            document.add(new Paragraph("Les primes totales sont les montants des créances concernées. Le montant réglé correspond uniquement à la part affectée par ce règlement.")
                     .setFontSize(7).setMarginTop(5));
             document.add(new Paragraph(policyKeys == null ? "Moyen(s) de règlement" : "Moyen(s) de règlement · Part affectée à la sélection")
                     .setFont(bold).setMarginTop(12).setMarginBottom(4));
@@ -160,7 +164,7 @@ public class QuittancePrimePdfService {
             }
             BigDecimal confirmed = instruments.stream().filter(i -> i.getStatut() == StatutInstrumentReglement.CONFIRME)
                     .map(i -> policyKeys == null ? i.getMontant() : selectedAmount(i, policyKeys)).reduce(BigDecimal.ZERO, BigDecimal::add);
-            document.add(new Paragraph((policyKeys == null ? "Total du règlement : " : "Total de la sélection : ") + amount(receiptTotal) + " MAD")
+            document.add(new Paragraph("Total : " + amount(receiptTotal) + " MAD")
                     .setFont(bold).setFontSize(11).setTextAlignment(TextAlignment.RIGHT).setMarginTop(12).setMarginBottom(4));
             if (receiptTotal.compareTo(confirmed) > 0) {
                 document.add(new Paragraph("Dont sous réserve d'encaissement : " + amount(receiptTotal.subtract(confirmed)) + " MAD")
@@ -302,32 +306,45 @@ public class QuittancePrimePdfService {
             if (document != null) descriptions.add("Document " + document.getNumero());
             for (ElementFacturable e : elements()) {
                 AssistanceContrat a = assistance.get(e.getId());
-                String policy = a == null ? e.getContrat().getNumeroPolice() : first(a.getNumeroPoliceContrat(), a.getNumeroContratOuQuittance());
-                String company = a != null && a.getCompagnieAssistance() != null ? a.getCompagnieAssistance().getNom()
-                        : e.getCompagnieAssurance() != null ? e.getCompagnieAssurance().getNom()
-                        : e.getContrat().getCompagnieAssurance() == null ? null : e.getContrat().getCompagnieAssurance().getNom();
-                if (document != null) {
-                    var snapshot = lines().stream().filter(l -> l.getElementFacturable().getId().equals(e.getId())).findFirst().orElseThrow();
-                    policy = first(snapshot.getNumeroPolice(), policy);
-                    company = first(snapshot.getCompagnie(), company);
-                }
-                descriptions.add(value(policy) + "\n" + value(company));
+                descriptions.add(policyNumber(e, a) + "\n" + company(e, a));
             }
             return String.join("\n", descriptions);
         }
 
-        private String riskDescription(Map<Long, AssistanceContrat> assistance) {
+        private String policyNumber(ElementFacturable element, AssistanceContrat assistance) {
+            String policy = assistance == null ? element.getContrat().getNumeroPolice()
+                    : first(assistance.getNumeroPoliceContrat(), assistance.getNumeroContratOuQuittance());
+            if (document != null) {
+                var snapshot = lines().stream().filter(l -> l.getElementFacturable().getId().equals(element.getId())).findFirst().orElseThrow();
+                policy = first(snapshot.getNumeroPolice(), policy);
+            }
+            return value(policy);
+        }
+
+        private String company(ElementFacturable element, AssistanceContrat assistance) {
+            String company = assistance != null && assistance.getCompagnieAssistance() != null ? assistance.getCompagnieAssistance().getNom()
+                    : element.getCompagnieAssurance() != null ? element.getCompagnieAssurance().getNom()
+                    : element.getContrat().getCompagnieAssurance() == null ? null : element.getContrat().getCompagnieAssurance().getNom();
+            if (document != null) {
+                var snapshot = lines().stream().filter(l -> l.getElementFacturable().getId().equals(element.getId())).findFirst().orElseThrow();
+                company = first(snapshot.getCompagnie(), company);
+            }
+            return value(company);
+        }
+
+        private String policyNumbers(Map<Long, AssistanceContrat> assistance) {
+            return String.join("\n", elements().stream().map(e -> policyNumber(e, assistance.get(e.getId()))).distinct().toList());
+        }
+
+        private String branchNames(Map<Long, AssistanceContrat> assistance) {
             List<String> descriptions = new ArrayList<>();
             for (ElementFacturable e : elements()) {
                 AssistanceContrat a = assistance.get(e.getId());
                 String branch = a != null && a.getBrancheAssurance() != null ? a.getBrancheAssurance().getLibelle()
                         : e.getContrat().getBrancheAssurance() == null ? null : e.getContrat().getBrancheAssurance().getLibelle();
-                descriptions.add(join(branch, e.getLibelle()));
+                descriptions.add(value(branch));
             }
-            return String.join("\n", descriptions) + "\n" + period();
-        }
-        private String period() {
-            return String.join("\n", elements().stream().map(e -> date(e.getDateDebut()) + "\n" + date(e.getDateFin())).distinct().toList());
+            return String.join("\n", descriptions.stream().distinct().toList());
         }
         private BigDecimal net() {
             return document == null ? element.getPrimeNette() : sum(lines().stream().map(LigneDocumentClient::getPrimeNette).toList());

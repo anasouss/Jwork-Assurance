@@ -244,7 +244,7 @@ export default function ClientPortfolioPage() {
 
 function PortfolioRow({ main, documents }: { main: ReactNode; documents: ReactNode }) {
   return (
-    <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid min-w-0 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       {main}
       {documents}
     </div>

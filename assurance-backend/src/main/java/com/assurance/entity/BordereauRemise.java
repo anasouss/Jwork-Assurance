@@ -59,7 +59,8 @@ public class BordereauRemise extends AuditedEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private StatutBordereauRemise statut;
+    @Builder.Default
+    private StatutBordereauRemise statut = StatutBordereauRemise.BROUILLON;
 
     @Column(name = "date_bordereau", nullable = false)
     private LocalDate dateBordereau;

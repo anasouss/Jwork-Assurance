@@ -23,23 +23,26 @@ class QuittancePrimeClientServiceTest {
     Path directory;
     private final ReglementClientRepository payments = mock(ReglementClientRepository.class);
     private final StorageLayoutService storage = mock(StorageLayoutService.class);
-    private final QuittancePrimePdfService renderer = mock(QuittancePrimePdfService.class);
-    private final QuittancePrimeClientService service = new QuittancePrimeClientService(payments, storage, renderer);
+    private final QuittancePrimeSelectionService selections = mock(QuittancePrimeSelectionService.class);
+    private final QuittancePrimeClientService service = new QuittancePrimeClientService(payments, storage, selections);
 
     @Test
-    void issuesOnceAndNeverRewritesTheArchivedDocument() throws Exception {
+    void existingLegacyArchivesAreReadWithoutBeingRewritten() throws Exception {
         ReglementClient payment = payment();
         when(payments.findByIdAndAgenceIdForUpdate(9L, 7L)).thenReturn(Optional.of(payment));
         when(storage.resolveClientPremiumReceipt(eq(7L), anyString())).thenReturn(directory.resolve("receipt.pdf"));
         String reference = LocalDate.now().getYear() + "000009";
-        when(renderer.render(eq(payment), eq(reference), any())).thenReturn(new byte[]{1, 2, 3});
+        payment.setQuittancePrimeNumero(reference);
+        payment.setQuittancePrimeDateEmission(LocalDate.now());
+        payment.setQuittancePrimeCheminStockage("7/9/receipt.pdf");
+        Files.write(directory.resolve("receipt.pdf"), new byte[]{1, 2, 3});
         var first = service.issue(7L, 9L);
         payment.setPayeurNom("Changed later");
         var second = service.issue(7L, 9L);
         assertThat(first.reference()).isEqualTo(reference).matches("[0-9]+");
         assertThat(second.pdf()).containsExactly(first.pdf());
-        verify(renderer, times(1)).render(any(), anyString(), any());
-        verify(payments, times(1)).saveAndFlush(payment);
+        verifyNoInteractions(selections);
+        verify(payments, never()).saveAndFlush(payment);
         assertThat(payment.getQuittancePrimeDateEmission()).isNotNull();
     }
 
@@ -52,7 +55,7 @@ class QuittancePrimeClientServiceTest {
         when(payments.findByIdAndAgenceId(9L, 7L)).thenReturn(Optional.of(payment));
         when(storage.resolveClientPremiumReceipt(7L, "7/9/archive.pdf")).thenReturn(directory.resolve("missing.pdf"));
         assertThatThrownBy(() -> service.read(7L, 9L)).isInstanceOf(BadRequestException.class);
-        verifyNoInteractions(renderer);
+        verifyNoInteractions(selections);
     }
 
     @Test
@@ -63,19 +66,31 @@ class QuittancePrimeClientServiceTest {
         assertThatThrownBy(() -> service.issue(7L, 9L)).isInstanceOf(BadRequestException.class);
         when(payments.findByIdAndAgenceIdForUpdate(9L, 8L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.issue(8L, 9L)).isInstanceOf(ResourceNotFoundException.class);
-        verifyNoInteractions(renderer, storage);
+        verifyNoInteractions(selections, storage);
     }
 
     @Test
-    void failedPersistenceRemovesTheUncommittedFile() {
+    void newFullPaymentReceiptsUseTheNumberedArchiveService() {
         ReglementClient payment = payment();
         when(payments.findByIdAndAgenceIdForUpdate(9L, 7L)).thenReturn(Optional.of(payment));
-        Path file = directory.resolve("failed.pdf");
-        when(storage.resolveClientPremiumReceipt(eq(7L), anyString())).thenReturn(file);
-        when(renderer.render(any(), anyString(), any())).thenReturn(new byte[]{1});
-        when(payments.saveAndFlush(payment)).thenThrow(new IllegalStateException("Save failed"));
+        var receipt = new QuittancePrimeClientService.Receipt("920260000000001", new byte[]{1});
+        when(selections.issueAll(7L, 9L)).thenReturn(receipt);
+        assertThat(service.issue(7L, 9L)).isEqualTo(receipt);
+        when(payments.findByIdAndAgenceId(9L, 7L)).thenReturn(Optional.of(payment));
+        when(selections.readAll(7L, 9L)).thenReturn(receipt);
+        assertThat(service.read(7L, 9L)).isEqualTo(receipt);
+        assertThat(payment.getQuittancePrimeNumero()).isNull();
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void failedIssueDoesNotChangePaymentData() {
+        ReglementClient payment = payment();
+        when(payments.findByIdAndAgenceIdForUpdate(9L, 7L)).thenReturn(Optional.of(payment));
+        when(selections.issueAll(7L, 9L)).thenThrow(new IllegalStateException("Save failed"));
         assertThatThrownBy(() -> service.issue(7L, 9L)).isInstanceOf(IllegalStateException.class);
-        assertThat(Files.exists(file)).isFalse();
+        assertThat(payment.getQuittancePrimeNumero()).isNull();
+        verifyNoInteractions(storage);
     }
 
     private ReglementClient payment() {

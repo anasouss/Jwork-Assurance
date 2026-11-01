@@ -23,10 +23,10 @@ const optionsSchema = z.object({
     })).default([]),
   })),
   archives: z.array(z.union([
-    // Older backends omit null properties; only the explicit "all" archive has no selection.
+    // Only legacy "all" archives may omit policyKeys; new numbered archives send an explicit null for all policies.
     z.object({ ...archiveFields, id: z.literal("all"), policyKeys: z.null().optional() })
       .transform(archive => ({ ...archive, policyKeys: null })),
-    z.object({ ...archiveFields, id: z.string().regex(/^[0-9]+$/), policyKeys: z.array(z.string()).min(1) }),
+    z.object({ ...archiveFields, id: z.string().regex(/^[0-9]+$/), policyKeys: z.array(z.string()).min(1).nullable() }),
   ])),
 });
 

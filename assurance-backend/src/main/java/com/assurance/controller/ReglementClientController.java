@@ -38,6 +38,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -279,6 +280,20 @@ public class ReglementClientController {
     @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
     public ResponseEntity<byte[]> premiumReceipt(@PathVariable Long paymentId) {
         return premiumReceiptResponse(quittancePrimeClientService.read(TenantContext.getCurrentAgence(), paymentId));
+    }
+
+    @DeleteMapping("/{paymentId}/quittance-prime/pdf")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<Void>> deleteLegacyPremiumReceipt(@PathVariable Long paymentId) {
+        quittancePrimeSelectionService.delete(TenantContext.getCurrentAgence(), paymentId, null);
+        return ResponseEntity.ok(ApiResponse.success(null, "Archive de quittance supprimée"));
+    }
+
+    @DeleteMapping("/{paymentId}/quittance-prime/{receiptId}/pdf")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<Void>> deletePremiumReceipt(@PathVariable Long paymentId, @PathVariable Long receiptId) {
+        quittancePrimeSelectionService.delete(TenantContext.getCurrentAgence(), paymentId, receiptId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Archive de quittance supprimée"));
     }
 
     private ResponseEntity<byte[]> premiumReceiptResponse(QuittancePrimeClientService.Receipt receipt) {

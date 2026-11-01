@@ -629,6 +629,14 @@ export const comptaApi = {
     return apiFetchBlob(`/api/v1/compta/reglements-clients/${id}/quittance-prime/${receiptId}/pdf`);
   },
 
+  async deletePremiumReceipt(id: string, receiptId: string) {
+    const suffix = receiptId === "all" ? "pdf" : `${receiptId}/pdf`;
+    return unwrap(await apiFetch<ApiResponse<null>>(
+      `/api/v1/compta/reglements-clients/${id}/quittance-prime/${suffix}`,
+      { method: "DELETE" }
+    ));
+  },
+
   async createClientPayment(request: CreateClientPaymentRequest) {
     return normalizeClientPayment(unwrap(await apiFetch<ApiResponse<ClientPayment>>(
       "/api/v1/compta/reglements-clients",

@@ -10,6 +10,7 @@ import com.assurance.repository.ReglementClientRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.assurance.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -62,21 +63,30 @@ public class QuittancePrimeSelectionService {
 
     @Transactional
     public QuittancePrimeClientService.Receipt issue(Long agencyId, Long paymentId, List<String> keys) {
-        ReglementClient payment = payment(agencyId, paymentId, true);
         if (keys == null || keys.isEmpty() || keys.size() > 500
                 || keys.stream().anyMatch(key -> key == null || !key.matches("[CAD]:[0-9]+"))) {
             throw new BadRequestException("Sélectionnez au moins une police du règlement");
         }
-        TreeSet<String> selection = new TreeSet<>(keys);
+        return issueScope(agencyId, paymentId, new TreeSet<>(keys));
+    }
+
+    @Transactional
+    public QuittancePrimeClientService.Receipt issueAll(Long agencyId, Long paymentId) {
+        return issueScope(agencyId, paymentId, null);
+    }
+
+    private QuittancePrimeClientService.Receipt issueScope(Long agencyId, Long paymentId, TreeSet<String> selection) {
+        ReglementClient payment = payment(agencyId, paymentId, true);
         String hash = hash(selection);
         var existing = receipts.findByAgenceIdAndReglementIdAndSelectionHash(agencyId, paymentId, hash);
         if (existing.isPresent()) return stored(agencyId, existing.get());
         var policies = renderer.policies(payment);
         var available = policies.stream().map(QuittancePrimePdfService.PolicyOption::key).toList();
-        if (!available.containsAll(selection)) {
+        if (selection != null && !available.containsAll(selection)) {
             throw new BadRequestException("Une police sélectionnée n'appartient pas à ce règlement");
         }
-        if (policies.stream().anyMatch(policy -> selection.contains(policy.key()) && !policy.eligible())) {
+        if (policies.isEmpty() || policies.stream().anyMatch(policy ->
+                (selection == null || selection.contains(policy.key())) && !policy.eligible())) {
             throw new BadRequestException("La sélection contient des mouvements non couverts ou des moyens rejetés");
         }
         QuittancePrimeSelection receipt = new QuittancePrimeSelection();
@@ -90,7 +100,7 @@ public class QuittancePrimeSelectionService {
             throw new BadRequestException("La sélection de polices ne peut pas être enregistrée");
         }
         receipts.saveAndFlush(receipt);
-        // A separate numeric namespace prevents collisions with legacy full-payment receipts.
+        // The generated ID also gives full-payment reissues a fresh numeric reference.
         String number = String.format(Locale.ROOT, "9%04d%010d", receipt.getDateEmission().getYear(), receipt.getId());
         byte[] pdf = renderer.render(payment, number, receipt.getDateEmission(), selection);
         String key = agencyId + "/" + paymentId + "/" + UUID.randomUUID() + ".pdf";
@@ -124,6 +134,76 @@ public class QuittancePrimeSelectionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Quittance de prime", receiptId)));
     }
 
+    @Transactional(readOnly = true)
+    public QuittancePrimeClientService.Receipt readAll(Long agencyId, Long paymentId) {
+        payment(agencyId, paymentId, false);
+        return stored(agencyId, receipts.findByAgenceIdAndReglementIdAndSelectionHash(agencyId, paymentId, hash(null))
+                .orElseThrow(() -> new BadRequestException("Aucune quittance de prime n'a encore été émise pour ce règlement")));
+    }
+
+    @Transactional
+    public void delete(Long agencyId, Long paymentId, Long receiptId) {
+        ReglementClient payment = payments.findByIdAndAgenceIdForUpdate(paymentId, agencyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
+        String number;
+        Path path;
+        if (receiptId == null) {
+            if (payment.getQuittancePrimeNumero() == null && payment.getQuittancePrimeDateEmission() == null
+                    && payment.getQuittancePrimeCheminStockage() == null) {
+                throw new ResourceNotFoundException("Archive de quittance de prime", paymentId);
+            }
+            number = payment.getQuittancePrimeNumero();
+            path = archivePath(agencyId, paymentId, payment.getQuittancePrimeCheminStockage());
+            payment.setQuittancePrimeNumero(null);
+            payment.setQuittancePrimeDateEmission(null);
+            payment.setQuittancePrimeCheminStockage(null);
+            payments.saveAndFlush(payment);
+        } else {
+            QuittancePrimeSelection receipt = receipts.findByIdAndAgenceIdAndReglementId(receiptId, agencyId, paymentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Quittance de prime", receiptId));
+            number = receipt.getNumero();
+            path = archivePath(agencyId, paymentId, receipt.getCheminStockage());
+            receipts.delete(receipt);
+            receipts.flush();
+        }
+        Long userId = TenantContext.getCurrentUser();
+        Runnable completeDeletion = () -> {
+            deleteFile(path);
+            log.info("Suppression de l'archive de quittance {} du règlement {} (agence {}, utilisateur {})",
+                    number, paymentId, agencyId, userId);
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    completeDeletion.run();
+                }
+            });
+        } else {
+            completeDeletion.run();
+        }
+    }
+
+    private Path archivePath(Long agencyId, Long paymentId, String key) {
+        if (key == null || key.isBlank()) return null;
+        Path storedKey = Path.of(key);
+        if (storedKey.isAbsolute() || storedKey.getNameCount() != 3
+                || !storedKey.getName(0).toString().equals(agencyId.toString())
+                || !storedKey.getName(1).toString().equals(paymentId.toString())) {
+            throw new BadRequestException("Le fichier de quittance n'appartient pas à ce règlement");
+        }
+        return storage.resolveClientPremiumReceipt(agencyId, key);
+    }
+
+    private void deleteFile(Path path) {
+        if (path == null) return;
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException error) {
+            log.error("Archive supprimée de la base, nettoyage du fichier à reprendre : {}", path, error);
+        }
+    }
+
     private ReglementClient payment(Long agencyId, Long paymentId, boolean lock) {
         ReglementClient payment = (lock ? payments.findByIdAndAgenceIdForUpdate(paymentId, agencyId)
                 : payments.findByIdAndAgenceId(paymentId, agencyId))
@@ -149,7 +229,7 @@ public class QuittancePrimeSelectionService {
     private static String hash(TreeSet<String> selection) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(String.join("\n", selection).getBytes(StandardCharsets.UTF_8)));
+                    .digest((selection == null ? "ALL" : String.join("\n", selection)).getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException error) {
             throw new IllegalStateException("SHA-256 indisponible", error);
         }

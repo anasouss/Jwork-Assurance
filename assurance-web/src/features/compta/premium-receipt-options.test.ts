@@ -23,9 +23,14 @@ describe("premium receipt options", () => {
     expect(result.policies[0].montant).toBe(50);
   });
 
-  it.each([undefined, null, []])("rejects incomplete specific selections instead of treating them as all policies: %s", keys => {
+  it.each([undefined, []])("rejects incomplete specific selections instead of treating them as all policies: %s", keys => {
     expect(() => normalizePremiumReceiptOptions({ policies: [policy], archives: [{ ...archive, id: "12", policyKeys: keys }] }))
       .toThrow("réponse des quittances");
+  });
+
+  it("accepts explicitly numbered full-payment archives without confusing them with omitted selections", () => {
+    const full = { ...archive, id: "15", policyKeys: null };
+    expect(normalizePremiumReceiptOptions({ policies: [policy], archives: [full] }).archives[0]).toEqual(full);
   });
 
   it("rejects missing policy descriptions and missing result lists before rendering", () => {

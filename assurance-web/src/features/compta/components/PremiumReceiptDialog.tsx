@@ -1,9 +1,10 @@
 import { Fragment, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive as ArchiveIcon, CornerDownRight, FileText, Printer } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Archive as ArchiveIcon, CornerDownRight, FileText, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import { formatAccountingAmount } from "../format";
 import { premiumReceiptBlockReason } from "../premium-receipt-options";
 import { formatTreasuryDate } from "../pages/treasury-format";
 import type { ClientPayment, PremiumReceiptOptions } from "../types";
+import { useAuthStore } from "@/store/auth-store";
 
 type Archive = PremiumReceiptOptions["archives"][number];
 type Policy = PremiumReceiptOptions["policies"][number];
@@ -24,9 +26,23 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const canDelete = useAuthStore(state => state.user?.permissions?.includes("reglement-client:manage") ?? false);
   const [scope, setScope] = useState("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [opening, setOpening] = useState(false);
+  const [archiveToDelete, setArchiveToDelete] = useState<Archive>();
+  const deleteArchive = useMutation({
+    mutationFn: (archive: Archive) => comptaApi.deletePremiumReceipt(payment.id, archive.id),
+    onSuccess: async (_result, archive) => {
+      queryClient.setQueryData<PremiumReceiptOptions>(["compta", "client-payments", payment.id, "premium-receipts"], current =>
+        current ? { ...current, archives: current.archives.filter(item => item.id !== archive.id) } : current);
+      setArchiveToDelete(undefined);
+      toast.success("Archive de quittance supprimée");
+      await queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] });
+    },
+    onError: error => toast.error(error instanceof Error ? error.message : "Suppression de l'archive impossible"),
+  });
+  const busy = opening || deleteArchive.isPending;
   const options = useQuery({
     queryKey: ["compta", "client-payments", payment.id, "premium-receipts"],
     queryFn: () => comptaApi.premiumReceiptOptions(payment.id),
@@ -78,7 +94,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
   }
 
   return (
-    <Dialog open onOpenChange={open => { if (!open && !opening) onClose(); }}>
+    <Dialog open onOpenChange={open => { if (!open && !busy && !archiveToDelete) onClose(); }}>
       <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
         <DialogHeader className="shrink-0 border-b bg-emerald-50/70 p-5 pr-12 text-left dark:bg-emerald-950/20">
           <div className="flex items-center gap-3">
@@ -95,7 +111,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
             <p>{options.error instanceof Error ? options.error.message : "Chargement impossible"}</p>
             <Button variant="outline" onClick={() => void options.refetch()}>Réessayer</Button>
           </div> : <>
-            <RadioGroup value={scope} onValueChange={setScope} disabled={opening} className="flex flex-wrap gap-x-6 gap-y-3 border-b pb-4">
+            <RadioGroup value={scope} onValueChange={setScope} disabled={busy} className="flex flex-wrap gap-x-6 gap-y-3 border-b pb-4">
               <div className="flex items-center gap-2"><RadioGroupItem id="receipt-all" value="ALL" /><Label htmlFor="receipt-all">Toutes les polices</Label></div>
               <div className="flex items-center gap-2"><RadioGroupItem id="receipt-specific" value="SPECIFIC" /><Label htmlFor="receipt-specific">Polices spécifiques</Label></div>
             </RadioGroup>
@@ -104,7 +120,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                 <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
                   <th className="p-3 text-left">
                     <div className="flex items-center gap-3">
-                    {scope === "SPECIFIC" && <Checkbox aria-label="Sélectionner toutes les polices réglées" disabled={opening || eligiblePolicies.length === 0}
+                    {scope === "SPECIFIC" && <Checkbox aria-label="Sélectionner toutes les polices réglées" disabled={busy || eligiblePolicies.length === 0}
                       checked={eligiblePolicies.length > 0 && eligiblePolicies.every(p => selected.has(p.key)) ? true : eligiblePolicies.some(p => selected.has(p.key)) ? "indeterminate" : false}
                       onCheckedChange={checked => setSelected(checked === true ? new Set(eligiblePolicies.map(p => p.key)) : new Set())} />}
                     Mouvement / prestation
@@ -121,7 +137,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex min-w-0 items-start gap-3">
                           {scope === "SPECIFIC" && <span title={!policy.eligible ? "Une prime n'est pas entièrement couverte ou un moyen de paiement est rejeté." : undefined}>
-                            <Checkbox id={`receipt-${policy.key}`} className="mt-1" disabled={opening || !policy.eligible} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />
+                            <Checkbox id={`receipt-${policy.key}`} className="mt-1" disabled={busy || !policy.eligible} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />
                           </span>}
                           <div className="min-w-0">
                             <label htmlFor={scope === "SPECIFIC" ? `receipt-${policy.key}` : undefined} className="block whitespace-pre-line break-words font-semibold">
@@ -165,7 +181,10 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                     {archive.policyKeys.map(key => policies.find(policy => policy.key === key)?.descriptions[0]?.split("\n")[0]).filter(Boolean).join(" · ") || "Sélection archivée"}
                   </span>}
                 </div>
-                <Button variant="outline" size="icon" className="shrink-0" title={`Ouvrir l'archive ${archive.numero}`} aria-label={`Ouvrir l'archive ${archive.numero}`} disabled={opening} onClick={() => void openPdf(archive)}><Printer className="size-4" /></Button>
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" size="icon" title={`Ouvrir l'archive ${archive.numero}`} aria-label={`Ouvrir l'archive ${archive.numero}`} disabled={busy} onClick={() => void openPdf(archive)}><Printer className="size-4" /></Button>
+                  {canDelete && <Button variant="ghost" size="icon" className="text-destructive hover:bg-red-50 hover:text-destructive dark:hover:bg-red-950/25" title={`Supprimer l'archive ${archive.numero}`} aria-label={`Supprimer l'archive ${archive.numero}`} disabled={busy} onClick={() => setArchiveToDelete(archive)}><Trash2 className="size-4" /></Button>}
+                </div>
               </li>)}</ul>
             </section>}
           </>}
@@ -173,13 +192,30 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
         <DialogFooter className="shrink-0 gap-3 border-t bg-muted/20 px-5 py-4 sm:items-center sm:justify-between">
           <p role="status" className="min-w-0 text-left text-xs text-muted-foreground sm:mr-auto">{blockedReason}</p>
           <div className="flex shrink-0 justify-end gap-2">
-          <Button variant="outline" disabled={opening} onClick={onClose}>Fermer</Button>
-          <Button disabled={opening || !options.data || options.isError || Boolean(blockedReason)} onClick={() => void openPdf(existing)}>
+          <Button variant="outline" disabled={busy} onClick={onClose}>Fermer</Button>
+          <Button disabled={busy || !options.data || options.isError || Boolean(blockedReason)} onClick={() => void openPdf(existing)}>
             {existing ? <Printer className="size-4" /> : <FileText className="size-4" />}{opening ? "Ouverture..." : existing ? "Ouvrir l'archive" : "Émettre la quittance"}
           </Button>
           </div>
         </DialogFooter>
       </DialogContent>
+      <AlertDialog open={Boolean(archiveToDelete)} onOpenChange={open => { if (!open && !deleteArchive.isPending) setArchiveToDelete(undefined); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer définitivement cette archive ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Le PDF et l'archive N° {archiveToDelete?.numero} seront supprimés. Le règlement, ses affectations et les contrats resteront inchangés. Une nouvelle émission recevra un nouveau numéro.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteArchive.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={deleteArchive.isPending || !canDelete} onClick={event => {
+              event.preventDefault();
+              if (archiveToDelete && canDelete) deleteArchive.mutate(archiveToDelete);
+            }}><Trash2 className="size-4" />{deleteArchive.isPending ? "Suppression..." : "Supprimer l'archive"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

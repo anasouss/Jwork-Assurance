@@ -38,14 +38,35 @@ class JournalReglementsPdfServiceTest {
             agencies, mock(UtilisateurRepository.class), mock(AgencyLogoStorageService.class));
 
     @Test
-    void dailyStatementOnlyShowsDateFiltersDetailsAndTotal() throws Exception {
+    void dailyStatementHidesTheAllUsersBoxAndShowsPaymentModeSummary() throws Exception {
         prepare(List.of());
         try (PDDocument pdf = PDDocument.load(generate())) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
-            assertThat(text).contains("Date de l’état : 30/10/2026", "UTILISATEUR", "MODE", "Détail des règlements", "TOTAL")
+            assertThat(text).contains("Date de l’état : 30/10/2026", "UTILISATEUR", "MODE", "Détail des règlements",
+                            "Récapitulatif par mode de règlement", "TOTAL (MAD)", "0,00")
                     .doesNotContain("Tous les modes", "Généré le", "Période", "PÉRIODE", "STATUT DU RÈGLEMENT",
-                            "RÈGLEMENTS ACTIFS", "RÈGLEMENTS ANNULÉS", "MONTANT ANNULÉ", "Synthèse par moyen de paiement");
+                            "Tous les utilisateurs", "RÈGLEMENTS ACTIFS", "RÈGLEMENTS ANNULÉS", "MONTANT ANNULÉ", "Synthèse par moyen de paiement");
+        }
+    }
+
+    @Test
+    void summaryGroupsEachInstrumentOnceByMode() throws Exception {
+        ReglementClient payment = ReglementClient.builder().numero("REG-TEST")
+                .dateReglement(DAY).payeurNom("Client test").statut(StatutReglementClient.VALIDE).build();
+        prepare(List.of(
+                InstrumentReglementClient.builder().reglement(payment).mode(ModeReglementClient.CHEQUE)
+                        .montant(new BigDecimal("200.00")).build(),
+                InstrumentReglementClient.builder().reglement(payment).mode(ModeReglementClient.CHEQUE)
+                        .montant(new BigDecimal("300.00")).build(),
+                InstrumentReglementClient.builder().reglement(payment).mode(ModeReglementClient.ESPECES)
+                        .montant(new BigDecimal("1000.00")).build()));
+        try (PDDocument pdf = PDDocument.load(generate())) {
+            String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
+            String summary = text.substring(text.indexOf("Récapitulatif par mode de règlement"));
+            assertThat(summary).contains("Espèces", "1 000,00", "Chèque", "500,00", "TOTAL (MAD)", "1 500,00")
+                    .doesNotContain("Effet", "Virement", "Versement bancaire");
+            assertThat(text.split("TOTAL", -1)).hasSize(2);
         }
     }
 

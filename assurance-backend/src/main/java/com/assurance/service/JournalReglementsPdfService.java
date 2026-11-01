@@ -35,6 +35,7 @@ import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Div;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
@@ -53,6 +54,7 @@ import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -203,10 +205,13 @@ public class JournalReglementsPdfService {
             PdfFont regular,
             PdfFont bold
     ) {
+        if (user == null) {
+            return;
+        }
         Table filters = new Table(new float[]{1})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setMarginBottom(10);
-        filters.addCell(infoCell("UTILISATEUR", user == null ? "Tous les utilisateurs" : user.getFullName(), regular, bold));
+        filters.addCell(infoCell("UTILISATEUR", user.getFullName(), regular, bold));
         document.add(filters);
     }
 
@@ -264,18 +269,50 @@ public class JournalReglementsPdfService {
                     .setBorder(new SolidBorder(BORDER, 0.45f))
                     .setPadding(10));
         }
-        BigDecimal total = instruments.stream()
-                .map(InstrumentReglementClient::getMontant)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        table.addCell(new Cell(1, columns.length - 1)
-                .add(new Paragraph("TOTAL").setFont(bold).setFontSize(7).setMargin(0))
-                .setTextAlignment(TextAlignment.RIGHT)
-                .setBorder(new SolidBorder(BORDER, 0.4f)).setPadding(4));
-        addBody(table, amount(total), bold, TextAlignment.RIGHT, null);
         document.add(table);
+        writeSummary(document, instruments, regular, bold);
         document.add(new Paragraph(
                 "Les chèques et effets en attente ou remis en banque sont enregistrés, mais ne sont pas encore définitivement encaissés."
         ).setFont(regular).setFontSize(7.5f).setFontColor(MUTED).setMarginTop(8).setMarginBottom(0));
+    }
+
+    private void writeSummary(
+            Document document,
+            List<InstrumentReglementClient> instruments,
+            PdfFont regular,
+            PdfFont bold
+    ) {
+        Map<ModeReglementClient, BigDecimal> totals = new EnumMap<>(ModeReglementClient.class);
+        for (InstrumentReglementClient instrument : instruments) {
+            totals.merge(instrument.getMode(), instrument.getMontant(), BigDecimal::add);
+        }
+        Div summary = new Div().setMarginTop(12).setKeepTogether(true);
+        summary.add(new Paragraph("Récapitulatif par mode de règlement")
+                .setFont(bold).setFontSize(8).setMarginTop(0).setMarginBottom(5));
+        int columns = Math.min(3, totals.size() + 1);
+        Table cards = new Table(UnitValue.createPercentArray(columns))
+                .setWidth(UnitValue.createPercentValue(100));
+        totals.forEach((mode, modeTotal) -> cards.addCell(
+                summaryCard(modeLabel(mode), modeTotal, false, regular, bold)));
+        BigDecimal total = totals.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        cards.addCell(summaryCard("TOTAL (MAD)", total, true, regular, bold));
+        int emptyCells = (columns - (totals.size() + 1) % columns) % columns;
+        for (int index = 0; index < emptyCells; index++) {
+            cards.addCell(cell());
+        }
+        summary.add(cards);
+        document.add(summary);
+    }
+
+    private Cell summaryCard(String label, BigDecimal total, boolean overall, PdfFont regular, PdfFont bold) {
+        Div card = new Div().setBorder(new SolidBorder(overall ? ACCENT : BORDER, 0.6f))
+                .setBackgroundColor(overall ? SOFT_BLUE : ColorConstants.WHITE)
+                .setPadding(8).setKeepTogether(true);
+        card.add(new Paragraph(label).setFont(regular).setFontSize(7)
+                .setFontColor(MUTED).setMargin(0));
+        card.add(new Paragraph(amount(total)).setFont(bold).setFontSize(11)
+                .setMarginTop(4).setMarginBottom(0));
+        return cell().setPaddingRight(6).setPaddingBottom(6).add(card);
     }
 
     private Map<Long, String> assistancePolicyNumbers(List<InstrumentReglementClient> instruments) {

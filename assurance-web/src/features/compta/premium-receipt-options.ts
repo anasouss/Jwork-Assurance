@@ -37,3 +37,24 @@ export function normalizePremiumReceiptOptions(value: unknown): PremiumReceiptOp
   }
   return result.data;
 }
+
+export function premiumReceiptBlockReason({ policies, keys, hasArchive, canIssue, cancelled, hasRejectedInstrument }: {
+  policies: PremiumReceiptOptions["policies"];
+  keys?: string[];
+  hasArchive: boolean;
+  canIssue: boolean;
+  cancelled: boolean;
+  hasRejectedInstrument: boolean;
+}): string | undefined {
+  if (cancelled) return "Le règlement est annulé.";
+  if (keys !== undefined && keys.length === 0) return "Sélectionnez au moins une police éligible.";
+  if (hasArchive) return undefined;
+  if (!canIssue) return "Vous ne disposez pas de l'autorisation d'émettre une quittance.";
+  if (policies.length === 0) return "Aucune prime n'est affectée à ce règlement.";
+  if (keys === undefined && hasRejectedInstrument) return "Le règlement contient un moyen de paiement rejeté.";
+  const selected = keys === undefined ? policies : policies.filter(policy => keys.includes(policy.key));
+  if ((keys !== undefined && selected.length !== keys.length) || selected.some(policy => !policy.eligible)) {
+    return "Une prime n'est pas entièrement couverte ou un moyen de paiement est rejeté.";
+  }
+  return undefined;
+}

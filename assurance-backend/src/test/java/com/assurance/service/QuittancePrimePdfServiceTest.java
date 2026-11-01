@@ -222,28 +222,56 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
-    void pendingChequeAndUnconfirmedAllocationCannotBeIssued() {
+    void pendingChequeAndRegisteredAllocationCanBeIssuedUnderReserve() throws Exception {
         ReglementClient payment = payment(1);
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
-        assertThat(service.policies(payment).get(0).eligible()).isFalse();
+        assertThat(service.policies(payment).get(0).eligible()).isTrue();
         assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("EN_ATTENTE_ENCAISSEMENT");
-        assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
+            assertThat(new PDFTextStripper().getText(pdf)).contains("Sous réserve d'encaissement.")
+                    .doesNotContain("Dont sous réserve d'encaissement", "MONTANT RÉGLÉ");
+        }
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.CONFIRME);
         payment.getInstruments().get(0).getAffectations().get(0).setStatut(StatutAffectationReglement.EN_ATTENTE);
-        assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
+        assertThat(service.policies(payment).get(0).eligible()).isTrue();
     }
 
     @Test
     void partialMovementCannotBeIssuedEvenWithAConfirmedInstrument() {
         ReglementClient payment = payment(1);
-        when(payments.fullySettledElementIds(org.mockito.ArgumentMatchers.eq(7L), anyCollection())).thenReturn(Set.of());
+        when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
+                .thenReturn(new ReglementClientService.ReceiptCoverage(Set.of(), Set.of()));
         assertThat(service.policies(payment).get(0).eligible()).isFalse();
         assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("NON_SOLDEE");
         assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
     }
 
     @Test
-    void aSettledPolicyCanBeSelectedWithoutIncludingAnotherPendingPolicy() throws Exception {
+    void cancelledPaymentAndPartiallyCoveredPendingChequeCannotBeIssued() {
+        ReglementClient payment = payment(1);
+        payment.setStatut(StatutReglementClient.ANNULE);
+        assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
+        payment.setStatut(StatutReglementClient.VALIDE);
+        payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.EN_ATTENTE);
+        when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
+                .thenReturn(new ReglementClientService.ReceiptCoverage(Set.of(), Set.of()));
+        assertThat(service.policies(payment).get(0).eligible()).isFalse();
+        assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void pendingEarlierInstalmentAlsoAddsTheReserveNote() throws Exception {
+        ReglementClient payment = payment(1);
+        when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
+                .thenReturn(new ReglementClientService.ReceiptCoverage(Set.of(1L), Set.of()));
+        assertThat(service.policies(payment).get(0).eligible()).isTrue();
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
+            assertThat(new PDFTextStripper().getText(pdf)).contains("Sous réserve d'encaissement.");
+        }
+    }
+
+    @Test
+    void reserveNoteOnlyIncludesTheSelectedPolicysPendingCollection() throws Exception {
         ReglementClient payment = payment(2);
         var confirmed = payment.getInstruments().get(0);
         confirmed.setMontant(new BigDecimal("200.00"));
@@ -255,9 +283,11 @@ class QuittancePrimePdfServiceTest {
         allocation.setStatut(StatutAffectationReglement.EN_ATTENTE);
         pending.getAffectations().add(allocation);
         payment.getInstruments().add(pending);
-        assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "POLICE-2", "Sous réserve d'encaissement.");
+        }
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now(), Set.of("C:1")))) {
-            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1").doesNotContain("POLICE-2");
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1").doesNotContain("POLICE-2", "Sous réserve d'encaissement.");
         }
     }
 
@@ -333,8 +363,10 @@ class QuittancePrimePdfServiceTest {
             allocation.setId((long) n);
             cheque.getAffectations().add(allocation);
         }
-        when(payments.fullySettledElementIds(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
-                .thenAnswer(call -> Set.copyOf((java.util.Collection<Long>) call.getArgument(1)));
+        when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection())).thenAnswer(call -> {
+            Set<Long> ids = Set.copyOf((java.util.Collection<Long>) call.getArgument(1));
+            return new ReglementClientService.ReceiptCoverage(ids, ids);
+        });
         return payment;
     }
 }

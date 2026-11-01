@@ -2323,15 +2323,15 @@ public class ReglementClientService {
     }
 
     @Transactional(readOnly = true)
-    public Set<Long> fullySettledElementIds(Long agenceId, Collection<Long> requestedIds) {
+    public ReceiptCoverage receiptCoverage(Long agenceId, Collection<Long> requestedIds) {
         List<Long> ids = requestedIds.stream().filter(Objects::nonNull).distinct().toList();
         if (ids.isEmpty()) {
-            return Set.of();
+            return new ReceiptCoverage(Set.of(), Set.of());
         }
         List<ElementFacturable> elements = elementRepository.findClientDocumentSources(agenceId, ids);
         List<Long> scopedIds = elements.stream().map(ElementFacturable::getId).toList();
         if (scopedIds.isEmpty()) {
-            return Set.of();
+            return new ReceiptCoverage(Set.of(), Set.of());
         }
         Map<Long, AllocationAmounts> amounts = new HashMap<>(loadAllocationAmounts(agenceId, scopedIds));
         Map<Long, BigDecimal> totals = elements.stream().collect(Collectors.toMap(
@@ -2350,11 +2350,19 @@ public class ReglementClientService {
                 }
             });
         }
-        return totals.entrySet().stream().filter(entry -> {
-            AllocationAmounts current = amounts.getOrDefault(entry.getKey(), AllocationAmounts.empty());
-            return entry.getValue().signum() > 0 && current.pending().signum() == 0
-                    && current.confirmed().add(current.adjustment()).compareTo(entry.getValue()) >= 0;
-        }).map(Map.Entry::getKey).collect(Collectors.toSet());
+        Set<Long> covered = new HashSet<>();
+        Set<Long> collected = new HashSet<>();
+        totals.forEach((id, total) -> {
+            AllocationAmounts current = amounts.getOrDefault(id, AllocationAmounts.empty());
+            if (total.signum() <= 0) return;
+            BigDecimal settled = current.confirmed().add(current.adjustment());
+            if (settled.add(current.pending()).compareTo(total) >= 0) covered.add(id);
+            if (current.pending().signum() == 0 && settled.compareTo(total) >= 0) collected.add(id);
+        });
+        return new ReceiptCoverage(Set.copyOf(covered), Set.copyOf(collected));
+    }
+
+    public record ReceiptCoverage(Set<Long> covered, Set<Long> collected) {
     }
 
     private Map<Long, AllocationAmounts> loadAllocationAmounts(Long agenceId, Collection<Long> elementIds) {

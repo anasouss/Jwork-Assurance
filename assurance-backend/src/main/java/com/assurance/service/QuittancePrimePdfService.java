@@ -4,6 +4,7 @@ import com.assurance.entity.*;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.RoleClientContrat;
+import com.assurance.enums.StatutReglementClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.AssistanceContratRepository;
 import com.itextpdf.io.font.constants.StandardFonts;
@@ -65,6 +66,9 @@ public class QuittancePrimePdfService {
     }
 
     public byte[] render(ReglementClient payment, String reference, LocalDate issuedOn, Set<String> policyKeys) {
+        if (payment.getStatut() != StatutReglementClient.VALIDE) {
+            throw new BadRequestException("Le règlement annulé ne peut pas donner lieu à une quittance de prime");
+        }
         List<InstrumentReglementClient> instruments = payment.getInstruments().stream()
                 .filter(i -> i.getStatut() != StatutInstrumentReglement.REMPLACE)
                 .sorted(Comparator.comparing(InstrumentReglementClient::getId)).toList();
@@ -93,10 +97,10 @@ public class QuittancePrimePdfService {
             }
             rows = rows.stream().filter(row -> policyKeys.contains(row.selectionKey())).toList();
         }
-        Set<Long> settled = settledElements(payment, rows);
-        if (rows.isEmpty() || !eligible(rows, instruments, settled)
-                || (policyKeys == null && instruments.stream().anyMatch(i -> i.getStatut() != StatutInstrumentReglement.CONFIRME))) {
-            throw new BadRequestException("La quittance est réservée aux mouvements intégralement réglés et encaissés");
+        ReglementClientService.ReceiptCoverage coverage = coverage(payment, rows);
+        if (rows.isEmpty() || !eligible(rows, instruments, coverage.covered())
+                || (policyKeys == null && instruments.stream().anyMatch(i -> i.getStatut() == StatutInstrumentReglement.REJETE))) {
+            throw new BadRequestException("La quittance est réservée aux mouvements intégralement couverts par un règlement enregistré");
         }
         BigDecimal allocated = rows.stream().map(row -> row.applied).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (allocated.compareTo(received) > 0) throw new BadRequestException("Les affectations dépassent le montant du règlement");
@@ -174,6 +178,11 @@ public class QuittancePrimePdfService {
                         i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle(),
                         instrumentDate, amount(instrumentAmount) + " MAD")).setFontSize(8).setMarginTop(0).setMarginBottom(4));
             }
+            if (detailRows.stream().anyMatch(row -> !coverage.collected().contains(row.element.getId()))
+                    || instruments.stream().anyMatch(instrument -> selectedAmount(instrument, selectedKeys).signum() > 0
+                        && instrument.getStatut() != StatutInstrumentReglement.CONFIRME)) {
+                document.add(new Paragraph("Sous réserve d'encaissement.").setFontSize(7).setMarginTop(6));
+            }
             document.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(20).setMarginBottom(25));
             document.close();
             return out.toByteArray();
@@ -188,33 +197,30 @@ public class QuittancePrimePdfService {
         List<PrimeRow> rows = rows(payment, instruments);
         Map<Long, AssistanceContrat> assistance = assistance(payment, rows);
         Map<String, List<PrimeRow>> grouped = new LinkedHashMap<>();
-        Set<Long> settled = settledElements(payment, rows);
+        ReglementClientService.ReceiptCoverage coverage = coverage(payment, rows);
         rows.forEach(row -> grouped.computeIfAbsent(row.selectionKey(), ignored -> new ArrayList<>()).add(row));
         return grouped.entrySet().stream().map(entry -> new PolicyOption(entry.getKey(),
                 entry.getValue().stream().map(row -> row.description(assistance)).distinct().toList(),
                 detailRows(entry.getValue()).stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add),
-                eligible(entry.getValue(), instruments, settled),
-                detailRows(entry.getValue()).stream().map(row -> movementOption(row, instruments, settled, assistance)).toList()))
+                eligible(entry.getValue(), instruments, coverage.covered()),
+                detailRows(entry.getValue()).stream().map(row -> movementOption(row, instruments, coverage, assistance)).toList()))
                 .toList();
     }
 
     private MovementOption movementOption(PrimeRow row, List<InstrumentReglementClient> instruments,
-                                           Set<Long> settled, Map<Long, AssistanceContrat> assistance) {
-        boolean pending = false;
+                                           ReglementClientService.ReceiptCoverage coverage, Map<Long, AssistanceContrat> assistance) {
         boolean confirmed = true;
         for (InstrumentReglementClient instrument : instruments) {
             for (AffectationReglementClient allocation : instrument.getAffectations()) {
                 if (allocation.getStatut() == StatutAffectationReglement.ANNULEE
                         || !matchesMovement(row, allocation)) continue;
-                pending |= instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
-                        || instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
-                        || allocation.getStatut() == StatutAffectationReglement.EN_ATTENTE;
                 confirmed &= instrument.getStatut() == StatutInstrumentReglement.CONFIRME
                         && allocation.getStatut() == StatutAffectationReglement.CONFIRMEE;
             }
         }
-        String status = confirmed && settled.contains(row.element.getId()) ? "REGLEE"
-                : pending ? "EN_ATTENTE_ENCAISSEMENT" : "NON_SOLDEE";
+        String status = !coverage.covered().contains(row.element.getId()) ? "NON_SOLDEE"
+                : confirmed && coverage.collected().contains(row.element.getId()) ? "REGLEE"
+                : "EN_ATTENTE_ENCAISSEMENT";
         String movement = row.element.getMouvementContrat() == null
                 || row.element.getMouvementContrat().getTypeMouvement() == null ? null
                 : row.element.getMouvementContrat().getTypeMouvement().getLibelle();
@@ -233,21 +239,24 @@ public class QuittancePrimePdfService {
                     && Objects.equals(allocation.getDocumentClient().getId(), row.document.getId());
     }
 
-    private Set<Long> settledElements(ReglementClient payment, List<PrimeRow> rows) {
+    private ReglementClientService.ReceiptCoverage coverage(ReglementClient payment, List<PrimeRow> rows) {
         Set<Long> ids = rows.stream().flatMap(row -> row.elements().stream()).map(ElementFacturable::getId)
                 .collect(java.util.stream.Collectors.toSet());
-        return paymentService.fullySettledElementIds(payment.getAgence().getId(), ids);
+        return paymentService.receiptCoverage(payment.getAgence().getId(), ids);
     }
 
-    private static boolean eligible(List<PrimeRow> rows, List<InstrumentReglementClient> instruments, Set<Long> settled) {
+    private static boolean eligible(List<PrimeRow> rows, List<InstrumentReglementClient> instruments, Set<Long> covered) {
         Set<String> keys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
-        return rows.stream().flatMap(row -> row.elements().stream()).allMatch(element -> settled.contains(element.getId()))
+        return rows.stream().flatMap(row -> row.elements().stream()).allMatch(element -> covered.contains(element.getId()))
                 && instruments.stream().allMatch(instrument -> selectedAmount(instrument, keys).signum() == 0
-                        || (instrument.getStatut() == StatutInstrumentReglement.CONFIRME
+                        || ((instrument.getStatut() == StatutInstrumentReglement.CONFIRME
+                                || instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
+                                || instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE)
                             && instrument.getAffectations().stream()
                                 .filter(a -> a.getStatut() != StatutAffectationReglement.ANNULEE)
                                 .filter(a -> keys.contains(new PrimeRow(a.getElementFacturable(), a.getDocumentClient()).selectionKey()))
-                                .allMatch(a -> a.getStatut() == StatutAffectationReglement.CONFIRMEE)));
+                                .allMatch(a -> a.getStatut() == StatutAffectationReglement.CONFIRMEE
+                                        || a.getStatut() == StatutAffectationReglement.EN_ATTENTE)));
     }
 
     private static List<PrimeRow> detailRows(List<PrimeRow> rows) {

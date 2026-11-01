@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
+import { premiumReceiptBlockReason } from "../premium-receipt-options";
 import { formatTreasuryDate } from "../pages/treasury-format";
 import type { ClientPayment, PremiumReceiptOptions } from "../types";
 
@@ -36,10 +37,10 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
   const existing = options.data?.archives.find(archive => keys === undefined
     ? archive.policyKeys === null
     : archive.policyKeys !== null && archive.policyKeys.length === keys.length && archive.policyKeys.every(key => keys.includes(key)));
-  const canIssueSelection = scope === "ALL"
-    ? policies.length > 0 && policies.every(policy => policy.eligible)
-      && payment.instruments.filter(instrument => instrument.statut !== "REMPLACE").every(instrument => instrument.statut === "CONFIRME")
-    : policies.some(policy => selected.has(policy.key)) && policies.filter(policy => selected.has(policy.key)).every(policy => policy.eligible);
+  const blockedReason = options.isSuccess ? premiumReceiptBlockReason({
+    policies, keys, hasArchive: Boolean(existing), canIssue, cancelled: payment.statut === "ANNULE",
+    hasRejectedInstrument: payment.instruments.some(instrument => instrument.statut === "REJETE"),
+  }) : undefined;
 
   function toggle(key: string, checked: boolean) {
     setSelected(current => {
@@ -111,7 +112,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                   </th>
                   <th className="w-32 p-3 text-left">Du / Au</th>
                   <th className="w-32 p-3 text-right">Prime TTC</th>
-                  <th className="w-40 p-3 text-right">État</th>
+                  <th className="w-40 p-3 text-right">Situation</th>
                 </tr></thead>
                 <tbody className="divide-y">{policies.map(policy => <Fragment key={policy.key}>
                   <tr className={policy.eligible && (scope === "ALL" || selected.has(policy.key))
@@ -119,7 +120,9 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                     <td colSpan={4} className="p-3">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex min-w-0 items-start gap-3">
-                          {scope === "SPECIFIC" && <Checkbox id={`receipt-${policy.key}`} className="mt-1" disabled={opening || !policy.eligible} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />}
+                          {scope === "SPECIFIC" && <span title={!policy.eligible ? "Une prime n'est pas entièrement couverte ou un moyen de paiement est rejeté." : undefined}>
+                            <Checkbox id={`receipt-${policy.key}`} className="mt-1" disabled={opening || !policy.eligible} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />
+                          </span>}
                           <div className="min-w-0">
                             <label htmlFor={scope === "SPECIFIC" ? `receipt-${policy.key}` : undefined} className="block whitespace-pre-line break-words font-semibold">
                               {policy.descriptions.join("\n")}
@@ -128,6 +131,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                               {policy.mouvements.length > 0 ? `${policy.mouvements.length} mouvement${policy.mouvements.length > 1 ? "s" : ""}` : "Détail indisponible"}
                               {policy.key.startsWith("D:") ? " · Affectation globale au document" : ""}
                             </div>
+                            {!policy.eligible && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">Prime non entièrement couverte ou moyen rejeté.</p>}
                           </div>
                         </div>
                         <div className="shrink-0 space-y-1.5 text-right">
@@ -166,11 +170,14 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
             </section>}
           </>}
         </div>
-        <DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-4">
+        <DialogFooter className="shrink-0 gap-3 border-t bg-muted/20 px-5 py-4 sm:items-center sm:justify-between">
+          <p role="status" className="min-w-0 text-left text-xs text-muted-foreground sm:mr-auto">{blockedReason}</p>
+          <div className="flex shrink-0 justify-end gap-2">
           <Button variant="outline" disabled={opening} onClick={onClose}>Fermer</Button>
-          <Button disabled={opening || !options.data || options.isError || (keys !== undefined && keys.length === 0) || (!existing && (!canIssue || !canIssueSelection))} onClick={() => void openPdf(existing)}>
+          <Button disabled={opening || !options.data || options.isError || Boolean(blockedReason)} onClick={() => void openPdf(existing)}>
             {existing ? <Printer className="size-4" /> : <FileText className="size-4" />}{opening ? "Ouverture..." : existing ? "Ouvrir l'archive" : "Émettre la quittance"}
           </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -179,14 +186,10 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
 
 function PolicyState({ policy }: { policy: Policy }) {
   if (policy.eligible) return <Badge variant="success">Éligible</Badge>;
-  if (policy.mouvements.some(movement => movement.statut === "EN_ATTENTE_ENCAISSEMENT")) {
-    return <Badge variant="info">Encaissement en attente</Badge>;
-  }
   return <Badge variant="warning">Non éligible</Badge>;
 }
 
 function MovementState({ movement }: { movement: Movement }) {
-  if (movement.statut === "REGLEE") return <Badge variant="success">Réglé</Badge>;
-  if (movement.statut === "EN_ATTENTE_ENCAISSEMENT") return <Badge variant="info">En attente</Badge>;
-  return <Badge variant="warning">Non soldé</Badge>;
+  if (movement.statut === "REGLEE" || movement.statut === "EN_ATTENTE_ENCAISSEMENT") return <Badge variant="success">Couvert</Badge>;
+  return <Badge variant="warning">Non couvert</Badge>;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePremiumReceiptOptions } from "./premium-receipt-options";
+import { normalizePremiumReceiptOptions, premiumReceiptBlockReason } from "./premium-receipt-options";
 
 const policy = { key: "C:1", descriptions: ["POL-1\nAssureur"], montant: 50, eligible: true };
 const archive = { id: "all", numero: "2026000001", dateEmission: "2026-10-31" };
@@ -54,5 +54,38 @@ describe("premium receipt options", () => {
 
   it("rejects malformed movement details instead of dropping movements silently", () => {
     expect(() => normalizePremiumReceiptOptions({ policies: [{ ...policy, mouvements: [{ libelle: "Extension garanties" }] }], archives: [] })).toThrow();
+  });
+});
+
+describe("premium receipt action messages", () => {
+  const base = {
+    policies: normalizePremiumReceiptOptions({ policies: [policy], archives: [] }).policies,
+    hasArchive: false, canIssue: true, cancelled: false, hasRejectedInstrument: false,
+  };
+
+  it("allows fully covered registered payments even before bank collection", () => {
+    const pending = normalizePremiumReceiptOptions({ policies: [{ ...policy, mouvements: [{
+      elementFacturableId: "1", libelle: "Affaire nouvelle", montant: 50, statut: "EN_ATTENTE_ENCAISSEMENT",
+    }] }], archives: [] }).policies;
+    expect(premiumReceiptBlockReason({ ...base, policies: pending })).toBeUndefined();
+  });
+
+  it("explains empty selections, missing permission and cancelled payments", () => {
+    expect(premiumReceiptBlockReason({ ...base, keys: [] })).toContain("Sélectionnez");
+    expect(premiumReceiptBlockReason({ ...base, canIssue: false })).toContain("autorisation");
+    expect(premiumReceiptBlockReason({ ...base, cancelled: true, hasArchive: true })).toContain("annulé");
+  });
+
+  it("explains insufficient coverage and rejected payment instruments", () => {
+    expect(premiumReceiptBlockReason({ ...base, policies: base.policies.map(p => ({ ...p, eligible: false })) })).toContain("pas entièrement couverte");
+    expect(premiumReceiptBlockReason({ ...base, hasRejectedInstrument: true })).toContain("rejeté");
+  });
+
+  it("does not block a valid specific selection because another policy has a rejection", () => {
+    expect(premiumReceiptBlockReason({ ...base, keys: ["C:1"], hasRejectedInstrument: true })).toBeUndefined();
+  });
+
+  it("preserves access to an existing archive without allowing a new issue", () => {
+    expect(premiumReceiptBlockReason({ ...base, hasArchive: true, canIssue: false, hasRejectedInstrument: true })).toBeUndefined();
   });
 });

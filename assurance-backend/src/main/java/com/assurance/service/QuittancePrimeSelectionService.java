@@ -77,7 +77,7 @@ public class QuittancePrimeSelectionService {
             throw new BadRequestException("Une police sélectionnée n'appartient pas à ce règlement");
         }
         if (policies.stream().anyMatch(policy -> selection.contains(policy.key()) && !policy.eligible())) {
-            throw new BadRequestException("La sélection contient des mouvements non soldés ou en attente d'encaissement");
+            throw new BadRequestException("La sélection contient des mouvements non couverts ou des moyens rejetés");
         }
         QuittancePrimeSelection receipt = new QuittancePrimeSelection();
         receipt.setAgence(payment.getAgence());

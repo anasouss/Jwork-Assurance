@@ -99,25 +99,29 @@ class ReglementClientAdjustmentTest {
                 new Object[]{1L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("120.00")}));
         when(ecartRepository.sumByElementIds(7L, List.of(1L))).thenReturn(Collections.singletonList(
                 new Object[]{1L, new BigDecimal("9.00")}));
-        assertThat(service.fullySettledElementIds(7L, List.of(1L))).containsExactly(1L);
+        var coverage = service.receiptCoverage(7L, List.of(1L));
+        assertThat(coverage.covered()).containsExactly(1L);
+        assertThat(coverage.collected()).containsExactly(1L);
     }
 
     @Test
-    void receiptEligibilityRejectsPendingAndPartialBalances() {
+    void receiptEligibilityAcceptsFullPendingCoverageButRejectsPartialBalances() {
         when(elementRepository.findClientDocumentSources(7L, List.of(1L))).thenReturn(List.of(element()));
         amounts(StatutAffectationReglement.EN_ATTENTE, "320.00", "9.00");
-        assertThat(service.fullySettledElementIds(7L, List.of(1L))).isEmpty();
+        var pending = service.receiptCoverage(7L, List.of(1L));
+        assertThat(pending.covered()).containsExactly(1L);
+        assertThat(pending.collected()).isEmpty();
         amounts(StatutAffectationReglement.CONFIRMEE, "319.00", "9.00");
-        assertThat(service.fullySettledElementIds(7L, List.of(1L))).isEmpty();
+        assertThat(service.receiptCoverage(7L, List.of(1L)).covered()).isEmpty();
     }
 
     @Test
     void missingOrForeignAgencySourcesAreNeverEligible() {
-        assertThat(service.fullySettledElementIds(8L, List.of(1L))).isEmpty();
+        assertThat(service.receiptCoverage(8L, List.of(1L)).covered()).isEmpty();
     }
 
     @Test
-    void receiptEligibilityIncludesConfirmedParentInvoicePaymentsButNotPendingOnes() {
+    void receiptCoverageIncludesParentInvoicePaymentsAndPreservesPendingCollection() {
         ElementFacturable element = element();
         Agence agency = new Agence();
         agency.setId(7L);
@@ -133,10 +137,12 @@ class ReglementClientAdjustmentTest {
                 new Object[]{1L, new BigDecimal("9.00")}));
         when(allocationRepository.sumParentByDocumentIds(List.of(10L))).thenReturn(Collections.singletonList(
                 new Object[]{10L, StatutAffectationReglement.EN_ATTENTE, new BigDecimal("320.00")}));
-        assertThat(service.fullySettledElementIds(7L, List.of(1L))).isEmpty();
+        var pending = service.receiptCoverage(7L, List.of(1L));
+        assertThat(pending.covered()).containsExactly(1L);
+        assertThat(pending.collected()).isEmpty();
         when(allocationRepository.sumParentByDocumentIds(List.of(10L))).thenReturn(Collections.singletonList(
                 new Object[]{10L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("320.00")}));
-        assertThat(service.fullySettledElementIds(7L, List.of(1L))).containsExactly(1L);
+        assertThat(service.receiptCoverage(7L, List.of(1L)).collected()).containsExactly(1L);
     }
 
     @Test

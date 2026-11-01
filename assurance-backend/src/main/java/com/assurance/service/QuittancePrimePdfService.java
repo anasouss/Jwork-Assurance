@@ -28,6 +28,7 @@ import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.property.TextAlignment;
+import com.itextpdf.layout.property.VerticalAlignment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -135,12 +136,17 @@ public class QuittancePrimePdfService {
                     row.selectionKey().equals(firstRow.selectionKey())
                             && Objects.equals(row.element.getDateDebut(), firstRow.element.getDateDebut())
                             && Objects.equals(row.element.getDateFin(), firstRow.element.getDateFin()));
-            writeHeader(document, payment, reference, issuedOn, detailRows, assistance, sharedPolicyAndPeriod, normal, bold);
+            writeHeader(document, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, normal, bold);
+            if (sharedPolicyAndPeriod) {
+                document.add(new Paragraph().add(new Text("Période de garantie : ").setFont(bold))
+                        .add("du " + date(firstRow.element.getDateDebut()) + " au " + date(firstRow.element.getDateFin()))
+                        .setFontSize(8).setMarginTop(0).setMarginBottom(6).setKeepWithNext(true));
+            }
             BigDecimal premiumTotal = detailRows.stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add);
             Table detail = new Table(sharedPolicyAndPeriod
-                    ? new float[]{1.9f, 1.1f, 1, 0.9f, 1.1f}
-                    : new float[]{1.2f, 1.8f, 0.95f, 0.95f, 1, 1, 0.9f, 1.1f}).useAllAvailableWidth();
-            List<String> columns = new ArrayList<>(List.of("CATÉGORIE"));
+                    ? new float[]{1.2f, 2, 1.1f, 1, 0.9f, 1.1f}
+                    : new float[]{1.1f, 1.8f, 1.2f, 0.9f, 0.9f, 1, 0.85f, 0.75f, 1}).useAllAvailableWidth();
+            List<String> columns = new ArrayList<>(List.of("CATÉGORIE", "MOUVEMENT"));
             if (!sharedPolicyAndPeriod) columns.addAll(List.of("N° POLICE", "DU", "AU"));
             columns.addAll(List.of("PRIME NETTE", "TAXES", "ACC.", "TTC"));
             for (String column : columns) {
@@ -149,6 +155,7 @@ public class QuittancePrimePdfService {
             }
             for (PrimeRow row : detailRows) {
                 add(detail, row.branchNames(assistance), normal, false);
+                add(detail, movementLabel(row, assistance), normal, false);
                 if (!sharedPolicyAndPeriod) {
                     add(detail, row.policyNumbers(assistance), normal, false);
                     add(detail, date(row.element.getDateDebut()), normal, false);
@@ -169,19 +176,9 @@ public class QuittancePrimePdfService {
             for (InstrumentReglementClient i : instruments) {
                 BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
                 if (instrumentAmount.signum() == 0) continue;
-                String instrumentDate = switch (i.getMode()) {
-                    case CHEQUE -> label("Date du chèque", i.getDateInstrument() == null ? null : date(i.getDateInstrument()));
-                    case EFFET -> label("Échéance", i.getDateEcheance() == null ? null : date(i.getDateEcheance()));
-                    default -> label("Date", i.getDateInstrument() == null ? null : date(i.getDateInstrument()));
-                };
                 document.add(new Paragraph(join(mode(i), label("N°", i.getReferenceInstrument()),
-                        i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle(),
-                        instrumentDate, amount(instrumentAmount) + " MAD")).setFontSize(8).setMarginTop(0).setMarginBottom(4));
-            }
-            if (detailRows.stream().anyMatch(row -> !coverage.collected().contains(row.element.getId()))
-                    || instruments.stream().anyMatch(instrument -> selectedAmount(instrument, selectedKeys).signum() > 0
-                        && instrument.getStatut() != StatutInstrumentReglement.CONFIRME)) {
-                document.add(new Paragraph("Sous réserve d'encaissement.").setFontSize(7).setMarginTop(6));
+                        i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle()))
+                        .setFontSize(8).setMarginTop(0).setMarginBottom(4));
             }
             document.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(20).setMarginBottom(25));
             document.close();
@@ -221,15 +218,18 @@ public class QuittancePrimePdfService {
         String status = !coverage.covered().contains(row.element.getId()) ? "NON_SOLDEE"
                 : confirmed && coverage.collected().contains(row.element.getId()) ? "REGLEE"
                 : "EN_ATTENTE_ENCAISSEMENT";
+        return new MovementOption(row.element.getId(), row.document == null ? null : row.document.getId(),
+                movementLabel(row, assistance), row.element.getDateDebut(), row.element.getDateFin(), row.total(), status);
+    }
+
+    private String movementLabel(PrimeRow row, Map<Long, AssistanceContrat> assistance) {
         String movement = row.element.getMouvementContrat() == null
                 || row.element.getMouvementContrat().getTypeMouvement() == null ? null
                 : row.element.getMouvementContrat().getTypeMouvement().getLibelle();
         AssistanceContrat support = assistance.get(row.element.getId());
         if (support != null) movement = "Assistance - " + value(first(support.getProduit(), row.element.getLibelle()));
         if (row.document != null) movement = first(row.lines().get(0).getMouvement(), movement);
-        return new MovementOption(row.element.getId(), row.document == null ? null : row.document.getId(),
-                value(first(movement, row.element.getLibelle())), row.element.getDateDebut(), row.element.getDateFin(),
-                row.total(), status);
+        return value(first(movement, row.element.getLibelle()));
     }
 
     private static boolean matchesMovement(PrimeRow row, AffectationReglementClient allocation) {
@@ -299,26 +299,24 @@ public class QuittancePrimePdfService {
                                  LocalDate dateDebut, LocalDate dateFin, BigDecimal montant, String statut) {
     }
 
-    private void writeHeader(Document document, ReglementClient payment, String reference, LocalDate issuedOn,
+    private void writeHeader(Document document, ReglementClient payment, String reference,
                              List<PrimeRow> rows, Map<Long, AssistanceContrat> assistance,
                              boolean sharedPolicyAndPeriod, PdfFont normal, PdfFont bold) {
-        Table header = new Table(new float[]{1, 2}).useAllAvailableWidth();
-        Cell brand = new Cell().setBorder(Border.NO_BORDER);
+        Table header = new Table(new float[]{1, 3, 1}).useAllAvailableWidth().setKeepTogether(true).setMarginBottom(14);
+        Cell brand = new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE);
         byte[] logo = logoStorage.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
-        if (logo != null && logo.length > 0) brand.add(new Image(ImageDataFactory.create(logo)).scaleToFit(155, 58));
+        if (logo != null && logo.length > 0) brand.add(new Image(ImageDataFactory.create(logo)).scaleToFit(85, 42));
         else brand.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(14));
         header.addCell(brand);
         Agence agency = payment.getAgence();
-        header.addCell(new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT)
-                .add(new Paragraph(join(agency.getAdresse(), agency.getVille())).setFontSize(8).setMargin(0))
-                .add(new Paragraph(join(agency.getTelephone(), agency.getEmail())).setFontSize(7).setMargin(0)));
+        header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .add(new Paragraph().add(new Text("QUITTANCE DE PRIME").setUnderline()).setFont(bold).setFontSize(17)
+                        .setTextAlignment(TextAlignment.CENTER).setMargin(0)));
+        header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0));
         document.add(header);
-        document.add(new Paragraph("QUITTANCE DE PRIME").setFont(bold).setFontSize(17)
-                .setTextAlignment(TextAlignment.CENTER).setMarginTop(10).setMarginBottom(12));
         Table identity = new Table(new float[]{1, 1}).useAllAvailableWidth().setMarginBottom(12).setKeepTogether(true);
         Cell details = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
         addField(details, "N° quittance", reference, normal, bold);
-        addField(details, "Date d'émission", date(issuedOn), normal, bold);
         addField(details, "Intermédiaire", agency.getNom(), normal, bold);
         String companies = String.join(" · ", rows.stream()
                 .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().toList());
@@ -326,8 +324,6 @@ public class QuittancePrimePdfService {
         if (sharedPolicyAndPeriod) {
             PrimeRow row = rows.get(0);
             addField(details, "N° police", row.policyNumbers(assistance), normal, bold);
-            addField(details, "Période de garantie", "du " + date(row.element.getDateDebut())
-                    + " au " + date(row.element.getDateFin()), normal, bold);
         }
         identity.addCell(details);
         Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);

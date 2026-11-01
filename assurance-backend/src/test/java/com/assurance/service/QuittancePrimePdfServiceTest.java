@@ -32,25 +32,27 @@ class QuittancePrimePdfServiceTest {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
             assertThat(text).contains("QUITTANCE DE PRIME", "2026000001", "POLICE-1", "POLICE-2", "200,00");
-            assertThat(text).contains("SOUSCRIPTEUR", "Souscripteur test", "Adresse", "Ville", "Intermédiaire", "N° quittance", "Date d'émission",
+            assertThat(text).contains("SOUSCRIPTEUR", "Souscripteur test", "Adresse", "Ville", "Intermédiaire", "N° quittance",
                     "CATÉGORIE", "N° POLICE", "Mode de règlement", "Chèque", "CH-001", "01/10/2026", "30/09/2027");
-            assertThat(text).contains("CATÉGORIE N° POLICE DU AU PRIME NETTE TAXES ACC. TTC", "TOTAL", "400,00");
+            assertThat(text).contains("CATÉGORIE MOUVEMENT N° POLICE DU AU PRIME NETTE TAXES ACC. TTC", "Affaire nouvelle", "TOTAL", "400,00");
             assertThat(text).doesNotContain("BRANCHE / MOUVEMENT", "Prime assurance", "Total de la sélection", "Montants en MAD");
             assertThat(text).doesNotContain("MONTANT RÉGLÉ", "TOTAL AFFECTÉ", "sous réserve d'encaissement", "Dont encaissé", "Dont acompte non affecté", "MONTANT (MAD)");
             assertThat(text).doesNotContain("0,25%", "TVA", "FICHE DE RÈGLEMENT CLIENT");
-            assertThat(text).doesNotContain("Payeur", "Réf. règlement", "Date du règlement", "Reçu de règlement émis par le cabinet",
+            assertThat(text).doesNotContain("Payeur", "Réf. règlement", "Date du règlement", "Date d'émission", "Date du chèque", "Reçu de règlement émis par le cabinet",
                     "Les primes des mouvements", "Ce document ne vaut", "Assuré :");
         }
     }
 
     @Test
-    void singlePolicyAndPeriodAppearOnlyInTheHeaderWithACenteredTitle() throws Exception {
+    void sharedPeriodAppearsBetweenTheIdentityBlockAndTableWithACenteredTitle() throws Exception {
         try (PDDocument pdf = PDDocument.load(service.render(payment(1), "2026000001", LocalDate.now()))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
             assertThat(text).contains("N° police : POLICE-1", "Période de garantie : du 01/10/2026 au 30/09/2027",
-                    "CATÉGORIE PRIME NETTE TAXES ACC. TTC", "Rue du client", "Agadir");
+                    "CATÉGORIE MOUVEMENT PRIME NETTE TAXES ACC. TTC", "Rue du client", "Agadir");
             assertThat(text).doesNotContain("N° POLICE DU AU");
             assertThat(text.split("POLICE-1", -1)).hasSize(2);
+            assertThat(text.indexOf("Période de garantie")).isGreaterThan(text.indexOf("Ville : Agadir"))
+                    .isLessThan(text.indexOf("CATÉGORIE"));
             float[] titleCenter = {Float.NaN};
             float[] left = {Float.NaN};
             float[] right = {Float.NaN};
@@ -59,8 +61,9 @@ class QuittancePrimePdfServiceTest {
                 protected void writeString(String content, List<TextPosition> glyphs) throws java.io.IOException {
                     if (!glyphs.isEmpty()) {
                         if (content.contains("QUITTANCE DE PRIME")) {
-                            TextPosition last = glyphs.get(glyphs.size() - 1);
-                            titleCenter[0] = (glyphs.get(0).getXDirAdj() + last.getXDirAdj() + last.getWidthDirAdj()) / 2;
+                            List<TextPosition> titleGlyphs = glyphs.stream().filter(glyph -> glyph.getFontSizeInPt() > 16).toList();
+                            TextPosition last = titleGlyphs.get(titleGlyphs.size() - 1);
+                            titleCenter[0] = (titleGlyphs.get(0).getXDirAdj() + last.getXDirAdj() + last.getWidthDirAdj()) / 2;
                         }
                         if (content.contains("N° quittance")) left[0] = glyphs.get(0).getXDirAdj();
                         if (content.contains("SOUSCRIPTEUR")) right[0] = glyphs.get(0).getXDirAdj();
@@ -77,6 +80,30 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
+    void agencyContactDetailsAppearOnlyInTheFooter() throws Exception {
+        ReglementClient payment = payment(1);
+        payment.getAgence().setAdresse("Adresse agence en pied de page");
+        payment.getAgence().setTelephone("0528000000");
+        payment.getAgence().setEmail("footer@example.test");
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
+            String text = new PDFTextStripper().getText(pdf);
+            assertThat(text.split("Adresse agence en pied de page", -1)).hasSize(2);
+            assertThat(text.split("0528000000", -1)).hasSize(2);
+            assertThat(text.split("footer@example\\.test", -1)).hasSize(2);
+            PDFTextStripper positions = new PDFTextStripper() {
+                @Override
+                protected void writeString(String content, List<TextPosition> glyphs) throws java.io.IOException {
+                    if (content.contains("Adresse agence en pied de page") && !glyphs.isEmpty()) {
+                        assertThat(glyphs.get(0).getYDirAdj()).isGreaterThan(700);
+                    }
+                    super.writeString(content, glyphs);
+                }
+            };
+            positions.getText(pdf);
+        }
+    }
+
+    @Test
     void differentPeriodsOnTheSamePolicyStayInTheTable() throws Exception {
         ReglementClient payment = payment(2);
         var allocations = payment.getInstruments().get(0).getAffectations();
@@ -84,7 +111,7 @@ class QuittancePrimePdfServiceTest {
         allocations.get(1).getElementFacturable().setDateDebut(LocalDate.of(2026, 11, 1));
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
-            assertThat(text).contains("CATÉGORIE N° POLICE DU AU", "01/10/2026", "01/11/2026");
+            assertThat(text).contains("CATÉGORIE MOUVEMENT N° POLICE DU AU", "01/10/2026", "01/11/2026");
             assertThat(text).doesNotContain("Période de garantie");
         }
     }
@@ -130,13 +157,13 @@ class QuittancePrimePdfServiceTest {
         assertThat(service.policies(payment)).hasSize(2);
         try (PDDocument pdf = PDDocument.load(service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
-            assertThat(text).contains("POLICE-1", "CH-001", "200,00 MAD");
-            assertThat(text).doesNotContain("POLICE-2", "400,00 MAD");
+            assertThat(text).contains("POLICE-1", "CH-001", "TOTAL 200,00");
+            assertThat(text).doesNotContain("POLICE-2", "400,00");
         }
     }
 
     @Test
-    void selectionRejectsUnknownPoliciesAndKeepsRepeatedPolicyMovementsTogether() {
+    void selectionRejectsUnknownPoliciesAndKeepsRepeatedPolicyMovementsTogether() throws Exception {
         ReglementClient payment = payment(2);
         assertThatThrownBy(() -> service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:999")))
                 .isInstanceOf(BadRequestException.class);
@@ -160,6 +187,10 @@ class QuittancePrimePdfServiceTest {
                 assertThat(movement.dateDebut()).isEqualTo(LocalDate.of(2026, 10, 1));
             });
         });
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
+            String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
+            assertThat(text).contains("MOUVEMENT", "Affaire nouvelle", "Extension garanties", "TOTAL 400,00");
+        }
     }
 
     @Test
@@ -210,7 +241,7 @@ class QuittancePrimePdfServiceTest {
     void longReceiptRetainsLastPolicyAndTotalsAcrossPages() throws Exception {
         try (PDDocument pdf = PDDocument.load(service.render(payment(60), "2026000060", LocalDate.now()))) {
             assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
-            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-60", "12 000,00 MAD");
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-60", "12 000,00");
         }
     }
 
@@ -222,14 +253,14 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
-    void pendingChequeAndRegisteredAllocationCanBeIssuedUnderReserve() throws Exception {
+    void pendingChequeCanBeIssuedWithoutPrintingCollectionDetails() throws Exception {
         ReglementClient payment = payment(1);
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
         assertThat(service.policies(payment).get(0).eligible()).isTrue();
         assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("EN_ATTENTE_ENCAISSEMENT");
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
-            assertThat(new PDFTextStripper().getText(pdf)).contains("Sous réserve d'encaissement.")
-                    .doesNotContain("Dont sous réserve d'encaissement", "MONTANT RÉGLÉ");
+            assertThat(new PDFTextStripper().getText(pdf)).contains("Chèque", "CH-001")
+                    .doesNotContain("Sous réserve d'encaissement", "Date du chèque", "200,00 MAD", "MONTANT RÉGLÉ");
         }
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.CONFIRME);
         payment.getInstruments().get(0).getAffectations().get(0).setStatut(StatutAffectationReglement.EN_ATTENTE);
@@ -260,18 +291,18 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
-    void pendingEarlierInstalmentAlsoAddsTheReserveNote() throws Exception {
+    void pendingEarlierInstalmentDoesNotAddCollectionText() throws Exception {
         ReglementClient payment = payment(1);
         when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
                 .thenReturn(new ReglementClientService.ReceiptCoverage(Set.of(1L), Set.of()));
         assertThat(service.policies(payment).get(0).eligible()).isTrue();
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
-            assertThat(new PDFTextStripper().getText(pdf)).contains("Sous réserve d'encaissement.");
+            assertThat(new PDFTextStripper().getText(pdf)).doesNotContain("Sous réserve d'encaissement");
         }
     }
 
     @Test
-    void reserveNoteOnlyIncludesTheSelectedPolicysPendingCollection() throws Exception {
+    void selectedPoliciesRemainIndependentOfOtherPendingCollections() throws Exception {
         ReglementClient payment = payment(2);
         var confirmed = payment.getInstruments().get(0);
         confirmed.setMontant(new BigDecimal("200.00"));
@@ -284,7 +315,7 @@ class QuittancePrimePdfServiceTest {
         pending.getAffectations().add(allocation);
         payment.getInstruments().add(pending);
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
-            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "POLICE-2", "Sous réserve d'encaissement.");
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "POLICE-2").doesNotContain("Sous réserve d'encaissement");
         }
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now(), Set.of("C:1")))) {
             assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1").doesNotContain("POLICE-2", "Sous réserve d'encaissement.");
@@ -292,15 +323,16 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
-    void fullySettledInstalmentsShowFullPremiumButOnlyTheCurrentPaymentsActualModeAmount() throws Exception {
+    void settledInstalmentsShowTheFullPremiumWithoutChangingActualPaymentAmounts() throws Exception {
         ReglementClient payment = payment(1);
         payment.setMontantTotal(new BigDecimal("50.00"));
         payment.getInstruments().get(0).setMontant(new BigDecimal("50.00"));
         payment.getInstruments().get(0).getAffectations().get(0).setMontant(new BigDecimal("50.00"));
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
-            assertThat(text).contains("TOTAL 200,00", "50,00 MAD");
-            assertThat(text).doesNotContain("MONTANT RÉGLÉ", "sous réserve");
+            assertThat(text).contains("TOTAL 200,00", "CH-001");
+            assertThat(text).doesNotContain("50,00 MAD", "MONTANT RÉGLÉ", "sous réserve");
+            assertThat(payment.getInstruments().get(0).getMontant()).isEqualByComparingTo("50.00");
         }
     }
 
@@ -312,8 +344,9 @@ class QuittancePrimePdfServiceTest {
         payment.getInstruments().get(0).getAffectations().get(0).setMontant(new BigDecimal("191.00"));
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
-            assertThat(text).contains("TOTAL 200,00", "191,00 MAD");
-            assertThat(text).doesNotContain("Écart", "écart", "MONTANT RÉGLÉ");
+            assertThat(text).contains("TOTAL 200,00", "CH-001");
+            assertThat(text).doesNotContain("191,00 MAD", "Écart", "écart", "MONTANT RÉGLÉ");
+            assertThat(payment.getInstruments().get(0).getMontant()).isEqualByComparingTo("191.00");
         }
     }
 
@@ -353,6 +386,8 @@ class QuittancePrimePdfServiceTest {
             contract.getClients().add(ContratClient.builder().contrat(contract).client(subscriber)
                     .role(RoleClientContrat.PROPRIETAIRE).principalPourRole(true).build());
             ElementFacturable element = ElementFacturable.builder().agence(agency).contrat(contract).libelle("Prime assurance")
+                    .mouvementContrat(MouvementContrat.builder()
+                            .typeMouvement(TypeMouvementContrat.builder().libelle("Affaire nouvelle").build()).build())
                     .dateDebut(LocalDate.of(2026, 10, 1)).dateFin(LocalDate.of(2027, 9, 30))
                     .primeNette(new BigDecimal("160.00")).taxe(new BigDecimal("30.00"))
                     .taxeParafiscale(BigDecimal.ZERO).accessoire(new BigDecimal("10.00")).cnpac(BigDecimal.ZERO)

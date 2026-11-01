@@ -96,6 +96,16 @@ class QuittancePrimeSelectionServiceTest {
     }
 
     @Test
+    void refusesIneligiblePoliciesBeforeCreatingAnArchive() {
+        ReglementClient payment = prepare();
+        when(renderer.policies(payment)).thenReturn(List.of(
+                new QuittancePrimePdfService.PolicyOption("C:1", List.of("P1"), new BigDecimal("50.00"), false)));
+        assertThatThrownBy(() -> service.issue(7L, 9L, List.of("C:1"))).isInstanceOf(BadRequestException.class);
+        verify(receipts, never()).saveAndFlush(any());
+        verify(renderer, never()).render(any(), anyString(), any(), anySet());
+    }
+
+    @Test
     void missingArchiveNeverRegeneratesFromLiveFinancialData() throws Exception {
         prepare();
         QuittancePrimeSelection receipt = new QuittancePrimeSelection();
@@ -115,8 +125,8 @@ class QuittancePrimeSelectionServiceTest {
         when(payments.findByIdAndAgenceIdForUpdate(9L, 7L)).thenReturn(Optional.of(payment));
         when(payments.findByIdAndAgenceId(9L, 7L)).thenReturn(Optional.of(payment));
         when(renderer.policies(payment)).thenReturn(List.of(
-                new QuittancePrimePdfService.PolicyOption("C:1", List.of("P1"), new BigDecimal("50.00")),
-                new QuittancePrimePdfService.PolicyOption("C:2", List.of("P2"), new BigDecimal("75.00"))));
+                new QuittancePrimePdfService.PolicyOption("C:1", List.of("P1"), new BigDecimal("50.00"), true),
+                new QuittancePrimePdfService.PolicyOption("C:2", List.of("P2"), new BigDecimal("75.00"), true)));
         when(renderer.render(eq(payment), anyString(), any(), anySet())).thenReturn(new byte[]{1, 2, 3});
         when(storage.resolveClientPremiumReceipt(eq(7L), anyString()))
                 .thenAnswer(call -> directory.resolve((String) call.getArgument(1)));

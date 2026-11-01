@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizePremiumReceiptOptions } from "./premium-receipt-options";
 
-const policy = { key: "C:1", descriptions: ["POL-1\nAssureur"], montant: 50 };
+const policy = { key: "C:1", descriptions: ["POL-1\nAssureur"], montant: 50, eligible: true };
 const archive = { id: "all", numero: "2026000001", dateEmission: "2026-10-31" };
 
 describe("premium receipt options", () => {
@@ -31,5 +31,10 @@ describe("premium receipt options", () => {
   it("rejects missing policy descriptions and missing result lists before rendering", () => {
     expect(() => normalizePremiumReceiptOptions({ policies: [{ key: "C:1", montant: 50 }], archives: [] })).toThrow();
     expect(() => normalizePremiumReceiptOptions({ policies: [] })).toThrow();
+  });
+  it("preserves backend eligibility and disables issuance if an older backend omits it", () => {
+    expect(normalizePremiumReceiptOptions({ policies: [policy], archives: [] }).policies[0].eligible).toBe(true);
+    expect(normalizePremiumReceiptOptions({ policies: [{ ...policy, eligible: false }], archives: [] }).policies[0].eligible).toBe(false);
+    expect(normalizePremiumReceiptOptions({ policies: [{ key: "C:1", descriptions: ["P1"], montant: 50 }], archives: [] }).policies[0].eligible).toBe(false);
   });
 });

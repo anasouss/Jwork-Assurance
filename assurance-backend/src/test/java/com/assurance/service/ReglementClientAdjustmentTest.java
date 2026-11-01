@@ -4,11 +4,18 @@ import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
 import com.assurance.entity.ElementFacturable;
+import com.assurance.entity.Agence;
+import com.assurance.entity.DocumentClient;
+import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.Quittance;
 import com.assurance.enums.StatutAffectationReglement;
+import com.assurance.enums.StatutDocumentClient;
+import com.assurance.enums.TypeDocumentClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.AffectationReglementClientRepository;
 import com.assurance.repository.EcartReglementClientRepository;
+import com.assurance.repository.ElementFacturableRepository;
+import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.QuittanceRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +46,8 @@ class ReglementClientAdjustmentTest {
     @Mock private AffectationReglementClientRepository allocationRepository;
     @Mock private EcartReglementClientRepository ecartRepository;
     @Mock private QuittanceRepository quittanceRepository;
+    @Mock private ElementFacturableRepository elementRepository;
+    @Mock private LigneDocumentClientRepository documentLineRepository;
     @Mock private ParametreApplicationService parametreApplicationService;
     @InjectMocks private ReglementClientService service;
 
@@ -80,6 +89,54 @@ class ReglementClientAdjustmentTest {
     @Test
     void cancellationExcludingPaymentAndAdjustmentRestoresTheFullBalance() {
         assertThat(receivable().getSoldeOuvert()).isEqualByComparingTo("329.00");
+    }
+
+    @Test
+    void receiptEligibilityCountsConfirmedInstalmentsAndTheAuthorisedAdjustment() {
+        when(elementRepository.findClientDocumentSources(7L, List.of(1L))).thenReturn(List.of(element()));
+        when(allocationRepository.sumByElementIds(List.of(1L))).thenReturn(List.of(
+                new Object[]{1L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("200.00")},
+                new Object[]{1L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("120.00")}));
+        when(ecartRepository.sumByElementIds(7L, List.of(1L))).thenReturn(Collections.singletonList(
+                new Object[]{1L, new BigDecimal("9.00")}));
+        assertThat(service.fullySettledElementIds(7L, List.of(1L))).containsExactly(1L);
+    }
+
+    @Test
+    void receiptEligibilityRejectsPendingAndPartialBalances() {
+        when(elementRepository.findClientDocumentSources(7L, List.of(1L))).thenReturn(List.of(element()));
+        amounts(StatutAffectationReglement.EN_ATTENTE, "320.00", "9.00");
+        assertThat(service.fullySettledElementIds(7L, List.of(1L))).isEmpty();
+        amounts(StatutAffectationReglement.CONFIRMEE, "319.00", "9.00");
+        assertThat(service.fullySettledElementIds(7L, List.of(1L))).isEmpty();
+    }
+
+    @Test
+    void missingOrForeignAgencySourcesAreNeverEligible() {
+        assertThat(service.fullySettledElementIds(8L, List.of(1L))).isEmpty();
+    }
+
+    @Test
+    void receiptEligibilityIncludesConfirmedParentInvoicePaymentsButNotPendingOnes() {
+        ElementFacturable element = element();
+        Agence agency = new Agence();
+        agency.setId(7L);
+        DocumentClient invoice = DocumentClient.builder().agence(agency).typeDocument(TypeDocumentClient.FACTURE).build();
+        invoice.setId(10L);
+        LigneDocumentClient line = LigneDocumentClient.builder().document(invoice).elementFacturable(element)
+                .ordre(0).montantTtc(new BigDecimal("329.00")).build();
+        invoice.getLignes().add(line);
+        when(elementRepository.findClientDocumentSources(7L, List.of(1L))).thenReturn(List.of(element));
+        when(documentLineRepository.findIssuedDocumentsByElementIds(List.of(1L), StatutDocumentClient.EMIS))
+                .thenReturn(List.of(line));
+        when(ecartRepository.sumByElementIds(7L, List.of(1L))).thenReturn(Collections.singletonList(
+                new Object[]{1L, new BigDecimal("9.00")}));
+        when(allocationRepository.sumParentByDocumentIds(List.of(10L))).thenReturn(Collections.singletonList(
+                new Object[]{10L, StatutAffectationReglement.EN_ATTENTE, new BigDecimal("320.00")}));
+        assertThat(service.fullySettledElementIds(7L, List.of(1L))).isEmpty();
+        when(allocationRepository.sumParentByDocumentIds(List.of(10L))).thenReturn(Collections.singletonList(
+                new Object[]{10L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("320.00")}));
+        assertThat(service.fullySettledElementIds(7L, List.of(1L))).containsExactly(1L);
     }
 
     @Test

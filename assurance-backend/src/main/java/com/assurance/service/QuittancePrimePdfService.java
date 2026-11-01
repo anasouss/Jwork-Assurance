@@ -3,6 +3,7 @@ package com.assurance.service;
 import com.assurance.entity.*;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.enums.RoleClientContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.AssistanceContratRepository;
 import com.itextpdf.io.font.constants.StandardFonts;
@@ -24,6 +25,7 @@ import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Text;
 import com.itextpdf.layout.property.TextAlignment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -56,6 +58,7 @@ public class QuittancePrimePdfService {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private final AgencyLogoStorageService logoStorage;
     private final AssistanceContratRepository assistanceRepository;
+    private final ReglementClientService paymentService;
 
     public byte[] render(ReglementClient payment, String reference, LocalDate issuedOn) {
         return render(payment, reference, issuedOn, null);
@@ -90,9 +93,10 @@ public class QuittancePrimePdfService {
             }
             rows = rows.stream().filter(row -> policyKeys.contains(row.selectionKey())).toList();
         }
-        if (instruments.stream().anyMatch(i -> i.getStatut() == StatutInstrumentReglement.REJETE
-                && (policyKeys == null || selectedAmount(i, policyKeys).signum() > 0))) {
-            throw new BadRequestException("Régularisez les moyens impayés avant d'émettre la quittance de prime");
+        Set<Long> settled = settledElements(payment, rows);
+        if (rows.isEmpty() || !eligible(rows, instruments, settled)
+                || (policyKeys == null && instruments.stream().anyMatch(i -> i.getStatut() != StatutInstrumentReglement.CONFIRME))) {
+            throw new BadRequestException("La quittance est réservée aux mouvements intégralement réglés et encaissés");
         }
         BigDecimal allocated = rows.stream().map(row -> row.applied).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (allocated.compareTo(received) > 0) throw new BadRequestException("Les affectations dépassent le montant du règlement");
@@ -121,37 +125,45 @@ public class QuittancePrimePdfService {
                         .setFont(normal).setFontSize(6).setTextAlignment(TextAlignment.CENTER).setMargin(0));
                 footer.close();
             });
-            writeHeader(document, payment, reference, issuedOn, normal, bold);
-            String companies = String.join(" · ", rows.stream().flatMap(row -> row.elements().stream()
-                    .map(e -> row.company(e, assistance.get(e.getId())))).distinct().toList());
-            if (!companies.isBlank()) {
-                document.add(new Paragraph("Assureur(s) : " + companies).setFontSize(7).setMarginTop(5).setMarginBottom(8));
-            }
-            Table detail = new Table(new float[]{1.5f, 2.5f, 1, 1, 1, 1, 1}).useAllAvailableWidth();
-            for (String column : List.of("CATÉGORIE", "N° POLICE", "PRIME NETTE", "TAXES / TPF", "ACC. / CNPAC", "PRIME TOTALE", "MONTANT RÉGLÉ")) {
+            List<PrimeRow> detailRows = detailRows(rows);
+            PrimeRow firstRow = detailRows.get(0);
+            boolean sharedPolicyAndPeriod = detailRows.stream().allMatch(row ->
+                    row.selectionKey().equals(firstRow.selectionKey())
+                            && Objects.equals(row.element.getDateDebut(), firstRow.element.getDateDebut())
+                            && Objects.equals(row.element.getDateFin(), firstRow.element.getDateFin()));
+            writeHeader(document, payment, reference, issuedOn, detailRows, assistance, sharedPolicyAndPeriod, normal, bold);
+            BigDecimal premiumTotal = detailRows.stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add);
+            Table detail = new Table(sharedPolicyAndPeriod
+                    ? new float[]{1.9f, 1.1f, 1, 0.9f, 1.1f}
+                    : new float[]{1.2f, 1.8f, 0.95f, 0.95f, 1, 1, 0.9f, 1.1f}).useAllAvailableWidth();
+            List<String> columns = new ArrayList<>(List.of("CATÉGORIE"));
+            if (!sharedPolicyAndPeriod) columns.addAll(List.of("N° POLICE", "DU", "AU"));
+            columns.addAll(List.of("PRIME NETTE", "TAXES", "ACC.", "TTC"));
+            for (String column : columns) {
                 detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
                         .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5));
             }
-            for (PrimeRow row : rows) {
+            for (PrimeRow row : detailRows) {
                 add(detail, row.branchNames(assistance), normal, false);
-                add(detail, row.policyNumbers(assistance), normal, false);
+                if (!sharedPolicyAndPeriod) {
+                    add(detail, row.policyNumbers(assistance), normal, false);
+                    add(detail, date(row.element.getDateDebut()), normal, false);
+                    add(detail, date(row.element.getDateFin()), normal, false);
+                }
                 add(detail, amount(row.net()), normal, true);
                 add(detail, amount(row.taxes()), normal, true);
                 add(detail, amount(row.fees()), normal, true);
-                add(detail, amount(row.total()), normal, true);
-                add(detail, amount(row.applied), bold, true);
+                add(detail, amount(row.total()), bold, true);
             }
-            if (rows.isEmpty()) detail.addCell(new Cell(1, 7).add(new Paragraph("Aucune prime affectée : acompte non affecté").setMargin(0)).setPadding(7));
-            detail.addCell(new Cell(1, 6).add(new Paragraph("TOTAL AFFECTÉ").setFont(bold).setMargin(0))
+            detail.addCell(new Cell(1, columns.size() - 1).add(new Paragraph("TOTAL").setFont(bold).setMargin(0))
                     .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5));
-            add(detail, amount(allocated), bold, true);
+            add(detail, amount(premiumTotal), bold, true);
             document.add(detail);
-            document.add(new Paragraph("Les primes totales sont les montants des créances concernées. Le montant réglé correspond uniquement à la part affectée par ce règlement.")
-                    .setFontSize(7).setMarginTop(5));
-            document.add(new Paragraph(policyKeys == null ? "Moyen(s) de règlement" : "Moyen(s) de règlement · Part affectée à la sélection")
+            document.add(new Paragraph("Mode de règlement")
                     .setFont(bold).setMarginTop(12).setMarginBottom(4));
+            Set<String> selectedKeys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
             for (InstrumentReglementClient i : instruments) {
-                BigDecimal instrumentAmount = policyKeys == null ? i.getMontant() : selectedAmount(i, policyKeys);
+                BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
                 if (instrumentAmount.signum() == 0) continue;
                 String instrumentDate = switch (i.getMode()) {
                     case CHEQUE -> label("Date du chèque", i.getDateInstrument() == null ? null : date(i.getDateInstrument()));
@@ -162,22 +174,6 @@ public class QuittancePrimePdfService {
                         i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle(),
                         instrumentDate, amount(instrumentAmount) + " MAD")).setFontSize(8).setMarginTop(0).setMarginBottom(4));
             }
-            BigDecimal confirmed = instruments.stream().filter(i -> i.getStatut() == StatutInstrumentReglement.CONFIRME)
-                    .map(i -> policyKeys == null ? i.getMontant() : selectedAmount(i, policyKeys)).reduce(BigDecimal.ZERO, BigDecimal::add);
-            document.add(new Paragraph("Total : " + amount(receiptTotal) + " MAD")
-                    .setFont(bold).setFontSize(11).setTextAlignment(TextAlignment.RIGHT).setMarginTop(12).setMarginBottom(4));
-            if (receiptTotal.compareTo(confirmed) > 0) {
-                document.add(new Paragraph("Dont sous réserve d'encaissement : " + amount(receiptTotal.subtract(confirmed)) + " MAD")
-                        .setFontSize(7).setTextAlignment(TextAlignment.RIGHT).setMargin(0));
-            }
-            if (policyKeys == null && received.compareTo(allocated) > 0) {
-                document.add(new Paragraph("Dont acompte non affecté : " + amount(received.subtract(allocated)) + " MAD")
-                        .setFontSize(7).setTextAlignment(TextAlignment.RIGHT).setMargin(0));
-            }
-            document.add(new Paragraph("Reçu établi par le cabinet pour le règlement référencé, dans la limite des montants imputés. "
-                    + "Les valeurs non définitivement encaissées sont reçues sous réserve d'encaissement. "
-                    + "Ce document ne vaut ni attestation d'assurance ni confirmation du règlement intégral des polices.")
-                    .setFontSize(7).setMarginTop(10));
             document.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(20).setMarginBottom(25));
             document.close();
             return out.toByteArray();
@@ -192,11 +188,41 @@ public class QuittancePrimePdfService {
         List<PrimeRow> rows = rows(payment, instruments);
         Map<Long, AssistanceContrat> assistance = assistance(payment, rows);
         Map<String, List<PrimeRow>> grouped = new LinkedHashMap<>();
+        Set<Long> settled = settledElements(payment, rows);
         rows.forEach(row -> grouped.computeIfAbsent(row.selectionKey(), ignored -> new ArrayList<>()).add(row));
         return grouped.entrySet().stream().map(entry -> new PolicyOption(entry.getKey(),
                 entry.getValue().stream().map(row -> row.description(assistance)).distinct().toList(),
-                entry.getValue().stream().map(row -> row.applied).reduce(BigDecimal.ZERO, BigDecimal::add)))
+                detailRows(entry.getValue()).stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add),
+                eligible(entry.getValue(), instruments, settled)))
                 .toList();
+    }
+
+    private Set<Long> settledElements(ReglementClient payment, List<PrimeRow> rows) {
+        Set<Long> ids = rows.stream().flatMap(row -> row.elements().stream()).map(ElementFacturable::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        return paymentService.fullySettledElementIds(payment.getAgence().getId(), ids);
+    }
+
+    private static boolean eligible(List<PrimeRow> rows, List<InstrumentReglementClient> instruments, Set<Long> settled) {
+        Set<String> keys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
+        return rows.stream().flatMap(row -> row.elements().stream()).allMatch(element -> settled.contains(element.getId()))
+                && instruments.stream().allMatch(instrument -> selectedAmount(instrument, keys).signum() == 0
+                        || (instrument.getStatut() == StatutInstrumentReglement.CONFIRME
+                            && instrument.getAffectations().stream()
+                                .filter(a -> a.getStatut() != StatutAffectationReglement.ANNULEE)
+                                .filter(a -> keys.contains(new PrimeRow(a.getElementFacturable(), a.getDocumentClient()).selectionKey()))
+                                .allMatch(a -> a.getStatut() == StatutAffectationReglement.CONFIRMEE)));
+    }
+
+    private static List<PrimeRow> detailRows(List<PrimeRow> rows) {
+        Map<String, PrimeRow> details = new LinkedHashMap<>();
+        for (PrimeRow row : rows) {
+            for (ElementFacturable element : row.elements()) {
+                String key = (row.document == null ? "" : row.document.getId()) + ":" + element.getId();
+                details.putIfAbsent(key, new PrimeRow(element, row.document));
+            }
+        }
+        return List.copyOf(details.values());
     }
 
     private Map<Long, AssistanceContrat> assistance(ReglementClient payment, List<PrimeRow> rows) {
@@ -220,34 +246,82 @@ public class QuittancePrimePdfService {
                 .map(AffectationReglementClient::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public record PolicyOption(String key, List<String> descriptions, BigDecimal montant) {
+    public record PolicyOption(String key, List<String> descriptions, BigDecimal montant, boolean eligible) {
     }
 
-    private void writeHeader(Document document, ReglementClient payment, String reference, LocalDate issuedOn, PdfFont normal, PdfFont bold) {
+    private void writeHeader(Document document, ReglementClient payment, String reference, LocalDate issuedOn,
+                             List<PrimeRow> rows, Map<Long, AssistanceContrat> assistance,
+                             boolean sharedPolicyAndPeriod, PdfFont normal, PdfFont bold) {
         Table header = new Table(new float[]{1, 2}).useAllAvailableWidth();
         Cell brand = new Cell().setBorder(Border.NO_BORDER);
         byte[] logo = logoStorage.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
         if (logo != null && logo.length > 0) brand.add(new Image(ImageDataFactory.create(logo)).scaleToFit(155, 58));
         else brand.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(14));
         header.addCell(brand);
+        Agence agency = payment.getAgence();
         header.addCell(new Cell().setBorder(Border.NO_BORDER).setTextAlignment(TextAlignment.RIGHT)
-                .add(new Paragraph("QUITTANCE DE PRIME").setFont(bold).setFontSize(17).setMargin(0))
-                .add(new Paragraph("Reçu de règlement émis par le cabinet").setFontSize(8).setMargin(0))
-                .add(new Paragraph("N° " + reference).setFont(bold).setMarginTop(5).setMarginBottom(0)));
+                .add(new Paragraph(join(agency.getAdresse(), agency.getVille())).setFontSize(8).setMargin(0))
+                .add(new Paragraph(join(agency.getTelephone(), agency.getEmail())).setFontSize(7).setMargin(0)));
         document.add(header);
-        Table identity = new Table(new float[]{1.15f, 2.5f, 1.25f, 1.8f}).useAllAvailableWidth().setMarginTop(12).setKeepTogether(true);
-        addIdentity(identity, "Payeur", value(payment.getPayeurNom()), "Date d'émission", date(issuedOn), normal, bold);
-        addIdentity(identity, "Adresse", payerAddress(payment), "Réf. règlement", value(payment.getNumero()), normal, bold);
-        addIdentity(identity, "Intermédiaire", value(payment.getAgence().getNom()), "Date du règlement", date(payment.getDateReglement()), normal, bold);
+        document.add(new Paragraph("QUITTANCE DE PRIME").setFont(bold).setFontSize(17)
+                .setTextAlignment(TextAlignment.CENTER).setMarginTop(10).setMarginBottom(12));
+        Table identity = new Table(new float[]{1, 1}).useAllAvailableWidth().setMarginBottom(12).setKeepTogether(true);
+        Cell details = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
+        addField(details, "N° quittance", reference, normal, bold);
+        addField(details, "Date d'émission", date(issuedOn), normal, bold);
+        addField(details, "Intermédiaire", agency.getNom(), normal, bold);
+        String companies = String.join(" · ", rows.stream()
+                .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().toList());
+        addField(details, "Assureur(s)", companies, normal, bold);
+        if (sharedPolicyAndPeriod) {
+            PrimeRow row = rows.get(0);
+            addField(details, "N° police", row.policyNumbers(assistance), normal, bold);
+            addField(details, "Période de garantie", "du " + date(row.element.getDateDebut())
+                    + " au " + date(row.element.getDateFin()), normal, bold);
+        }
+        identity.addCell(details);
+        Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
+        Map<Client, List<PrimeRow>> bySubscriber = new LinkedHashMap<>();
+        for (PrimeRow row : rows) {
+            Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);
+            bySubscriber.computeIfAbsent(subscriber, ignored -> new ArrayList<>()).add(row);
+        }
+        parties.add(new Paragraph(bySubscriber.size() == 1 ? "SOUSCRIPTEUR" : "SOUSCRIPTEURS")
+                .setFont(bold).setFontSize(8).setMarginBottom(6));
+        bySubscriber.forEach((subscriber, sourceRows) -> {
+            addField(parties, "Nom", subscriber == null ? null : subscriber.getNomAffichage(), normal, bold);
+            addField(parties, "Adresse", subscriber == null ? null : subscriber.getAdresse(), normal, bold);
+            addField(parties, "Ville", subscriber == null || subscriber.getVille() == null
+                    ? null : subscriber.getVille().getNom(), normal, bold);
+            if (bySubscriber.size() > 1) {
+                addField(parties, "Police(s)", String.join(" · ", sourceRows.stream()
+                        .map(row -> row.policyNumbers(assistance)).distinct().toList()), normal, bold);
+            }
+            String insured = String.join(" · ", sourceRows.stream()
+                    .map(row -> party(row.element.getContrat(), RoleClientContrat.PROPRIETAIRE))
+                    .filter(client -> client != null && !sameClient(client, subscriber))
+                    .map(Client::getNomAffichage).filter(name -> name != null && !name.isBlank()).distinct().toList());
+            if (!insured.isBlank()) addField(parties, "Assuré", insured, normal, bold);
+        });
+        identity.addCell(parties);
         document.add(identity);
     }
 
-    private static void addIdentity(Table table, String leftLabel, String leftValue, String rightLabel, String rightValue,
-                                    PdfFont normal, PdfFont bold) {
-        add(table, leftLabel, bold, false);
-        add(table, leftValue, normal, false);
-        add(table, rightLabel, bold, false);
-        add(table, rightValue, normal, false);
+    private static void addField(Cell cell, String label, String text, PdfFont normal, PdfFont bold) {
+        cell.add(new Paragraph().add(new Text(label + " : ").setFont(bold))
+                .add(new Text(value(text)).setFont(normal)).setFontSize(8).setMarginTop(0).setMarginBottom(4));
+    }
+
+    private static Client party(Contrat contract, RoleClientContrat role) {
+        if (contract == null) return null;
+        return contract.getClients().stream().filter(link -> link.getRole() == role && link.getClient() != null)
+                .min(Comparator.comparing(link -> !Boolean.TRUE.equals(link.getPrincipalPourRole())))
+                .map(ContratClient::getClient).orElse(null);
+    }
+
+    private static boolean sameClient(Client first, Client second) {
+        return first == second || (first != null && second != null && first.getId() != null
+                && first.getId().equals(second.getId()));
     }
 
     private List<PrimeRow> rows(ReglementClient payment, List<InstrumentReglementClient> instruments) {
@@ -388,11 +462,6 @@ public class QuittancePrimePdfService {
     }
     private static String join(String... parts) {
         return String.join(" · ", Arrays.stream(parts).filter(s -> s != null && !s.isBlank()).toList());
-    }
-    private static String payerAddress(ReglementClient payment) {
-        Client payer = payment.getClientPayeur();
-        if (payer == null && payment.getGroupePayeur() != null) payer = payment.getGroupePayeur().getClientTresorerie();
-        return payer == null ? "-" : value(payer.getAdresse());
     }
     private static String mode(InstrumentReglementClient i) {
         return switch (i.getMode()) {

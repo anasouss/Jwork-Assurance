@@ -27,10 +27,15 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
     queryFn: () => comptaApi.premiumReceiptOptions(payment.id),
   });
   const policies = options.data?.policies ?? [];
+  const eligiblePolicies = policies.filter(policy => policy.eligible);
   const keys = scope === "ALL" ? undefined : policies.filter(p => selected.has(p.key)).map(p => p.key);
   const existing = options.data?.archives.find(archive => keys === undefined
     ? archive.policyKeys === null
     : archive.policyKeys !== null && archive.policyKeys.length === keys.length && archive.policyKeys.every(key => keys.includes(key)));
+  const canIssueSelection = scope === "ALL"
+    ? policies.length > 0 && policies.every(policy => policy.eligible)
+      && payment.instruments.filter(instrument => instrument.statut !== "REMPLACE").every(instrument => instrument.statut === "CONFIRME")
+    : policies.some(policy => selected.has(policy.key)) && policies.filter(policy => selected.has(policy.key)).every(policy => policy.eligible);
 
   function toggle(key: string, checked: boolean) {
     setSelected(current => {
@@ -87,19 +92,20 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
               <table className="w-full text-sm">
                 <thead className="bg-muted/60 text-xs uppercase text-muted-foreground"><tr>
                   {scope === "SPECIFIC" && <th className="w-10 p-3">
-                    <Checkbox aria-label="Sélectionner toutes les polices" disabled={opening || policies.length === 0}
-                      checked={policies.length > 0 && policies.every(p => selected.has(p.key)) ? true : policies.some(p => selected.has(p.key)) ? "indeterminate" : false}
-                      onCheckedChange={checked => setSelected(checked === true ? new Set(policies.map(p => p.key)) : new Set())} />
+                    <Checkbox aria-label="Sélectionner toutes les polices réglées" disabled={opening || eligiblePolicies.length === 0}
+                      checked={eligiblePolicies.length > 0 && eligiblePolicies.every(p => selected.has(p.key)) ? true : eligiblePolicies.some(p => selected.has(p.key)) ? "indeterminate" : false}
+                      onCheckedChange={checked => setSelected(checked === true ? new Set(eligiblePolicies.map(p => p.key)) : new Set())} />
                   </th>}
-                  <th className="p-3 text-left">Police / assureur</th><th className="p-3 text-right">Montant affecté</th>
+                  <th className="p-3 text-left">Police / assureur</th><th className="p-3 text-right">Prime TTC</th>
                 </tr></thead>
                 <tbody className="divide-y">{policies.map(policy => <tr key={policy.key} className={scope === "ALL" || selected.has(policy.key) ? "bg-primary/5" : ""}>
                   {scope === "SPECIFIC" && <td className="p-3 align-top">
-                    <Checkbox id={`receipt-${policy.key}`} disabled={opening} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />
+                    <Checkbox id={`receipt-${policy.key}`} disabled={opening || !policy.eligible} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />
                   </td>}
                   <td className="p-3">
                     <label htmlFor={scope === "SPECIFIC" ? `receipt-${policy.key}` : undefined} className="block cursor-pointer whitespace-pre-line break-words">
                       {policy.descriptions.join("\n")}
+                      {!policy.eligible && <span className="mt-1 block text-xs text-muted-foreground">Non soldée ou encaissement en attente</span>}
                       {policy.key.startsWith("D:") && <span className="mt-1 block text-xs text-muted-foreground">Affectation globale au document</span>}
                     </label>
                   </td>
@@ -123,7 +129,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
           </>}
         <DialogFooter>
           <Button variant="outline" disabled={opening} onClick={onClose}>Fermer</Button>
-          <Button disabled={opening || !options.data || options.isError || (keys !== undefined && keys.length === 0) || (!existing && !canIssue)} onClick={() => void openPdf(existing)}>
+          <Button disabled={opening || !options.data || options.isError || (keys !== undefined && keys.length === 0) || (!existing && (!canIssue || !canIssueSelection))} onClick={() => void openPdf(existing)}>
             <FileText className="size-4" />{opening ? "Ouverture..." : existing ? "Ouvrir la quittance" : "Émettre la quittance"}
           </Button>
         </DialogFooter>

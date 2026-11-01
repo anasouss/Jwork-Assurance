@@ -623,7 +623,7 @@ export type CreateRemittanceSlipRequest = {
 };
 
 export type PremiumReceiptOptions = {
-  policies: { key: string; descriptions: string[]; montant: number }[];
+  policies: { key: string; descriptions: string[]; montant: number; eligible: boolean }[];
   archives: { id: string; numero: string; dateEmission: string; policyKeys: string[] | null }[];
 };
 

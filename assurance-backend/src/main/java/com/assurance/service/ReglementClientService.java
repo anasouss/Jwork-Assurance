@@ -2322,6 +2322,41 @@ public class ReglementClientService {
         return result;
     }
 
+    @Transactional(readOnly = true)
+    public Set<Long> fullySettledElementIds(Long agenceId, Collection<Long> requestedIds) {
+        List<Long> ids = requestedIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        List<ElementFacturable> elements = elementRepository.findClientDocumentSources(agenceId, ids);
+        List<Long> scopedIds = elements.stream().map(ElementFacturable::getId).toList();
+        if (scopedIds.isEmpty()) {
+            return Set.of();
+        }
+        Map<Long, AllocationAmounts> amounts = new HashMap<>(loadAllocationAmounts(agenceId, scopedIds));
+        Map<Long, BigDecimal> totals = elements.stream().collect(Collectors.toMap(
+                ElementFacturable::getId, element -> money(element.getPrimeTotale())));
+        Map<Long, DocumentClient> invoices = new LinkedHashMap<>();
+        documentLineRepository.findIssuedDocumentsByElementIds(scopedIds, StatutDocumentClient.EMIS).stream()
+                .map(LigneDocumentClient::getDocument)
+                .filter(document -> document.getTypeDocument() == TypeDocumentClient.FACTURE
+                        && agenceId.equals(document.getAgence().getId()))
+                .forEach(document -> invoices.putIfAbsent(document.getId(), document));
+        for (DocumentClient invoice : invoices.values()) {
+            amounts.putAll(invoiceLineAllocationAmounts(invoice));
+            invoice.getLignes().forEach(line -> {
+                if (totals.containsKey(line.getElementFacturable().getId())) {
+                    totals.put(line.getElementFacturable().getId(), money(line.getMontantTtc()));
+                }
+            });
+        }
+        return totals.entrySet().stream().filter(entry -> {
+            AllocationAmounts current = amounts.getOrDefault(entry.getKey(), AllocationAmounts.empty());
+            return entry.getValue().signum() > 0 && current.pending().signum() == 0
+                    && current.confirmed().add(current.adjustment()).compareTo(entry.getValue()) >= 0;
+        }).map(Map.Entry::getKey).collect(Collectors.toSet());
+    }
+
     private Map<Long, AllocationAmounts> loadAllocationAmounts(Long agenceId, Collection<Long> elementIds) {
         if (elementIds.isEmpty()) {
             return Map.of();

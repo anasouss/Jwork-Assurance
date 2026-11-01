@@ -71,9 +71,13 @@ public class QuittancePrimeSelectionService {
         String hash = hash(selection);
         var existing = receipts.findByAgenceIdAndReglementIdAndSelectionHash(agencyId, paymentId, hash);
         if (existing.isPresent()) return stored(agencyId, existing.get());
-        var available = renderer.policies(payment).stream().map(QuittancePrimePdfService.PolicyOption::key).toList();
+        var policies = renderer.policies(payment);
+        var available = policies.stream().map(QuittancePrimePdfService.PolicyOption::key).toList();
         if (!available.containsAll(selection)) {
             throw new BadRequestException("Une police sélectionnée n'appartient pas à ce règlement");
+        }
+        if (policies.stream().anyMatch(policy -> selection.contains(policy.key()) && !policy.eligible())) {
+            throw new BadRequestException("La sélection contient des mouvements non soldés ou en attente d'encaissement");
         }
         QuittancePrimeSelection receipt = new QuittancePrimeSelection();
         receipt.setAgence(payment.getAgence());

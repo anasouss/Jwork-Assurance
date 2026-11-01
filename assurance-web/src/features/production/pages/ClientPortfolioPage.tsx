@@ -317,8 +317,8 @@ function ProductionSection({
       />
       {contracts.length ? (
         <Table>
-          <TableHeader className="bg-emerald-700 text-white">
-            <TableRow className="hover:bg-emerald-700">
+          <TableHeader className="bg-emerald-600 text-white dark:bg-emerald-700">
+            <TableRow className="hover:bg-emerald-600 dark:hover:bg-emerald-700">
               <TableHead className="w-52 px-3 text-white">
                 <Select value={branchId} onValueChange={onBranchChange}>
                   <SelectTrigger

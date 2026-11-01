@@ -11,6 +11,7 @@ const optionsSchema = z.object({
     key: z.string(),
     descriptions: z.array(z.string()).min(1),
     montant: z.number().finite(),
+    eligible: z.boolean().default(false),
   })),
   archives: z.array(z.union([
     // Older backends omit null properties; only the explicit "all" archive has no selection.

@@ -37,4 +37,22 @@ describe("premium receipt options", () => {
     expect(normalizePremiumReceiptOptions({ policies: [{ ...policy, eligible: false }], archives: [] }).policies[0].eligible).toBe(false);
     expect(normalizePremiumReceiptOptions({ policies: [{ key: "C:1", descriptions: ["P1"], montant: 50 }], archives: [] }).policies[0].eligible).toBe(false);
   });
+
+  it("preserves every movement under its policy with dates, amounts and collection status", () => {
+    const mouvements = [
+      { elementFacturableId: "9007199254740993", libelle: "Affaire nouvelle", dateDebut: "2026-10-28", dateFin: "2027-08-27", montant: 5940.21, statut: "EN_ATTENTE_ENCAISSEMENT" },
+      { elementFacturableId: "9007199254740994", documentClientId: "10", libelle: "Extension garanties", dateDebut: "2026-10-29", dateFin: "2027-08-27", montant: 137.78, statut: "EN_ATTENTE_ENCAISSEMENT" },
+    ];
+    const result = normalizePremiumReceiptOptions({ policies: [{ ...policy, montant: 6077.99, eligible: false, mouvements }], archives: [archive] });
+    expect(result.policies[0].mouvements).toEqual(mouvements);
+    expect(result.archives[0].id).toBe("all");
+  });
+
+  it("handles omitted movement details from older backends without crashing", () => {
+    expect(normalizePremiumReceiptOptions({ policies: [policy], archives: [] }).policies[0].mouvements).toEqual([]);
+  });
+
+  it("rejects malformed movement details instead of dropping movements silently", () => {
+    expect(() => normalizePremiumReceiptOptions({ policies: [{ ...policy, mouvements: [{ libelle: "Extension garanties" }] }], archives: [] })).toThrow();
+  });
 });

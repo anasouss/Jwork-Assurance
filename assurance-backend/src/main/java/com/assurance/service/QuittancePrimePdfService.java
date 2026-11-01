@@ -193,8 +193,44 @@ public class QuittancePrimePdfService {
         return grouped.entrySet().stream().map(entry -> new PolicyOption(entry.getKey(),
                 entry.getValue().stream().map(row -> row.description(assistance)).distinct().toList(),
                 detailRows(entry.getValue()).stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add),
-                eligible(entry.getValue(), instruments, settled)))
+                eligible(entry.getValue(), instruments, settled),
+                detailRows(entry.getValue()).stream().map(row -> movementOption(row, instruments, settled, assistance)).toList()))
                 .toList();
+    }
+
+    private MovementOption movementOption(PrimeRow row, List<InstrumentReglementClient> instruments,
+                                           Set<Long> settled, Map<Long, AssistanceContrat> assistance) {
+        boolean pending = false;
+        boolean confirmed = true;
+        for (InstrumentReglementClient instrument : instruments) {
+            for (AffectationReglementClient allocation : instrument.getAffectations()) {
+                if (allocation.getStatut() == StatutAffectationReglement.ANNULEE
+                        || !matchesMovement(row, allocation)) continue;
+                pending |= instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
+                        || instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
+                        || allocation.getStatut() == StatutAffectationReglement.EN_ATTENTE;
+                confirmed &= instrument.getStatut() == StatutInstrumentReglement.CONFIRME
+                        && allocation.getStatut() == StatutAffectationReglement.CONFIRMEE;
+            }
+        }
+        String status = confirmed && settled.contains(row.element.getId()) ? "REGLEE"
+                : pending ? "EN_ATTENTE_ENCAISSEMENT" : "NON_SOLDEE";
+        String movement = row.element.getMouvementContrat() == null
+                || row.element.getMouvementContrat().getTypeMouvement() == null ? null
+                : row.element.getMouvementContrat().getTypeMouvement().getLibelle();
+        AssistanceContrat support = assistance.get(row.element.getId());
+        if (support != null) movement = "Assistance - " + value(first(support.getProduit(), row.element.getLibelle()));
+        if (row.document != null) movement = first(row.lines().get(0).getMouvement(), movement);
+        return new MovementOption(row.element.getId(), row.document == null ? null : row.document.getId(),
+                value(first(movement, row.element.getLibelle())), row.element.getDateDebut(), row.element.getDateFin(),
+                row.total(), status);
+    }
+
+    private static boolean matchesMovement(PrimeRow row, AffectationReglementClient allocation) {
+        return allocation.getElementFacturable() != null
+                ? Objects.equals(allocation.getElementFacturable().getId(), row.element.getId())
+                : row.document != null && allocation.getDocumentClient() != null
+                    && Objects.equals(allocation.getDocumentClient().getId(), row.document.getId());
     }
 
     private Set<Long> settledElements(ReglementClient payment, List<PrimeRow> rows) {
@@ -246,7 +282,12 @@ public class QuittancePrimePdfService {
                 .map(AffectationReglementClient::getMontant).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public record PolicyOption(String key, List<String> descriptions, BigDecimal montant, boolean eligible) {
+    public record PolicyOption(String key, List<String> descriptions, BigDecimal montant, boolean eligible,
+                               List<MovementOption> mouvements) {
+    }
+
+    public record MovementOption(Long elementFacturableId, Long documentClientId, String libelle,
+                                 LocalDate dateDebut, LocalDate dateFin, BigDecimal montant, String statut) {
     }
 
     private void writeHeader(Document document, ReglementClient payment, String reference, LocalDate issuedOn,

@@ -623,7 +623,21 @@ export type CreateRemittanceSlipRequest = {
 };
 
 export type PremiumReceiptOptions = {
-  policies: { key: string; descriptions: string[]; montant: number; eligible: boolean }[];
+  policies: {
+    key: string;
+    descriptions: string[];
+    montant: number;
+    eligible: boolean;
+    mouvements: {
+      elementFacturableId: string;
+      documentClientId?: string | null;
+      libelle: string;
+      dateDebut?: string | null;
+      dateFin?: string | null;
+      montant: number;
+      statut: "REGLEE" | "EN_ATTENTE_ENCAISSEMENT" | "NON_SOLDEE";
+    }[];
+  }[];
   archives: { id: string; numero: string; dateEmission: string; policyKeys: string[] | null }[];
 };
 

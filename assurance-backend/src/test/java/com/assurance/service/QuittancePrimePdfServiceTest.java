@@ -142,10 +142,23 @@ class QuittancePrimePdfServiceTest {
                 .isInstanceOf(BadRequestException.class);
         var allocations = payment.getInstruments().get(0).getAffectations();
         allocations.get(1).getElementFacturable().setContrat(allocations.get(0).getElementFacturable().getContrat());
+        allocations.get(0).getElementFacturable().setMouvementContrat(MouvementContrat.builder()
+                .typeMouvement(TypeMouvementContrat.builder().libelle("Affaire nouvelle").build()).build());
+        allocations.get(1).getElementFacturable().setMouvementContrat(MouvementContrat.builder()
+                .typeMouvement(TypeMouvementContrat.builder().libelle("Extension garanties").build()).build());
         assertThat(service.policies(payment)).singleElement().satisfies(option -> {
             assertThat(option.key()).isEqualTo("C:1");
             assertThat(option.montant()).isEqualByComparingTo("400.00");
             assertThat(option.eligible()).isTrue();
+            assertThat(option.mouvements()).extracting(QuittancePrimePdfService.MovementOption::libelle)
+                    .containsExactly("Affaire nouvelle", "Extension garanties");
+            assertThat(option.mouvements()).extracting(QuittancePrimePdfService.MovementOption::elementFacturableId)
+                    .containsExactly(1L, 2L);
+            assertThat(option.mouvements()).allSatisfy(movement -> {
+                assertThat(movement.montant()).isEqualByComparingTo("200.00");
+                assertThat(movement.statut()).isEqualTo("REGLEE");
+                assertThat(movement.dateDebut()).isEqualTo(LocalDate.of(2026, 10, 1));
+            });
         });
     }
 
@@ -184,6 +197,7 @@ class QuittancePrimePdfServiceTest {
         assertThat(service.policies(payment)).singleElement().satisfies(option -> {
             assertThat(option.key()).isEqualTo("D:10");
             assertThat(option.montant()).isEqualByComparingTo("400.00");
+            assertThat(option.mouvements()).hasSize(2);
         });
         assertThatThrownBy(() -> service.render(payment, "920260000000001", LocalDate.now(), Set.of("C:1")))
                 .isInstanceOf(BadRequestException.class);
@@ -212,6 +226,7 @@ class QuittancePrimePdfServiceTest {
         ReglementClient payment = payment(1);
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
         assertThat(service.policies(payment).get(0).eligible()).isFalse();
+        assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("EN_ATTENTE_ENCAISSEMENT");
         assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.CONFIRME);
         payment.getInstruments().get(0).getAffectations().get(0).setStatut(StatutAffectationReglement.EN_ATTENTE);
@@ -223,6 +238,7 @@ class QuittancePrimePdfServiceTest {
         ReglementClient payment = payment(1);
         when(payments.fullySettledElementIds(org.mockito.ArgumentMatchers.eq(7L), anyCollection())).thenReturn(Set.of());
         assertThat(service.policies(payment).get(0).eligible()).isFalse();
+        assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("NON_SOLDEE");
         assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
     }
 

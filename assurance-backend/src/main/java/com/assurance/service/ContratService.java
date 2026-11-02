@@ -863,15 +863,18 @@ public class ContratService {
             contrat.getGaranties().add(contratGarantie);
         }
 
+        List<AssistanceContrat> assistancesCreees = request.getAssistances() == null ? List.of()
+                : persistCreationAssistances(contrat, vehiculesCrees, request, List.of());
         QuittanceCalculService.Resultat quittanceManuelle = buildManualQuittanceResult(request);
         if (!Boolean.TRUE.equals(contrat.getProspection())) {
-            mouvementContratService.creerAffaireNouvelle(
+            MouvementContrat mouvementInitial = mouvementContratService.creerAffaireNouvelle(
                     contrat,
                     vehiculesCrees,
                     remorquesCreees,
                     garantiesCreees,
                     quittanceManuelle
             );
+            bindAssistancesToMovement(assistancesCreees, mouvementInitial);
         }
 
         return toResponse(contrat);
@@ -1362,8 +1365,63 @@ public class ContratService {
         List<ContratGarantie> garantiesCreees = finalMode
                 ? replaceFinalGaranties(contrat, request, vehiculesCrees, remorquesCreees)
                 : replaceRawDraftGaranties(contrat, request, vehiculesCrees, remorquesCreees);
-        List<AssistanceContrat> assistancesCreees = restoreDraftAssistances(contrat, vehiculesCrees, assistanceSnapshots);
+        List<AssistanceContrat> assistancesCreees = finalMode && request.getAssistances() != null
+                ? persistCreationAssistances(contrat, vehiculesCrees, request, assistanceSnapshots)
+                : restoreDraftAssistances(contrat, vehiculesCrees, assistanceSnapshots);
         return new PersistedDraftGraph(vehiculesCrees, remorquesCreees, garantiesCreees, assistancesCreees, buildManualQuittanceResult(request));
+    }
+
+    private List<AssistanceContrat> persistCreationAssistances(
+            Contrat contrat,
+            List<Vehicule> vehicules,
+            CreateContratRequest request,
+            List<DraftAssistanceSnapshot> snapshots
+    ) {
+        Map<Integer, DraftAssistanceSnapshot> previousByVehicle = new HashMap<>();
+        snapshots.forEach(snapshot -> previousByVehicle.put(snapshot.vehiculeIndex(), snapshot));
+        Set<Integer> selectedVehicles = new HashSet<>();
+        List<AssistanceContrat> persisted = new ArrayList<>();
+        for (CreateContratRequest.AssistanceInput input : request.getAssistances()) {
+            if (input == null) {
+                throw new BadRequestException("Une ligne d'assistance est invalide");
+            }
+            if (Boolean.FALSE.equals(input.getEnabled())) {
+                continue;
+            }
+            Integer index = input.getVehiculeIndex();
+            if (index == null || index < 0 || index >= vehicules.size()) {
+                throw new BadRequestException("L'assistance cible un vehicule invalide");
+            }
+            if (!selectedVehicles.add(index)) {
+                throw new BadRequestException("Une seule assistance est autorisée par véhicule");
+            }
+            if (input.getCompagnieAssistanceId() == null || input.getProduitAssistanceId() == null) {
+                throw new BadRequestException("La compagnie et le produit d'assistance sont obligatoires");
+            }
+            Vehicule vehicule = vehicules.get(index);
+            UpsertAssistanceContratRequest assistanceRequest = new UpsertAssistanceContratRequest();
+            assistanceRequest.setVehiculeId(vehicule.getId());
+            assistanceRequest.setCompagnieAssistanceId(input.getCompagnieAssistanceId());
+            assistanceRequest.setProduitAssistanceId(input.getProduitAssistanceId());
+            assistanceRequest.setDateSouscription(input.getDateSouscription());
+            assistanceRequest.setDateEffet(firstNonNull(input.getDateEffet(), request.getDateEffet()));
+            assistanceRequest.setEcheanceCode(firstNonNull(input.getEcheanceCode(), request.getEcheance()));
+            assistanceRequest.setNumeroContratOuQuittance(blankToNull(input.getNumeroContratOuQuittance()));
+            assistanceRequest.setLibelleReleve(input.getLibelleReleve());
+            assistanceRequest.setTypeQuittance(hasText(input.getTypeQuittance()) ? input.getTypeQuittance() : "AN");
+            assistanceContratService.upsert(contrat.getAgence().getId(), contrat.getId(), assistanceRequest);
+            AssistanceContrat assistance = assistanceContratRepository
+                    .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contrat.getId(), vehicule.getId())
+                    .orElseThrow(() -> new BadRequestException("L'assistance enregistrée est introuvable"));
+            DraftAssistanceSnapshot previous = previousByVehicle.get(index);
+            if (previous != null) {
+                assistance.setAssistanceOrigine(previous.assistanceOrigine());
+            }
+            persisted.add(assistance);
+            contrat.getAssistances().add(assistance);
+        }
+        contrat.setAssistance(!persisted.isEmpty());
+        return persisted;
     }
 
     private void clearDraftChildren(Contrat contrat) {

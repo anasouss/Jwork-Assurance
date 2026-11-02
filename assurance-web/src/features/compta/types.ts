@@ -303,6 +303,8 @@ export type ClientDocumentSource = {
   dossier: string;
   police: string;
   typeContrat: TypeContrat;
+  branche?: string | null;
+  produit?: string | null;
   mouvement: string;
   reference?: string | null;
   referenceSource?: string | null;

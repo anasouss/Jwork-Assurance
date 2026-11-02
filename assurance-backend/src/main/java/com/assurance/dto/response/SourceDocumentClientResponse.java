@@ -21,6 +21,8 @@ public class SourceDocumentClientResponse {
     private String dossier;
     private String police;
     private TypeContrat typeContrat;
+    private String branche;
+    private String produit;
     private String mouvement;
     private String reference;
     private String referenceSource;

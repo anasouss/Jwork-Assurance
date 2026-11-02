@@ -507,9 +507,9 @@ export default function RelevesFacturesPage() {
                         />
                       </th>
                       <Header>Souscripteur</Header>
-                      <Header>Assuré</Header>
-                      <Header>Police</Header>
-                      <Header>Mouvement</Header>
+                      <Header>Police N°</Header>
+                      <Header>Branche</Header>
+                      <Header>Produit</Header>
                       <Header>Compagnie</Header>
                       <SortHeader column="dateDebut" activeColumn={urlState.sourceSortBy} direction={urlState.sourceSortDirection} onSort={sortSources}>Date d'effet</SortHeader>
                       <Header align="right">Prime nette</Header>
@@ -517,14 +517,15 @@ export default function RelevesFacturesPage() {
                       <SortHeader column="primeTotale" activeColumn={urlState.sourceSortBy} direction={urlState.sourceSortDirection} onSort={sortSources} align="right">TTC</SortHeader>
                       <Header align="right">Reste à payer</Header>
                       <Header>FC/RL</Header>
-                      <Header>Référence document</Header>
+                      <Header>Référence</Header>
+                      <Header>Date</Header>
                       <Header align="center">Actions</Header>
                     </tr>
                   </thead>
                   <tbody>
-                    {sources.isLoading ? <LoadingRows columns={14} /> : null}
+                    {sources.isLoading ? <LoadingRows columns={15} /> : null}
                     {!sources.isLoading && !(sources.data?.rows.length) ? (
-                      <tr><td colSpan={14} className="h-32 text-center text-muted-foreground">Aucune écriture impayée trouvée.</td></tr>
+                      <tr><td colSpan={15} className="h-32 text-center text-muted-foreground">Aucune écriture impayée trouvée.</td></tr>
                     ) : null}
                     {pageRows.map((row) => (
                       <tr key={row.elementFacturableId} className="border-b hover:bg-muted/30">
@@ -538,18 +539,13 @@ export default function RelevesFacturesPage() {
                         <td className="px-3 py-3">
                           <div className="font-medium">{row.souscripteurNom || "-"}</div>
                         </td>
-                        <td className="px-3 py-3 font-medium">{row.assureNom || "-"}</td>
                         <td className="px-3 py-3">
                           <div className="font-medium">
                             {row.nature === "ASSISTANCE" ? row.reference || "-" : row.police || row.reference || "-"}
                           </div>
-                          {row.nature === "ASSISTANCE" ? (
-                            <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
-                          ) : (
-                            <div className="text-xs text-muted-foreground">{contractTypeLabel(row.typeContrat)}</div>
-                          )}
                         </td>
-                        <td className="px-3 py-3">{row.mouvement}</td>
+                        <td className="px-3 py-3">{row.branche || "-"}</td>
+                        <td className="px-3 py-3">{row.produit || "-"}</td>
                         <td className="px-3 py-3">{row.compagnie}</td>
                         <td className="whitespace-nowrap px-3 py-3">{formatDate(row.dateEffet)}</td>
                         <MoneyCell value={row.primeNette} />
@@ -569,6 +565,11 @@ export default function RelevesFacturesPage() {
                             documents={row.documents}
                             onOpen={setDetailId}
                           />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3">
+                          {row.documents.length ? <div className="grid gap-1">
+                            {row.documents.map(document => <span key={document.id} className="text-xs">{formatDate(document.dateEmission)}</span>)}
+                          </div> : "-"}
                         </td>
                         <td className="px-3 py-3 text-center">
                           <SourceActionsMenu row={row} onInvoice={canIssue ? setInvoiceFromStatementId : undefined} />
@@ -2057,9 +2058,6 @@ function DocumentReferences(props: {
             >
               {document.numero}
             </button>
-            <span className="text-xs text-muted-foreground">
-              {formatDate(document.dateEmission)}
-            </span>
           </div>
         </div>
       ))}

@@ -1161,6 +1161,8 @@ public class DocumentClientService {
                 .dossier(contract.getNumeroDossier())
                 .police(contract.getNumeroPolice())
                 .typeContrat(contract.getTypeContrat())
+                .branche(sourceBranch(source))
+                .produit(sourceProduct(source))
                 .mouvement(sourceLabel(source))
                 .reference(sourceReference(source))
                 .referenceSource(sourceReference(source))
@@ -1423,6 +1425,30 @@ public class DocumentClientService {
             throw new BadRequestException("L'écriture assurance " + element.getId() + " n'a pas de quittance valide");
         }
         return new BillableSource(element, quittance, null);
+    }
+
+    private String sourceBranch(BillableSource source) {
+        if (source.assistance() != null) {
+            return source.assistance().getBrancheAssurance() == null ? "Assistance"
+                    : source.assistance().getBrancheAssurance().getLibelle();
+        }
+        Contrat contract = source.element().getContrat();
+        return contract.getBrancheAssurance() == null ? null : contract.getBrancheAssurance().getLibelle();
+    }
+
+    private String sourceProduct(BillableSource source) {
+        if (source.assistance() != null) {
+            AssistanceContrat assistance = source.assistance();
+            return firstNonBlank(assistance.getProduitAssistance() == null ? null : assistance.getProduitAssistance().getType(),
+                    assistance.getProduit(), assistance.getProduitAssistance() == null ? null : assistance.getProduitAssistance().getLibelle());
+        }
+        TypeContrat type = source.element().getContrat().getTypeContrat();
+        if (type == null) return null;
+        return switch (type) {
+            case PARTICULIER -> "Mono";
+            case FLOTTE -> "Flotte";
+            case CONVENTION -> "Convention";
+        };
     }
 
     private String sourceLabel(BillableSource source) {

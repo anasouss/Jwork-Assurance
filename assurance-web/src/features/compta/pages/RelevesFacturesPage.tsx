@@ -568,11 +568,10 @@ export default function RelevesFacturesPage() {
                           <DocumentReferences
                             documents={row.documents}
                             onOpen={setDetailId}
-                            onInvoice={canIssue ? setInvoiceFromStatementId : undefined}
                           />
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <SourceActionsMenu row={row} />
+                          <SourceActionsMenu row={row} onInvoice={canIssue ? setInvoiceFromStatementId : undefined} />
                         </td>
                       </tr>
                     ))}
@@ -986,37 +985,64 @@ function DocumentActionsMenu(props: {
 
 function SourceActionsMenu(props: {
   row: ClientDocumentSource;
+  onInvoice?: (id: string) => void;
 }) {
+  const [selectedDocument, setSelectedDocument] = useState<DocumentPdfTarget>();
+  const pdf = useDocumentPdfPreview(selectedDocument);
+  const statements = props.row.documents.filter(document => document.type === "RELEVE");
+  const canCreateInvoice = props.onInvoice && !props.row.documents.some(document => document.type === "FACTURE");
   const contractPdfUrl = `/app/production/contrats/${props.row.contratId}/pdf${
     props.row.mouvementId ? `?mouvementId=${props.row.mouvementId}` : ""
   }`;
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
           title="Actions"
+          disabled={pdf.loading}
           aria-label={`Actions pour ${props.row.police || props.row.reference || props.row.dossier}`}
         >
           <MoreHorizontal className="size-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-64">
-        <DropdownMenuItem asChild>
-          <Link to={`/app/production/contrats/${props.row.contratId}`}>
-            <Eye className="size-4" />
-            Voir le contrat
-          </Link>
-        </DropdownMenuItem>
+        {props.row.documents.map(document => {
+          const statement = document.type === "RELEVE";
+          const multiple = props.row.documents.filter(item => item.type === document.type).length > 1;
+          return <DropdownMenuItem key={document.id} disabled={pdf.loading} onSelect={() => {
+            setSelectedDocument({ id: document.id, typeDocument: document.type, signatureDisponible: document.signatureDisponible });
+            pdf.open();
+          }}>
+            <Printer className={statement ? "size-4 text-sky-600 dark:text-sky-400" : "size-4 text-emerald-600 dark:text-emerald-400"} />
+            {statement ? "Imprimer le relevé" : "Imprimer la facture"}{multiple ? ` ${document.numero}` : ""}
+          </DropdownMenuItem>;
+        })}
+        {canCreateInvoice && statements.map(document => <DropdownMenuItem key={`invoice-${document.id}`}
+          disabled={pdf.loading} onSelect={() => props.onInvoice?.(document.id)}>
+          <ReceiptText className="size-4 text-emerald-600 dark:text-emerald-400" />
+          Créer une facture{statements.length > 1 ? ` depuis ${document.numero}` : ""}
+        </DropdownMenuItem>)}
+        {props.row.documents.length > 0 && <DropdownMenuSeparator />}
         <DropdownMenuItem asChild>
           <Link to={contractPdfUrl} target="_blank" rel="noopener noreferrer">
-            <Printer className="size-4" />
-            Imprimer la police
+            <FileText className="size-4 text-blue-600 dark:text-blue-400" />
+            Consulter le contrat
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    {selectedDocument && <DocumentPdfOptionsDialog
+      open={pdf.optionsOpen}
+      loading={pdf.loading}
+      documentType={selectedDocument.typeDocument}
+      signatureAvailable={selectedDocument.signatureDisponible}
+      onOpenChange={pdf.setOptionsOpen}
+      onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
+    />}
+    </>
   );
 }
 
@@ -1937,11 +1963,12 @@ function CancelDocumentDialog(props: {
 
 type DocumentPdfTarget = Pick<ClientDocument, "id" | "typeDocument" | "signatureDisponible">;
 
-function useDocumentPdfPreview(document: DocumentPdfTarget) {
+function useDocumentPdfPreview(document?: DocumentPdfTarget) {
   const [loading, setLoading] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
 
   async function preview(withSignature: boolean) {
+    if (!document) return;
     const previewWindow = window.open("about:blank", "_blank");
     if (!previewWindow) {
       toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
@@ -2014,12 +2041,10 @@ function DocumentTypeBadges(props: { documents: ClientDocumentSource["documents"
 function DocumentReferences(props: {
   documents: ClientDocumentSource["documents"];
   onOpen: (id: string) => void;
-  onInvoice?: (id: string) => void;
 }) {
   if (!props.documents.length) {
     return <span className="text-muted-foreground">-</span>;
   }
-  const hasInvoice = props.documents.some((document) => document.type === "FACTURE");
   return (
     <div className="grid justify-items-start gap-1">
       {props.documents.map((document) => (
@@ -2036,71 +2061,9 @@ function DocumentReferences(props: {
               {formatDate(document.dateEmission)}
             </span>
           </div>
-          <SourceDocumentActionsMenu
-            document={document}
-            onOpen={() => props.onOpen(document.id)}
-            onInvoice={props.onInvoice && document.type === "RELEVE" && !hasInvoice
-              ? () => props.onInvoice?.(document.id)
-              : undefined}
-          />
         </div>
       ))}
     </div>
-  );
-}
-
-function SourceDocumentActionsMenu(props: {
-  document: ClientDocumentSource["documents"][number];
-  onOpen: () => void;
-  onInvoice?: () => void;
-}) {
-  const pdf = useDocumentPdfPreview({
-    id: props.document.id,
-    typeDocument: props.document.type,
-    signatureDisponible: props.document.signatureDisponible,
-  });
-
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0"
-            title={`Actions pour ${props.document.numero}`}
-            aria-label={`Actions pour ${props.document.numero}`}
-          >
-            <MoreHorizontal className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuItem onSelect={props.onOpen}>
-            <Eye className="size-4" />
-            Voir le document
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={pdf.loading} onSelect={pdf.open}>
-            <Printer className="size-4" />
-            {pdf.loading ? "Ouverture..." : "Imprimer le PDF"}
-          </DropdownMenuItem>
-          {props.onInvoice ? (
-            <DropdownMenuItem onSelect={props.onInvoice}>
-              <ReceiptText className="size-4 text-emerald-600 dark:text-emerald-400" />
-              Créer une facture
-            </DropdownMenuItem>
-          ) : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DocumentPdfOptionsDialog
-        open={pdf.optionsOpen}
-        loading={pdf.loading}
-        documentType={props.document.type}
-        signatureAvailable={props.document.signatureDisponible}
-        onOpenChange={pdf.setOptionsOpen}
-        onOpenPdf={(withSignature) => void pdf.preview(withSignature)}
-      />
-    </>
   );
 }
 

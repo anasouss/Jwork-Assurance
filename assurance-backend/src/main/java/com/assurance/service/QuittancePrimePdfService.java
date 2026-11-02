@@ -151,7 +151,8 @@ public class QuittancePrimePdfService {
             columns.addAll(List.of("PRIME NETTE", "TAXES", "ACC.", "TTC"));
             for (String column : columns) {
                 detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
-                        .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5));
+                        .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5)
+                        .setBorder(new SolidBorder(BORDER, 0.5f)));
             }
             for (PrimeRow row : detailRows) {
                 add(detail, row.branchNames(assistance), normal, false);
@@ -167,7 +168,8 @@ public class QuittancePrimePdfService {
                 add(detail, amount(row.total()), bold, true);
             }
             detail.addCell(new Cell(1, columns.size() - 1).add(new Paragraph("TOTAL").setFont(bold).setMargin(0))
-                    .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5));
+                    .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5)
+                    .setBorder(new SolidBorder(BORDER, 0.5f)));
             add(detail, amount(premiumTotal), bold, true);
             document.add(detail);
             document.add(new Paragraph("Mode de règlement")

@@ -23,6 +23,7 @@ public class SourceDocumentClientResponse {
     private TypeContrat typeContrat;
     private String branche;
     private String produit;
+    private String produitDetail;
     private String mouvement;
     private String reference;
     private String referenceSource;

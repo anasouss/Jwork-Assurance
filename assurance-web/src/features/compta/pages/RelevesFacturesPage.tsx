@@ -507,7 +507,7 @@ export default function RelevesFacturesPage() {
                         />
                       </th>
                       <Header>Souscripteur</Header>
-                      <Header>Police N°</Header>
+                      <Header>Police / Contrat N°</Header>
                       <Header>Branche</Header>
                       <Header>Produit</Header>
                       <Header>Compagnie</Header>
@@ -541,11 +541,16 @@ export default function RelevesFacturesPage() {
                         </td>
                         <td className="px-3 py-3">
                           <div className="font-medium">
-                            {row.nature === "ASSISTANCE" ? row.reference || "-" : row.police || row.reference || "-"}
+                            {row.police || "-"}
                           </div>
                         </td>
                         <td className="px-3 py-3">{row.branche || "-"}</td>
-                        <td className="px-3 py-3">{row.produit || "-"}</td>
+                        <td className="px-3 py-3">
+                          <div className="font-medium">{row.produit || "-"}</div>
+                          {(row.produitDetail || row.mouvement) && (row.produitDetail || row.mouvement) !== row.produit && (
+                            <div className="mt-0.5 text-xs text-muted-foreground">{row.produitDetail || row.mouvement}</div>
+                          )}
+                        </td>
                         <td className="px-3 py-3">{row.compagnie}</td>
                         <td className="whitespace-nowrap px-3 py-3">{formatDate(row.dateEffet)}</td>
                         <MoneyCell value={row.primeNette} />

@@ -1159,10 +1159,14 @@ public class DocumentClientService {
                 .mouvementId(element.getMouvementContrat() == null
                         ? null : element.getMouvementContrat().getId())
                 .dossier(contract.getNumeroDossier())
-                .police(contract.getNumeroPolice())
+                .police(source.assistance() == null ? contract.getNumeroPolice()
+                        : trimToNull(source.assistance().getNumeroContratOuQuittance()))
                 .typeContrat(contract.getTypeContrat())
                 .branche(sourceBranch(source))
                 .produit(sourceProduct(source))
+                .produitDetail(source.assistance() == null ? sourceLabel(source)
+                        : firstNonBlank(source.assistance().getProduit(), source.assistance().getProduitAssistance() == null
+                                ? null : source.assistance().getProduitAssistance().getLibelle()))
                 .mouvement(sourceLabel(source))
                 .reference(sourceReference(source))
                 .referenceSource(sourceReference(source))

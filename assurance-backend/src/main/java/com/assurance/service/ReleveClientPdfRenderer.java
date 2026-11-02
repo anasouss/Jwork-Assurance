@@ -303,21 +303,32 @@ public class ReleveClientPdfRenderer {
     ) {
         float fontSize = denseStatement ? DENSE_TABLE_FONT_SIZE : TABLE_FONT_SIZE;
         float cellPadding = denseStatement ? DENSE_TABLE_CELL_PADDING : TABLE_CELL_PADDING;
-        Table table = new Table(new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 7, 9, 23})
+        boolean showAdvance = hasStatementAdvance(source);
+        Map<Long, String> subscriberNames = subscriberNames(source);
+        boolean showInsured = source.getPayeurNom() == null || source.getPayeurNom().isBlank()
+                || source.getLignes().stream().anyMatch(line -> !value(statementInsuredName(source, line, subscriberNames))
+                        .equalsIgnoreCase(source.getPayeurNom().trim()));
+        float[] columns = showAdvance
+                ? new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 7, 9, 23}
+                : new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 9, 23};
+        Table table = new Table(showInsured ? columns : java.util.Arrays.copyOfRange(columns, 1, columns.length))
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
-        addHeader(table, "L’assuré", tableHeader, fontSize, cellPadding);
+        if (showInsured) {
+            addHeader(table, "L’assuré", tableHeader, fontSize, cellPadding);
+        }
         addHeader(table, "Police", tableHeader, fontSize, cellPadding);
         addHeader(table, "Du", tableHeader, fontSize, cellPadding);
         addHeader(table, "Au", tableHeader, fontSize, cellPadding);
         addHeader(table, "Prime Nette", tableHeader, fontSize, cellPadding);
         addHeader(table, "Taxes", tableHeader, fontSize, cellPadding);
         addHeader(table, "Montant\nTTC", tableHeader, fontSize, cellPadding);
-        addHeader(table, "Acompte", tableHeader, fontSize, cellPadding);
+        if (showAdvance) {
+            addHeader(table, "Acompte", tableHeader, fontSize, cellPadding);
+        }
         addHeader(table, "Reste à payer", tableHeader, fontSize, cellPadding);
         addHeader(table, "Libellé", tableHeader, fontSize, cellPadding);
 
-        Map<Long, String> subscriberNames = subscriberNames(source);
         source.getLignes().stream()
                 .sorted(Comparator.comparing(LigneDocumentClient::getOrdre))
                 .forEach(line -> addStatementLine(
@@ -327,6 +338,8 @@ public class ReleveClientPdfRenderer {
                         bold,
                         fleetAnnexes.get(line),
                         subscriberNames,
+                        showInsured,
+                        showAdvance,
                         fontSize,
                         cellPadding
                 ));
@@ -381,26 +394,33 @@ public class ReleveClientPdfRenderer {
             PdfFont bold,
             Integer fleetAnnexNumber,
             Map<Long, String> subscriberNames,
+            boolean showInsured,
+            boolean showAdvance,
             float fontSize,
             float cellPadding
     ) {
         BigDecimal balance = money(line.getDebit()).subtract(money(line.getCredit()));
-        Contrat contract = contract(line);
-        String subscriberName = contract == null ? null : subscriberNames.get(contract.getId());
-        String insuredName = subscriberName == null || subscriberName.isBlank()
-                ? source.getPayeurNom()
-                : subscriberName;
-        addValue(table, insuredName, TextAlignment.LEFT, null, fontSize, cellPadding);
+        if (showInsured) {
+            addValue(table, statementInsuredName(source, line, subscriberNames), TextAlignment.LEFT, null, fontSize, cellPadding);
+        }
         addValue(table, statementReference(line), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null, fontSize, cellPadding);
-        addValue(table, positiveAmount(money(line.getCredit()).subtract(money(line.getEcartReglement()))), TextAlignment.CENTER, null, fontSize, cellPadding);
+        if (showAdvance) {
+            addValue(table, positiveAmount(statementAdvance(line)), TextAlignment.CENTER, null, fontSize, cellPadding);
+        }
         addValue(table, amount(balance), TextAlignment.CENTER, bold, fontSize, cellPadding);
         addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null,
                 fontSize, cellPadding);
+    }
+
+    private String statementInsuredName(DocumentClient source, LigneDocumentClient line, Map<Long, String> subscriberNames) {
+        Contrat contract = contract(line);
+        String subscriberName = contract == null ? null : subscriberNames.get(contract.getId());
+        return subscriberName == null || subscriberName.isBlank() ? source.getPayeurNom() : subscriberName;
     }
 
     private Map<Long, String> subscriberNames(DocumentClient source) {
@@ -564,10 +584,20 @@ public class ReleveClientPdfRenderer {
                 .setMarginRight(0)
                 .setMarginTop(denseStatement ? 6 : 10);
         addTotalRow(total, "Total TTC", source.getTotalDebit(), bold);
-        BigDecimal adjustment = source.getLignes().stream().map(line -> money(line.getEcartReglement())).reduce(BigDecimal.ZERO, BigDecimal::add);
-        addTotalRow(total, "Total acompte", money(source.getTotalCredit()).subtract(adjustment), bold);
+        if (hasStatementAdvance(source)) {
+            BigDecimal adjustment = source.getLignes().stream().map(line -> money(line.getEcartReglement())).reduce(BigDecimal.ZERO, BigDecimal::add);
+            addTotalRow(total, "Total acompte", money(source.getTotalCredit()).subtract(adjustment), bold);
+        }
         addTotalRow(total, "Total à payer", source.getTotalDocument(), bold);
         document.add(total);
+    }
+
+    private boolean hasStatementAdvance(DocumentClient source) {
+        return source.getLignes().stream().anyMatch(line -> statementAdvance(line).signum() > 0);
+    }
+
+    private BigDecimal statementAdvance(LigneDocumentClient line) {
+        return money(line.getCredit()).subtract(money(line.getEcartReglement()));
     }
 
     private void addTotalRow(Table total, String label, BigDecimal value, PdfFont bold) {

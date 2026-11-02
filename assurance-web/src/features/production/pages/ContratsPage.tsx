@@ -1048,22 +1048,9 @@ function productLabel(contrat: ContratListItem) {
 
 function companyLabel(contrat: ContratListItem) {
   if (contrat.assistanceLiee) {
-    return String(
-      contrat.compagnieAssistanceCode
-      ?? contrat.compagnieAssistanceLibelle
-      ?? contrat.compagnieAssistanceId
-      ?? "-"
-    );
+    return contrat.compagnieAssistanceLibelle?.trim() || "-";
   }
-  return String(
-    contrat.compagnieCode
-    ?? contrat.compagnieLibelle
-    ?? contrat.compagnieAssistanceCode
-    ?? contrat.compagnieAssistanceLibelle
-    ?? contrat.compagnieAssuranceId
-    ?? contrat.compagnieAssistanceId
-    ?? "-"
-  );
+  return contrat.compagnieLibelle?.trim() || contrat.compagnieAssistanceLibelle?.trim() || "-";
 }
 
 function conventionLabel(contrat: ContratListItem) {

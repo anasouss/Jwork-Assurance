@@ -1028,7 +1028,7 @@ function SourceActionsMenu(props: {
         {props.row.documents.length > 0 && <DropdownMenuSeparator />}
         <DropdownMenuItem asChild>
           <Link to={contractPdfUrl} target="_blank" rel="noopener noreferrer">
-            <FileText className="size-4 text-blue-600 dark:text-blue-400" />
+            <Eye className="size-4 text-blue-600 dark:text-blue-400" />
             Consulter le contrat
           </Link>
         </DropdownMenuItem>

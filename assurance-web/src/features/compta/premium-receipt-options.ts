@@ -12,6 +12,7 @@ const optionsSchema = z.object({
     descriptions: z.array(z.string()).min(1),
     montant: z.number().finite(),
     eligible: z.boolean().default(false),
+    motifBlocage: z.string().nullish(),
     mouvements: z.array(z.object({
       elementFacturableId: z.string(),
       documentClientId: z.string().nullish(),
@@ -38,6 +39,10 @@ export function normalizePremiumReceiptOptions(value: unknown): PremiumReceiptOp
   return result.data;
 }
 
+export function premiumReceiptPolicyBlockReason(policy: PremiumReceiptOptions["policies"][number]): string | undefined {
+  return policy.eligible ? undefined : policy.motifBlocage?.trim() || "Quittance indisponible pour cette police.";
+}
+
 export function premiumReceiptBlockReason({ policies, keys, hasArchive, canIssue, cancelled, hasRejectedInstrument }: {
   policies: PremiumReceiptOptions["policies"];
   keys?: string[];
@@ -53,8 +58,9 @@ export function premiumReceiptBlockReason({ policies, keys, hasArchive, canIssue
   if (policies.length === 0) return "Aucune prime n'est affectée à ce règlement.";
   if (keys === undefined && hasRejectedInstrument) return "Le règlement contient un moyen de paiement rejeté.";
   const selected = keys === undefined ? policies : policies.filter(policy => keys.includes(policy.key));
-  if ((keys !== undefined && selected.length !== keys.length) || selected.some(policy => !policy.eligible)) {
-    return "Une prime n'est pas entièrement couverte ou un moyen de paiement est rejeté.";
+  if (keys !== undefined && selected.length !== keys.length) {
+    return "Une police sélectionnée n'appartient plus à ce règlement.";
   }
-  return undefined;
+  const reasons = selected.map(premiumReceiptPolicyBlockReason).filter(Boolean);
+  return reasons.length > 0 ? [...new Set(reasons)].join(" ") : undefined;
 }

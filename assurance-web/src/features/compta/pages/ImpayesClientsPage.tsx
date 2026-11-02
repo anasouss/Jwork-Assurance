@@ -114,7 +114,7 @@ export default function ImpayesClientsPage() {
       await queryClient.invalidateQueries({ queryKey: ["compta"] });
     },
     onError: (error) => toast.error(
-      error instanceof Error ? error.message : "Représentation impossible"
+      error instanceof Error ? error.message : "Préparation de la nouvelle remise impossible"
     ),
   });
 
@@ -254,7 +254,7 @@ export default function ImpayesClientsPage() {
                 <tr key={instrument.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3 font-semibold">{instrument.referenceInstrument || "-"}</td>
                   <td className="px-4 py-3">{instrument.payeurNom}</td>
-                  <td className="px-4 py-3">{instrument.numeroReglement}</td>
+                  <td className="px-4 py-3"><Link className="font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/reglements/${instrument.reglementId}`}>{instrument.numeroReglement}</Link></td>
                   <td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
                   <td className="px-4 py-3">{instrument.banqueEmettrice || "-"}</td>
                   <td className="px-4 py-3">{formatTreasuryDate(instrument.dateRejet)}</td>
@@ -268,7 +268,7 @@ export default function ImpayesClientsPage() {
                       <DropdownMenuContent align="end" className="min-w-60">
                         <DropdownMenuItem asChild><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></DropdownMenuItem>
                         {canManage && instrument.statut === "REJETE" && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
-                        {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Représenter l’instrument</DropdownMenuItem>}
+                        {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Nouvelle remise en banque</DropdownMenuItem>}
                         {canManage && instrument.statut === "REJETE" && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => setReplacementTarget(instrument)}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Remplacer le moyen de paiement</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -289,7 +289,7 @@ export default function ImpayesClientsPage() {
       <Dialog open={Boolean(instrumentToRepresent)} onOpenChange={(open) => !open && !representInstrument.isPending && setInstrumentToRepresent(undefined)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Représenter l’instrument</DialogTitle>
+            <DialogTitle>Nouvelle remise en banque</DialogTitle>
             <DialogDescription>
               La présentation rejetée reste dans l’historique. L’instrument sera disponible pour un nouveau bordereau.
             </DialogDescription>
@@ -299,12 +299,12 @@ export default function ImpayesClientsPage() {
             <div className="mt-1 text-muted-foreground">{instrumentToRepresent?.payeurNom} · {formatTreasuryMoney(instrumentToRepresent?.montant ?? 0)}</div>
           </div>
           <div className="grid gap-4">
-            <div className="grid gap-2"><Label>Date de représentation</Label><DatePicker date={representationDate} disabled={representInstrument.isPending} maxDate={new Date(`${TODAY}T00:00:00`)} minDate={instrumentToRepresent?.dateRejet ? new Date(`${instrumentToRepresent.dateRejet}T00:00:00`) : undefined} onSelect={(value) => setRepresentationDate(toDateOnly(value) ?? "")} /></div>
+            <div className="grid gap-2"><Label>Date de préparation</Label><DatePicker date={representationDate} disabled={representInstrument.isPending} maxDate={new Date(`${TODAY}T00:00:00`)} minDate={instrumentToRepresent?.dateRejet ? new Date(`${instrumentToRepresent.dateRejet}T00:00:00`) : undefined} onSelect={(value) => setRepresentationDate(toDateOnly(value) ?? "")} /></div>
             <div className="grid gap-2"><Label htmlFor="representation-reason">Justification</Label><Textarea id="representation-reason" value={representationReason} maxLength={500} disabled={representInstrument.isPending} onChange={(event) => setRepresentationReason(event.target.value)} placeholder="Ex. Provision reconstituée confirmée par le client" /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" disabled={representInstrument.isPending} onClick={() => setInstrumentToRepresent(undefined)}>Annuler</Button>
-            <Button disabled={!representationDate || !representationReason.trim() || representInstrument.isPending} onClick={() => representInstrument.mutate()}>{representInstrument.isPending ? "Enregistrement..." : "Préparer la nouvelle remise"}</Button>
+            <Button disabled={!representationDate || !representationReason.trim() || representInstrument.isPending} onClick={() => representInstrument.mutate()}>{representInstrument.isPending ? "Enregistrement..." : "Préparer la remise"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

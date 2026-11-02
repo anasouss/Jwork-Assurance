@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
-import { premiumReceiptBlockReason } from "../premium-receipt-options";
+import { premiumReceiptBlockReason, premiumReceiptPolicyBlockReason } from "../premium-receipt-options";
 import { formatTreasuryDate } from "../pages/treasury-format";
 import type { ClientPayment, PremiumReceiptOptions } from "../types";
 import { useAuthStore } from "@/store/auth-store";
@@ -136,7 +136,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                     <td colSpan={4} className="p-3">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex min-w-0 items-start gap-3">
-                          {scope === "SPECIFIC" && <span title={!policy.eligible ? "Une prime n'est pas entièrement couverte ou un moyen de paiement est rejeté." : undefined}>
+                          {scope === "SPECIFIC" && <span title={premiumReceiptPolicyBlockReason(policy)}>
                             <Checkbox id={`receipt-${policy.key}`} className="mt-1" disabled={busy || !policy.eligible} checked={selected.has(policy.key)} onCheckedChange={checked => toggle(policy.key, checked === true)} aria-label={`Sélectionner ${policy.descriptions.join(", ")}`} />
                           </span>}
                           <div className="min-w-0">
@@ -147,7 +147,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                               {policy.mouvements.length > 0 ? `${policy.mouvements.length} mouvement${policy.mouvements.length > 1 ? "s" : ""}` : "Détail indisponible"}
                               {policy.key.startsWith("D:") ? " · Affectation globale au document" : ""}
                             </div>
-                            {!policy.eligible && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">Prime non entièrement couverte ou moyen rejeté.</p>}
+                            {!policy.eligible && <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">{premiumReceiptPolicyBlockReason(policy)}</p>}
                           </div>
                         </div>
                         <div className="shrink-0 space-y-1.5 text-right">

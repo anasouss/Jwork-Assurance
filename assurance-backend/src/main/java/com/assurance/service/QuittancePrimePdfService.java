@@ -200,7 +200,8 @@ public class QuittancePrimePdfService {
                 entry.getValue().stream().map(row -> row.description(assistance)).distinct().toList(),
                 detailRows(entry.getValue()).stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add),
                 eligible(entry.getValue(), instruments, coverage.covered()),
-                detailRows(entry.getValue()).stream().map(row -> movementOption(row, instruments, coverage, assistance)).toList()))
+                detailRows(entry.getValue()).stream().map(row -> movementOption(row, instruments, coverage, assistance)).toList(),
+                blockingReason(entry.getValue(), instruments, coverage.covered())))
                 .toList();
     }
 
@@ -246,9 +247,19 @@ public class QuittancePrimePdfService {
     }
 
     private static boolean eligible(List<PrimeRow> rows, List<InstrumentReglementClient> instruments, Set<Long> covered) {
+        return blockingReason(rows, instruments, covered) == null;
+    }
+
+    private static String blockingReason(List<PrimeRow> rows, List<InstrumentReglementClient> instruments, Set<Long> covered) {
         Set<String> keys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
-        return rows.stream().flatMap(row -> row.elements().stream()).allMatch(element -> covered.contains(element.getId()))
-                && instruments.stream().allMatch(instrument -> selectedAmount(instrument, keys).signum() == 0
+        if (instruments.stream().anyMatch(instrument -> instrument.getStatut() == StatutInstrumentReglement.REJETE
+                && selectedAmount(instrument, keys).signum() != 0)) {
+            return "Moyen de paiement rejeté.";
+        }
+        if (rows.stream().flatMap(row -> row.elements().stream()).anyMatch(element -> !covered.contains(element.getId()))) {
+            return "Prime partiellement réglée.";
+        }
+        boolean validAllocations = instruments.stream().allMatch(instrument -> selectedAmount(instrument, keys).signum() == 0
                         || ((instrument.getStatut() == StatutInstrumentReglement.CONFIRME
                                 || instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
                                 || instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE)
@@ -257,6 +268,7 @@ public class QuittancePrimePdfService {
                                 .filter(a -> keys.contains(new PrimeRow(a.getElementFacturable(), a.getDocumentClient()).selectionKey()))
                                 .allMatch(a -> a.getStatut() == StatutAffectationReglement.CONFIRMEE
                                         || a.getStatut() == StatutAffectationReglement.EN_ATTENTE)));
+        return validAllocations ? null : "Affectation de règlement non valide.";
     }
 
     private static List<PrimeRow> detailRows(List<PrimeRow> rows) {
@@ -292,7 +304,7 @@ public class QuittancePrimePdfService {
     }
 
     public record PolicyOption(String key, List<String> descriptions, BigDecimal montant, boolean eligible,
-                               List<MovementOption> mouvements) {
+                               List<MovementOption> mouvements, String motifBlocage) {
     }
 
     public record MovementOption(Long elementFacturableId, Long documentClientId, String libelle,

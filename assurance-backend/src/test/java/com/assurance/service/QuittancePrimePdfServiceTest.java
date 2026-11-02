@@ -249,6 +249,10 @@ class QuittancePrimePdfServiceTest {
     void rejectedValuesCannotBeIssuedAsPaidPremiums() {
         ReglementClient payment = payment(1);
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.REJETE);
+        assertThat(service.policies(payment).get(0).motifBlocage()).isEqualTo("Moyen de paiement rejeté.");
+        when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
+                .thenReturn(new ReglementClientService.ReceiptCoverage(Set.of(), Set.of()));
+        assertThat(service.policies(payment).get(0).motifBlocage()).isEqualTo("Moyen de paiement rejeté.");
         assertThatThrownBy(() -> service.render(payment, "2026000001", LocalDate.now())).isInstanceOf(BadRequestException.class);
     }
 
@@ -257,6 +261,7 @@ class QuittancePrimePdfServiceTest {
         ReglementClient payment = payment(1);
         payment.getInstruments().get(0).setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
         assertThat(service.policies(payment).get(0).eligible()).isTrue();
+        assertThat(service.policies(payment).get(0).motifBlocage()).isNull();
         assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("EN_ATTENTE_ENCAISSEMENT");
         try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
             assertThat(new PDFTextStripper().getText(pdf)).contains("Chèque", "CH-001")
@@ -273,6 +278,7 @@ class QuittancePrimePdfServiceTest {
         when(payments.receiptCoverage(org.mockito.ArgumentMatchers.eq(7L), anyCollection()))
                 .thenReturn(new ReglementClientService.ReceiptCoverage(Set.of(), Set.of()));
         assertThat(service.policies(payment).get(0).eligible()).isFalse();
+        assertThat(service.policies(payment).get(0).motifBlocage()).isEqualTo("Prime partiellement réglée.");
         assertThat(service.policies(payment).get(0).mouvements().get(0).statut()).isEqualTo("NON_SOLDEE");
         assertThatThrownBy(() -> service.render(payment, "1", LocalDate.now())).isInstanceOf(BadRequestException.class);
     }

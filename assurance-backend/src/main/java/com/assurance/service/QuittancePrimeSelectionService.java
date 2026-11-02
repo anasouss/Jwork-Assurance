@@ -85,9 +85,14 @@ public class QuittancePrimeSelectionService {
         if (selection != null && !available.containsAll(selection)) {
             throw new BadRequestException("Une police sélectionnée n'appartient pas à ce règlement");
         }
-        if (policies.isEmpty() || policies.stream().anyMatch(policy ->
-                (selection == null || selection.contains(policy.key())) && !policy.eligible())) {
-            throw new BadRequestException("La sélection contient des mouvements non couverts ou des moyens rejetés");
+        if (policies.isEmpty()) {
+            throw new BadRequestException("Aucune prime n'est affectée à ce règlement.");
+        }
+        for (var policy : policies) {
+            if ((selection == null || selection.contains(policy.key())) && !policy.eligible()) {
+                throw new BadRequestException(policy.motifBlocage() == null
+                        ? "Quittance indisponible pour cette police." : policy.motifBlocage());
+            }
         }
         QuittancePrimeSelection receipt = new QuittancePrimeSelection();
         receipt.setAgence(payment.getAgence());

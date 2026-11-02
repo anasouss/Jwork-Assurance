@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePremiumReceiptOptions, premiumReceiptBlockReason } from "./premium-receipt-options";
+import { normalizePremiumReceiptOptions, premiumReceiptBlockReason, premiumReceiptPolicyBlockReason } from "./premium-receipt-options";
 
 const policy = { key: "C:1", descriptions: ["POL-1\nAssureur"], montant: 50, eligible: true };
 const archive = { id: "all", numero: "2026000001", dateEmission: "2026-10-31" };
@@ -82,8 +82,20 @@ describe("premium receipt action messages", () => {
   });
 
   it("explains insufficient coverage and rejected payment instruments", () => {
-    expect(premiumReceiptBlockReason({ ...base, policies: base.policies.map(p => ({ ...p, eligible: false })) })).toContain("pas entièrement couverte");
+    expect(premiumReceiptBlockReason({ ...base, policies: base.policies.map(p => ({ ...p, eligible: false, motifBlocage: "Prime partiellement réglée." })) })).toBe("Prime partiellement réglée.");
     expect(premiumReceiptBlockReason({ ...base, hasRejectedInstrument: true })).toContain("rejeté");
+  });
+
+  it("uses the backend reason consistently without guessing from missing fields", () => {
+    const policies = normalizePremiumReceiptOptions({ policies: [
+      { ...policy, eligible: false, motifBlocage: "Moyen de paiement rejeté." },
+      { ...policy, key: "C:2", eligible: false, motifBlocage: "Prime partiellement réglée." },
+    ], archives: [] }).policies;
+    expect(premiumReceiptPolicyBlockReason(policies[0])).toBe("Moyen de paiement rejeté.");
+    expect(premiumReceiptBlockReason({ ...base, policies, keys: ["C:2"] })).toBe("Prime partiellement réglée.");
+    expect(premiumReceiptBlockReason({ ...base, policies })).toBe("Moyen de paiement rejeté. Prime partiellement réglée.");
+    expect(premiumReceiptPolicyBlockReason({ ...base.policies[0], eligible: false })).toBe("Quittance indisponible pour cette police.");
+    expect(premiumReceiptPolicyBlockReason({ ...base.policies[0], motifBlocage: "Obsolete reason" })).toBeUndefined();
   });
 
   it("does not block a valid specific selection because another policy has a rejection", () => {

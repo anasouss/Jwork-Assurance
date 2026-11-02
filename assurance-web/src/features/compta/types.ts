@@ -628,6 +628,7 @@ export type PremiumReceiptOptions = {
     descriptions: string[];
     montant: number;
     eligible: boolean;
+    motifBlocage?: string | null;
     mouvements: {
       elementFacturableId: string;
       documentClientId?: string | null;

@@ -7,6 +7,7 @@ import com.assurance.entity.Contrat;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.ReglementClient;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutAffectationReglement;
@@ -180,11 +181,17 @@ public class ReglementClientPdfService {
 
     private void writeInstruments(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
         document.add(sectionTitle("Moyens de paiement", bold));
-        Table table = new Table(new float[]{0.9f, 0.8f, 0.8f, 1.1f, 1.35f, 0.9f, 0.85f})
+        boolean showDueDate = payment.getInstruments().stream()
+                .anyMatch(instrument -> instrument.getMode() == ModeReglementClient.EFFET);
+        Table table = new Table(showDueDate
+                ? new float[]{0.9f, 0.8f, 0.8f, 1.1f, 1.35f, 0.9f, 0.85f}
+                : new float[]{0.9f, 0.8f, 1.1f, 1.35f, 0.9f, 0.85f})
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "MODE", bold, TextAlignment.LEFT);
         addHeader(table, "DATE", bold, TextAlignment.CENTER);
-        addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
+        if (showDueDate) {
+            addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
+        }
         addHeader(table, "RÉFÉRENCE", bold, TextAlignment.LEFT);
         addHeader(table, "BANQUE / COMPTE", bold, TextAlignment.LEFT);
         addHeader(table, "STATUT", bold, TextAlignment.LEFT);
@@ -205,7 +212,10 @@ public class ReglementClientPdfService {
             }
             addBody(table, modeLabel(instrument.getMode()), regular, TextAlignment.LEFT, background);
             addBody(table, date(instrument.getDateInstrument()), regular, TextAlignment.CENTER, background);
-            addBody(table, date(instrument.getDateEcheance()), regular, TextAlignment.CENTER, background);
+            if (showDueDate) {
+                addBody(table, instrument.getMode() == ModeReglementClient.EFFET
+                        ? date(instrument.getDateEcheance()) : "-", regular, TextAlignment.CENTER, background);
+            }
             addBody(table, value(instrument.getReferenceInstrument()), regular, TextAlignment.LEFT, background);
             addBody(table, bank, regular, TextAlignment.LEFT, background);
             addBody(table, status, regular, TextAlignment.LEFT, background);
@@ -229,9 +239,17 @@ public class ReglementClientPdfService {
                     .setFont(regular).setFontSize(7.5f).setFontColor(MUTED)
                     .setMarginTop(-4).setMarginBottom(6));
         }
-        Table table = new Table(new float[]{3f, 1.35f, 0.7f, 1f, 1f})
+        boolean showDocument = allocations.values().stream().anyMatch(allocation -> allocation.document != null);
+        float[] columns = showDocument
+                ? new float[]{1.35f, 2f, 1.1f, 1.3f, 0.55f, 0.85f, 1f}
+                : new float[]{1.35f, 2.4f, 1.3f, 0.55f, 0.85f, 1f};
+        Table table = new Table(columns)
                 .setWidth(UnitValue.createPercentValue(100));
-        addHeader(table, "CRÉANCE / DOCUMENT", bold, TextAlignment.LEFT);
+        addHeader(table, "N° POLICE", bold, TextAlignment.LEFT);
+        addHeader(table, "MOUVEMENT / PRESTATION", bold, TextAlignment.LEFT);
+        if (showDocument) {
+            addHeader(table, "DOCUMENT", bold, TextAlignment.LEFT);
+        }
         addHeader(table, "PAYEUR", bold, TextAlignment.LEFT);
         addHeader(table, "MOYENS", bold, TextAlignment.CENTER);
         addHeader(table, "STATUT", bold, TextAlignment.LEFT);
@@ -240,14 +258,18 @@ public class ReglementClientPdfService {
         int index = 0;
         for (AllocationSummary allocation : allocations.values()) {
             DeviceRgb background = index++ % 2 == 1 ? SOFT_BLUE : null;
-            addBody(table, allocation.destination, regular, TextAlignment.LEFT, background);
+            addBody(table, allocation.policyNumber, regular, TextAlignment.LEFT, background);
+            addBody(table, allocation.movement, regular, TextAlignment.LEFT, background);
+            if (showDocument) {
+                addBody(table, allocation.document, regular, TextAlignment.LEFT, background);
+            }
             addBody(table, allocation.payer, regular, TextAlignment.LEFT, background);
             addBody(table, String.valueOf(allocation.instrumentIds.size()), regular, TextAlignment.CENTER, background);
             addBody(table, allocationStatus(allocation.status), regular, TextAlignment.LEFT, background);
             addBody(table, amount(allocation.amount), bold, TextAlignment.RIGHT, background);
         }
         if (index == 0) {
-            table.addCell(new Cell(1, 5)
+            table.addCell(new Cell(1, columns.length)
                     .add(new Paragraph("Aucune affectation").setFont(regular).setFontSize(8).setMargin(0))
                     .setTextAlignment(TextAlignment.CENTER).setFontColor(MUTED)
                     .setBorder(new SolidBorder(BORDER, 0.45f)).setPadding(10));
@@ -266,7 +288,10 @@ public class ReglementClientPdfService {
                 String key = allocationTargetKey(allocation) + ":" + allocation.getStatut()
                         + ":" + value(allocation.getPayeurNomSnapshot());
                 AllocationSummary summary = grouped.computeIfAbsent(key, ignored -> new AllocationSummary(
-                        allocationDestination(allocation),
+                        allocationPolicyNumber(allocation),
+                        allocation.getElementFacturable() == null ? "Affectation globale au document"
+                                : value(allocation.getElementFacturable().getLibelle()),
+                        allocationDocument(allocation),
                         value(allocation.getPayeurNomSnapshot()),
                         allocation.getStatut()
                 ));
@@ -286,18 +311,24 @@ public class ReglementClientPdfService {
     }
 
     private static final class AllocationSummary {
-        private final String destination;
+        private final String policyNumber;
+        private final String movement;
+        private final String document;
         private final String payer;
         private final StatutAffectationReglement status;
         private final Set<Long> instrumentIds = new LinkedHashSet<>();
         private BigDecimal amount = BigDecimal.ZERO;
 
         private AllocationSummary(
-                String destination,
+                String policyNumber,
+                String movement,
+                String document,
                 String payer,
                 StatutAffectationReglement status
         ) {
-            this.destination = destination;
+            this.policyNumber = policyNumber;
+            this.movement = movement;
+            this.document = document;
             this.payer = payer;
             this.status = status;
         }
@@ -368,27 +399,39 @@ public class ReglementClientPdfService {
         footer.close();
     }
 
-    private String allocationDestination(AffectationReglementClient allocation) {
+    private String allocationDocument(AffectationReglementClient allocation) {
         DocumentClient clientDocument = allocation.getDocumentClient();
-        ElementFacturable element = allocation.getElementFacturable();
         if (clientDocument != null) {
             String documentLabel = switch (clientDocument.getTypeDocument()) {
                 case FACTURE -> "Facture ";
                 case RELEVE -> "Relevé ";
             };
-            return join(documentLabel + clientDocument.getNumero(), elementReference(element));
+            return documentLabel + value(clientDocument.getNumero());
         }
-        return elementReference(element);
+        return null;
     }
 
-    private String elementReference(ElementFacturable element) {
-        if (element == null) {
+    private String allocationPolicyNumber(AffectationReglementClient allocation) {
+        if (allocation.getElementFacturable() != null) {
+            return policyNumber(allocation.getElementFacturable());
+        }
+        if (allocation.getDocumentClient() == null) {
             return "-";
         }
-        Contrat contract = element.getContrat();
-        String contractReference = contract == null ? null
-                : join(contract.getNumeroPolice(), contract.getNumeroDossier());
-        return join(element.getLibelle(), contractReference);
+        Set<String> numbers = new LinkedHashSet<>();
+        for (LigneDocumentClient line : allocation.getDocumentClient().getLignes()) {
+            String number = line.getNumeroPolice() == null || line.getNumeroPolice().isBlank()
+                    ? policyNumber(line.getElementFacturable()) : line.getNumeroPolice().trim();
+            if (!"-".equals(number)) {
+                numbers.add(number);
+            }
+        }
+        return numbers.isEmpty() ? "-" : String.join("\n", numbers);
+    }
+
+    private String policyNumber(ElementFacturable element) {
+        Contrat contract = element == null ? null : element.getContrat();
+        return contract == null ? "-" : value(contract.getNumeroPolice());
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {

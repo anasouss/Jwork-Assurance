@@ -2769,6 +2769,10 @@ public class ReglementClientService {
                                         : allocation.getGroupePayeur().getId())
                                 .payeurNom(allocation.getPayeurNomSnapshot())
                                 .destination(allocationDestination(allocation))
+                                .numeroPolice(allocationPolicyNumber(allocation))
+                                .mouvement(allocation.getElementFacturable() == null
+                                        ? "Affectation globale au document" : allocation.getElementFacturable().getLibelle())
+                                .referenceDocument(allocationDocumentReference(allocation))
                                 .montant(allocation.getMontant())
                                 .statut(allocation.getStatut())
                                 .build())
@@ -2796,6 +2800,40 @@ public class ReglementClientService {
             return joinLabels(documentLabel + document.getNumero(), elementReference(element));
         }
         return elementReference(element);
+    }
+
+    private String allocationPolicyNumber(AffectationReglementClient allocation) {
+        if (allocation.getElementFacturable() != null) {
+            Contrat contract = allocation.getElementFacturable().getContrat();
+            return contract == null ? null : contract.getNumeroPolice();
+        }
+        if (allocation.getDocumentClient() == null) {
+            return null;
+        }
+        return allocation.getDocumentClient().getLignes().stream()
+                .map(line -> {
+                    if (line.getNumeroPolice() != null && !line.getNumeroPolice().isBlank()) {
+                        return line.getNumeroPolice().trim();
+                    }
+                    Contrat contract = line.getElementFacturable() == null
+                            ? null : line.getElementFacturable().getContrat();
+                    return contract == null ? null : contract.getNumeroPolice();
+                })
+                .filter(number -> number != null && !number.isBlank())
+                .distinct()
+                .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private String allocationDocumentReference(AffectationReglementClient allocation) {
+        DocumentClient document = allocation.getDocumentClient();
+        if (document == null) {
+            return null;
+        }
+        String label = switch (document.getTypeDocument()) {
+            case FACTURE -> "Facture ";
+            case RELEVE -> "Relevé ";
+        };
+        return label + document.getNumero();
     }
 
     private String elementReference(ElementFacturable element) {

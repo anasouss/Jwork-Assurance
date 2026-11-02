@@ -493,6 +493,9 @@ export type PaymentAllocation = {
   payeurId?: string | null;
   payeurNom?: string | null;
   destination?: string | null;
+  numeroPolice?: string | null;
+  mouvement?: string | null;
+  referenceDocument?: string | null;
   montant: number;
   statut: PaymentAllocationStatus;
 };

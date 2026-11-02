@@ -4,10 +4,14 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.BordereauRemise;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.LigneBordereauEspeces;
+import com.assurance.entity.LigneBordereauRemise;
+import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.ReglementClient;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.StatutBordereauRemise;
 import com.assurance.enums.TypeBordereauRemise;
+import com.assurance.enums.ModeReglementClient;
 import com.assurance.repository.BordereauRemiseRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -41,6 +45,33 @@ class BordereauRemisePdfServiceTest {
                         .doesNotContain("Réf. interne", "DATE DE REMISE", "ENCAISSEMENTS", "CAISSIER",
                                 "ENCAISS.", "MONTANT VERSÉ", "DATE DE VALEUR", "CLÔTURÉ", "PROVISOIRE",
                                 "Journées de caisse versées", "Caisse source");
+            }
+        }
+    }
+
+    @Test
+    void chequeSlipOmitsInstrumentDatesWhileEffectSlipRetainsMaturity() throws Exception {
+        for (TypeBordereauRemise type : new TypeBordereauRemise[]{TypeBordereauRemise.CHEQUE, TypeBordereauRemise.EFFET}) {
+            BordereauRemise slip = cashSlip(1);
+            slip.setType(type);
+            slip.getLignesEspeces().clear();
+            InstrumentReglementClient instrument = InstrumentReglementClient.builder()
+                    .reglement(ReglementClient.builder().payeurNom("Client test").build())
+                    .mode(type == TypeBordereauRemise.CHEQUE ? ModeReglementClient.CHEQUE : ModeReglementClient.EFFET)
+                    .referenceInstrument("TEST-001").dateEcheance(LocalDate.of(2031, 12, 11)).build();
+            LigneBordereauRemise line = LigneBordereauRemise.builder().bordereau(slip)
+                    .instrument(instrument).montant(new BigDecimal("5620")).build();
+            line.setId(1L);
+            slip.getLignes().add(line);
+            when(repository.findByIdAndAgenceId(10L, 1L)).thenReturn(Optional.of(slip));
+            try (PDDocument pdf = PDDocument.load(service.generate(1L, 10L))) {
+                String text = new PDFTextStripper().getText(pdf);
+                assertThat(text).contains("TEST-001", "5 620,00");
+                if (type == TypeBordereauRemise.CHEQUE) {
+                    assertThat(text).doesNotContain("ÉCHÉANCE", "DATE CHÈQUE", "11/12/2031");
+                } else {
+                    assertThat(text).contains("ÉCHÉANCE", "11/12/2031");
+                }
             }
         }
     }

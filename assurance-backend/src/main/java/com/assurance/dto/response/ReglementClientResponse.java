@@ -88,6 +88,9 @@ public class ReglementClientResponse {
         private Long payeurId;
         private String payeurNom;
         private String destination;
+        private String numeroPolice;
+        private String mouvement;
+        private String referenceDocument;
         private BigDecimal montant;
         private StatutAffectationReglement statut;
     }

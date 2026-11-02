@@ -72,6 +72,7 @@ export default function ReglementClientDetailPage() {
 
   const data = payment.data;
   const allocations = groupAllocations(data);
+  const showDocument = allocations.some(allocation => allocation.documentId);
   const allocatedInstrumentCount = new Set(
     allocations.flatMap((allocation) => Array.from(allocation.instrumentIds))
   ).size;
@@ -218,10 +219,12 @@ export default function ReglementClientDetailPage() {
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
               <tr>
-                <th className="px-4 py-3 text-left">Destination</th>
+                <th className="px-4 py-3 text-left">N° police</th>
+                <th className="px-4 py-3 text-left">Mouvement / prestation</th>
+                {showDocument && <th className="px-4 py-3 text-left">Document</th>}
                 <th className="px-4 py-3 text-left">Client / groupe</th>
                 <th className="px-4 py-3 text-center">Moyens</th>
                 <th className="px-4 py-3 text-right">Montant affecté</th>
@@ -231,9 +234,9 @@ export default function ReglementClientDetailPage() {
             <tbody className="divide-y">
               {allocations.map((allocation) => (
                 <tr key={allocation.key} className="hover:bg-muted/30">
-                  <td className="px-4 py-3 font-medium">
-                    {allocation.destination}
-                  </td>
+                  <td className="whitespace-pre-line px-4 py-3 font-medium">{allocation.numeroPolice || "-"}</td>
+                  <td className="px-4 py-3">{allocation.mouvement || "-"}</td>
+                  {showDocument && <td className="px-4 py-3">{allocation.referenceDocument || "-"}</td>}
                   <td className="px-4 py-3">{allocation.payer}</td>
                   <td className="px-4 py-3 text-center">{allocation.instrumentCount}</td>
                   <td className="px-4 py-3 text-right font-semibold">{formatAccountingAmount(allocation.montant)}</td>
@@ -251,7 +254,7 @@ export default function ReglementClientDetailPage() {
               ))}
               {allocations.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">Aucune affectation.</td>
+                  <td colSpan={showDocument ? 7 : 6} className="px-4 py-10 text-center text-muted-foreground">Aucune affectation.</td>
                 </tr>
               )}
             </tbody>
@@ -266,7 +269,10 @@ export default function ReglementClientDetailPage() {
 function groupAllocations(payment: ClientPayment) {
   const grouped = new Map<string, {
     key: string;
-    destination: string;
+    numeroPolice?: string | null;
+    mouvement?: string | null;
+    documentId?: string | null;
+    referenceDocument?: string | null;
     payer: string;
     instrumentIds: Set<string>;
     instrumentCount: number;
@@ -281,12 +287,10 @@ function groupAllocations(payment: ClientPayment) {
       const key = `${target}:${allocation.statut}:${allocation.payeurType ?? ""}:${allocation.payeurId ?? ""}`;
       const current = grouped.get(key) ?? {
         key,
-        destination: allocation.destination
-          || (allocation.documentClientId
-            ? `Document client #${allocation.documentClientId}`
-            : allocation.elementFacturableId
-              ? `Créance #${allocation.elementFacturableId}`
-              : "-"),
+        numeroPolice: allocation.numeroPolice,
+        mouvement: allocation.mouvement,
+        documentId: allocation.documentClientId,
+        referenceDocument: allocation.referenceDocument,
         payer: allocation.payeurNom || "-",
         instrumentIds: new Set<string>(),
         instrumentCount: 0,

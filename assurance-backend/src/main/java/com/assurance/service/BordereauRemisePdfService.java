@@ -170,7 +170,10 @@ public class BordereauRemisePdfService {
                 .setFont(bold)
                 .setFontSize(11)
                 .setMarginBottom(5));
-        Table table = new Table(new float[]{0.35f, 1.45f, 1.55f, 1.35f, 0.95f, 1f})
+        boolean showDueDate = slip.getType() == TypeBordereauRemise.EFFET;
+        Table table = new Table(showDueDate
+                ? new float[]{0.35f, 1.45f, 1.55f, 1.35f, 0.95f, 1f}
+                : new float[]{0.35f, 1.45f, 1.55f, 1.35f, 1f})
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N°", bold, TextAlignment.CENTER);
         addHeader(table, slip.getType() == TypeBordereauRemise.CHEQUE
@@ -179,8 +182,9 @@ public class BordereauRemisePdfService {
                 ? "TIREUR / PAYEUR" : "TIRÉ / PAYEUR", bold, TextAlignment.LEFT);
         addHeader(table, slip.getType() == TypeBordereauRemise.CHEQUE
                 ? "BANQUE TIRÉE" : "BANQUE DOMICILIATAIRE", bold, TextAlignment.LEFT);
-        addHeader(table, slip.getType() == TypeBordereauRemise.CHEQUE
-                ? "DATE CHÈQUE" : "ÉCHÉANCE", bold, TextAlignment.CENTER);
+        if (showDueDate) {
+            addHeader(table, "ÉCHÉANCE", bold, TextAlignment.CENTER);
+        }
         addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
 
         int index = 1;
@@ -194,7 +198,9 @@ public class BordereauRemisePdfService {
             addBody(table, instrument.getReglement().getPayeurNom(), regular, TextAlignment.LEFT, background);
             addBody(table, value(instrument.getBanqueEmettriceReference() == null
                     ? null : instrument.getBanqueEmettriceReference().getLibelle()), regular, TextAlignment.LEFT, background);
-            addBody(table, date(instrument.getDateEcheance()), regular, TextAlignment.CENTER, background);
+            if (showDueDate) {
+                addBody(table, date(instrument.getDateEcheance()), regular, TextAlignment.CENTER, background);
+            }
             addBody(table, amount(line.getMontant()), bold, TextAlignment.RIGHT, background);
             index++;
         }

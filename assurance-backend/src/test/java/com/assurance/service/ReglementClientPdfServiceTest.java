@@ -3,14 +3,17 @@ package com.assurance.service;
 import com.assurance.entity.AffectationReglementClient;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Contrat;
+import com.assurance.entity.DocumentClient;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.ReglementClient;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutReglementClient;
+import com.assurance.enums.TypeDocumentClient;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.ReglementClientRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -66,10 +69,55 @@ class ReglementClientPdfServiceTest {
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
             assertThat(text)
                     .contains("11 moyens de paiement · 1 destination affectée")
+                    .contains("N° POLICE", "MOUVEMENT / PRESTATION", "26500001")
                     .contains("MONTANT AFFECTÉ")
-                    .contains("55 000,00");
-            assertThat(occurrences(text, "Affaire nouvelle · 26500001 · MATU26-0021"))
-                    .isEqualTo(1);
+                    .contains("55 000,00")
+                    .doesNotContain("ÉCHÉANCE", "DATE CHÈQUE", "13/11/2026", "CRÉANCE / DOCUMENT", "MATU26-0021");
+            assertThat(occurrences(text, "Affaire nouvelle")).isEqualTo(1);
+            assertThat(occurrences(text, "26500001")).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void documentAllocationKeepsItsReferenceAndSnapshotPoliciesWithoutSplittingTheAmount() throws Exception {
+        ReglementClient payment = paymentWithElevenCheques();
+        DocumentClient invoice = DocumentClient.builder().typeDocument(TypeDocumentClient.FACTURE)
+                .numero("FAC-TEST-001").build();
+        invoice.setId(80L);
+        invoice.getLignes().add(LigneDocumentClient.builder().numeroPolice("POL-SNAPSHOT-1").build());
+        invoice.getLignes().add(LigneDocumentClient.builder().numeroPolice("POL-SNAPSHOT-2").build());
+        payment.getInstruments().forEach(instrument -> instrument.getAffectations().forEach(allocation -> {
+            allocation.setElementFacturable(null);
+            allocation.setDocumentClient(invoice);
+        }));
+        when(paymentRepository.findByIdAndAgenceId(50L, 1L)).thenReturn(Optional.of(payment));
+        when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L))
+                .thenReturn(payment.getInstruments());
+        ReglementClientPdfService service = new ReglementClientPdfService(
+                paymentRepository, instrumentRepository, logoStorageService);
+        try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
+            String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
+            assertThat(text).contains("11 moyens de paiement · 1 destination affectée", "DOCUMENT",
+                    "Facture FAC-TEST-001", "POL-SNAPSHOT-1", "POL-SNAPSHOT-2", "55 000,00");
+            assertThat(occurrences(text, "Facture FAC-TEST-001")).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void mixedPaymentOnlyShowsTheEffectMaturityDate() throws Exception {
+        ReglementClient payment = paymentWithElevenCheques();
+        payment.getInstruments().forEach(instrument -> instrument.setDateEcheance(LocalDate.of(2031, 12, 11)));
+        InstrumentReglementClient effect = payment.getInstruments().get(0);
+        effect.setMode(ModeReglementClient.EFFET);
+        effect.setDateEcheance(LocalDate.of(2030, 12, 11));
+        when(paymentRepository.findByIdAndAgenceId(50L, 1L)).thenReturn(Optional.of(payment));
+        when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L))
+                .thenReturn(payment.getInstruments());
+        ReglementClientPdfService service = new ReglementClientPdfService(
+                paymentRepository, instrumentRepository, logoStorageService);
+        try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
+            assertThat(new PDFTextStripper().getText(pdf)).contains("ÉCHÉANCE", "11/12/2030")
+                    .doesNotContain("11/12/2031", "DATE CHÈQUE");
         }
     }
 

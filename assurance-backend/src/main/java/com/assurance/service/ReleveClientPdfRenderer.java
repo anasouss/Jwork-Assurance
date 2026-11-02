@@ -583,11 +583,6 @@ public class ReleveClientPdfRenderer {
                 .setKeepTogether(true)
                 .setMarginRight(0)
                 .setMarginTop(denseStatement ? 6 : 10);
-        addTotalRow(total, "Total TTC", source.getTotalDebit(), bold);
-        if (hasStatementAdvance(source)) {
-            BigDecimal adjustment = source.getLignes().stream().map(line -> money(line.getEcartReglement())).reduce(BigDecimal.ZERO, BigDecimal::add);
-            addTotalRow(total, "Total acompte", money(source.getTotalCredit()).subtract(adjustment), bold);
-        }
         addTotalRow(total, "Total à payer", source.getTotalDocument(), bold);
         document.add(total);
     }

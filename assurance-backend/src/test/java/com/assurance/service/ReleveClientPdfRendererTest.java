@@ -42,8 +42,8 @@ class ReleveClientPdfRendererTest {
         DocumentClient source = statement(2);
         try (PDDocument pdf = PDDocument.load(renderLinesAndTotals(source))) {
             String text = new PDFTextStripper().getText(pdf);
-            assertThat(text).contains("POL-1", "POL-2", "Total TTC", "Total à payer", "200,00")
-                    .doesNotContain("Acompte", "Total acompte", "L’assuré");
+            assertThat(text).contains("POL-1", "POL-2", "Total à payer", "200,00")
+                    .doesNotContain("Acompte", "Total acompte", "Total TTC", "L’assuré");
         }
     }
 
@@ -85,7 +85,8 @@ class ReleveClientPdfRendererTest {
             assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
             PDFTextStripper stripper = new PDFTextStripper();
             String text = stripper.getText(pdf);
-            assertThat(text).contains("Acompte", "Total acompte", "POL-75", "25,00", "7 475,00");
+            assertThat(text).contains("Acompte", "Total à payer", "POL-75", "25,00", "7 475,00")
+                    .doesNotContain("Total acompte", "Total TTC");
             stripper.setEndPage(1);
             assertThat(stripper.getText(pdf)).contains("Acompte");
         }

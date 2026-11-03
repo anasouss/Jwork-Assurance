@@ -208,6 +208,8 @@ export function ClientSection({
                 cinValidite: found.cinValidite ?? undefined,
                 rc: found.rc ?? undefined,
                 ice: found.ice ?? undefined,
+                iff: found.iff ?? undefined,
+                cnss: found.cnss ?? undefined,
                 numeroPermis: found.numeroPermis ?? undefined,
                 dateDelivrancePermis: found.dateDelivrancePermis ?? undefined,
                 dateValiditePermis: found.dateValiditePermis ?? undefined,
@@ -421,6 +423,12 @@ export function ClientSection({
                     </Field>
                     <Field label="ICE">
                       <Input disabled={disabledByCopy} value={item.client.ice ?? ""} onChange={(event) => updateClient(index, { ice: event.target.value })} />
+                    </Field>
+                    <Field label="Identifiant fiscal (IF)">
+                      <Input disabled={disabledByCopy} value={item.client.iff ?? ""} onChange={(event) => updateClient(index, { iff: event.target.value })} />
+                    </Field>
+                    <Field label="N° d'affiliation CNSS">
+                      <Input disabled={disabledByCopy} value={item.client.cnss ?? ""} onChange={(event) => updateClient(index, { cnss: event.target.value })} />
                     </Field>
                   </>
                 ) : (
@@ -801,7 +809,7 @@ function LookupMessage({ state }: { state?: LookupState }) {
   );
 }
 
-function TelephoneList({
+export function TelephoneList({
   client,
   updateClient,
   error,
@@ -812,7 +820,7 @@ function TelephoneList({
 }) {
   const telephones = client.client.telephones && client.client.telephones.length > 0
     ? client.client.telephones
-    : [{ numero: "", principal: true, whatsapp: false }];
+    : [{ numero: client.client.telephone ?? "", principal: true, whatsapp: false }];
 
   const updateTelephone = (index: number, patch: Partial<NonNullable<ClientInput["client"]["telephones"]>[number]>) => {
     updateClient({
@@ -831,9 +839,10 @@ function TelephoneList({
 
   const removeTelephone = (index: number) => {
     const next = telephones.filter((_, idx) => idx !== index);
+    const principalIndex = Math.max(next.findIndex((telephone) => telephone.principal), 0);
     updateClient({
       telephones: next.length > 0
-        ? next.map((telephone, idx) => ({ ...telephone, principal: idx === 0 ? true : telephone.principal }))
+        ? next.map((telephone, idx) => ({ ...telephone, principal: idx === principalIndex }))
         : [{ numero: "", principal: true, whatsapp: false }],
     });
   };
@@ -853,20 +862,22 @@ function TelephoneList({
         {telephones.map((telephone, index) => (
           <div key={index} className="grid gap-2 rounded-md border bg-muted/20 p-2 md:grid-cols-[1fr_auto_auto_auto]">
             <Input
+              type="tel"
+              aria-label={`Téléphone ${index + 1}`}
               value={telephone.numero}
               aria-invalid={Boolean(error)}
               onChange={(event) => updateTelephone(index, { numero: event.target.value })}
               placeholder="Numéro"
             />
             <label className="flex items-center gap-2 text-xs">
-              <Checkbox checked={Boolean(telephone.principal)} onCheckedChange={(checked) => updateTelephone(index, { principal: Boolean(checked) })} />
+              <Checkbox checked={Boolean(telephone.principal)} onCheckedChange={(checked) => { if (checked) updateTelephone(index, { principal: true }); }} />
               Principal
             </label>
             <label className="flex items-center gap-2 text-xs">
               <Checkbox checked={Boolean(telephone.whatsapp)} onCheckedChange={(checked) => updateTelephone(index, { whatsapp: Boolean(checked) })} />
               WhatsApp
             </label>
-            <Button type="button" variant="ghost" size="icon" disabled={telephones.length === 1} onClick={() => removeTelephone(index)}>
+            <Button type="button" variant="ghost" size="icon" aria-label={`Supprimer le téléphone ${index + 1}`} title="Supprimer le téléphone" disabled={telephones.length === 1} onClick={() => removeTelephone(index)}>
               <Trash2 className="size-4" />
             </Button>
           </div>

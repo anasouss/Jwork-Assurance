@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "@/features/production/api/clients";
+import { TelephoneList } from "@/features/production/components/ClientSection";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
@@ -431,12 +432,6 @@ function ClientDialog({
     staleTime: 60_000,
     enabled: open,
   });
-  const categoriesQuery = useQuery({
-    queryKey: ["referentiel", "categories-client"],
-    queryFn: () => referenceApi.list("categories-client"),
-    staleTime: 60_000,
-    enabled: open,
-  });
   const acquisitionOptionsQuery = useQuery({
     queryKey: ["crm", "acquisition-options"],
     queryFn: clientApi.acquisitionOptions,
@@ -444,6 +439,7 @@ function ClientDialog({
     enabled: open,
   });
   const update = (patch: Partial<ClientDraft>) => setDraft((current) => ({ ...current, ...patch }));
+  const telephones = draft.telephones ?? [];
   const createMutation = useMutation({
     mutationFn: async () => {
       const client = await clientApi.createClient({
@@ -456,16 +452,15 @@ function ClientDialog({
         cinValidite: draft.cinValidite,
         rc: clean(draft.rc),
         ice: clean(draft.ice),
+        iff: draft.typeClient === "PERSONNE_MORALE" ? clean(draft.iff) : undefined,
+        cnss: draft.typeClient === "PERSONNE_MORALE" ? clean(draft.cnss) : undefined,
         villeId: draft.villeId,
-        categorieClientId: draft.categorieClientId,
         adresse: clean(draft.adresse),
-        telephone: clean(draft.telephone),
+        telephone: clean((telephones.find((telephone) => telephone.principal) ?? telephones[0])?.numero),
         email: clean(draft.email),
         groupeClientId: draft.groupeClientId,
         relationGroupe: draft.relationGroupe,
-        telephones: draft.telephone?.trim()
-          ? [{ numero: draft.telephone.trim(), principal: true, whatsapp: false }]
-          : [],
+        telephones: telephones.map((telephone) => ({ ...telephone, numero: telephone.numero.trim() })),
         acquisition: draft.acquisition,
       });
       return client;
@@ -482,7 +477,7 @@ function ClientDialog({
   const valid = Boolean(
     draft.villeId
       && draft.adresse?.trim()
-      && draft.telephone?.trim()
+      && telephones.length > 0 && telephones.every((telephone) => telephone.numero.trim())
       && (physical
         ? draft.genre && draft.nom?.trim() && draft.prenom?.trim() && draft.cin?.trim() && draft.cinValidite
         : draft.raisonSociale?.trim() && draft.rc?.trim())
@@ -555,6 +550,12 @@ function ClientDialog({
               <Field label="ICE">
                 <Input value={draft.ice ?? ""} onChange={(event) => update({ ice: event.target.value })} />
               </Field>
+              <Field label="Identifiant fiscal (IF)">
+                <Input value={draft.iff ?? ""} onChange={(event) => update({ iff: event.target.value })} />
+              </Field>
+              <Field label="N° d'affiliation CNSS">
+                <Input value={draft.cnss ?? ""} onChange={(event) => update({ cnss: event.target.value })} />
+              </Field>
             </>
           )}
           <Field label="Ville" required>
@@ -570,22 +571,11 @@ function ClientDialog({
           <Field label="Adresse" required>
             <Input value={draft.adresse ?? ""} onChange={(event) => update({ adresse: event.target.value })} />
           </Field>
-          <Field label="Téléphone" required>
-            <Input value={draft.telephone ?? ""} onChange={(event) => update({ telephone: event.target.value })} />
-          </Field>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <TelephoneList client={{ role: "SOUSCRIPTEUR", client: draft }} updateClient={update} />
+          </div>
           <Field label="Email">
             <Input type="email" value={draft.email ?? ""} onChange={(event) => update({ email: event.target.value })} />
-          </Field>
-          <Field label="Catégorie">
-            <Select value={draft.categorieClientId ?? "AUCUNE"} onValueChange={(value) => update({ categorieClientId: value === "AUCUNE" ? undefined : value })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="AUCUNE">Non définie</SelectItem>
-                {(categoriesQuery.data ?? []).filter((item) => item.actif !== false).map((categorie) => (
-                  <SelectItem key={categorie.id} value={categorie.id}>{categorie.libelle}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </Field>
           <Field label="Groupe">
             <Select value={draft.groupeClientId ?? "INDEPENDANT"} onValueChange={(value) => update({
@@ -729,9 +719,15 @@ function ClientDetail({
         <PortfolioSection title="Informations client" icon={<Users className="size-4" />} tone="blue">
             <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">
               <Info label="Identifiant" value={client.rc || client.cin || client.ice} />
-              <Info label="Catégorie" value={client.categorieClientLibelle} />
+              {client.typeClient === "PERSONNE_MORALE" ? <>
+                <Info label="ICE" value={client.ice} />
+                <Info label="IF" value={client.iff} />
+                <Info label="CNSS" value={client.cnss} />
+              </> : null}
               <Info label="Adresse" value={[client.adresse, client.ville].filter(Boolean).join(", ")} />
-              <Info label="Téléphone" value={client.telephone} />
+              <Info label="Téléphones" value={client.telephones?.length
+                ? client.telephones.map((telephone) => `${telephone.numero}${telephone.principal ? " (principal)" : ""}${telephone.whatsapp ? " · WhatsApp" : ""}`).join(" / ")
+                : client.telephone} />
               <Info label="Email" value={client.email} />
               <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
             </dl>
@@ -1429,6 +1425,7 @@ function emptyClientDraft(typeClient: TypeClient = "PERSONNE_MORALE"): ClientDra
   return {
     typeClient,
     conducteurHabituel: true,
+    telephones: [{ numero: "", principal: true, whatsapp: false }],
   };
 }
 

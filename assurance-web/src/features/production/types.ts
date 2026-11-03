@@ -460,6 +460,8 @@ export type ClientInput = {
     nationalite?: string;
     rc?: string;
     ice?: string;
+    iff?: string;
+    cnss?: string;
     numeroPermis?: string;
     dateDelivrancePermis?: string;
     dateValiditePermis?: string;

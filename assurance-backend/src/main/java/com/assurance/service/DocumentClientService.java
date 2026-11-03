@@ -498,17 +498,6 @@ public class DocumentClientService {
             Long agenceId,
             Collection<Long> requestedIds
     ) {
-        return findSourcesByIds(agenceId, requestedIds, false);
-    }
-
-    @Transactional(readOnly = true)
-    public List<SourceDocumentClientResponse> findPaymentSourcesByIds(Long agenceId, Collection<Long> requestedIds) {
-        return findSourcesByIds(agenceId, requestedIds, true);
-    }
-
-    private List<SourceDocumentClientResponse> findSourcesByIds(
-            Long agenceId, Collection<Long> requestedIds, boolean includeInactive
-    ) {
         List<Long> ids = requestedIds == null
                 ? List.of()
                 : requestedIds.stream().filter(Objects::nonNull).distinct().toList();
@@ -516,9 +505,7 @@ public class DocumentClientService {
             return List.of();
         }
 
-        List<ElementFacturable> elements = includeInactive
-                ? elementFacturableRepository.findByAgenceIdAndIdIn(agenceId, ids)
-                : elementFacturableRepository.findClientDocumentSources(agenceId, ids);
+        List<ElementFacturable> elements = elementFacturableRepository.findClientDocumentSources(agenceId, ids);
         if (elements.size() != ids.size()) {
             throw new BadRequestException("Une ou plusieurs créances sont introuvables ou annulées");
         }
@@ -557,6 +544,46 @@ public class DocumentClientService {
                         source -> source
                 ));
         return ids.stream().map(byId::get).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SourceDocumentClientResponse> findPaymentSourcesByIds(Long agenceId, Collection<Long> requestedIds) {
+        List<Long> ids = requestedIds == null ? List.of()
+                : requestedIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) return List.of();
+        List<ElementFacturable> elements = elementFacturableRepository.findByAgenceIdAndIdIn(agenceId, ids);
+        if (elements.size() != ids.size()) {
+            throw new BadRequestException("Une ou plusieurs écritures du règlement sont introuvables");
+        }
+        Map<Long, Quittance> quittances = quittanceRepository.findGlobalForPaymentHistory(agenceId, ids).stream()
+                .collect(Collectors.toMap(quittance -> quittance.getElementFacturable().getId(), quittance -> quittance,
+                        (current, candidate) -> candidate.getId() > current.getId() ? candidate : current));
+        Map<Long, AssistanceContrat> assistances = assistanceContratRepository.findForPaymentHistory(agenceId, ids).stream()
+                .collect(Collectors.toMap(assistance -> assistance.getElementFacturable().getId(), assistance -> assistance,
+                        (current, candidate) -> candidate.getId() > current.getId() ? candidate : current));
+        List<Contrat> contracts = elements.stream().map(ElementFacturable::getContrat).toList();
+        Map<Long, Client> subscribers = loadSubscribersFromContracts(contracts);
+        Map<Long, Client> insured = loadClientsFromContracts(contracts, RoleClientContrat.PROPRIETAIRE);
+        Map<Long, ElementFacturable> byId = elements.stream()
+                .collect(Collectors.toMap(ElementFacturable::getId, element -> element));
+        return ids.stream().map(id -> {
+            ElementFacturable element = byId.get(id);
+            Contrat contract = element.getContrat();
+            Quittance quittance = quittances.get(id);
+            AssistanceContrat assistance = assistances.get(id);
+            boolean assistanceLine = element.getNature() == NatureElementFacturable.ASSISTANCE;
+            BillableSource source = new BillableSource(element, quittance, assistance);
+            Client client = insured.getOrDefault(contract.getId(), subscribers.get(contract.getId()));
+            return SourceDocumentClientResponse.builder().elementFacturableId(id).contratId(contract.getId())
+                    .nature(element.getNature()).quittanceId(quittance == null ? null : quittance.getId())
+                    .police(assistanceLine ? assistance == null ? null : trimToNull(assistance.getNumeroContratOuQuittance())
+                            : contract.getNumeroPolice())
+                    .compagnie(assistanceLine && assistance == null ? null : sourceCompany(source))
+                    .assureId(client == null ? null : client.getId()).assureNom(client == null ? null : client.getNomAffichage())
+                    .mouvement(assistance != null || quittance != null ? sourceLabel(source) : element.getLibelle())
+                    .dateEffet(element.getDateDebut()).dateEcheance(element.getDateFin())
+                    .montantTtc(money(element.getPrimeTotale())).build();
+        }).toList();
     }
 
     @Transactional(readOnly = true)

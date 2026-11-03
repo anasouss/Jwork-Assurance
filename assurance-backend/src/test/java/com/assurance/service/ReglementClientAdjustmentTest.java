@@ -14,6 +14,9 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.Quittance;
+import com.assurance.entity.Contrat;
+import com.assurance.entity.AssistanceContrat;
+import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.TypeDocumentClient;
@@ -23,6 +26,8 @@ import com.assurance.repository.EcartReglementClientRepository;
 import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.QuittanceRepository;
+import com.assurance.repository.AssistanceContratRepository;
+import com.assurance.repository.ContratClientRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +52,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ReglementClientAdjustmentTest {
@@ -57,7 +65,10 @@ class ReglementClientAdjustmentTest {
     @Mock private LigneDocumentClientRepository documentLineRepository;
     @Mock private ParametreApplicationService parametreApplicationService;
     @Mock private DocumentClientService documentClientService;
+    @Mock private AssistanceContratRepository historyAssistanceRepository;
+    @Mock private ContratClientRepository historyClientRepository;
     @InjectMocks private ReglementClientService service;
+    @InjectMocks private DocumentClientService paymentHistoryReader;
 
     @BeforeEach
     void manager() {
@@ -68,6 +79,80 @@ class ReglementClientAdjustmentTest {
     @AfterEach
     void clearSecurity() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void paymentHistoryLoadsPaidQuittancesWithoutApplyingUnpaidEligibility() {
+        var source = historyElement(62L, NatureElementFacturable.CONTRAT);
+        var paid = Quittance.builder().elementFacturable(source).globale(true).alternative(false).payee(true)
+                .numeroQuittance("Q-62").build();
+        paid.setId(10L);
+        when(elementRepository.findByAgenceIdAndIdIn(7L, List.of(62L))).thenReturn(List.of(source));
+        when(quittanceRepository.findGlobalForPaymentHistory(7L, List.of(62L))).thenReturn(List.of(paid));
+
+        var rows = paymentHistoryReader.findPaymentSourcesByIds(7L, List.of(62L));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.getElementFacturableId()).isEqualTo(62L);
+            assertThat(row.getQuittanceId()).isEqualTo(10L);
+            assertThat(row.getPolice()).isEqualTo("POL-62");
+            assertThat(row.getMontantTtc()).isEqualByComparingTo("329.00");
+        });
+        assertThat(paid.getPayee()).isTrue();
+        verify(quittanceRepository, never()).findGlobalByElementFacturableIds(any());
+    }
+
+    @Test
+    void paymentHistoryKeepsInactiveAssistanceWithItsOwnContractReference() {
+        var source = historyElement(85L, NatureElementFacturable.ASSISTANCE);
+        var assistance = AssistanceContrat.builder().elementFacturable(source).actif(false)
+                .numeroContratOuQuittance("ASS-85").produit("F4").build();
+        assistance.setId(20L);
+        when(elementRepository.findByAgenceIdAndIdIn(7L, List.of(85L))).thenReturn(List.of(source));
+        when(historyAssistanceRepository.findForPaymentHistory(7L, List.of(85L))).thenReturn(List.of(assistance));
+
+        var rows = paymentHistoryReader.findPaymentSourcesByIds(7L, List.of(85L));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.getPolice()).isEqualTo("ASS-85");
+            assertThat(row.getMouvement()).isEqualTo("Assistance - F4");
+        });
+        assertThat(assistance.getActif()).isFalse();
+        verify(historyAssistanceRepository, never()).findActiveByElementFacturableIds(any());
+    }
+
+    @Test
+    void historicalMissingQuittanceDoesNotBlockReadingButStillBlocksNewDocumentEligibility() {
+        var source = historyElement(85L, NatureElementFacturable.CONTRAT);
+        source.setLibelle("Extension garanties");
+        when(elementRepository.findByAgenceIdAndIdIn(7L, List.of(85L))).thenReturn(List.of(source));
+
+        var rows = paymentHistoryReader.findPaymentSourcesByIds(7L, List.of(85L));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row.getQuittanceId()).isNull();
+            assertThat(row.getMouvement()).isEqualTo("Extension garanties");
+        });
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                paymentHistoryReader, "resolveSource", source, Map.of(), Map.of()))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("n'a pas de quittance valide");
+    }
+
+    @Test
+    void paymentHistoryRejectsSourcesOutsideTheCurrentAgencyBeforeLoadingReferences() {
+        assertThatThrownBy(() -> paymentHistoryReader.findPaymentSourcesByIds(7L, List.of(62L)))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("introuvables");
+        verify(elementRepository).findByAgenceIdAndIdIn(7L, List.of(62L));
+        verifyNoInteractions(quittanceRepository, historyAssistanceRepository, historyClientRepository);
+    }
+
+    private ElementFacturable historyElement(Long id, NatureElementFacturable nature) {
+        var contract = Contrat.builder().numeroPolice("POL-" + id).build();
+        contract.setId(11L);
+        var source = ElementFacturable.builder().contrat(contract).nature(nature)
+                .primeTotale(new BigDecimal("329.00")).actif(false).build();
+        source.setId(id);
+        return source;
     }
 
     @Test

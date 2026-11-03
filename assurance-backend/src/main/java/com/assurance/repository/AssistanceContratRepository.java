@@ -215,4 +215,15 @@ public interface AssistanceContratRepository extends JpaRepository<AssistanceCon
     List<AssistanceContrat> findByElementFacturableIds(
             @Param("elementIds") Collection<Long> elementIds
     );
+
+    @EntityGraph(attributePaths = {"compagnieAssistance", "produitAssistance", "elementFacturable"})
+    @Query("""
+            select a from AssistanceContrat a
+            where a.contrat.agence.id = :agenceId
+              and a.elementFacturable.id in :elementIds
+            """)
+    List<AssistanceContrat> findForPaymentHistory(
+            @Param("agenceId") Long agenceId,
+            @Param("elementIds") Collection<Long> elementIds
+    );
 }

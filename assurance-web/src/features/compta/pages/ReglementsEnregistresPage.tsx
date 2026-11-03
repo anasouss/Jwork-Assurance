@@ -16,7 +16,7 @@ import {
   Search,
   XCircle,
 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -56,6 +56,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import { PremiumReceiptDialog } from "../components/PremiumReceiptDialog";
+import { ClientPaymentDetailsDialog } from "../components/ClientPaymentDetailsDialog";
 import {
   usePayerSearch,
   type PayerSelection,
@@ -153,6 +154,7 @@ export default function ReglementsEnregistresPage() {
   const [paymentToCancel, setPaymentToCancel] = useState<ClientPayment>();
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [paymentToReceipt, setPaymentToReceipt] = useState<ClientPayment>();
+  const [detailPaymentId, setDetailPaymentId] = useState<string>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [cancelReason, setCancelReason] = useState("");
@@ -553,6 +555,7 @@ export default function ReglementsEnregistresPage() {
                         canManage={canManage}
                         canIssueInvoice={canIssueInvoice}
                         pdfLoading={openingPaymentId === payment.id}
+                        onDetail={() => setDetailPaymentId(payment.id)}
                         onPreview={() => void previewPayment(payment)}
                         onPremiumReceipt={() => setPaymentToReceipt(payment)}
                         onInvoice={() => setPaymentToInvoice(payment)}
@@ -598,6 +601,7 @@ export default function ReglementsEnregistresPage() {
       </section>
 
       {paymentToReceipt && <PremiumReceiptDialog key={paymentToReceipt.id} payment={paymentToReceipt} canIssue={canCreate} onClose={() => setPaymentToReceipt(undefined)} />}
+      {detailPaymentId && <ClientPaymentDetailsDialog key={detailPaymentId} paymentId={detailPaymentId} onClose={() => setDetailPaymentId(undefined)} />}
 
       <Dialog
         open={Boolean(paymentToInvoice)}
@@ -691,6 +695,7 @@ function PaymentActionsMenu({
   onPremiumReceipt,
   onInvoice,
   onCancel,
+  onDetail,
 }: {
   payment: ClientPayment;
   canManage: boolean;
@@ -700,6 +705,7 @@ function PaymentActionsMenu({
   onPremiumReceipt: () => void;
   onInvoice: () => void;
   onCancel: () => void;
+  onDetail: () => void;
 }) {
   const canCreateInvoice = payment.statut === "VALIDE"
     && canIssueInvoice
@@ -721,11 +727,9 @@ function PaymentActionsMenu({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuItem asChild>
-          <Link to={`/app/compta/reglements/${payment.id}`}>
-            <Eye className="size-4" />
-            Voir le détail
-          </Link>
+        <DropdownMenuItem onSelect={onDetail}>
+          <Eye className="size-4" />
+          Voir le détail
         </DropdownMenuItem>
         <DropdownMenuItem disabled={pdfLoading} onSelect={onPreview}>
           <Printer className="size-4" />

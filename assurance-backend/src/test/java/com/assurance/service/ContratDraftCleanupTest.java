@@ -9,6 +9,7 @@ import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.enums.ModeSaisieGarantieContrat;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.TypeVehiculeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +61,34 @@ class ContratDraftCleanupTest {
         contrat.getAssistances().add(assistance);
         lenient().when(assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(10L))
                 .thenReturn(List.of(assistance));
+    }
+
+    @Test
+    void amendmentVehicleValidationDoesNotRequireCrmButCreationStillDoes() {
+        Usage usage = new Usage();
+        usage.setId(42L);
+        usage.setActif(true);
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        contrat.setUsage(usage);
+        var vehicle = new CreateContratRequest.VehiculeInput();
+        vehicle.setTypeVehicule(TypeVehiculeContrat.AUTOMOBILE);
+        vehicle.setImmatriculation("67114-A-40");
+        vehicle.setMarqueId(2L);
+        vehicle.setCarrosserieId(3L);
+        vehicle.setNombrePlaces("7");
+
+        ReflectionTestUtils.invokeMethod(service, "validateDraftVehiculeInput", contrat, vehicle, false);
+        assertThat(vehicle.getCrm()).isNull();
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                service, "validateDraftVehiculeInput", contrat, vehicle))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("CRM obligatoire");
+
+        vehicle.setImmatriculation("");
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                service, "validateDraftVehiculeInput", contrat, vehicle, false))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Immatriculation obligatoire");
     }
 
     @Test

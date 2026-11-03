@@ -186,7 +186,6 @@ export function vehicleValidationMessage(vehicle: VehiculeInput | undefined, usa
   if (!vehicle.carrosserieId && !vehicle.carrosserieLibelle?.trim()) return "La carrosserie est obligatoire pour chaque véhicule";
   if (!vehicle.immatriculation?.trim()) return "L'immatriculation est obligatoire pour chaque véhicule";
   if (!vehicle.nombrePlaces?.trim()) return "Le nombre de places est obligatoire pour chaque véhicule";
-  if (!vehicle.crm?.trim()) return "Le CRM est obligatoire pour chaque véhicule";
   const usage = usages.find((item) => item.id === vehicle.usageId);
   if (Boolean(usage?.byCarburant) && !vehicle.carburant?.trim()) return "Le carburant est obligatoire pour cet usage";
   if (Boolean(usage?.byPuissanceFiscale) && !vehicle.puissanceFiscale?.trim()) {

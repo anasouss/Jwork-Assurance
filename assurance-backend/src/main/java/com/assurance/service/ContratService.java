@@ -1655,6 +1655,10 @@ public class ContratService {
     }
 
     private void validateDraftVehiculeInput(Contrat contrat, CreateContratRequest.VehiculeInput input) {
+        validateDraftVehiculeInput(contrat, input, true);
+    }
+
+    private void validateDraftVehiculeInput(Contrat contrat, CreateContratRequest.VehiculeInput input, boolean requireCrm) {
         if (input == null) {
             throw new BadRequestException("Vehicule obligatoire");
         }
@@ -1676,7 +1680,7 @@ public class ContratService {
         if (!hasText(input.getNombrePlaces())) {
             throw new BadRequestException("Nombre de places obligatoire");
         }
-        if (!hasText(input.getCrm())) {
+        if (requireCrm && !hasText(input.getCrm())) {
             throw new BadRequestException("CRM obligatoire");
         }
         validateConditionalVehicleInput(input);
@@ -4658,7 +4662,7 @@ public class ContratService {
         inheritConventionAvenantVehicleUsage(contrat, request);
         List<Vehicule> vehicules = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
-            validateDraftVehiculeInput(contrat, input);
+            validateDraftVehiculeInput(contrat, input, false);
             Vehicule vehicule = new Vehicule();
             vehicule.setContrat(contrat);
             applyVehiculeInput(contrat, vehicule, input);

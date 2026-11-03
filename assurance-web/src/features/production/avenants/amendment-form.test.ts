@@ -7,10 +7,30 @@ import {
   mapCurrentGaranties,
   restoreExtensionGaranties,
   scopeGarantiesForTarget,
+  normalizeVehicle,
+  vehicleValidationMessage,
 } from "./amendment-form";
 import type { ContratSummary, GarantieInput, ReferenceOption } from "../types";
 
 describe("amendment form adapters", () => {
+  it("accepts an amendment vehicle without CRM while keeping usage requirements", () => {
+    const vehicle = {
+      ...DEFAULT_VEHICLE, usageId: "1", marqueId: "2", carrosserieId: "3",
+      immatriculation: "67114-A-40", nombrePlaces: "7", crm: undefined,
+    };
+    const usages = [{ id: "1", libelle: "Tourisme", byPuissanceFiscale: true }];
+    expect(vehicleValidationMessage({ ...vehicle, puissanceFiscale: "9" }, usages)).toBeNull();
+    expect(vehicleValidationMessage(vehicle, usages)).toBe("La puissance fiscale est obligatoire pour cet usage");
+    expect(vehicleValidationMessage({ ...vehicle, immatriculation: "" }, usages))
+      .toBe("L'immatriculation est obligatoire pour chaque véhicule");
+  });
+
+  it("preserves existing CRM values without inventing one for amendment vehicles", () => {
+    expect(normalizeVehicle({ ...DEFAULT_VEHICLE, crm: "0.90" }).crm).toBe("0.90");
+    expect(normalizeVehicle({ ...DEFAULT_VEHICLE }, undefined, undefined, "0.95").crm).toBe("0.95");
+    expect(normalizeVehicle({ ...DEFAULT_VEHICLE }).crm).toBeUndefined();
+  });
+
   it("inherits convention usage for new vehicles and reopened drafts without mutating them", () => {
     const vehicles = [{ ...DEFAULT_VEHICLE, usageId: undefined }, { ...DEFAULT_VEHICLE, usageId: "old-usage" }];
     expect(inheritConventionVehicleUsage(vehicles, { typeContrat: "CONVENTION", usageId: "contract-usage" }))

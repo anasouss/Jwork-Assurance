@@ -3,6 +3,12 @@ package com.assurance.service;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.response.CreanceClientPageResponse;
 import com.assurance.dto.response.SourceDocumentClientResponse;
+import com.assurance.dto.response.ReglementClientResponse;
+import com.assurance.entity.ReglementClient;
+import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.AffectationReglementClient;
+import com.assurance.enums.StatutReglementClient;
+import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.Agence;
 import com.assurance.entity.DocumentClient;
@@ -31,6 +37,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +56,7 @@ class ReglementClientAdjustmentTest {
     @Mock private ElementFacturableRepository elementRepository;
     @Mock private LigneDocumentClientRepository documentLineRepository;
     @Mock private ParametreApplicationService parametreApplicationService;
+    @Mock private DocumentClientService documentClientService;
     @InjectMocks private ReglementClientService service;
 
     @BeforeEach
@@ -60,6 +68,111 @@ class ReglementClientAdjustmentTest {
     @AfterEach
     void clearSecurity() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void paymentDetailCountsEachPremiumOnceAndSeparatesPendingCashAndForgiveness() {
+        var payment = detailPayment();
+        var confirmed = detailInstrument(payment, StatutInstrumentReglement.CONFIRME, "200.00");
+        var pending = detailInstrument(payment, StatutInstrumentReglement.REMIS_EN_BANQUE, "120.00");
+        var rejected = detailInstrument(payment, StatutInstrumentReglement.REJETE, "999.00");
+        confirmed.setAffectations(List.of(detailAllocation(confirmed, StatutAffectationReglement.CONFIRMEE, "200.00")));
+        pending.setAffectations(List.of(detailAllocation(pending, StatutAffectationReglement.EN_ATTENTE, "120.00")));
+        rejected.setAffectations(List.of(detailAllocation(rejected, StatutAffectationReglement.ANNULEE, "999.00")));
+        payment.setInstruments(List.of(confirmed, pending, rejected));
+        when(documentClientService.findPaymentSourcesByIds(eq(7L), any())).thenReturn(List.of(detailSource()));
+        when(allocationRepository.sumByElementIds(any())).thenReturn(List.of(
+                new Object[]{1L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("200.00")},
+                new Object[]{1L, StatutAffectationReglement.EN_ATTENTE, new BigDecimal("120.00")}));
+        when(ecartRepository.sumByElementIds(eq(7L), any())).thenReturn(Collections.singletonList(
+                new Object[]{1L, new BigDecimal("9.00")}));
+
+        ReglementClientResponse.Detail detail = ReflectionTestUtils.invokeMethod(service, "paymentDetail", payment);
+
+        assertThat(detail.getTotalEncaisse()).isEqualByComparingTo("200.00");
+        assertThat(detail.getTotalEnAttente()).isEqualByComparingTo("120.00");
+        assertThat(detail.getTotalQuittances()).isEqualByComparingTo("329.00");
+        assertThat(detail.getSolde()).isZero();
+        assertThat(detail.getProductions()).singleElement().satisfies(row -> {
+            assertThat(row.getNumeroPolice()).isEqualTo("ASS-123");
+            assertThat(row.getCompagnie()).isEqualTo("Assistance compagnie");
+            assertThat(row.getAssure()).isEqualTo("Client assuré");
+            assertThat(row.getMontantEncaisse()).isEqualByComparingTo("200.00");
+            assertThat(row.getMontantEnAttente()).isEqualByComparingTo("120.00");
+        });
+    }
+
+    @Test
+    void cancelledPaymentNeverReportsItsInstrumentsAsCollected() {
+        var payment = detailPayment();
+        payment.setStatut(StatutReglementClient.ANNULE);
+        var instrument = detailInstrument(payment, StatutInstrumentReglement.CONFIRME, "200.00");
+        instrument.setAffectations(List.of(detailAllocation(instrument, StatutAffectationReglement.ANNULEE, "200.00")));
+        payment.setInstruments(List.of(instrument));
+        when(documentClientService.findPaymentSourcesByIds(eq(7L), any())).thenReturn(List.of(detailSource()));
+
+        ReglementClientResponse.Detail detail = ReflectionTestUtils.invokeMethod(service, "paymentDetail", payment);
+
+        assertThat(detail.getTotalEncaisse()).isZero();
+        assertThat(detail.getTotalEnAttente()).isZero();
+        assertThat(detail.getSolde()).isEqualByComparingTo("329.00");
+        assertThat(detail.getProductions()).singleElement().satisfies(row -> assertThat(row.getMontantEncaisse()).isZero());
+    }
+
+    @Test
+    void globalDocumentAndChildAllocationsDoNotDoubleCountDocumentPremiums() {
+        var payment = detailPayment();
+        var document = DocumentClient.builder().agence(payment.getAgence()).typeDocument(TypeDocumentClient.FACTURE)
+                .numero("FAC-1").totalDocument(new BigDecimal("350.00")).build();
+        document.setId(10L);
+        document.getLignes().add(LigneDocumentClient.builder().elementFacturable(element()).ordre(1)
+                .numeroPolice("POL-SNAPSHOT").compagnie("Compagnie snapshot")
+                .dateOperation(LocalDate.of(2026, 1, 1)).dateEcheance(LocalDate.of(2026, 12, 31))
+                .montantTtc(new BigDecimal("350.00")).build());
+        var instrument = detailInstrument(payment, StatutInstrumentReglement.CONFIRME, "100.00");
+        var parent = AffectationReglementClient.builder().instrument(instrument).documentClient(document)
+                .statut(StatutAffectationReglement.CONFIRMEE).montant(new BigDecimal("50.00")).build();
+        var child = detailAllocation(instrument, StatutAffectationReglement.CONFIRMEE, "50.00");
+        child.setDocumentClient(document);
+        instrument.setAffectations(List.of(parent, child));
+        payment.setInstruments(List.of(instrument));
+        when(documentClientService.findPaymentSourcesByIds(eq(7L), any())).thenReturn(List.of(detailSource()));
+        when(allocationRepository.sumByElementIds(any())).thenReturn(Collections.singletonList(
+                new Object[]{1L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("50.00")}));
+        when(allocationRepository.sumParentByDocumentIds(List.of(10L))).thenReturn(Collections.singletonList(
+                new Object[]{10L, StatutAffectationReglement.CONFIRMEE, new BigDecimal("50.00")}));
+
+        ReglementClientResponse.Detail detail = ReflectionTestUtils.invokeMethod(service, "paymentDetail", payment);
+
+        assertThat(detail.getTotalQuittances()).isEqualByComparingTo("350.00");
+        assertThat(detail.getSolde()).isEqualByComparingTo("250.00");
+        assertThat(detail.getProductions()).singleElement().satisfies(row -> {
+            assertThat(row.getNumeroPolice()).isEqualTo("POL-SNAPSHOT");
+            assertThat(row.getCompagnie()).isEqualTo("Compagnie snapshot");
+            assertThat(row.getDateDebut()).isEqualTo(LocalDate.of(2026, 1, 1));
+            assertThat(row.getMontantEncaisse()).isEqualByComparingTo("100.00");
+        });
+    }
+
+    private ReglementClient detailPayment() {
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        return ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+    }
+
+    private InstrumentReglementClient detailInstrument(ReglementClient payment, StatutInstrumentReglement status, String amount) {
+        return InstrumentReglementClient.builder().reglement(payment).statut(status).montant(new BigDecimal(amount)).build();
+    }
+
+    private AffectationReglementClient detailAllocation(InstrumentReglementClient instrument, StatutAffectationReglement status, String amount) {
+        return AffectationReglementClient.builder().instrument(instrument).elementFacturable(element())
+                .statut(status).montant(new BigDecimal(amount)).build();
+    }
+
+    private SourceDocumentClientResponse detailSource() {
+        return SourceDocumentClientResponse.builder().elementFacturableId(1L).police("ASS-123")
+                .compagnie("Assistance compagnie").assureNom("Client assuré")
+                .montantTtc(new BigDecimal("329.00")).build();
     }
 
     @Test

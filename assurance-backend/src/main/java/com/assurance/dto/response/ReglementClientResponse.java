@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class ReglementClientResponse {
     private Long id;
     private String numero;
@@ -41,6 +41,36 @@ public class ReglementClientResponse {
     private String validePar;
     private java.time.LocalDateTime dateValidation;
     private List<Instrument> instruments;
+    private Detail detail;
+
+    @Getter
+    @Builder
+    public static class Detail {
+        private BigDecimal totalEncaisse;
+        private BigDecimal totalEnAttente;
+        private BigDecimal totalQuittances;
+        private BigDecimal solde;
+        private List<Production> productions;
+    }
+
+    @Getter
+    @Builder
+    public static class Production {
+        private String key;
+        private Long elementFacturableId;
+        private Long documentClientId;
+        private String numeroPolice;
+        private String compagnie;
+        private String assure;
+        private String mouvement;
+        private String referenceDocument;
+        private LocalDate dateDebut;
+        private LocalDate dateFin;
+        private BigDecimal montantQuittance;
+        private BigDecimal montantEncaisse;
+        private BigDecimal montantEnAttente;
+        private BigDecimal solde;
+    }
 
     @Getter
     @Builder

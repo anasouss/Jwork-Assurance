@@ -498,6 +498,17 @@ public class DocumentClientService {
             Long agenceId,
             Collection<Long> requestedIds
     ) {
+        return findSourcesByIds(agenceId, requestedIds, false);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SourceDocumentClientResponse> findPaymentSourcesByIds(Long agenceId, Collection<Long> requestedIds) {
+        return findSourcesByIds(agenceId, requestedIds, true);
+    }
+
+    private List<SourceDocumentClientResponse> findSourcesByIds(
+            Long agenceId, Collection<Long> requestedIds, boolean includeInactive
+    ) {
         List<Long> ids = requestedIds == null
                 ? List.of()
                 : requestedIds.stream().filter(Objects::nonNull).distinct().toList();
@@ -505,8 +516,9 @@ public class DocumentClientService {
             return List.of();
         }
 
-        List<ElementFacturable> elements = elementFacturableRepository
-                .findClientDocumentSources(agenceId, ids);
+        List<ElementFacturable> elements = includeInactive
+                ? elementFacturableRepository.findByAgenceIdAndIdIn(agenceId, ids)
+                : elementFacturableRepository.findClientDocumentSources(agenceId, ids);
         if (elements.size() != ids.size()) {
             throw new BadRequestException("Une ou plusieurs créances sont introuvables ou annulées");
         }

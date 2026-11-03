@@ -561,4 +561,6 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
             @Param("agenceId") Long agenceId,
             @Param("ids") Collection<Long> ids
     );
+
+    List<ElementFacturable> findByAgenceIdAndIdIn(Long agenceId, Collection<Long> ids);
 }

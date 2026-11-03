@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from "@/components/ui/skeleton";
 import { comptaApi } from "../api";
 import { ClientPaymentDetails } from "./ClientPaymentDetails";
+import { formatTreasuryDate } from "../pages/treasury-format";
 
 export function ClientPaymentDetailsDialog({ paymentId, onClose }: { paymentId: string; onClose: () => void }) {
   const query = useQuery({
@@ -18,11 +19,14 @@ export function ClientPaymentDetailsDialog({ paymentId, onClose }: { paymentId: 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-orange-600 text-white"><ReceiptText className="size-5" /></div>
-            <div className="min-w-0 space-y-1"><DialogTitle>Détail du règlement</DialogTitle>
-              <DialogDescription className="break-words">{query.data ? `${query.data.numero} · ${query.data.payeurNom}` : "Règlement client"}</DialogDescription>
+            <div className="min-w-0 space-y-1"><DialogTitle>Détail du règlement{query.data ? ` N° ${query.data.numero}` : ""}</DialogTitle>
+              <DialogDescription className="sr-only">Détail des productions et encaissements du règlement client.</DialogDescription>
             </div>
           </div>
-          {query.data && <Badge variant={query.data.statut === "VALIDE" ? "success" : "red"}>{query.data.statut === "VALIDE" ? "Enregistré" : "Annulé"}</Badge>}
+          {query.data && <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span>Date du règlement : <span className="font-medium">{formatTreasuryDate(query.data.dateReglement)}</span></span>
+            <Badge variant={query.data.statut === "VALIDE" ? "success" : "red"}>{query.data.statut === "VALIDE" ? "Enregistré" : "Annulé"}</Badge>
+          </div>}
         </div>
       </DialogHeader>
       <div className="min-h-0 overflow-y-auto p-4 sm:p-5">

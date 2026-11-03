@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { comptaApi } from "../api";
 import { ClientPaymentDetails } from "../components/ClientPaymentDetails";
+import { formatTreasuryDate } from "./treasury-format";
 
 export default function ReglementClientDetailPage() {
   const { reglementId = "" } = useParams();
@@ -34,7 +35,10 @@ export default function ReglementClientDetailPage() {
         <h1 className="mt-1 text-xl font-semibold">{payment.data.numero}</h1>
         <p className="text-sm text-muted-foreground">Détail du règlement client.</p>
       </div>
-      <Badge variant={payment.data.statut === "VALIDE" ? "success" : "red"}>{payment.data.statut === "VALIDE" ? "Enregistré" : "Annulé"}</Badge>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span>Date du règlement : <span className="font-medium">{formatTreasuryDate(payment.data.dateReglement)}</span></span>
+        <Badge variant={payment.data.statut === "VALIDE" ? "success" : "red"}>{payment.data.statut === "VALIDE" ? "Enregistré" : "Annulé"}</Badge>
+      </div>
     </header>
     <ClientPaymentDetails payment={payment.data} />
   </div>;

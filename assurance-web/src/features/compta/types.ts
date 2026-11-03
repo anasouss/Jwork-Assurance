@@ -721,6 +721,28 @@ export type ClientPayment = {
   validePar?: string | null;
   dateValidation?: string | null;
   instruments: PaymentInstrument[];
+  detail?: {
+    totalEncaisse: number;
+    totalEnAttente: number;
+    totalQuittances: number;
+    solde: number;
+    productions: {
+      key: string;
+      elementFacturableId?: string | null;
+      documentClientId?: string | null;
+      numeroPolice?: string | null;
+      compagnie?: string | null;
+      assure?: string | null;
+      mouvement?: string | null;
+      referenceDocument?: string | null;
+      dateDebut?: string | null;
+      dateFin?: string | null;
+      montantQuittance: number;
+      montantEncaisse: number;
+      montantEnAttente: number;
+      solde: number;
+    }[];
+  } | null;
 };
 
 export type ClientPaymentPolicy = {

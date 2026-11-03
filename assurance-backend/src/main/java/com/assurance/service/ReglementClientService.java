@@ -414,7 +414,8 @@ public class ReglementClientService {
 
     @Transactional(readOnly = true)
     public ReglementClientResponse detail(Long agenceId, Long paymentId) {
-        return toResponse(findPayment(agenceId, paymentId));
+        ReglementClient payment = findPayment(agenceId, paymentId);
+        return toResponse(payment).toBuilder().detail(paymentDetail(payment)).build();
     }
 
     @Transactional
@@ -2567,7 +2568,7 @@ public class ReglementClientService {
             AllocationAmounts amounts
     ) {
         BigDecimal total = money(source.getMontantTtc());
-        BigDecimal open = total.subtract(amounts.confirmed()).subtract(amounts.pending()).subtract(amounts.adjustment()).max(ZERO);
+        BigDecimal open = remainingAfterAllocations(total, amounts);
         String status;
         if (amounts.confirmed().add(amounts.adjustment()).compareTo(total) >= 0) {
             status = "PAYEE";
@@ -2695,6 +2696,138 @@ public class ReglementClientService {
                 payment.getId(),
                 agenceId
         );
+    }
+
+    private ReglementClientResponse.Detail paymentDetail(ReglementClient payment) {
+        Long agenceId = payment.getAgence().getId();
+        List<AffectationReglementClient> allocations = payment.getInstruments().stream()
+                .flatMap(instrument -> instrument.getAffectations().stream()).toList();
+        Map<Long, DocumentClient> globalDocuments = new LinkedHashMap<>();
+        Map<Long, DocumentClient> documents = new LinkedHashMap<>();
+        Set<Long> elementIds = new java.util.LinkedHashSet<>();
+        for (AffectationReglementClient allocation : allocations) {
+            if (allocation.getElementFacturable() != null) {
+                elementIds.add(allocation.getElementFacturable().getId());
+            }
+            DocumentClient document = allocation.getDocumentClient();
+            if (document != null) {
+                if (!agenceId.equals(document.getAgence().getId())) {
+                    throw new ResourceNotFoundException("DocumentClient", document.getId());
+                }
+                documents.putIfAbsent(document.getId(), document);
+                if (allocation.getElementFacturable() == null) {
+                    globalDocuments.putIfAbsent(document.getId(), document);
+                    document.getLignes().forEach(line -> elementIds.add(line.getElementFacturable().getId()));
+                }
+            }
+        }
+        Map<Long, SourceDocumentClientResponse> sources = new LinkedHashMap<>();
+        documentClientService.findPaymentSourcesByIds(agenceId, elementIds)
+                .forEach(source -> sources.put(source.getElementFacturableId(), source));
+        Map<Long, AllocationAmounts> amounts = new HashMap<>(loadAllocationAmounts(agenceId, elementIds));
+        documents.values().forEach(document -> amounts.putAll(invoiceLineAllocationAmounts(document)));
+        Map<Long, DocumentClient> globalDocumentByElement = new HashMap<>();
+        globalDocuments.values().forEach(document -> document.getLignes().forEach(line ->
+                globalDocumentByElement.putIfAbsent(line.getElementFacturable().getId(), document)));
+        Map<String, List<AffectationReglementClient>> grouped = new LinkedHashMap<>();
+        Map<String, DocumentClient> groupedDocuments = new HashMap<>();
+        for (AffectationReglementClient allocation : allocations) {
+            ElementFacturable element = allocation.getElementFacturable();
+            DocumentClient global = element == null ? allocation.getDocumentClient()
+                    : globalDocumentByElement.get(element.getId());
+            if (global == null && element == null) continue;
+            String key = global == null ? "E:" + element.getId() : "D:" + global.getId();
+            grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(allocation);
+            if (global != null) groupedDocuments.put(key, global);
+        }
+        List<ReglementClientResponse.Production> productions = new ArrayList<>();
+        grouped.forEach((key, values) -> {
+            AllocationAmounts current = paymentAllocationAmounts(payment, values);
+            DocumentClient global = groupedDocuments.get(key);
+            if (global != null) {
+                List<SourceDocumentClientResponse> lines = global.getLignes().stream()
+                        .map(line -> sources.get(line.getElementFacturable().getId())).filter(Objects::nonNull).toList();
+                BigDecimal balance = global.getLignes().stream()
+                        .map(line -> remainingAfterAllocations(money(line.getMontantTtc()),
+                                amounts.getOrDefault(line.getElementFacturable().getId(), AllocationAmounts.empty())))
+                        .reduce(ZERO, BigDecimal::add);
+                productions.add(ReglementClientResponse.Production.builder().key(key).documentClientId(global.getId())
+                        .numeroPolice(joinProductionLabels(global.getLignes().stream().map(LigneDocumentClient::getNumeroPolice).toList()))
+                        .compagnie(joinProductionLabels(global.getLignes().stream().map(LigneDocumentClient::getCompagnie).toList()))
+                        .assure(joinProductionLabels(lines.stream().map(SourceDocumentClientResponse::getAssureNom).toList()))
+                        .mouvement("Affectation globale au document").referenceDocument(global.getNumero())
+                        .dateDebut(global.getLignes().stream().map(LigneDocumentClient::getDateOperation).filter(Objects::nonNull)
+                                .min(LocalDate::compareTo).orElse(null))
+                        .dateFin(global.getLignes().stream().map(LigneDocumentClient::getDateEcheance).filter(Objects::nonNull)
+                                .max(LocalDate::compareTo).orElse(null))
+                        .montantQuittance(money(global.getTotalDocument())).montantEncaisse(current.confirmed())
+                        .montantEnAttente(current.pending()).solde(balance).build());
+                return;
+            }
+            AffectationReglementClient allocation = values.get(0);
+            Long elementId = allocation.getElementFacturable().getId();
+            SourceDocumentClientResponse source = sources.get(elementId);
+            LigneDocumentClient snapshot = values.stream()
+                    .sorted(java.util.Comparator.comparing((AffectationReglementClient value) ->
+                            value.getStatut() == StatutAffectationReglement.ANNULEE))
+                    .map(AffectationReglementClient::getDocumentClient)
+                    .filter(Objects::nonNull).flatMap(document -> document.getLignes().stream())
+                    .filter(line -> elementId.equals(line.getElementFacturable().getId())).findFirst().orElse(null);
+            BigDecimal total = money(snapshot == null ? source.getMontantTtc() : snapshot.getMontantTtc());
+            productions.add(ReglementClientResponse.Production.builder().key(key).elementFacturableId(elementId)
+                    .documentClientId(allocation.getDocumentClient() == null ? null : allocation.getDocumentClient().getId())
+                    .numeroPolice(snapshot == null ? source.getPolice() : snapshot.getNumeroPolice())
+                    .compagnie(snapshot == null ? source.getCompagnie() : snapshot.getCompagnie())
+                    .assure(source.getAssureNom()).mouvement(snapshot == null ? source.getMouvement() : snapshot.getMouvement())
+                    .referenceDocument(allocationDocumentReference(allocation))
+                    .dateDebut(snapshot == null ? source.getDateEffet() : snapshot.getDateOperation())
+                    .dateFin(snapshot == null ? source.getDateEcheance() : snapshot.getDateEcheance())
+                    .montantQuittance(total).montantEncaisse(current.confirmed()).montantEnAttente(current.pending())
+                    .solde(remainingAfterAllocations(total, amounts.getOrDefault(elementId, AllocationAmounts.empty()))).build());
+        });
+        BigDecimal collected = ZERO;
+        BigDecimal pending = ZERO;
+        if (payment.getStatut() != StatutReglementClient.ANNULE) {
+            for (InstrumentReglementClient instrument : payment.getInstruments()) {
+                if (instrument.getStatut() == StatutInstrumentReglement.CONFIRME) {
+                    collected = collected.add(money(instrument.getMontant()));
+                } else if (instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
+                        || instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE) {
+                    pending = pending.add(money(instrument.getMontant()));
+                }
+            }
+        }
+        return ReglementClientResponse.Detail.builder().totalEncaisse(collected).totalEnAttente(pending)
+                .totalQuittances(productions.stream().map(ReglementClientResponse.Production::getMontantQuittance)
+                        .reduce(ZERO, BigDecimal::add))
+                .solde(productions.stream().map(ReglementClientResponse.Production::getSolde).reduce(ZERO, BigDecimal::add))
+                .productions(productions).build();
+    }
+
+    private AllocationAmounts paymentAllocationAmounts(ReglementClient payment, List<AffectationReglementClient> allocations) {
+        BigDecimal confirmed = ZERO;
+        BigDecimal pending = ZERO;
+        if (payment.getStatut() != StatutReglementClient.ANNULE) {
+            for (AffectationReglementClient allocation : allocations) {
+                StatutInstrumentReglement status = allocation.getInstrument().getStatut();
+                if (allocation.getStatut() == StatutAffectationReglement.CONFIRMEE && status == StatutInstrumentReglement.CONFIRME) {
+                    confirmed = confirmed.add(money(allocation.getMontant()));
+                } else if (allocation.getStatut() == StatutAffectationReglement.EN_ATTENTE
+                        && (status == StatutInstrumentReglement.EN_ATTENTE || status == StatutInstrumentReglement.REMIS_EN_BANQUE)) {
+                    pending = pending.add(money(allocation.getMontant()));
+                }
+            }
+        }
+        return new AllocationAmounts(confirmed, pending, ZERO);
+    }
+
+    private String joinProductionLabels(List<String> labels) {
+        return labels.stream().filter(Objects::nonNull).filter(label -> !label.isBlank()).distinct()
+                .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private BigDecimal remainingAfterAllocations(BigDecimal total, AllocationAmounts amounts) {
+        return total.subtract(amounts.confirmed()).subtract(amounts.pending()).subtract(amounts.adjustment()).max(ZERO);
     }
 
     private ReglementClientResponse toResponse(ReglementClient payment) {

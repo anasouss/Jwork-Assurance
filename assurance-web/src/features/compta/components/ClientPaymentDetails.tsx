@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { Download, Landmark } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -22,8 +23,8 @@ const ALLOCATION_LABELS: Record<PaymentAllocationStatus, string> = {
 const ALLOCATION_VARIANTS = { EN_ATTENTE: "warning", CONFIRMEE: "success", ANNULEE: "red" } as const;
 
 export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
-  const allocations = groupAllocations(payment);
-  const showDocument = allocations.some(allocation => allocation.documentId);
+  const detail = payment.detail;
+  const history = groupAllocations(payment).filter(allocation => allocation.statut === "ANNULEE");
   const downloadReceipt = useMutation({
     mutationFn: () => comptaApi.clientPaymentReceipt(payment.id),
     onSuccess: blob => downloadBlob(blob, payment.bordereauNomFichier || `bordereau-${payment.numero}`),
@@ -31,40 +32,52 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
   });
 
   return <div className="min-w-0 space-y-5">
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 border-y bg-muted/20 px-4 py-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-      <Summary label="Payeur" value={payment.payeurNom} />
-      <Summary label="Date du règlement" value={formatTreasuryDate(payment.dateReglement)} />
-      <Summary label="Montant total" value={formatAccountingAmount(payment.montantTotal)} strong />
-      {payment.multiPayeur && <Summary label="Déposant" value={payment.deposantNom || "-"} />}
-      <Summary label="Non affecté" value={formatAccountingAmount(payment.montantNonAffecte)} />
-      <Summary label="Créé par" value={payment.creePar || "-"} />
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+      <dl className="min-w-0 space-y-2 text-sm">
+        <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">Payeur :</dt><dd className="break-words font-semibold">{payment.payeurNom}</dd></div>
+        {payment.multiPayeur && <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">Déposant :</dt><dd className="break-words">{payment.deposantNom || "-"}</dd></div>}
+      </dl>
+      <span className="text-xs text-muted-foreground">Montants en MAD</span>
+    </div>
+
+    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <Summary label="Total encaissé" value={amount(detail?.totalEncaisse)} tone="emerald">
+        {detail && detail.totalEnAttente > 0 && <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">En attente : {amount(detail.totalEnAttente)}</p>}
+      </Summary>
+      <Summary label="Total quittances" value={amount(detail?.totalQuittances)} tone="sky" />
+      <Summary label="Solde restant" value={amount(detail?.solde)} tone="orange" />
     </dl>
 
     <section className="min-w-0 space-y-3">
-      <h2 className="text-sm font-semibold">Polices et mouvements</h2>
+      <h2 className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Productions</h2>
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
-            <th className="px-3 py-3 text-left">N° police</th>
-            <th className="px-3 py-3 text-left">Mouvement / prestation</th>
-            {showDocument && <th className="px-3 py-3 text-left">Document</th>}
-            <th className="px-3 py-3 text-left">Client / groupe</th>
-            <th className="px-3 py-3 text-center">Moyens</th>
-            <th className="px-3 py-3 text-right">Montant affecté</th>
-            <th className="px-3 py-3 text-center">Statut</th>
+        <table className="w-full min-w-[1040px] text-sm">
+          <thead className="bg-emerald-600 text-xs uppercase text-white"><tr>
+            <th className="px-3 py-3 text-left">Police</th>
+            <th className="px-3 py-3 text-left">Compagnie</th>
+            <th className="px-3 py-3 text-left">Assuré</th>
+            <th className="px-3 py-3 text-left">Du</th>
+            <th className="px-3 py-3 text-left">Au</th>
+            <th className="px-3 py-3 text-right">Montant quittance</th>
+            <th className="px-3 py-3 text-right" title="Montant confirmé affecté par ce règlement">Montant encaissé</th>
+            <th className="px-3 py-3 text-right">Solde</th>
           </tr></thead>
-          <tbody className="divide-y">{allocations.map(allocation => <tr key={allocation.key} className="hover:bg-muted/30">
-            <td className="whitespace-pre-line px-3 py-3 font-medium">{allocation.numeroPolice || "-"}</td>
-            <td className="px-3 py-3">{allocation.mouvement || "-"}</td>
-            {showDocument && <td className="px-3 py-3">{allocation.referenceDocument || "-"}</td>}
-            <td className="px-3 py-3">{allocation.payer}</td>
-            <td className="px-3 py-3 text-center">{allocation.instrumentIds.size}</td>
-            <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(allocation.montant)}</td>
-            <td className="px-3 py-3 text-center"><Badge variant={payment.statut === "ANNULE" ? "red" : ALLOCATION_VARIANTS[allocation.statut]}>
-              {payment.statut === "ANNULE" ? "Annulée" : ALLOCATION_LABELS[allocation.statut]}
-            </Badge></td>
+          <tbody className="divide-y">{detail?.productions.map(production => <tr key={production.key} className="hover:bg-muted/30">
+            <td className="max-w-60 px-3 py-3"><div className="whitespace-pre-line font-medium">{production.numeroPolice || "-"}</div>
+              {production.mouvement && <div className="mt-1 text-xs text-muted-foreground">{production.mouvement}</div>}
+              {production.referenceDocument && <div className="mt-1 text-xs text-muted-foreground">{production.referenceDocument}</div>}
+            </td>
+            <td className="max-w-44 whitespace-pre-line px-3 py-3">{production.compagnie || "-"}</td>
+            <td className="max-w-44 whitespace-pre-line px-3 py-3">{production.assure || "-"}</td>
+            <td className="whitespace-nowrap px-3 py-3">{formatTreasuryDate(production.dateDebut)}</td>
+            <td className="whitespace-nowrap px-3 py-3">{formatTreasuryDate(production.dateFin)}</td>
+            <td className="px-3 py-3 text-right tabular-nums">{amount(production.montantQuittance)}</td>
+            <td className="px-3 py-3 text-right tabular-nums"><div className="font-semibold">{amount(production.montantEncaisse)}</div>
+              {production.montantEnAttente > 0 && <div className="mt-1 text-xs text-blue-700 dark:text-blue-300">En attente : {amount(production.montantEnAttente)}</div>}
+            </td>
+            <td className="px-3 py-3 text-right font-semibold tabular-nums">{amount(production.solde)}</td>
           </tr>)}
-            {!allocations.length && <tr><td colSpan={showDocument ? 7 : 6} className="px-3 py-8 text-center text-muted-foreground">Aucune affectation.</td></tr>}
+            {!detail?.productions.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">{detail ? "Aucune production affectée." : "Détail des productions indisponible."}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -72,49 +85,53 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
 
     <section className="min-w-0 space-y-3 border-t pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">Modes de règlement</h2>
+        <h2 className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Encaissements</h2>
         {payment.bordereauNomFichier && <Button size="sm" variant="outline" disabled={downloadReceipt.isPending} onClick={() => downloadReceipt.mutate()}>
           <Download className="size-4" />{downloadReceipt.isPending ? "Téléchargement..." : "Bordereau banque"}
         </Button>}
       </div>
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[780px] text-sm">
           <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
             <th className="px-3 py-3 text-left">Mode</th>
-            <th className="px-3 py-3 text-left">Date</th>
             <th className="px-3 py-3 text-left">Référence</th>
-            <th className="px-3 py-3 text-left">Banque / compte</th>
             <th className="px-3 py-3 text-right">Montant</th>
-            <th className="px-3 py-3 text-center">Statut</th>
-            <th className="px-3 py-3 text-right">Bordereau</th>
+            <th className="px-3 py-3 text-left">Banque</th>
+            <th className="px-3 py-3 text-left">Date de valeur</th>
+            <th className="px-3 py-3 text-left">Statut</th>
           </tr></thead>
           <tbody className="divide-y">{payment.instruments.map(instrument => <tr key={instrument.id} className="hover:bg-muted/30">
             <td className="px-3 py-3 font-medium">{paymentModeLabel(instrument.mode)}</td>
-            <td className="px-3 py-3"><div>{formatTreasuryDate(instrument.dateInstrument)}</div>
-              {instrument.dateEcheance && <div className="text-xs text-muted-foreground">{instrument.mode === "CHEQUE" ? "Date portée sur le chèque" : "Échéance"} {formatTreasuryDate(instrument.dateEcheance)}</div>}
-            </td>
             <td className="px-3 py-3"><div>{instrument.referenceInstrument || "-"}</div>
-              {instrument.instrumentRemplaceId && <div className="text-xs text-muted-foreground">Remplace {instrument.modeInstrumentRemplace ? paymentModeLabel(instrument.modeInstrumentRemplace).toLowerCase() : "le moyen"}{instrument.referenceInstrumentRemplace ? ` ${instrument.referenceInstrumentRemplace}` : ""}</div>}
+              {instrument.instrumentRemplaceId && <div className="mt-1 text-xs text-muted-foreground">Remplace {instrument.modeInstrumentRemplace ? paymentModeLabel(instrument.modeInstrumentRemplace).toLowerCase() : "le moyen"}{instrument.referenceInstrumentRemplace ? ` ${instrument.referenceInstrumentRemplace}` : ""}</div>}
             </td>
+            <td className="px-3 py-3 text-right font-semibold tabular-nums">{amount(instrument.montant)}</td>
             <td className="px-3 py-3"><div>{instrument.banqueEmettrice || instrument.compteTresorerie || "-"}</div>
-              {instrument.banqueEmettrice && instrument.compteTresorerie && <div className="text-xs text-muted-foreground">{instrument.compteTresorerie}</div>}
+              {instrument.banqueEmettrice && instrument.compteTresorerie && <div className="mt-1 text-xs text-muted-foreground">{instrument.compteTresorerie}</div>}
             </td>
-            <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)}</td>
-            <td className="px-3 py-3 text-center"><Badge variant={payment.statut === "ANNULE" ? "red" : INSTRUMENT_VARIANTS[instrument.statut]}>
+            <td className="whitespace-nowrap px-3 py-3" title={instrument.mode === "CHEQUE" ? "Date portée sur le chèque" : undefined}>{formatTreasuryDate(instrument.mode === "CHEQUE" || instrument.mode === "EFFET" ? instrument.dateEcheance : instrument.dateInstrument)}</td>
+            <td className="px-3 py-3"><Badge variant={payment.statut === "ANNULE" ? "red" : INSTRUMENT_VARIANTS[instrument.statut]}>
               {payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]}
             </Badge>
               {instrument.motifStatut && <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>{instrument.motifStatut}</div>}
+              {instrument.bordereauRemiseId && <Link className="mt-2 flex items-center gap-1.5 text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}><Landmark className="size-3.5 shrink-0" />{instrument.numeroBordereauRemise || "Voir le bordereau"}</Link>}
             </td>
-            <td className="px-3 py-3 text-right">{instrument.bordereauRemiseId ? <Button asChild variant="outline" size="sm">
-              <Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}><Landmark className="size-4" />{instrument.numeroBordereauRemise || "Voir le bordereau"}</Link>
-            </Button> : "-"}</td>
           </tr>)}
-            {!payment.instruments.length && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Aucun mode de règlement.</td></tr>}
+            {!payment.instruments.length && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Aucun encaissement.</td></tr>}
           </tbody>
         </table>
       </div>
     </section>
+
+    {history.length > 0 && <details className="border-t pt-4 text-sm">
+      <summary className="cursor-pointer font-medium">Historique des affectations annulées</summary>
+      <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[600px] text-sm">
+        <thead className="bg-muted text-xs"><tr><th className="px-3 py-2 text-left">Police</th><th className="px-3 py-2 text-left">Mouvement / document</th><th className="px-3 py-2 text-right">Montant</th><th className="px-3 py-2 text-left">Statut</th></tr></thead>
+        <tbody className="divide-y">{history.map(allocation => <tr key={allocation.key}><td className="px-3 py-2">{allocation.numeroPolice || "-"}</td><td className="px-3 py-2">{allocation.mouvement || allocation.referenceDocument || "-"}</td><td className="px-3 py-2 text-right tabular-nums">{amount(allocation.montant)}</td><td className="px-3 py-2"><Badge variant={ALLOCATION_VARIANTS[allocation.statut]}>{ALLOCATION_LABELS[allocation.statut]}</Badge></td></tr>)}</tbody>
+      </table></div>
+    </details>}
     {payment.notes && <section className="space-y-2 border-t pt-4"><h2 className="text-sm font-semibold">Notes</h2><p className="whitespace-pre-wrap break-words text-sm">{payment.notes}</p></section>}
+    <div className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-muted-foreground"><span>Créé par : {payment.creePar || "-"}</span><span>Non affecté : {amount(payment.montantNonAffecte)}</span></div>
   </div>;
 }
 
@@ -149,6 +166,15 @@ function groupAllocations(payment: ClientPayment) {
   return Array.from(grouped.values());
 }
 
-function Summary({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className={`mt-1 break-words ${strong ? "text-lg font-semibold tabular-nums" : "font-medium"}`}>{value}</dd></div>;
+function Summary({ label, value, tone, children }: { label: string; value: string; tone: "emerald" | "sky" | "orange"; children?: ReactNode }) {
+  const styles = {
+    emerald: "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20",
+    sky: "border-sky-200 bg-sky-50/50 dark:border-sky-900 dark:bg-sky-950/20",
+    orange: "border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20",
+  };
+  return <div className={`min-w-0 rounded-md border px-4 py-3 ${styles[tone]}`}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-lg font-semibold tabular-nums">{value}{children}</dd></div>;
+}
+
+function amount(value?: number | null) {
+  return value == null ? "-" : formatAccountingAmount(value);
 }

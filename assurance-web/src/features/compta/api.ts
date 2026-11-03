@@ -1397,6 +1397,14 @@ function normalizeClientPayment(payment: ClientPayment): ClientPayment {
     clientPayeurId: payment.clientPayeurId == null ? null : String(payment.clientPayeurId),
     groupePayeurId: payment.groupePayeurId == null ? null : String(payment.groupePayeurId),
     instruments: payment.instruments.map(normalizePaymentInstrument),
+    detail: payment.detail ? {
+      ...payment.detail,
+      productions: payment.detail.productions.map(production => ({
+        ...production,
+        elementFacturableId: production.elementFacturableId == null ? null : String(production.elementFacturableId),
+        documentClientId: production.documentClientId == null ? null : String(production.documentClientId),
+      })),
+    } : payment.detail,
   };
 }
 

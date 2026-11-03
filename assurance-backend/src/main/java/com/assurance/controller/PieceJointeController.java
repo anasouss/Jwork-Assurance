@@ -105,7 +105,7 @@ public class PieceJointeController {
         return ResponseEntity.ok()
                 .contentType(download.mediaType())
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(download.piece().getNomFichier())
+                        .filename(download.fileName(), java.nio.charset.StandardCharsets.UTF_8)
                         .build()
                         .toString())
                 .body(download.resource());

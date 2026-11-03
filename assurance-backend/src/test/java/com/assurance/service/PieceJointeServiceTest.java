@@ -4,6 +4,8 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.Contrat;
+import com.assurance.entity.PieceJointe;
+import com.assurance.dto.response.PieceJointeResponse;
 import com.assurance.entity.ProduitAssistance;
 import com.assurance.entity.TypePieceJointe;
 import com.assurance.enums.TypeAssistance;
@@ -20,15 +22,22 @@ import com.assurance.repository.TypePieceJointeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class PieceJointeServiceTest {
@@ -60,6 +69,79 @@ class PieceJointeServiceTest {
                 brancheAssuranceRepository,
                 storageLayoutService
         );
+    }
+
+    @Test
+    void legacyStorageNamesAreReadableInResponsesWithoutChangingStoredReferences() {
+        Contrat contrat = Contrat.builder().build();
+        contrat.setId(11L);
+        TypePieceJointe type = type(1L, null, null, "CIN");
+        for (String name : List.of(
+                "cin-2026-11-03T16-02-37.956785552-218dd332-ec63-4c2f-a3c4-6bb8796786c7.pdf",
+                "cin-2026-11-03T16-02-37-218dd332-ec63-4c2f-a3c4-6bb8796786c7.pdf",
+                "cin-2026-11-03T16-02-218dd332-ec63-4c2f-a3c4-6bb8796786c7.pdf")) {
+            String key = "7/11/contrat/" + name;
+            PieceJointe piece = PieceJointe.builder().contrat(contrat).typePieceJointe(type)
+                    .nomFichier(name).cheminStockage(key).contentType("application/pdf").build();
+
+            PieceJointeResponse response = ReflectionTestUtils.invokeMethod(service, "toPieceResponse", piece);
+
+            assertThat(response.getNomFichier()).isEqualTo("CIN.pdf");
+            assertThat(piece.getNomFichier()).isEqualTo(name);
+            assertThat(piece.getCheminStockage()).isEqualTo(key);
+        }
+    }
+
+    @Test
+    void preservesReadableOriginalNamesAndProvidesFallbackForMissingTypes() {
+        PieceJointe original = PieceJointe.builder().nomFichier("Carte grise client.pdf").build();
+        String readable = ReflectionTestUtils.invokeMethod(service, "displayFileName", original);
+        assertThat(readable).isEqualTo("Carte grise client.pdf");
+
+        PieceJointe missingType = PieceJointe.builder().contentType("application/pdf")
+                .nomFichier("cin-2026-11-03T16-02-37-218dd332-ec63-4c2f-a3c4-6bb8796786c7.pdf").build();
+        String fallback = ReflectionTestUtils.invokeMethod(service, "displayFileName", missingType);
+        assertThat(fallback).isEqualTo("Document.pdf");
+    }
+
+    @Test
+    void cleansClientPathsAndUnsafeFilenameCharacters() {
+        String windows = ReflectionTestUtils.invokeMethod(service, "safeFileName", "C:\\fakepath\\CIN client.pdf");
+        String unix = ReflectionTestUtils.invokeMethod(service, "safeFileName", "../../carte-grise.pdf");
+        String unsafe = ReflectionTestUtils.invokeMethod(service, "safeFileName", "scan\r\n\"client.pdf");
+        String longName = ReflectionTestUtils.invokeMethod(service, "safeFileName", "a".repeat(300) + ".pdf");
+        assertThat(windows).isEqualTo("CIN client.pdf");
+        assertThat(unix).isEqualTo("carte-grise.pdf");
+        assertThat(unsafe).doesNotContain("\r", "\n", "\"");
+        assertThat(longName).hasSize(255).endsWith(".pdf");
+    }
+
+    @Test
+    void singleUploadKeepsAnOriginalDisplayNameWithAUniqueStoragePath(@TempDir Path folder) throws Exception {
+        Contrat contrat = Contrat.builder().build();
+        contrat.setId(11L);
+        when(storageLayoutService.resolveContractAttachment(any(Path.class)))
+                .thenAnswer(invocation -> folder.resolve(invocation.getArgument(0, Path.class)));
+        var file = new MockMultipartFile("files", "C:\\fakepath\\CIN client.pdf", "application/pdf",
+                "contents".getBytes(StandardCharsets.UTF_8));
+
+        Object stored = ReflectionTestUtils.invokeMethod(service, "storeFiles", 7L, contrat, null,
+                type(1L, null, null, "CIN"), List.of(file));
+        String displayName = ReflectionTestUtils.invokeMethod(stored, "displayName");
+        String storageKey = ReflectionTestUtils.invokeMethod(stored, "storageKey");
+        Path path = ReflectionTestUtils.invokeMethod(stored, "path");
+
+        assertThat(displayName).isEqualTo("CIN client.pdf");
+        assertThat(Path.of(storageKey).getParent()).isEqualTo(Path.of("7", "11", "contrat"));
+        assertThat(path.getFileName().toString()).startsWith("cin-").endsWith(".pdf").isNotEqualTo(displayName);
+        assertThat(Files.readString(path)).isEqualTo("contents");
+    }
+
+    @Test
+    void mergedImageDocumentsUseTheirTypeAsThePdfName() {
+        String name = ReflectionTestUtils.invokeMethod(service, "readableFileName",
+                type(1L, null, null, "Carte grise"), "pdf");
+        assertThat(name).isEqualTo("Carte grise.pdf");
     }
 
     @Test

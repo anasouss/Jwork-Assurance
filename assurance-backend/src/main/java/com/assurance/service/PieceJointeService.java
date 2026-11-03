@@ -60,10 +60,17 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class PieceJointeService {
+
+    private static final Pattern GENERATED_FILE_NAME = Pattern.compile(
+            ".+-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}(?:-\\d{2}(?:\\.\\d{1,9})?)?"
+                    + "-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]+",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final ContratRepository contratRepository;
     private final AgenceRepository agenceRepository;
@@ -225,7 +232,7 @@ public class PieceJointeService {
                 .contrat(contrat)
                 .mouvementContrat(mouvement)
                 .typePieceJointe(type)
-                .nomFichier(stored.fileName())
+                .nomFichier(stored.displayName())
                 .contentType(stored.contentType())
                 .cheminStockage(stored.storageKey())
                 .tailleOctets(stored.size())
@@ -294,6 +301,7 @@ public class PieceJointeService {
         }
         return DownloadedPiece.builder()
                 .piece(piece)
+                .fileName(displayFileName(piece))
                 .resource(new FileSystemResource(path))
                 .mediaType(resolveMediaType(piece.getContentType()))
                 .build();
@@ -495,14 +503,16 @@ public class PieceJointeService {
                 Path target = folder.resolve(fileName);
                 byte[] pdf = imagesToPdf(files);
                 Files.write(target, pdf);
-                return new StoredUpload(target, folderKey.resolve(fileName).toString(), fileName, MediaType.APPLICATION_PDF_VALUE, (long) pdf.length);
+                return new StoredUpload(target, folderKey.resolve(fileName).toString(), readableFileName(type, "pdf"), MediaType.APPLICATION_PDF_VALUE, (long) pdf.length);
             }
             MultipartFile file = files.get(0);
             String extension = extension(file.getOriginalFilename(), file.getContentType());
             String fileName = storageName(type.getLibelle(), extension);
             Path target = folder.resolve(fileName);
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-            return new StoredUpload(target, folderKey.resolve(fileName).toString(), fileName, file.getContentType(), file.getSize());
+            String originalName = safeFileName(file.getOriginalFilename());
+            return new StoredUpload(target, folderKey.resolve(fileName).toString(),
+                    originalName == null ? readableFileName(type, extension) : originalName, file.getContentType(), file.getSize());
         } catch (IOException error) {
             throw new BadRequestException("Stockage de la piece jointe impossible");
         }
@@ -591,6 +601,35 @@ public class PieceJointeService {
         return slug(libelle) + "-" + LocalDateTime.now().toString().replace(":", "-") + "-" + UUID.randomUUID() + "." + extension;
     }
 
+    private String displayFileName(PieceJointe piece) {
+        String name = safeFileName(piece.getNomFichier());
+        if (name == null || GENERATED_FILE_NAME.matcher(name).matches()) {
+            return readableFileName(piece.getTypePieceJointe(), extension(piece.getNomFichier(), piece.getContentType()));
+        }
+        return name;
+    }
+
+    private String readableFileName(TypePieceJointe type, String extension) {
+        String label = type == null ? null : type.getLibelle();
+        String name = safeFileName(label == null || label.isBlank() ? "Document" : label.replace('/', '_').replace('\\', '_'));
+        return safeFileName((name == null ? "Document" : name) + "." + extension);
+    }
+
+    private String safeFileName(String originalName) {
+        if (originalName == null) return null;
+        String name = originalName.replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1)
+                .replaceAll("[\\p{Cntrl}<>:\"|?*]", "_").trim();
+        if (name.isBlank() || name.equals(".") || name.equals("..")) return null;
+        if (name.codePointCount(0, name.length()) > 255) {
+            int dot = name.lastIndexOf('.');
+            String suffix = dot > 0 && name.length() - dot <= 20 ? name.substring(dot) : "";
+            int prefixLength = 255 - suffix.codePointCount(0, suffix.length());
+            name = name.substring(0, name.offsetByCodePoints(0, prefixLength)) + suffix;
+        }
+        return name;
+    }
+
     private String extension(String filename, String contentType) {
         if (filename != null && filename.contains(".")) {
             String extension = filename.substring(filename.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
@@ -668,17 +707,17 @@ public class PieceJointeService {
                 .typePieceJointeId(piece.getTypePieceJointe() == null ? null : piece.getTypePieceJointe().getId())
                 .typePieceJointeLibelle(piece.getTypePieceJointe() == null ? null : piece.getTypePieceJointe().getLibelle())
                 .obligatoire(piece.getTypePieceJointe() == null ? null : piece.getTypePieceJointe().getObligatoire())
-                .nomFichier(piece.getNomFichier())
+                .nomFichier(displayFileName(piece))
                 .contentType(piece.getContentType())
                 .tailleOctets(piece.getTailleOctets())
                 .createdAt(piece.getCreatedAt())
                 .build();
     }
 
-    private record StoredUpload(Path path, String storageKey, String fileName, String contentType, Long size) {
+    private record StoredUpload(Path path, String storageKey, String displayName, String contentType, Long size) {
     }
 
     @Builder
-    public record DownloadedPiece(PieceJointe piece, Resource resource, MediaType mediaType) {
+    public record DownloadedPiece(PieceJointe piece, String fileName, Resource resource, MediaType mediaType) {
     }
 }

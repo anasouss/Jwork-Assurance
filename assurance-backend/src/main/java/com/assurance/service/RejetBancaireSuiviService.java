@@ -96,20 +96,30 @@ public class RejetBancaireSuiviService {
                 .findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(agenceId, instrumentId).stream()
                 .map(event -> new SuiviRejetBancaireResponse.Mouvement(event.getId().toString(), event.getDateOperation(),
                         event.getCreatedAt(), event.getType(), event.getStatutSuivi(), event.getMotif(), event.getUtilisateurNom(),
-                        event.getInstrumentSource() == null ? null : event.getInstrumentSource().getId())).toList());
-        // Legacy rejections remain visible without creating events during a read.
+                        event.getInstrumentSource() == null ? null : event.getInstrumentSource().getId(),
+                        null, null, false, null)).toList());
+        // Reconstruct dated bank events from existing slips without creating audit records.
+        Long firstRejectedSlip = history.stream().filter(line -> line.getStatut() == StatutLigneBordereauRemise.REJETEE)
+                .map(line -> line.getBordereau().getId()).min(Long::compareTo).orElse(null);
         for (LigneBordereauRemise line : history) {
+            boolean represented = firstRejectedSlip != null ? line.getBordereau().getId() > firstRejectedSlip
+                    : instrument.getDateRejet() != null && line.getBordereau().getDateDepot() != null
+                        && line.getBordereau().getDateDepot().isAfter(instrument.getDateRejet());
+            mergeBankEvent(events, history, line, instrumentId, TypeMouvementRejetBancaire.REMISE_EN_BANQUE,
+                    line.getBordereau().getDateDepot(), represented ? "Nouvelle remise en banque" : "Remise initiale en banque", null);
             if (line.getStatut() == StatutLigneBordereauRemise.REJETEE) {
-                addLegacyRejet(events, "bordereau-" + line.getId(), line.getDateTraitement(), line.getMotifRejet(), instrumentId);
+                mergeBankEvent(events, history, line, instrumentId, TypeMouvementRejetBancaire.REJET,
+                        line.getDateTraitement(), "Rejet bancaire", line.getMotifRejet());
+            } else if (line.getStatut() == StatutLigneBordereauRemise.ENCAISSEE) {
+                mergeBankEvent(events, history, line, instrumentId, TypeMouvementRejetBancaire.ENCAISSEMENT,
+                        line.getDateTraitement(), "Encaissement confirmé", null);
             }
         }
         addLegacyRejet(events, "instrument-" + instrumentId,
                 instrument.getDateRejet() != null ? instrument.getDateRejet()
                         : instrument.getStatut() == StatutInstrumentReglement.REJETE ? instrument.getDateStatut() : null,
                 instrument.getMotifRejet() != null ? instrument.getMotifRejet() : instrument.getMotifStatut(), instrumentId);
-        events.sort(Comparator.comparing(SuiviRejetBancaireResponse.Mouvement::date,
-                Comparator.nullsFirst(Comparator.naturalOrder())).thenComparing(
-                        SuiviRejetBancaireResponse.Mouvement::enregistreLe, Comparator.nullsFirst(Comparator.naturalOrder())));
+        events.sort(this::compareEvents);
         List<InstrumentReglementClient> replacements = new ArrayList<>();
         collectReplacements(instrument, new HashSet<>(), replacements);
         Stream<LocalDate> operationDates = Stream.concat(Stream.of(instrument.getDateStatut()),
@@ -243,8 +253,51 @@ public class RejetBancaireSuiviService {
         if (date != null && events.stream().noneMatch(event -> event.type() == TypeMouvementRejetBancaire.REJET
                 && Objects.equals(event.date(), date) && Objects.equals(event.instrumentSourceId(), instrumentId))) {
             events.add(new SuiviRejetBancaireResponse.Mouvement(id, date, null, TypeMouvementRejetBancaire.REJET,
-                    StatutSuiviRejetBancaire.INSTANCE, reason, null, instrumentId));
+                    StatutSuiviRejetBancaire.INSTANCE, reason, null, instrumentId, null, null, true, "Rejet bancaire"));
         }
+    }
+
+    private void mergeBankEvent(List<SuiviRejetBancaireResponse.Mouvement> events, List<LigneBordereauRemise> history,
+                                LigneBordereauRemise line, Long instrumentId, TypeMouvementRejetBancaire type,
+                                LocalDate date, String label, String reason) {
+        if (date == null) return;
+        List<SuiviRejetBancaireResponse.Mouvement> matches = events.stream()
+                .filter(event -> event.type() == type && date.equals(event.date()) && event.bordereauId() == null
+                        && Objects.equals(event.instrumentSourceId(), instrumentId)).toList();
+        long slipCount = history.stream().filter(candidate -> type == TypeMouvementRejetBancaire.REMISE_EN_BANQUE
+                ? date.equals(candidate.getBordereau().getDateDepot())
+                : date.equals(candidate.getDateTraitement()) && candidate.getStatut() == line.getStatut()).count();
+        // Do not attribute an operator to a particular slip when same-day evidence is ambiguous.
+        if (matches.size() == 1 && slipCount == 1) {
+            var event = matches.get(0);
+            events.set(events.indexOf(event), new SuiviRejetBancaireResponse.Mouvement(event.id(), event.date(), event.enregistreLe(),
+                    event.type(), event.statut(), event.motif() != null ? event.motif() : reason, event.utilisateur(), event.instrumentSourceId(),
+                    line.getBordereau().getId(), line.getBordereau().getNumero(), event.historiqueExistant(), label));
+        } else {
+            StatutSuiviRejetBancaire status = type == TypeMouvementRejetBancaire.REJET
+                    ? StatutSuiviRejetBancaire.INSTANCE : StatutSuiviRejetBancaire.REPRESENTE;
+            events.add(new SuiviRejetBancaireResponse.Mouvement("bordereau-" + line.getId() + "-" + type.name(), date, null,
+                    type, status, reason, null, instrumentId, line.getBordereau().getId(), line.getBordereau().getNumero(), true, label));
+        }
+    }
+
+    private int compareEvents(SuiviRejetBancaireResponse.Mouvement first, SuiviRejetBancaireResponse.Mouvement second) {
+        return Comparator.comparing(SuiviRejetBancaireResponse.Mouvement::date,
+                        Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(SuiviRejetBancaireResponse.Mouvement::enregistreLe, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(SuiviRejetBancaireResponse.Mouvement::bordereauId, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparingInt(this::eventOrder).compare(first, second);
+    }
+
+    private int eventOrder(SuiviRejetBancaireResponse.Mouvement event) {
+        return switch (event.type()) {
+            case REMISE_EN_BANQUE -> "Remise initiale en banque".equals(event.libelle()) ? 0 : 3;
+            case REJET -> 1;
+            case PREPARATION_REMISE -> 2;
+            case REMPLACEMENT -> 3;
+            case ENCAISSEMENT -> 4;
+            case SUIVI -> 5;
+        };
     }
 
     private LocalDate latestRejetDate(List<LigneBordereauRemise> lines) {

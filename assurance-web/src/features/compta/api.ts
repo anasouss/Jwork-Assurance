@@ -13,6 +13,7 @@ import type {
   BankRejectionFollowUp,
   BankRejectionFollowUpStatus,
   BankRejectionPayer,
+  BankRejectionSort,
   ClientDocument,
   ClientDocumentPage,
   ClientDocumentSourcePage,
@@ -713,6 +714,8 @@ export const comptaApi = {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
     resolution?: "A_TRAITER" | "REMPLACE" | "REPRESENTE";
+    sortBy?: BankRejectionSort;
+    sortDirection?: "ASC" | "DESC";
     search?: string;
     page: number;
     size: number;
@@ -737,6 +740,7 @@ export const comptaApi = {
     return {
       ...result, instrumentId: String(result.instrumentId), reglementId: String(result.reglementId),
       mouvements: result.mouvements.map(event => ({ ...event, id: String(event.id),
+        bordereauId: event.bordereauId == null ? null : String(event.bordereauId),
         instrumentSourceId: event.instrumentSourceId == null ? null : String(event.instrumentSourceId) })),
       remises: result.remises.map(line => ({ ...line, id: String(line.id) })),
       contreValeurs: result.contreValeurs.map(instrument => ({ ...instrument, id: String(instrument.id), instrumentRemplaceId: String(instrument.instrumentRemplaceId) })),

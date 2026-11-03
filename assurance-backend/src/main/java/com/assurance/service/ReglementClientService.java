@@ -1399,6 +1399,8 @@ public class ReglementClientService {
             Long payeurId,
             ResolutionRejetBancaire resolution,
             String search,
+            String sortBy,
+            String sortDirection,
             int page,
             int size
     ) {
@@ -1412,6 +1414,7 @@ public class ReglementClientService {
         Page<InstrumentReglementClient> result = instrumentRepository.searchBankRejections(
                 agenceId, mode, bankId, dateDu, dateAu, payeurType, payeurId, resolution == null ? null : resolution.name(),
                 trimToNull(search),
+                bankRejectionSortBy(sortBy), "ASC".equalsIgnoreCase(sortDirection) ? "ASC" : "DESC",
                 PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100))
         );
         Map<Long, LigneBordereauRemise> rejections = new LinkedHashMap<>();
@@ -1456,6 +1459,14 @@ public class ReglementClientService {
                 && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
                 && (instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
                 || instrument.getStatut() == StatutInstrumentReglement.CONFIRME);
+    }
+
+    private String bankRejectionSortBy(String sortBy) {
+        String key = sortBy == null ? "" : sortBy.trim().toUpperCase(Locale.ROOT);
+        return switch (key) {
+            case "MODE", "REFERENCE", "PAYER", "AMOUNT", "PAYMENT_DATE", "RETURN_DATE" -> key;
+            default -> "RETURN_DATE";
+        };
     }
 
     private String instrumentSortBy(String sortBy) {

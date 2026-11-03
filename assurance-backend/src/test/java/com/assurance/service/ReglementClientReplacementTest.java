@@ -49,6 +49,51 @@ class ReglementClientReplacementTest {
     private ReglementClientService service;
 
     @Test
+    void historyIncludesLegacyRemittancesAndMergesRecordedEventsWithoutInventingOperators() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        payment.setId(5L);
+        var instrument = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.REMIS_EN_BANQUE, null);
+        LocalDate returned = LocalDate.of(2026, 11, 1);
+        instrument.setDateRejet(returned);
+        instrument.setMotifRejet("Provision insuffisante");
+        var first = BordereauRemise.builder().numero("BRC-5").dateDepot(returned).build();
+        first.setId(5L);
+        var second = BordereauRemise.builder().numero("BRC-6").dateDepot(returned.plusDays(1)).build();
+        second.setId(6L);
+        var rejectedLine = LigneBordereauRemise.builder().bordereau(first).instrument(instrument)
+                .statut(StatutLigneBordereauRemise.REJETEE).dateTraitement(returned).motifRejet("Provision insuffisante").build();
+        rejectedLine.setId(10L);
+        var resubmitted = LigneBordereauRemise.builder().bordereau(second).instrument(instrument)
+                .statut(StatutLigneBordereauRemise.REMISE).build();
+        resubmitted.setId(11L);
+        when(instrumentRepository.findByIdAndAgenceId(1L, 7L)).thenReturn(Optional.of(instrument));
+        when(remittanceLineRepository.findHistoryByAgenceIdAndInstrumentId(7L, 1L)).thenReturn(List.of(rejectedLine, resubmitted));
+        var legacy = followUp.detail(7L, 1L).mouvements();
+        assertThat(legacy).extracting(SuiviRejetBancaireResponse.Mouvement::libelle)
+                .containsExactly("Remise initiale en banque", "Rejet bancaire", "Nouvelle remise en banque");
+        assertThat(legacy).allMatch(SuiviRejetBancaireResponse.Mouvement::historiqueExistant);
+        assertThat(legacy).allMatch(event -> event.utilisateur() == null);
+        MouvementRejetBancaire recorded = new MouvementRejetBancaire();
+        recorded.setId(20L);
+        recorded.setDateOperation(returned.plusDays(1));
+        recorded.setType(TypeMouvementRejetBancaire.REMISE_EN_BANQUE);
+        recorded.setStatutSuivi(StatutSuiviRejetBancaire.REPRESENTE);
+        recorded.setInstrumentSource(instrument);
+        recorded.setUtilisateurNom("Operator");
+        when(events.findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(7L, 1L)).thenReturn(List.of(recorded));
+        var merged = followUp.detail(7L, 1L).mouvements();
+        assertThat(merged).hasSize(3);
+        assertThat(merged.get(2).utilisateur()).isEqualTo("Operator");
+        assertThat(merged.get(2).historiqueExistant()).isFalse();
+        assertThat(merged.get(2).numeroBordereau()).isEqualTo("BRC-6");
+        verify(events, never()).save(any());
+    }
+
+    @Test
     void rejectionClientCardOnlyExposesIdentifiersMatchingTheClientType() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
                 mock(MouvementRejetBancaireRepository.class));

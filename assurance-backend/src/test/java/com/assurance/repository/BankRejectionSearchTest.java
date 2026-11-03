@@ -61,15 +61,37 @@ class BankRejectionSearchTest {
         instrument(agency, "CHEQUE-OLD", StatutInstrumentReglement.REMPLACE, null);
         entityManager.flush();
         var result = repository.searchBankRejections(agency.getId(), ModeReglementClient.CHEQUE, null,
-                null, null, null, null, null, "abc", PageRequest.of(0, 25));
+                null, null, null, null, null, "abc", "RETURN_DATE", "DESC", PageRequest.of(0, 25));
         assertThat(result.getContent()).extracting(InstrumentReglementClient::getId).containsExactly(rejected.getId());
         assertThat(repository.searchBankRejections(agency.getId(), ModeReglementClient.EFFET, null,
-                null, null, null, null, null, null, PageRequest.of(0, 25))).isEmpty();
+                null, null, null, null, null, null, "RETURN_DATE", "DESC", PageRequest.of(0, 25))).isEmpty();
+    }
+
+    @Test
+    void sortsAcrossPagesWithoutMixingAgencies() {
+        Agence agency = entityManager.persist(Agence.builder().code("SORT-1").nom("Agency").build());
+        Agence other = entityManager.persist(Agence.builder().code("SORT-2").nom("Other").build());
+        var high = instrument(agency, "SORT-A", StatutInstrumentReglement.REJETE, LocalDate.of(2026, 10, 20));
+        high.setMontant(new BigDecimal("200.00"));
+        var low = instrument(agency, "SORT-B", StatutInstrumentReglement.REJETE, LocalDate.of(2026, 10, 20));
+        low.setMontant(new BigDecimal("50.00"));
+        instrument(other, "SORT-C", StatutInstrumentReglement.REJETE, LocalDate.of(2026, 10, 20));
+        entityManager.flush();
+        var first = repository.searchBankRejections(agency.getId(), null, null, null, null, null, null, null, null,
+                "AMOUNT", "ASC", PageRequest.of(0, 1));
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(first.getContent()).extracting(InstrumentReglementClient::getId).containsExactly(low.getId());
+        assertThat(repository.searchBankRejections(agency.getId(), null, null, null, null, null, null, null, null,
+                "AMOUNT", "ASC", PageRequest.of(1, 1)).getContent())
+                .extracting(InstrumentReglementClient::getId).containsExactly(high.getId());
+        assertThat(repository.searchBankRejections(agency.getId(), null, null, null, null, null, null, null, null,
+                "REFERENCE", "ASC", PageRequest.of(0, 1)).getContent())
+                .extracting(InstrumentReglementClient::getId).containsExactly(high.getId());
     }
 
     private List<InstrumentReglementClient> search(Long agencyId, LocalDate date, String resolution) {
         return repository.searchBankRejections(agencyId, null, null, date, date, null, null,
-                resolution, null, PageRequest.of(0, 25)).getContent();
+                resolution, null, "RETURN_DATE", "DESC", PageRequest.of(0, 25)).getContent();
     }
 
     private InstrumentReglementClient instrument(Agence agency, String reference, StatutInstrumentReglement status, LocalDate rejectionDate) {

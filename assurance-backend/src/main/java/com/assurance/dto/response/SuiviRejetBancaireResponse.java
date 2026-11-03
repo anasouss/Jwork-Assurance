@@ -21,7 +21,8 @@ public record SuiviRejetBancaireResponse(
 ) {
     public record Mouvement(String id, LocalDate date, LocalDateTime enregistreLe,
                             TypeMouvementRejetBancaire type, StatutSuiviRejetBancaire statut,
-                            String motif, String utilisateur, Long instrumentSourceId) {
+                            String motif, String utilisateur, Long instrumentSourceId,
+                            Long bordereauId, String numeroBordereau, boolean historiqueExistant, String libelle) {
     }
 
     public record Remise(Long id, String numero, LocalDate dateDepot, LocalDate dateTraitement, String statut, String motif) {

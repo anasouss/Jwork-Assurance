@@ -541,6 +541,7 @@ export type PaymentInstrument = {
 };
 
 export type BankRejectionFollowUpStatus = "INSTANCE" | "REPRESENTE" | "REGLE_CV" | "CONTENTIEUX";
+export type BankRejectionSort = "MODE" | "REFERENCE" | "PAYER" | "AMOUNT" | "PAYMENT_DATE" | "RETURN_DATE";
 
 export type BankRejectionFollowUp = {
   instrumentId: string;
@@ -567,6 +568,10 @@ export type BankRejectionFollowUp = {
     motif?: string | null;
     utilisateur?: string | null;
     instrumentSourceId?: string | null;
+    bordereauId?: string | null;
+    numeroBordereau?: string | null;
+    historiqueExistant?: boolean;
+    libelle?: string | null;
   }[];
   remises: { id: string; numero: string; dateDepot?: string | null; dateTraitement?: string | null; statut: string; motif?: string | null }[];
   contreValeurs: { id: string; mode: ClientPaymentMode; reference?: string | null; montant: number; statut: PaymentInstrumentStatus; instrumentRemplaceId: string }[];

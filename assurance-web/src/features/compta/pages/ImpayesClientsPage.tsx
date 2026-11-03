@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { toDateOnly } from "@/features/production/date";
 import { clientApi } from "@/features/production/api/clients";
 import { useAuthStore } from "@/store/auth-store";
@@ -36,7 +37,7 @@ import { BankRejectionFollowUpDialog, BankRejectionPayerDialog } from "../compon
 import { rejectionStatusLabels, rejectionStatusVariants } from "../bank-rejection-status";
 import { ReplacePaymentInstrumentDialog } from "../components/ReplacePaymentInstrumentDialog";
 import { usePayerSearch, type PayerSelection, type PayerType } from "../components/use-payer-search";
-import type { PaymentInstrument } from "../types";
+import type { BankRejectionSort, PaymentInstrument } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, paymentModeLabel, TODAY, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type ModeFilter = "ALL" | "CHEQUE" | "EFFET";
@@ -51,6 +52,8 @@ export default function ImpayesClientsPage() {
   const mode = parseMode(params.get("mode"));
   const appliedSearch = params.get("search")?.trim() ?? "";
   const page = parsePage(params.get("page"));
+  const sortBy = parseSort(params.get("sortBy"));
+  const sortDirection = params.get("sortDirection") === "ASC" ? "ASC" : "DESC";
   const dateFrom = parseDate(params.get("dateDu"));
   const dateTo = parseDate(params.get("dateAu"));
   const payerType: PayerType = params.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT";
@@ -94,12 +97,13 @@ export default function ImpayesClientsPage() {
   }, [payerId, payerType, selectedPayer?.id, selectedPayer?.type, requestedClient.data, payerSearch.groups]);
 
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, payerType, payerId, page],
+    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, payerType, payerId, sortBy, sortDirection, page],
     queryFn: () => comptaApi.bankRejections({
       mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined, dateAu: dateTo || undefined,
       payeurType: payerId ? payerType : undefined, payeurId: payerId || undefined,
+      sortBy, sortDirection,
       page,
       size: TREASURY_PAGE_SIZE,
     }),
@@ -121,7 +125,7 @@ export default function ImpayesClientsPage() {
     ),
   });
 
-  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; cible?: PayerType; payeurId?: string }) {
+  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; cible?: PayerType; payeurId?: string; sortBy?: BankRejectionSort; sortDirection?: "ASC" | "DESC" }) {
     const nextParams = new URLSearchParams(params);
     nextParams.delete("resolution");
     nextParams.delete("banqueId");
@@ -139,6 +143,8 @@ export default function ImpayesClientsPage() {
       if (next.search) nextParams.set("search", next.search);
       else nextParams.delete("search");
     }
+    if (next.sortBy !== undefined) nextParams.set("sortBy", next.sortBy);
+    if (next.sortDirection !== undefined) nextParams.set("sortDirection", next.sortDirection);
     if (next.page !== undefined) {
       if (next.page === 0) nextParams.delete("page");
       else nextParams.set("page", String(next.page));
@@ -152,6 +158,10 @@ export default function ImpayesClientsPage() {
     setInstrumentToRepresent(instrument);
     setRepresentationDate(TODAY);
     setRepresentationReason("");
+  }
+
+  function sort(column: BankRejectionSort) {
+    updateUrl({ sortBy: column, sortDirection: column === sortBy && sortDirection === "ASC" ? "DESC" : "ASC" });
   }
 
   return (
@@ -237,12 +247,12 @@ export default function ImpayesClientsPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
-              <th className="px-4 py-3 text-left">Mode</th>
-              <th className="px-4 py-3 text-left">Référence</th>
-              <th className="px-4 py-3 text-left">Payeur</th>
-              <th className="px-4 py-3 text-right">Montant</th>
-              <th className="px-4 py-3 text-left">Date du règlement</th>
-              <th className="px-4 py-3 text-left">Date de retour</th>
+              {([
+                ["MODE", "Mode"], ["REFERENCE", "Référence"], ["PAYER", "Payeur"],
+                ["AMOUNT", "Montant"], ["PAYMENT_DATE", "Date du règlement"], ["RETURN_DATE", "Date de retour"],
+              ] as const).map(([column, label]) => <SortableTableHead key={column} column={column} activeColumn={sortBy}
+                direction={sortDirection === "ASC" ? "asc" : "desc"} onSort={sort} align={column === "AMOUNT" ? "right" : "left"}
+                className="px-4 py-3 text-xs text-white">{label}</SortableTableHead>)}
               <th className="px-4 py-3 text-left">Motif du retour</th>
               <th className="px-4 py-3 text-left">Statut</th>
               <th className="w-20 px-4 py-3"><span className="sr-only">Actions</span></th>
@@ -314,6 +324,11 @@ export default function ImpayesClientsPage() {
 
 function parseMode(value: string | null): ModeFilter {
   return value === "CHEQUE" || value === "EFFET" ? value : "ALL";
+}
+
+function parseSort(value: string | null): BankRejectionSort {
+  return value === "MODE" || value === "REFERENCE" || value === "PAYER" || value === "AMOUNT"
+    || value === "PAYMENT_DATE" || value === "RETURN_DATE" ? value : "RETURN_DATE";
 }
 
 function parseDate(value: string | null) {

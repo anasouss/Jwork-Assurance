@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, Plus, UserRound } from "lucide-react";
+import { CheckCircle2, CircleAlert, History, Landmark, Plus, RefreshCcw, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -57,9 +57,12 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
         {query.isPending ? <p className="py-6 text-sm text-muted-foreground">Chargement...</p> : query.isError ? <div role="alert" className="space-y-3 text-sm">
           <p>{query.error instanceof Error ? query.error.message : "Chargement impossible"}</p><Button variant="outline" onClick={() => void query.refetch()}>Réessayer</Button>
         </div> : detail && <>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-            <Badge variant={rejectionStatusVariants[detail.statutSuivi]}>{rejectionStatusLabels[detail.statutSuivi]}</Badge>
-            <span className="text-sm text-muted-foreground">{rejectionInstrumentLabels[detail.statutInstrument]}</span>
+          <div className="space-y-2 border-b pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Situation actuelle</h3>
+              <Badge variant={detail.reglementAnnule ? "destructive" : rejectionStatusVariants[detail.statutSuivi]}>{detail.reglementAnnule ? "Annulé" : rejectionStatusLabels[detail.statutSuivi]}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{currentSituation(detail)}</p>
           </div>
           {detail.reglementAnnule && <p role="alert" className="text-sm text-destructive">Le règlement est annulé. Aucun mouvement ne peut être ajouté.</p>}
           {movement ? <>
@@ -79,25 +82,29 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
               <Info label="Date du règlement">{formatTreasuryDate(detail.dateReglement)}</Info>
               <Info label="Banque">{detail.banque || "-"}</Info>
               <Info label="Date de retour">{formatTreasuryDate(detail.dateRejet)}</Info>
-              <div className="col-span-2"><Info label="Motif du retour">{detail.motifRejet || "-"}</Info></div>
               {detail.contreValeurs.length > 0 && <Info label="Contre-valeur encaissée">{formatTreasuryMoney(detail.contreValeurEncaissee)}</Info>}
             </dl>
-            <section className="space-y-2"><h3 className="text-sm font-semibold">Mouvements du rejet</h3>
-              <div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[680px] text-sm">
-                <thead className="bg-orange-600 text-xs uppercase text-white"><tr>{["Date", "Mouvement", "Statut", "Motif", "Utilisateur"].map(label => <th key={label} className="px-3 py-3 text-left">{label}</th>)}</tr></thead>
-                <tbody className="divide-y">{detail.mouvements.map(event => <tr key={event.id} className="align-top hover:bg-muted/20">
-                  <td className="whitespace-nowrap px-3 py-3">{formatTreasuryDate(event.date)}</td>
-                  <td className="px-3 py-3">{eventLabels[event.type]}{event.instrumentSourceId && event.instrumentSourceId !== instrument.id && <span className="block text-xs text-muted-foreground">Contre-valeur</span>}</td>
-                  <td className="px-3 py-3"><Badge variant={rejectionStatusVariants[event.statut]}>{rejectionStatusLabels[event.statut]}</Badge></td>
-                  <td className="max-w-96 whitespace-pre-wrap break-words px-3 py-3">{event.motif || "-"}</td>
-                  <td className="px-3 py-3">{event.utilisateur || "-"}</td>
-                </tr>)}{!detail.mouvements.length && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Aucun mouvement enregistré.</td></tr>}</tbody>
-              </table></div>
+            <section className="space-y-4 border-t pt-4"><h3 className="text-sm font-semibold">Historique</h3>
+              <ol>{detail.mouvements.map((event, index) => {
+                const bank = event.type === "REMISE_EN_BANQUE";
+                const rejected = event.type === "REJET";
+                const confirmed = event.type === "ENCAISSEMENT";
+                const Icon = rejected ? CircleAlert : bank ? Landmark : confirmed ? CheckCircle2 : event.type === "PREPARATION_REMISE" ? RefreshCcw : History;
+                const title = event.libelle || (event.type === "SUIVI" ? `Suivi : ${rejectionStatusLabels[event.statut]}` : eventLabels[event.type]);
+                return <li key={event.id} className="relative flex gap-3 pb-5 last:pb-0">
+                  {index < detail.mouvements.length - 1 && <span aria-hidden className="absolute bottom-0 left-4 top-8 w-px bg-border" />}
+                  <span className={`relative flex size-8 shrink-0 items-center justify-center rounded-md ${rejected ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400" : confirmed ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400" : "bg-sky-50 text-sky-600 dark:bg-sky-950/30 dark:text-sky-400"}`}><Icon className="size-4" /></span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"><h4 className="text-sm font-semibold">{title}</h4><time dateTime={event.date} className="text-xs text-muted-foreground">{formatTreasuryDate(event.date)}</time></div>
+                    {event.motif && event.motif !== title && <p className="whitespace-pre-wrap break-words text-sm">{event.motif}</p>}
+                    {event.instrumentSourceId && event.instrumentSourceId !== instrument.id && <p className="text-xs text-muted-foreground">Sur une contre-valeur</p>}
+                    {event.bordereauId && <Link className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${event.bordereauId}`}><Landmark className="size-3.5" />{event.numeroBordereau || "Bordereau"}</Link>}
+                    <p className="text-xs text-muted-foreground">{event.historiqueExistant ? "Historique existant" : event.utilisateur || "Utilisateur non renseigné"}</p>
+                  </div>
+                </li>;
+              })}</ol>
+              {!detail.mouvements.length && <p className="py-3 text-sm text-muted-foreground">Aucun événement enregistré.</p>}
             </section>
-            {detail.remises.length > 0 && <section className="space-y-2"><h3 className="text-sm font-semibold">Remises bancaires</h3><ul className="divide-y border-y text-sm">{detail.remises.map((line, index) => <li key={`${line.id}-${index}`} className="flex flex-wrap justify-between gap-2 py-2">
-              <Link className="font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${line.id}`}>{line.numero}</Link>
-              <span>{formatTreasuryDate(line.dateDepot)} · {line.statut === "REJETEE" ? "Rejetée" : line.statut === "ENCAISSEE" ? "Encaissée" : "Remise"}</span>
-            </li>)}</ul></section>}
             {detail.contreValeurs.length > 0 && <section className="space-y-2"><h3 className="text-sm font-semibold">Contre-valeurs</h3><div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[440px] text-sm">
               <thead className="bg-muted/60 text-xs uppercase"><tr>{["Mode", "Référence", "Montant", "État"].map(label => <th key={label} className="px-3 py-2 text-left">{label}</th>)}</tr></thead>
               <tbody className="divide-y">{detail.contreValeurs.map(value => <tr key={value.id}><td className="px-3 py-2">{paymentModeLabel(value.mode)}</td><td className="px-3 py-2">{value.reference || "-"}</td><td className="px-3 py-2 font-semibold tabular-nums">{formatTreasuryMoney(value.montant)}</td><td className="px-3 py-2">{rejectionInstrumentLabels[value.statut]}</td></tr>)}</tbody>
@@ -145,4 +152,18 @@ export function BankRejectionPayerDialog({ instrument, onClose }: { instrument: 
 
 function Info({ label, children }: { label: string; children: ReactNode }) {
   return <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words">{children}</dd></div>;
+}
+
+function currentSituation(detail: BankRejectionFollowUp) {
+  if (detail.reglementAnnule) return "Règlement annulé.";
+  if (detail.statutSuivi === "REGLE_CV") return "Montant intégralement réglé par contre-valeur.";
+  if (detail.statutSuivi === "CONTENTIEUX") return "Recouvrement en contentieux.";
+  if (detail.statutInstrument === "CONFIRME") return "Encaissement confirmé.";
+  if (detail.statutInstrument === "REMIS_EN_BANQUE") {
+    const lastRemittance = detail.mouvements.filter(event => event.type === "REMISE_EN_BANQUE" && event.instrumentSourceId === detail.instrumentId).at(-1);
+    return `${lastRemittance ? `Remis en banque le ${formatTreasuryDate(lastRemittance.date)}. ` : ""}En attente d’encaissement.`;
+  }
+  if (detail.statutInstrument === "REMPLACE") return "Contre-valeur en attente d’encaissement.";
+  if (detail.statutInstrument === "EN_ATTENTE") return "Nouvelle remise préparée, non encore déposée en banque.";
+  return "En attente de traitement du rejet.";
 }

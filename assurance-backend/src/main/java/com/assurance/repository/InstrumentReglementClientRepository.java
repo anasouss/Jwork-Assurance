@@ -55,7 +55,20 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                    or lower(payment.payeurNom) like lower(concat('%', :search, '%'))
                    or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
                    or lower(coalesce(bank.libelle, '')) like lower(concat('%', :search, '%')))
-            order by coalesce(instrument.dateRejet, instrument.dateStatut) desc, instrument.id desc
+            order by
+                case when :sortBy = 'MODE' and :sortDirection = 'ASC' then instrument.mode end asc,
+                case when :sortBy = 'MODE' and :sortDirection = 'DESC' then instrument.mode end desc,
+                case when :sortBy = 'REFERENCE' and :sortDirection = 'ASC' then lower(instrument.referenceInstrument) end asc,
+                case when :sortBy = 'REFERENCE' and :sortDirection = 'DESC' then lower(instrument.referenceInstrument) end desc,
+                case when :sortBy = 'PAYER' and :sortDirection = 'ASC' then lower(payment.payeurNom) end asc,
+                case when :sortBy = 'PAYER' and :sortDirection = 'DESC' then lower(payment.payeurNom) end desc,
+                case when :sortBy = 'AMOUNT' and :sortDirection = 'ASC' then instrument.montant end asc,
+                case when :sortBy = 'AMOUNT' and :sortDirection = 'DESC' then instrument.montant end desc,
+                case when :sortBy = 'PAYMENT_DATE' and :sortDirection = 'ASC' then payment.dateReglement end asc,
+                case when :sortBy = 'PAYMENT_DATE' and :sortDirection = 'DESC' then payment.dateReglement end desc,
+                case when :sortBy = 'RETURN_DATE' and :sortDirection = 'ASC' then coalesce(instrument.dateRejet, instrument.dateStatut) end asc,
+                case when :sortBy = 'RETURN_DATE' and :sortDirection = 'DESC' then coalesce(instrument.dateRejet, instrument.dateStatut) end desc,
+                instrument.id desc
             """)
     Page<InstrumentReglementClient> searchBankRejections(
             @Param("agenceId") Long agenceId,
@@ -67,6 +80,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             @Param("payeurId") Long payeurId,
             @Param("resolution") String resolution,
             @Param("search") String search,
+            @Param("sortBy") String sortBy,
+            @Param("sortDirection") String sortDirection,
             Pageable pageable
     );
 

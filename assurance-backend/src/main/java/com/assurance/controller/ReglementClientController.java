@@ -435,12 +435,14 @@ public class ReglementClientController {
             @RequestParam(required = false) Long payeurId,
             @RequestParam(required = false) ResolutionRejetBancaire resolution,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "RETURN_DATE") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchBankRejections(
                 TenantContext.getCurrentAgence(), mode, banqueId, dateDu, dateAu,
-                payeurType, payeurId, resolution, search, page, size
+                payeurType, payeurId, resolution, search, sortBy, sortDirection, page, size
         )));
     }
 

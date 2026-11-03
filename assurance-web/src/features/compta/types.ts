@@ -513,6 +513,8 @@ export type PaymentInstrument = {
   statut: PaymentInstrumentStatus;
   montant: number;
   dateInstrument: string;
+  dateReglement?: string | null;
+  statutSuiviRejet?: BankRejectionFollowUpStatus | null;
   dateEcheance?: string | null;
   dateStatut?: string | null;
   referenceInstrument?: string | null;
@@ -536,6 +538,45 @@ export type PaymentInstrument = {
   numeroBordereauRemise?: string | null;
   statutBordereauRemise?: RemittanceSlipStatus | null;
   affectations: PaymentAllocation[];
+};
+
+export type BankRejectionFollowUpStatus = "INSTANCE" | "REPRESENTE" | "REGLE_CV" | "CONTENTIEUX";
+
+export type BankRejectionFollowUp = {
+  instrumentId: string;
+  reglementId: string;
+  numeroReglement: string;
+  payeurNom: string;
+  dateReglement?: string | null;
+  dateRejet?: string | null;
+  motifRejet?: string | null;
+  banque?: string | null;
+  statutInstrument: PaymentInstrumentStatus;
+  statutSuivi: BankRejectionFollowUpStatus;
+  montant: number;
+  contreValeurEncaissee: number;
+  reglementAnnule: boolean;
+  dateMinimumMouvement?: string | null;
+  statutsAutorises: BankRejectionFollowUpStatus[];
+  mouvements: {
+    id: string;
+    date: string;
+    enregistreLe?: string | null;
+    type: "REJET" | "PREPARATION_REMISE" | "REMISE_EN_BANQUE" | "REMPLACEMENT" | "ENCAISSEMENT" | "SUIVI";
+    statut: BankRejectionFollowUpStatus;
+    motif?: string | null;
+    utilisateur?: string | null;
+    instrumentSourceId?: string | null;
+  }[];
+  remises: { id: string; numero: string; dateDepot?: string | null; dateTraitement?: string | null; statut: string; motif?: string | null }[];
+  contreValeurs: { id: string; mode: ClientPaymentMode; reference?: string | null; montant: number; statut: PaymentInstrumentStatus; instrumentRemplaceId: string }[];
+};
+
+export type BankRejectionPayer = {
+  nom: string;
+  groupe?: string | null;
+  clients: { id: string; code?: string | null; nom: string; cin?: string | null; rc?: string | null; ice?: string | null;
+    adresse?: string | null; ville?: string | null; telephone?: string | null; email?: string | null }[];
 };
 
 export type PaymentInstrumentPage = {

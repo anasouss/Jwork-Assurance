@@ -2,6 +2,7 @@ package com.assurance.entity;
 
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.enums.StatutSuiviRejetBancaire;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -96,6 +97,10 @@ public class InstrumentReglementClient extends BaseEntity {
 
     @Column(name = "motif_rejet", length = 500)
     private String motifRejet;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "suivi_rejet", length = 30)
+    private StatutSuiviRejetBancaire suiviRejet;
 
     @OneToMany(mappedBy = "instrument", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

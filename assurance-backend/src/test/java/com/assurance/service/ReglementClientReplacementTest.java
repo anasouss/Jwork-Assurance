@@ -8,6 +8,9 @@ import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.EcartReglementClientRepository;
+import com.assurance.repository.MouvementRejetBancaireRepository;
+import com.assurance.dto.request.AjouterMouvementRejetRequest;
+import com.assurance.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,8 +42,79 @@ class ReglementClientReplacementTest {
     private BanqueService banqueService;
     @Mock
     private EcartReglementClientRepository ecartRepository;
+    @Mock
+    private RejetBancaireSuiviService rejetSuiviService;
     @InjectMocks
     private ReglementClientService service;
+
+    @Test
+    void rejectionIsSettledOnlyAfterEveryCounterValueIsConfirmedIncludingReplacementChains() {
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
+                mock(MouvementRejetBancaireRepository.class));
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        payment.setId(5L);
+        InstrumentReglementClient rejected = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.REMPLACE, null);
+        followUpInstrument(payment, 2L, "30.00", StatutInstrumentReglement.CONFIRME, rejected);
+        InstrumentReglementClient second = followUpInstrument(payment, 3L, "70.00", StatutInstrumentReglement.EN_ATTENTE, rejected);
+        assertThat(followUp.statut(rejected)).isEqualTo(StatutSuiviRejetBancaire.INSTANCE);
+        rejected.setSuiviRejet(StatutSuiviRejetBancaire.CONTENTIEUX);
+        assertThat(followUp.statut(rejected)).isEqualTo(StatutSuiviRejetBancaire.CONTENTIEUX);
+        second.setStatut(StatutInstrumentReglement.REMPLACE);
+        followUpInstrument(payment, 4L, "40.00", StatutInstrumentReglement.CONFIRME, second);
+        InstrumentReglementClient last = followUpInstrument(payment, 5L, "30.00", StatutInstrumentReglement.EN_ATTENTE, second);
+        assertThat(followUp.statut(rejected)).isNotEqualTo(StatutSuiviRejetBancaire.REGLE_CV);
+        last.setStatut(StatutInstrumentReglement.CONFIRME);
+        assertThat(followUp.statut(rejected)).isEqualTo(StatutSuiviRejetBancaire.REGLE_CV);
+        last.setStatut(StatutInstrumentReglement.REJETE);
+        assertThat(followUp.statut(rejected)).isNotEqualTo(StatutSuiviRejetBancaire.REGLE_CV);
+        verifyNoInteractions(tresorerieService);
+    }
+
+    @Test
+    void preparingAResubmissionDoesNotMeanItHasBeenPresentedToTheBank() {
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
+                mock(MouvementRejetBancaireRepository.class));
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        var instrument = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.EN_ATTENTE, null);
+        assertThat(followUp.statut(instrument)).isEqualTo(StatutSuiviRejetBancaire.INSTANCE);
+        instrument.setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
+        assertThat(followUp.statut(instrument)).isEqualTo(StatutSuiviRejetBancaire.REPRESENTE);
+    }
+
+    @Test
+    void manualFollowUpCannotInventSettlementOrReadAnotherAgency() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        payment.setId(5L);
+        var instrument = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.REJETE, null);
+        instrument.setDateRejet(LocalDate.now().minusDays(1));
+        when(instrumentRepository.findByIdAndAgenceIdForUpdate(1L, 7L)).thenReturn(Optional.of(instrument));
+        when(instrumentRepository.findByIdAndAgenceId(1L, 7L)).thenReturn(Optional.of(instrument));
+        AjouterMouvementRejetRequest request = new AjouterMouvementRejetRequest();
+        request.setStatut(StatutSuiviRejetBancaire.REGLE_CV);
+        request.setDateOperation(LocalDate.now());
+        request.setMotif("Attempted settlement");
+        assertThatThrownBy(() -> followUp.ajouter(7L, 1L, request)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> followUp.detail(8L, 1L)).isInstanceOf(ResourceNotFoundException.class);
+        verify(events, never()).save(any());
+    }
+
+    private InstrumentReglementClient followUpInstrument(ReglementClient payment, Long id, String amount,
+                                                         StatutInstrumentReglement status, InstrumentReglementClient replaced) {
+        var instrument = InstrumentReglementClient.builder().agence(payment.getAgence()).reglement(payment)
+                .mode(ModeReglementClient.CHEQUE).montant(new BigDecimal(amount)).statut(status)
+                .instrumentRemplace(replaced).build();
+        instrument.setId(id);
+        payment.getInstruments().add(instrument);
+        return instrument;
+    }
 
     @Test
     void splitsAcrossTargetsAndPreservesUnallocatedCreditAndPayerSnapshots() {

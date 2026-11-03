@@ -4,6 +4,7 @@ import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.ResolutionRejetBancaire;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.enums.StatutSuiviRejetBancaire;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.StatutBordereauRemise;
 import lombok.Builder;
@@ -53,6 +54,8 @@ public class ReglementClientResponse {
         private StatutInstrumentReglement statut;
         private BigDecimal montant;
         private LocalDate dateInstrument;
+        private LocalDate dateReglement;
+        private StatutSuiviRejetBancaire statutSuiviRejet;
         private LocalDate dateEcheance;
         private LocalDate dateStatut;
         private String referenceInstrument;

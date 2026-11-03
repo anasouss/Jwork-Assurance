@@ -10,6 +10,9 @@ import type {
   BankStatementImportPage,
   BankStatementImportProfile,
   BankReference,
+  BankRejectionFollowUp,
+  BankRejectionFollowUpStatus,
+  BankRejectionPayer,
   ClientDocument,
   ClientDocumentPage,
   ClientDocumentSourcePage,
@@ -725,6 +728,33 @@ export const comptaApi = {
       `/api/v1/compta/reglements-clients/instruments/${id}/rejet-bancaire`,
       { method: "POST", body: JSON.stringify({ ...request, statut: "REJETE" }) }
     )));
+  },
+
+  async bankRejectionHistory(id: string): Promise<BankRejectionFollowUp> {
+    const result = unwrap(await apiFetch<ApiResponse<BankRejectionFollowUp>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/suivi-rejet`
+    ));
+    return {
+      ...result, instrumentId: String(result.instrumentId), reglementId: String(result.reglementId),
+      mouvements: result.mouvements.map(event => ({ ...event, id: String(event.id),
+        instrumentSourceId: event.instrumentSourceId == null ? null : String(event.instrumentSourceId) })),
+      remises: result.remises.map(line => ({ ...line, id: String(line.id) })),
+      contreValeurs: result.contreValeurs.map(instrument => ({ ...instrument, id: String(instrument.id), instrumentRemplaceId: String(instrument.instrumentRemplaceId) })),
+    };
+  },
+
+  async bankRejectionPayer(id: string): Promise<BankRejectionPayer> {
+    const result = unwrap(await apiFetch<ApiResponse<BankRejectionPayer>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/fiche-payeur-rejet`
+    ));
+    return { ...result, clients: result.clients.map(client => ({ ...client, id: String(client.id) })) };
+  },
+
+  async addBankRejectionMovement(id: string, request: { dateOperation: string; statut: BankRejectionFollowUpStatus; motif: string }) {
+    return unwrap(await apiFetch<ApiResponse<null>>(
+      `/api/v1/compta/reglements-clients/instruments/${id}/suivi-rejet`,
+      { method: "POST", body: JSON.stringify(request) }
+    ));
   },
 
   async changePaymentInstrumentStatus(

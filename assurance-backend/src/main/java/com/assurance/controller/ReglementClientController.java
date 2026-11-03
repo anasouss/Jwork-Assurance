@@ -1,6 +1,7 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.AnnulerReglementClientRequest;
+import com.assurance.dto.request.AjouterMouvementRejetRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
@@ -15,6 +16,7 @@ import com.assurance.dto.response.InstrumentReglementPageResponse;
 import com.assurance.dto.response.ReglementClientPageResponse;
 import com.assurance.dto.response.ReglementClientPolicyResponse;
 import com.assurance.dto.response.ReglementClientResponse;
+import com.assurance.dto.response.SuiviRejetBancaireResponse;
 import com.assurance.dto.response.UtilisateurTresorerieResponse;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.ResolutionRejetBancaire;
@@ -27,6 +29,7 @@ import com.assurance.service.ReglementClientPdfService;
 import com.assurance.service.QuittancePrimeClientService;
 import com.assurance.service.QuittancePrimeSelectionService;
 import com.assurance.service.ReglementClientService;
+import com.assurance.service.RejetBancaireSuiviService;
 import com.assurance.service.TresorerieAccessService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +59,27 @@ import java.util.List;
 @RequestMapping("/api/v1/compta/reglements-clients")
 @RequiredArgsConstructor
 public class ReglementClientController {
+    private final RejetBancaireSuiviService rejetSuiviService;
+
+    @GetMapping("/instruments/{instrumentId}/suivi-rejet")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse>> rejectionHistory(@PathVariable Long instrumentId) {
+        return ResponseEntity.ok(ApiResponse.success(rejetSuiviService.detail(TenantContext.getCurrentAgence(), instrumentId)));
+    }
+
+    @GetMapping("/instruments/{instrumentId}/fiche-payeur-rejet")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view') and hasAuthority('PERM_client:view')")
+    public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse.FichePayeur>> rejectionPayer(@PathVariable Long instrumentId) {
+        return ResponseEntity.ok(ApiResponse.success(rejetSuiviService.fichePayeur(TenantContext.getCurrentAgence(), instrumentId)));
+    }
+
+    @PostMapping("/instruments/{instrumentId}/suivi-rejet")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view') and hasAuthority('PERM_reglement-client:manage')")
+    public ResponseEntity<ApiResponse<Void>> addRejectionMovement(@PathVariable Long instrumentId,
+            @Valid @RequestBody AjouterMouvementRejetRequest request) {
+        rejetSuiviService.ajouter(TenantContext.getCurrentAgence(), instrumentId, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Mouvement de suivi enregistré"));
+    }
 
     private final ReglementClientService reglementClientService;
     private final ReglementClientPdfService reglementClientPdfService;

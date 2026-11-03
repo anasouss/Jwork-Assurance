@@ -38,6 +38,8 @@ import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeFacturationContrat;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.ResolutionRejetBancaire;
+import com.assurance.enums.StatutSuiviRejetBancaire;
+import com.assurance.enums.TypeMouvementRejetBancaire;
 import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutAffectationReglement;
@@ -107,6 +109,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ReglementClientService {
+    private final RejetBancaireSuiviService rejetSuiviService;
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     private static final BigDecimal DEFAULT_MAX_UNALLOCATED_CREDIT = new BigDecimal("100.00");
@@ -1117,6 +1120,7 @@ public class ReglementClientService {
         replaced.setStatut(StatutInstrumentReglement.REMPLACE);
         replaced.setDateStatut(replacementDate);
         replaced.setMotifStatut(request.getMotif().trim());
+        replaced.setSuiviRejet(StatutSuiviRejetBancaire.INSTANCE);
         replaced.getReglement().getInstruments().addAll(replacements);
         ReglementClient payment = reglementRepository.saveAndFlush(replaced.getReglement());
         for (InstrumentReglementClient replacement : replacements) {
@@ -1124,6 +1128,7 @@ public class ReglementClientService {
                 tresorerieService.recordInstrumentEntry(replacement, replacement.getCompteTresorerie(), replacementDate);
             }
         }
+        rejetSuiviService.suivreOperation(replaced, TypeMouvementRejetBancaire.REMPLACEMENT, replacementDate, request.getMotif());
         refreshUnallocatedAmount(payment);
         recalculatePaymentFlags(
                 agenceId,
@@ -1266,11 +1271,14 @@ public class ReglementClientService {
         instrument.setStatut(StatutInstrumentReglement.EN_ATTENTE);
         instrument.setDateStatut(request.getDateRepresentation());
         instrument.setMotifStatut("Représentation : " + request.getMotif().trim());
+        instrument.setSuiviRejet(StatutSuiviRejetBancaire.INSTANCE);
         instrument.setCompteTresorerie(null);
         instrument.setReglementBureau(false);
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.EN_ATTENTE));
         ReglementClient payment = reglementRepository.saveAndFlush(instrument.getReglement());
+        rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.PREPARATION_REMISE,
+                request.getDateRepresentation(), request.getMotif());
         refreshUnallocatedAmount(payment);
         recalculatePaymentFlags(
                 agenceId,
@@ -1488,6 +1496,8 @@ public class ReglementClientService {
                 .statut(instrument.getStatut())
                 .montant(instrument.getMontant())
                 .dateInstrument(instrument.getDateInstrument())
+                .dateReglement(instrument.getReglement().getDateReglement())
+                .statutSuiviRejet(hasRejection ? rejetSuiviService.statut(instrument) : null)
                 .dateEcheance(instrument.getDateEcheance())
                 .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
@@ -1778,6 +1788,8 @@ public class ReglementClientService {
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.CONFIRMEE));
         instrumentRepository.saveAndFlush(instrument);
+        rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.ENCAISSEMENT, operationDate,
+                "Encaissement confirmé");
         return tresorerieService.recordInstrumentEntry(
                 instrument,
                 account,
@@ -1811,8 +1823,10 @@ public class ReglementClientService {
         instrument.setStatut(StatutInstrumentReglement.REJETE);
         instrument.setDateRejet(operationDate);
         instrument.setMotifRejet(reason.trim());
+        instrument.setSuiviRejet(StatutSuiviRejetBancaire.INSTANCE);
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.ANNULEE));
+        rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.REJET, operationDate, reason);
     }
 
     @Transactional
@@ -1850,6 +1864,8 @@ public class ReglementClientService {
         instrument.setDateStatut(operationDate);
         instrument.setMotifStatut("Remis en banque");
         instrumentRepository.save(instrument);
+        rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.REMISE_EN_BANQUE, operationDate,
+                "Remise en banque");
     }
 
     @Transactional

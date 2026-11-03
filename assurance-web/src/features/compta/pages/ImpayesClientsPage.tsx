@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { History, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search, UserRound } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,8 @@ import { clientApi } from "@/features/production/api/clients";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { BankRejectionDialog } from "../components/BankRejectionDialog";
+import { BankRejectionFollowUpDialog, BankRejectionPayerDialog } from "../components/BankRejectionFollowUpDialog";
+import { rejectionStatusLabels, rejectionStatusVariants } from "../bank-rejection-status";
 import { ReplacePaymentInstrumentDialog } from "../components/ReplacePaymentInstrumentDialog";
 import { usePayerSearch, type PayerSelection, type PayerType } from "../components/use-payer-search";
 import type { PaymentInstrument } from "../types";
@@ -45,6 +47,7 @@ export default function ImpayesClientsPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("reglement-client:manage");
   const canReject = permissions.includes("tresorerie:manage");
+  const canViewClient = permissions.includes("client:view");
   const mode = parseMode(params.get("mode"));
   const appliedSearch = params.get("search")?.trim() ?? "";
   const page = parsePage(params.get("page"));
@@ -57,6 +60,8 @@ export default function ImpayesClientsPage() {
   const payerSearch = usePayerSearch(payerType, selectedPayer);
   const [rejectionOpen, setRejectionOpen] = useState(false);
   const [replacementTarget, setReplacementTarget] = useState<PaymentInstrument>();
+  const [followUpTarget, setFollowUpTarget] = useState<{ instrument: PaymentInstrument; mode: "history" | "movement" }>();
+  const [payerTarget, setPayerTarget] = useState<PaymentInstrument>();
   const [search, setSearch] = useState(appliedSearch);
   const [instrumentToRepresent, setInstrumentToRepresent] = useState<PaymentInstrument>();
   const [representationDate, setRepresentationDate] = useState(TODAY);
@@ -237,46 +242,44 @@ export default function ImpayesClientsPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
+              <th className="px-4 py-3 text-left">Mode</th>
               <th className="px-4 py-3 text-left">Référence</th>
               <th className="px-4 py-3 text-left">Payeur</th>
-              <th className="px-4 py-3 text-left">Règlement</th>
-              <th className="px-4 py-3 text-left">Mode</th>
-              <th className="px-4 py-3 text-left">Banque</th>
-              <th className="px-4 py-3 text-left">Rejeté le</th>
-              <th className="px-4 py-3 text-left">Motif du rejet</th>
-              <th className="px-4 py-3 text-left">Bordereau d’origine</th>
               <th className="px-4 py-3 text-right">Montant</th>
-              <th className="px-4 py-3 text-left">Traitement</th>
+              <th className="px-4 py-3 text-left">Date du règlement</th>
+              <th className="px-4 py-3 text-left">Date de retour</th>
+              <th className="px-4 py-3 text-left">Motif du retour</th>
+              <th className="px-4 py-3 text-left">Statut</th>
               <th className="w-20 px-4 py-3"><span className="sr-only">Actions</span></th>
             </tr></thead>
             <tbody className="divide-y">
-              {instruments.isLoading ? <TableRowsSkeleton colSpan={11} rows={6} /> : (instruments.data?.rows ?? []).map((instrument) => (
+              {instruments.isLoading ? <TableRowsSkeleton colSpan={9} rows={6} /> : (instruments.data?.rows ?? []).map((instrument) => (
                 <tr key={instrument.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
                   <td className="px-4 py-3 font-semibold">{instrument.referenceInstrument || "-"}</td>
                   <td className="px-4 py-3">{instrument.payeurNom}</td>
-                  <td className="px-4 py-3"><Link className="font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/reglements/${instrument.reglementId}`}>{instrument.numeroReglement}</Link></td>
-                  <td className="px-4 py-3">{paymentModeLabel(instrument.mode)}</td>
-                  <td className="px-4 py-3">{instrument.banqueEmettrice || "-"}</td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatTreasuryMoney(instrument.montant)}</td>
+                  <td className="px-4 py-3">{formatTreasuryDate(instrument.dateReglement)}</td>
                   <td className="px-4 py-3">{formatTreasuryDate(instrument.dateRejet)}</td>
                   <td className="max-w-72 px-4 py-3"><span className="line-clamp-2" title={instrument.motifRejet || undefined}>{instrument.motifRejet || "-"}</span></td>
-                  <td className="px-4 py-3">{instrument.bordereauRemiseId ? <Link className="font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>{instrument.numeroBordereauRemise}</Link> : "-"}</td>
-                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatTreasuryMoney(instrument.montant)}</td>
-                  <td className="px-4 py-3"><Badge variant={instrument.resolutionRejet === "A_TRAITER" ? "destructive" : "secondary"}>{instrument.resolutionRejet === "A_TRAITER" ? "À traiter" : instrument.resolutionRejet === "REMPLACE" ? "Remplacé" : instrument.resolutionRejet === "REPRESENTE" ? "Représenté" : "-"}</Badge></td>
+                  <td className="px-4 py-3">{instrument.statutSuiviRejet ? <Badge variant={rejectionStatusVariants[instrument.statutSuiviRejet]}>{rejectionStatusLabels[instrument.statutSuiviRejet]}</Badge> : "-"}</td>
                   <td className="px-4 py-3 text-right">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" title="Actions"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" title="Actions" aria-label={`Actions pour ${instrument.referenceInstrument || instrument.numeroReglement}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-60">
-                        <DropdownMenuItem asChild><Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link></DropdownMenuItem>
+                        {canViewClient && <DropdownMenuItem onSelect={() => setPayerTarget(instrument)}><UserRound className="size-4 text-emerald-600 dark:text-emerald-400" /> Fiche client</DropdownMenuItem>}
+                        <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "history" })}><History className="size-4 text-blue-600 dark:text-blue-400" /> Historique du rejet</DropdownMenuItem>
+                        {canManage && <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "movement" })}><Plus className="size-4 text-orange-600 dark:text-orange-400" /> Ajouter un mouvement</DropdownMenuItem>}
                         {canManage && instrument.statut === "REJETE" && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
                         {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Nouvelle remise en banque</DropdownMenuItem>}
-                        {canManage && instrument.statut === "REJETE" && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => setReplacementTarget(instrument)}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Remplacer le moyen de paiement</DropdownMenuItem>}
+                        {canManage && instrument.statut === "REJETE" && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => setReplacementTarget(instrument)}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Régler par contre-valeur</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
                 </tr>
               ))}
-              {instruments.isError && <tr><td colSpan={11} className="px-4 py-14 text-center text-destructive">Chargement des rejets impossible. <Button variant="link" onClick={() => void instruments.refetch()}>Réessayer</Button></td></tr>}
-              {!instruments.isLoading && !instruments.isError && (instruments.data?.rows.length ?? 0) === 0 && <tr><td colSpan={11} className="px-4 py-14 text-center text-muted-foreground">Aucun rejet ne correspond aux filtres.</td></tr>}
+              {instruments.isError && <tr><td colSpan={9} className="px-4 py-14 text-center text-destructive">Chargement des rejets impossible. <Button variant="link" onClick={() => void instruments.refetch()}>Réessayer</Button></td></tr>}
+              {!instruments.isLoading && !instruments.isError && (instruments.data?.rows.length ?? 0) === 0 && <tr><td colSpan={9} className="px-4 py-14 text-center text-muted-foreground">Aucun rejet ne correspond aux filtres.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -284,6 +287,8 @@ export default function ImpayesClientsPage() {
       </section>
 
       {rejectionOpen && <BankRejectionDialog onClose={() => setRejectionOpen(false)} />}
+      {followUpTarget && <BankRejectionFollowUpDialog instrument={followUpTarget.instrument} mode={followUpTarget.mode} onClose={() => setFollowUpTarget(undefined)} />}
+      {payerTarget && <BankRejectionPayerDialog instrument={payerTarget} onClose={() => setPayerTarget(undefined)} />}
       {replacementTarget && <ReplacePaymentInstrumentDialog instrument={replacementTarget} onClose={() => setReplacementTarget(undefined)} />}
 
       <Dialog open={Boolean(instrumentToRepresent)} onOpenChange={(open) => !open && !representInstrument.isPending && setInstrumentToRepresent(undefined)}>

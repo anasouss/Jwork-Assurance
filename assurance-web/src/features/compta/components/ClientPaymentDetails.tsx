@@ -40,12 +40,12 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
       <span className="text-xs text-muted-foreground">Montants en MAD</span>
     </div>
 
-    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <Summary label="Total encaissé" value={amount(detail?.totalEncaisse)} tone="emerald">
+    <dl className="grid grid-cols-1 divide-y border-b sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <Summary label="Total encaissé" value={amount(detail?.totalEncaisse)}>
         {detail && detail.totalEnAttente > 0 && <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">En attente : {amount(detail.totalEnAttente)}</p>}
       </Summary>
-      <Summary label="Total quittances" value={amount(detail?.totalQuittances)} tone="sky" />
-      <Summary label="Solde restant" value={amount(detail?.solde)} tone="orange" />
+      <Summary label="Total quittances" value={amount(detail?.totalQuittances)} />
+      <Summary label="Solde restant" value={amount(detail?.solde)} />
     </dl>
 
     <section className="min-w-0 space-y-3">
@@ -113,7 +113,9 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
             <td className="px-3 py-3"><Badge variant={payment.statut === "ANNULE" ? "red" : INSTRUMENT_VARIANTS[instrument.statut]}>
               {payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]}
             </Badge>
-              {instrument.motifStatut && <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>{instrument.motifStatut}</div>}
+              {instrument.motifStatut && instrument.motifStatut.trim().toLocaleLowerCase("fr")
+                !== (payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]).toLocaleLowerCase("fr")
+                && <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>{instrument.motifStatut}</div>}
               {instrument.bordereauRemiseId && <Link className="mt-2 flex items-center gap-1.5 text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}><Landmark className="size-3.5 shrink-0" />{instrument.numeroBordereauRemise || "Voir le bordereau"}</Link>}
             </td>
           </tr>)}
@@ -166,13 +168,8 @@ function groupAllocations(payment: ClientPayment) {
   return Array.from(grouped.values());
 }
 
-function Summary({ label, value, tone, children }: { label: string; value: string; tone: "emerald" | "sky" | "orange"; children?: ReactNode }) {
-  const styles = {
-    emerald: "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900 dark:bg-emerald-950/20",
-    sky: "border-sky-200 bg-sky-50/50 dark:border-sky-900 dark:bg-sky-950/20",
-    orange: "border-orange-200 bg-orange-50/50 dark:border-orange-900 dark:bg-orange-950/20",
-  };
-  return <div className={`min-w-0 rounded-md border px-4 py-3 ${styles[tone]}`}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-lg font-semibold tabular-nums">{value}{children}</dd></div>;
+function Summary({ label, value, children }: { label: string; value: string; children?: ReactNode }) {
+  return <div className="min-w-0 py-3 sm:px-5 sm:first:pl-0 sm:last:pr-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-lg font-semibold tabular-nums">{value}{children}</dd></div>;
 }
 
 function amount(value?: number | null) {

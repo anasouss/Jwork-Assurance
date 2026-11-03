@@ -5,6 +5,7 @@ import com.assurance.entity.Contrat;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.Quittance;
 import com.assurance.entity.Usage;
+import com.assurance.entity.Vehicule;
 import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.enums.ModeSaisieGarantieContrat;
@@ -61,6 +62,82 @@ class ContratDraftCleanupTest {
         contrat.getAssistances().add(assistance);
         lenient().when(assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(10L))
                 .thenReturn(List.of(assistance));
+    }
+
+    @Test
+    void conventionAmendmentCrmComesFromSharedContractValueNotTheSubmittedDraft() {
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        contrat.setCrmPartage(true);
+        contrat.setCrmPartageValeur(" 0.85 ");
+        var vehicle = new CreateContratRequest.VehiculeInput();
+        vehicle.setCrm("1.50");
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(vehicle));
+        var original = Vehicule.builder().crm("0.90").build();
+
+        ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleCrm", contrat, request, List.of(original));
+
+        assertThat(vehicle.getCrm()).isEqualTo("0.85");
+        assertThat(original.getCrm()).isEqualTo("0.90");
+    }
+
+    @Test
+    void conventionReplacementCrmUsesTheSuppliedBeforeVehicleRatherThanTheCurrentVehicle() {
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        contrat.setCrmPartage(false);
+        contrat.setCrmPartageValeur("1.20");
+        contrat.getVehicules().add(Vehicule.builder().crm("1.50").build());
+        var vehicle = new CreateContratRequest.VehiculeInput();
+        vehicle.setCrm("1.50");
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(vehicle));
+
+        ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleCrm", contrat, request,
+                List.of(Vehicule.builder().crm("0.90").build()));
+
+        assertThat(vehicle.getCrm()).isEqualTo("0.90");
+    }
+
+    @Test
+    void missingOriginalConventionCrmIsNotInventedFromTheRequest() {
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        var vehicle = new CreateContratRequest.VehiculeInput();
+        vehicle.setCrm("1.50");
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(vehicle));
+
+        ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleCrm", contrat, request,
+                List.of(Vehicule.builder().crm(" ").build()));
+
+        assertThat(vehicle.getCrm()).isNull();
+    }
+
+    @Test
+    void conflictingOriginalConventionCrmsAreNotPickedArbitrarily() {
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(new CreateContratRequest.VehiculeInput()));
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleCrm", contrat, request,
+                List.of(Vehicule.builder().crm("0.90").build(), Vehicule.builder().crm("1.10").build())))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Plusieurs CRM");
+    }
+
+    @Test
+    void fleetAndMonoCrmsAreNotOverwrittenByConventionInheritance() {
+        for (TypeContrat type : List.of(TypeContrat.FLOTTE, TypeContrat.PARTICULIER)) {
+            contrat.setTypeContrat(type);
+            var vehicle = new CreateContratRequest.VehiculeInput();
+            vehicle.setCrm("1.50");
+            var request = new AvenantRequest();
+            request.setVehicules(List.of(vehicle));
+
+            ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleCrm", contrat, request,
+                    List.of(Vehicule.builder().crm("0.90").build()));
+
+            assertThat(vehicle.getCrm()).isEqualTo("1.50");
+        }
     }
 
     @Test

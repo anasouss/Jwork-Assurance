@@ -3,6 +3,7 @@ import {
   buildAvenantAssistances,
   DEFAULT_VEHICLE,
   inheritConventionVehicleUsage,
+  inheritConventionVehicleCrm,
   ensureRcGaranties,
   mapCurrentGaranties,
   restoreExtensionGaranties,
@@ -13,6 +14,40 @@ import {
 import type { ContratSummary, GarantieInput, ReferenceOption } from "../types";
 
 describe("amendment form adapters", () => {
+  it("inherits shared convention CRM instead of accepting a stale draft coefficient", () => {
+    const vehicles = [{ ...DEFAULT_VEHICLE, crm: "1.50" }];
+    expect(inheritConventionVehicleCrm(vehicles, {
+      typeContrat: "CONVENTION", crmPartage: true, crmPartageValeur: " 0.85 ",
+      vehicules: [{ vehiculeId: "old", typeVehicule: "AUTOMOBILE", crm: "0.90" }],
+    })[0].crm).toBe("0.85");
+    expect(vehicles[0].crm).toBe("1.50");
+  });
+
+  it("inherits the original convention vehicle CRM when shared CRM is not configured", () => {
+    expect(inheritConventionVehicleCrm([{ ...DEFAULT_VEHICLE }], {
+      typeContrat: "CONVENTION", crmPartage: false, crmPartageValeur: "1.20",
+      vehicules: [{ vehiculeId: "old", typeVehicule: "AUTOMOBILE", crm: "0.90" }],
+    })[0].crm).toBe("0.90");
+  });
+
+  it("does not invent or choose an ambiguous convention CRM", () => {
+    const vehicles = [{ ...DEFAULT_VEHICLE, crm: "1.50" }];
+    expect(inheritConventionVehicleCrm(vehicles, { typeContrat: "CONVENTION" })[0].crm).toBeUndefined();
+    expect(inheritConventionVehicleCrm(vehicles, {
+      typeContrat: "CONVENTION",
+      vehicules: [
+        { vehiculeId: "one", typeVehicule: "AUTOMOBILE", crm: "0.90" },
+        { vehiculeId: "two", typeVehicule: "AUTOMOBILE", crm: "1.10" },
+      ],
+    })[0].crm).toBeUndefined();
+  });
+
+  it("does not change CRM entry for fleet and mono contracts", () => {
+    const vehicles = [{ ...DEFAULT_VEHICLE, crm: "1.10" }];
+    expect(inheritConventionVehicleCrm(vehicles, { typeContrat: "FLOTTE" })).toBe(vehicles);
+    expect(inheritConventionVehicleCrm(vehicles, { typeContrat: "PARTICULIER" })).toBe(vehicles);
+  });
+
   it("accepts an amendment vehicle without CRM while keeping usage requirements", () => {
     const vehicle = {
       ...DEFAULT_VEHICLE, usageId: "1", marqueId: "2", carrosserieId: "3",

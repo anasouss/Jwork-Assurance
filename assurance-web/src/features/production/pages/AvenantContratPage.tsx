@@ -20,6 +20,7 @@ import {
   ensureRcGaranties,
   hydrateAvenantAssistances,
   inheritConventionVehicleUsage,
+  inheritConventionVehicleCrm,
   isClosureCode,
   isDifferentialCode,
   isDuplicataCode,
@@ -128,7 +129,7 @@ export default function AvenantContratPage() {
   const contrat = contextQuery.data?.contrat;
   const vehicules = useMemo(
     () => isVehicleTargetCreationCode(movementCode)
-      ? inheritConventionVehicleUsage(vehicleInputs, contrat)
+      ? inheritConventionVehicleCrm(inheritConventionVehicleUsage(vehicleInputs, contrat), contrat)
       : vehicleInputs,
     [vehicleInputs, contrat, movementCode]
   );

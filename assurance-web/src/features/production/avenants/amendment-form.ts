@@ -59,6 +59,17 @@ export function inheritConventionVehicleUsage(
     : vehicles;
 }
 
+export function inheritConventionVehicleCrm(
+  vehicles: VehiculeInput[],
+  contract?: Pick<ContratSummary, "typeContrat" | "crmPartage" | "crmPartageValeur" | "vehicules">
+): VehiculeInput[] {
+  if (contract?.typeContrat !== "CONVENTION") return vehicles;
+  const shared = contract.crmPartage ? contract.crmPartageValeur?.trim() || undefined : undefined;
+  const values = new Set((contract.vehicules ?? []).map(vehicle => vehicle.crm?.trim() || undefined));
+  const inherited = shared ?? (values.size === 1 ? values.values().next().value : undefined);
+  return vehicles.map(vehicle => ({ ...vehicle, crm: inherited }));
+}
+
 export function normalizeVehicle(
   vehicle: VehiculeInput,
   dateEffet?: string,

@@ -3718,8 +3718,8 @@ public class ContratService {
             throw new BadRequestException("Aucun vehicule actif disponible pour le changement de vehicule");
         }
         AvenantTargets targets = persist
-                ? persistAvenantTargets(contrat, request)
-                : buildAvenantTargetsPreview(contrat, request);
+                ? persistAvenantTargets(contrat, request, vehiculesAvant)
+                : buildAvenantTargetsPreview(contrat, request, vehiculesAvant);
         if (targets.garanties().isEmpty()) {
             throw new BadRequestException("Au moins une garantie est obligatoire pour le changement de vehicule");
         }
@@ -4637,7 +4637,13 @@ public class ContratService {
     }
 
     private AvenantTargets buildAvenantTargetsPreview(Contrat contrat, AvenantRequest request) {
+        return buildAvenantTargetsPreview(contrat, request,
+                contrat.getTypeContrat() == TypeContrat.CONVENTION ? activeVehicules(contrat) : List.of());
+    }
+
+    private AvenantTargets buildAvenantTargetsPreview(Contrat contrat, AvenantRequest request, List<Vehicule> crmSources) {
         inheritConventionAvenantVehicleUsage(contrat, request);
+        inheritConventionAvenantVehicleCrm(contrat, request, crmSources);
         CreateContratRequest previewRequest = avenantCreateRequest(contrat, request);
         LocalDate dateEffetCible = firstNonNull(request.getDateEffet(), contrat.getDateEffet());
         List<Vehicule> vehicules = buildVehiculesPreview(
@@ -4659,7 +4665,13 @@ public class ContratService {
     }
 
     private AvenantTargets persistAvenantTargets(Contrat contrat, AvenantRequest request) {
+        return persistAvenantTargets(contrat, request,
+                contrat.getTypeContrat() == TypeContrat.CONVENTION ? activeVehicules(contrat) : List.of());
+    }
+
+    private AvenantTargets persistAvenantTargets(Contrat contrat, AvenantRequest request, List<Vehicule> crmSources) {
         inheritConventionAvenantVehicleUsage(contrat, request);
+        inheritConventionAvenantVehicleCrm(contrat, request, crmSources);
         List<Vehicule> vehicules = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             validateDraftVehiculeInput(contrat, input, false);
@@ -4692,6 +4704,28 @@ public class ContratService {
         List<ContratGarantie> garanties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
         updateTargetCounts(contrat);
         return new AvenantTargets(vehicules, remorques, garanties);
+    }
+
+    private void inheritConventionAvenantVehicleCrm(Contrat contrat, AvenantRequest request, List<Vehicule> sources) {
+        if (contrat.getTypeContrat() != TypeContrat.CONVENTION
+                || request.getVehicules() == null || request.getVehicules().isEmpty()) {
+            return;
+        }
+        String crm = Boolean.TRUE.equals(contrat.getCrmPartage()) ? blankToNull(contrat.getCrmPartageValeur()) : null;
+        if (crm == null) {
+            Set<String> values = new LinkedHashSet<>();
+            sources.forEach(vehicle -> values.add(blankToNull(vehicle.getCrm())));
+            if (values.size() > 1) {
+                throw new BadRequestException("Plusieurs CRM existent sur le contrat convention. Le CRM a reprendre doit etre clarifie sur le contrat.");
+            }
+            crm = values.isEmpty() ? null : values.iterator().next();
+        }
+        for (CreateContratRequest.VehiculeInput vehicle : request.getVehicules()) {
+            if (vehicle == null) {
+                throw new BadRequestException("Vehicule obligatoire");
+            }
+            vehicle.setCrm(crm);
+        }
     }
 
     private void inheritConventionAvenantVehicleUsage(Contrat contrat, AvenantRequest request) {

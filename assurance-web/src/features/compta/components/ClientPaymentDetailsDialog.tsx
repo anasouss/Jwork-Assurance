@@ -8,7 +8,11 @@ import { comptaApi } from "../api";
 import { ClientPaymentDetails } from "./ClientPaymentDetails";
 import { formatTreasuryDate } from "../pages/treasury-format";
 
-export function ClientPaymentDetailsDialog({ paymentId, onClose }: { paymentId: string; onClose: () => void }) {
+export function ClientPaymentDetailsDialog({ paymentId, onClose, closeLabel = "Fermer" }: {
+  paymentId: string;
+  onClose: () => void;
+  closeLabel?: string;
+}) {
   const query = useQuery({
     queryKey: ["compta", "client-payment", paymentId],
     queryFn: () => comptaApi.clientPayment(paymentId),
@@ -34,7 +38,7 @@ export function ClientPaymentDetailsDialog({ paymentId, onClose }: { paymentId: 
           : query.isError ? <div role="alert" className="space-y-3 py-6 text-sm"><p>{query.error instanceof Error ? query.error.message : "Chargement du règlement impossible."}</p><Button variant="outline" onClick={() => void query.refetch()}>Réessayer</Button></div>
             : <ClientPaymentDetails payment={query.data} />}
       </div>
-      <DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-4"><Button variant="outline" onClick={onClose}>Fermer</Button></DialogFooter>
+      <DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-4"><Button variant="outline" onClick={onClose}>{closeLabel}</Button></DialogFooter>
     </DialogContent>
   </Dialog>;
 }

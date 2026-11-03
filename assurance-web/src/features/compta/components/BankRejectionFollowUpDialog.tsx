@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
+import { useAuthStore } from "@/store/auth-store";
+import { ClientPaymentDetailsDialog } from "./ClientPaymentDetailsDialog";
 import { comptaApi } from "../api";
 import { rejectionInstrumentLabels, rejectionStatusLabels, rejectionStatusVariants } from "../bank-rejection-status";
 import type { BankRejectionFollowUp, BankRejectionFollowUpStatus, PaymentInstrument } from "../types";
@@ -25,6 +27,8 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
   instrument: PaymentInstrument; mode: "history" | "movement"; onClose: () => void;
 }) {
   const queryClient = useQueryClient();
+  const canViewPayment = useAuthStore(state => state.user?.permissions.includes("reglement-client:view") ?? false);
+  const [paymentDetailId, setPaymentDetailId] = useState<string>();
   const [date, setDate] = useState(TODAY);
   const [status, setStatus] = useState<BankRejectionFollowUpStatus>();
   const [reason, setReason] = useState("");
@@ -44,6 +48,8 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
     onError: error => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
   const movement = mode === "movement";
+  if (paymentDetailId) return <ClientPaymentDetailsDialog paymentId={paymentDetailId}
+    closeLabel="Retour au rejet" onClose={() => setPaymentDetailId(undefined)} />;
   return <Dialog open onOpenChange={open => { if (!open && !save.isPending) onClose(); }}>
     <DialogContent className={`flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 ${movement ? "sm:max-w-xl" : "sm:max-w-5xl"}`}>
       <DialogHeader className="shrink-0 border-b bg-orange-50/70 p-5 pr-12 text-left dark:bg-orange-950/20">
@@ -78,7 +84,9 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
             </>}
           </> : <>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-4">
-              <Info label="Règlement"><Link className="font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/reglements/${detail.reglementId}`}>{detail.numeroReglement}</Link></Info>
+              <Info label="Règlement">{canViewPayment
+                ? <button type="button" className="text-left font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" onClick={() => setPaymentDetailId(detail.reglementId)}>{detail.numeroReglement}</button>
+                : detail.numeroReglement}</Info>
               <Info label="Date du règlement">{formatTreasuryDate(detail.dateReglement)}</Info>
               <Info label="Banque">{detail.banque || "-"}</Info>
               <Info label="Date de retour">{formatTreasuryDate(detail.dateRejet)}</Info>

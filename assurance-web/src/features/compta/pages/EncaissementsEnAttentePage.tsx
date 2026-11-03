@@ -30,10 +30,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { SortIcon } from "@/components/ui/sort-icon";
 import { clientApi } from "@/features/production/api/clients";
+import { ClientRecordDialog } from "@/features/crm/components/ClientRecordDialog";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { AddInstrumentToRemittanceDialog } from "../components/AddInstrumentToRemittanceDialog";
+import { ClientPaymentDetailsDialog } from "../components/ClientPaymentDetailsDialog";
 import { ReplacePaymentInstrumentDialog } from "../components/ReplacePaymentInstrumentDialog";
 import { usePayerSearch, type PayerSelection } from "../components/use-payer-search";
 import type { ClientPaymentMode, EligibleCashDay, PaymentInstrument } from "../types";
@@ -50,6 +52,8 @@ export default function EncaissementsEnAttentePage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canManage = permissions.includes("tresorerie:manage");
   const canReplacePayment = permissions.includes("reglement-client:manage");
+  const canViewPayment = permissions.includes("reglement-client:view");
+  const canViewClient = permissions.includes("client:view");
   const queryClient = useQueryClient();
   const {
     mode, search: appliedSearch, payerType, payerId,
@@ -64,6 +68,8 @@ export default function EncaissementsEnAttentePage() {
   const [selectedCashDays, setSelectedCashDays] = useState<EligibleCashDay[]>([]);
   const [instrumentToReplace, setInstrumentToReplace] = useState<PaymentInstrument>();
   const [instrumentToRemit, setInstrumentToRemit] = useState<PaymentInstrument>();
+  const [paymentDetailId, setPaymentDetailId] = useState<string>();
+  const [clientDetail, setClientDetail] = useState<{ id: string; name: string }>();
   const [slipDialogOpen, setSlipDialogOpen] = useState(false);
   const [cashSlipDialogOpen, setCashSlipDialogOpen] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState("");
@@ -657,6 +663,10 @@ export default function EncaissementsEnAttentePage() {
                       instrument={instrument}
                       canReplace={canReplacePayment}
                       canRemit={canManage}
+                      canViewPayment={canViewPayment}
+                      canViewClient={canViewClient}
+                      onViewPayment={() => setPaymentDetailId(instrument.reglementId)}
+                      onViewClient={() => instrument.clientPayeurId && setClientDetail({ id: instrument.clientPayeurId, name: instrument.payeurNom })}
                       onRemit={() => setInstrumentToRemit(instrument)}
                       onReplace={() => {
                         setInstrumentToReplace(instrument);
@@ -767,6 +777,8 @@ export default function EncaissementsEnAttentePage() {
         </DialogContent>
       </Dialog>
 
+      {paymentDetailId && <ClientPaymentDetailsDialog paymentId={paymentDetailId} onClose={() => setPaymentDetailId(undefined)} />}
+      {clientDetail && <ClientRecordDialog clientId={clientDetail.id} name={clientDetail.name} onClose={() => setClientDetail(undefined)} />}
       {instrumentToReplace && <ReplacePaymentInstrumentDialog
         instrument={instrumentToReplace}
         onClose={() => setInstrumentToReplace(undefined)}
@@ -824,10 +836,14 @@ function WorkflowBadge({ instrument }: { instrument: PaymentInstrument }) {
   return <Badge className="bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-200">À rapprocher</Badge>;
 }
 
-function InstrumentAction({ instrument, canReplace, canRemit, onReplace, onRemit }: {
+function InstrumentAction({ instrument, canReplace, canRemit, canViewPayment, canViewClient, onViewPayment, onViewClient, onReplace, onRemit }: {
   instrument: PaymentInstrument;
   canReplace: boolean;
   canRemit: boolean;
+  canViewPayment: boolean;
+  canViewClient: boolean;
+  onViewPayment: () => void;
+  onViewClient: () => void;
   onReplace: () => void;
   onRemit: () => void;
 }) {
@@ -840,14 +856,12 @@ function InstrumentAction({ instrument, canReplace, canRemit, onReplace, onRemit
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="min-w-56">
-      {instrument.clientPayeurId && (
-        <DropdownMenuItem asChild>
-          <Link to={`/app/production/portefeuille-clients/${instrument.clientPayeurId}`}><UserRound className="size-4" /> Voir la fiche client</Link>
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem asChild>
-        <Link to={`/app/compta/reglements/${instrument.reglementId}`}>Voir le règlement <ArrowRight className="size-4" /></Link>
-      </DropdownMenuItem>
+      {canViewClient && instrument.clientPayeurId && <DropdownMenuItem onSelect={onViewClient}>
+        <UserRound className="size-4 text-emerald-600 dark:text-emerald-400" /> Fiche client
+      </DropdownMenuItem>}
+      {canViewPayment && <DropdownMenuItem onSelect={onViewPayment}>
+        <Eye className="size-4 text-blue-600 dark:text-blue-400" /> Voir le règlement
+      </DropdownMenuItem>}
       {instrument.bordereauRemiseId && (
         <DropdownMenuItem asChild>
           <Link to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}>Voir le bordereau <ArrowRight className="size-4" /></Link>

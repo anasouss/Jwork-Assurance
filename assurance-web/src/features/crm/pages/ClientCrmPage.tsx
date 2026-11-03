@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Eye,
   FolderOpen,
   Megaphone,
   Paperclip,
@@ -40,6 +41,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
+import { ClientRecordDialog } from "@/features/crm/components/ClientRecordDialog";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
@@ -649,6 +651,7 @@ function ClientDetail({
   const [acquisitionOpen, setAcquisitionOpen] = useState(false);
   const [acquisitionDraft, setAcquisitionDraft] = useState<AcquisitionClient | undefined>();
   const [paymentConditionOpen, setPaymentConditionOpen] = useState(false);
+  const [linkedClient, setLinkedClient] = useState<{ id: string; name: string }>();
   const acquisitionOptionsQuery = useQuery({
     queryKey: ["crm", "acquisition-options"],
     queryFn: clientApi.acquisitionOptions,
@@ -806,10 +809,11 @@ function ClientDetail({
             {groupMembers.length ? (
               <div className="divide-y">
                 {groupMembers.slice(0, 8).map((member) => (
-                  <Link key={member.clientId} to={`/app/crm?clientId=${member.clientId}`} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-blue-700">
+                  <button key={member.clientId} type="button" onClick={() => setLinkedClient({ id: member.clientId, name: member.clientNom })}
+                    className="flex w-full items-center justify-between gap-3 py-2 text-left text-sm hover:text-blue-700" aria-label={`Consulter la fiche de ${member.clientNom}`}>
                     <span><strong>{member.clientNom}</strong><span className="ml-2 text-muted-foreground">{label(member.typeRelation)}</span></span>
-                    <ArrowRight className="size-4" />
-                  </Link>
+                    <Eye className="size-4 shrink-0" />
+                  </button>
                 ))}
               </div>
             ) : <EmptyState text="Aucune autre entité liée." />}
@@ -865,6 +869,7 @@ function ClientDetail({
           });
         }}
       />
+      {linkedClient && <ClientRecordDialog clientId={linkedClient.id} name={linkedClient.name} onClose={() => setLinkedClient(undefined)} />}
     </section>
   );
 }

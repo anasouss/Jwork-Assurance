@@ -56,6 +56,7 @@ export function ConventionAvenantTargetsSection({
       allowTargetChanges={false}
       guaranteeLayout="tariff"
       garantiesExtraAction={guaranteesAction}
+      showVehicleUsage={false}
       maxRemorques={1}
       remorqueSectionTitle="Remorque"
       showRemorqueSection={showRemorque}

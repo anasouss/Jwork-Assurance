@@ -4,6 +4,7 @@ import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.Quittance;
+import com.assurance.entity.Usage;
 import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.request.CreateContratRequest;
 import com.assurance.enums.ModeSaisieGarantieContrat;
@@ -59,6 +60,67 @@ class ContratDraftCleanupTest {
         contrat.getAssistances().add(assistance);
         lenient().when(assistanceContratRepository.findByContratIdOrderByCreatedAtDesc(10L))
                 .thenReturn(List.of(assistance));
+    }
+
+    @Test
+    void conventionAmendmentVehiclesInheritContractUsage() {
+        Usage usage = new Usage();
+        usage.setId(42L);
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        contrat.setUsage(usage);
+        var vehicle = new CreateContratRequest.VehiculeInput();
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(vehicle));
+
+        ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleUsage", contrat, request);
+
+        assertThat(vehicle.getUsageId()).isEqualTo(42L);
+        ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleUsage", contrat, request);
+        assertThat(vehicle.getUsageId()).isEqualTo(42L);
+    }
+
+    @Test
+    void conventionAmendmentCannotSwitchUsageThroughAVehicle() {
+        Usage usage = new Usage();
+        usage.setId(42L);
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        contrat.setUsage(usage);
+        var vehicle = new CreateContratRequest.VehiculeInput();
+        vehicle.setUsageId(99L);
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(vehicle));
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                service, "inheritConventionAvenantVehicleUsage", contrat, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("doit correspondre");
+    }
+
+    @Test
+    void conventionAmendmentRequiresAnExistingContractUsage() {
+        contrat.setTypeContrat(TypeContrat.CONVENTION);
+        var request = new AvenantRequest();
+        request.setVehicules(List.of(new CreateContratRequest.VehiculeInput()));
+
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(
+                service, "inheritConventionAvenantVehicleUsage", contrat, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("usage du contrat convention");
+    }
+
+    @Test
+    void fleetAndMonoAmendmentsKeepVehicleSpecificUsages() {
+        for (TypeContrat type : List.of(TypeContrat.FLOTTE, TypeContrat.PARTICULIER)) {
+            contrat.setTypeContrat(type);
+            var vehicle = new CreateContratRequest.VehiculeInput();
+            vehicle.setUsageId(99L);
+            var request = new AvenantRequest();
+            request.setVehicules(List.of(vehicle));
+
+            ReflectionTestUtils.invokeMethod(service, "inheritConventionAvenantVehicleUsage", contrat, request);
+
+            assertThat(vehicle.getUsageId()).isEqualTo(99L);
+        }
     }
 
     @Test

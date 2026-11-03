@@ -4633,6 +4633,7 @@ public class ContratService {
     }
 
     private AvenantTargets buildAvenantTargetsPreview(Contrat contrat, AvenantRequest request) {
+        inheritConventionAvenantVehicleUsage(contrat, request);
         CreateContratRequest previewRequest = avenantCreateRequest(contrat, request);
         LocalDate dateEffetCible = firstNonNull(request.getDateEffet(), contrat.getDateEffet());
         List<Vehicule> vehicules = buildVehiculesPreview(
@@ -4654,6 +4655,7 @@ public class ContratService {
     }
 
     private AvenantTargets persistAvenantTargets(Contrat contrat, AvenantRequest request) {
+        inheritConventionAvenantVehicleUsage(contrat, request);
         List<Vehicule> vehicules = new ArrayList<>();
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             validateDraftVehiculeInput(contrat, input);
@@ -4686,6 +4688,26 @@ public class ContratService {
         List<ContratGarantie> garanties = replaceFinalGaranties(contrat, createRequest, vehicules, remorques);
         updateTargetCounts(contrat);
         return new AvenantTargets(vehicules, remorques, garanties);
+    }
+
+    private void inheritConventionAvenantVehicleUsage(Contrat contrat, AvenantRequest request) {
+        if (contrat.getTypeContrat() != TypeContrat.CONVENTION
+                || request.getVehicules() == null || request.getVehicules().isEmpty()) {
+            return;
+        }
+        if (contrat.getUsage() == null) {
+            throw new BadRequestException("L'usage du contrat convention doit etre renseigne avant de creer cet avenant");
+        }
+        Long usageId = contrat.getUsage().getId();
+        for (CreateContratRequest.VehiculeInput vehicle : request.getVehicules()) {
+            if (vehicle == null) {
+                throw new BadRequestException("Vehicule obligatoire");
+            }
+            if (vehicle.getUsageId() != null && !usageId.equals(vehicle.getUsageId())) {
+                throw new BadRequestException("L'usage du vehicule doit correspondre a l'usage du contrat convention");
+            }
+            vehicle.setUsageId(usageId);
+        }
     }
 
     private CreateContratRequest avenantCreateRequest(Contrat contrat, AvenantRequest request) {

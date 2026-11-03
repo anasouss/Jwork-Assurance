@@ -19,6 +19,7 @@ import {
   DEFAULT_VEHICLE,
   ensureRcGaranties,
   hydrateAvenantAssistances,
+  inheritConventionVehicleUsage,
   isClosureCode,
   isDifferentialCode,
   isDuplicataCode,
@@ -74,7 +75,7 @@ export default function AvenantContratPage() {
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [precisionDrafts, setPrecisionDrafts] = useState<Record<string, PrecisionDraft>>({});
   const [duplicataAttestationDrafts, setDuplicataAttestationDrafts] = useState<Record<string, DuplicataAttestationDraft>>({});
-  const [vehicules, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
+  const [vehicleInputs, setVehicules] = useState<VehiculeInput[]>([{ ...DEFAULT_VEHICLE }]);
   const [remorques, setRemorques] = useState<RemorqueInput[]>([]);
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [quittanceLines, setQuittanceLines] = useState<QuittanceInput[]>(emptyAvenantQuittance);
@@ -125,6 +126,12 @@ export default function AvenantContratPage() {
     }
   }, [rectificationQuery.error]);
   const contrat = contextQuery.data?.contrat;
+  const vehicules = useMemo(
+    () => isVehicleTargetCreationCode(movementCode)
+      ? inheritConventionVehicleUsage(vehicleInputs, contrat)
+      : vehicleInputs,
+    [vehicleInputs, contrat, movementCode]
+  );
   const grilleTarifaireId = contrat?.grilleTarifaireId ? String(contrat.grilleTarifaireId) : undefined;
   const supportsManualQuittance = contrat?.typeContrat === "PARTICULIER" && isGuaranteeModificationCode(movementCode);
   const {
@@ -212,7 +219,10 @@ export default function AvenantContratPage() {
   }, [formulesPersonne.data, grilleTarifaireId, lignesGrille.data, usages.data]);
   const avenantTargetUsages = contrat?.typeContrat === "PARTICULIER"
     ? usages.data ?? []
-    : flotteTargetUsages;
+    : contrat?.typeContrat === "CONVENTION"
+      ? (usages.data ?? []).filter(usage => usage.id === contrat.usageId
+        || (!isVehicleTargetCreationCode(movementCode) && vehicules.some(vehicle => vehicle.usageId === usage.id)))
+      : flotteTargetUsages;
 
   const hydrationKey = `${movementCode}:${validatedMovementId ?? "draft"}`;
   const sourceQuery = validatedMovementId ? rectificationQuery : draftQuery;
@@ -1046,6 +1056,10 @@ export default function AvenantContratPage() {
           <Field label="Date d'échéance">
             <DatePicker date={dateEcheance} disabled />
           </Field>
+          {contrat?.typeContrat === "CONVENTION" && <Field label="Usage contrat">
+            <Input readOnly aria-invalid={!contrat.usageId} value={[contrat.usageCode, contrat.usageLibelle].filter(Boolean).join(" - ") || "Non renseigné"} />
+            {!contrat.usageId && <span className="text-xs font-normal normal-case text-destructive">L'usage doit être renseigné sur le contrat avant de créer cet avenant.</span>}
+          </Field>}
           <Field label="Libellé du relevé (facultatif)">
             <Input
               value={libelleReleve}
@@ -1085,6 +1099,7 @@ export default function AvenantContratPage() {
           lignes={lignesGrille.data ?? []}
           formulesPersonne={formulesPersonne.data ?? []}
           usages={avenantTargetUsages}
+          remorqueUsages={contrat?.typeContrat === "CONVENTION" ? flotteTargetUsages : undefined}
           compagnies={compagnies.data ?? []}
           compagnieAssuranceId={contrat?.compagnieAssuranceId}
           categorieClientId={contrat?.categorieClientId}

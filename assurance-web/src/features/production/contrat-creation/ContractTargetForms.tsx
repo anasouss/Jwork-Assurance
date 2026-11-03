@@ -30,6 +30,7 @@ type VehicleFormProps = {
   crmPartage: boolean;
   crmPartageValeur: string;
   showCrm: boolean;
+  showUsage?: boolean;
   prospectionMode: boolean;
   controleStockAttestation: boolean;
   showTowingExtension?: boolean;
@@ -54,6 +55,7 @@ export function VehicleForm({
   crmPartage,
   crmPartageValeur,
   showCrm,
+  showUsage = true,
   prospectionMode,
   controleStockAttestation,
   showTowingExtension = false,
@@ -80,7 +82,7 @@ export function VehicleForm({
     const marqueId = stringValue(found.marqueId);
     const carrosserieId = stringValue(found.carrosserieId);
     const categorieTransportId = stringValue(found.categorieTransportId);
-    const usageAllowed = usageId && usages.some((item) => item.id === usageId);
+    const usageAllowed = showUsage && usageId && usages.some((item) => item.id === usageId);
     update({
       usageId: usageAllowed ? usageId : vehicule.usageId,
       marqueId: marqueId || undefined,
@@ -110,7 +112,7 @@ export function VehicleForm({
   return (
     <div className="grid gap-3">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Field label={usageFieldLabel} required error={errors[`vehicules.${index}.usageId`]}>
+        {showUsage && <Field label={usageFieldLabel} required error={errors[`vehicules.${index}.usageId`]}>
           <AutocompleteSelect
             value={vehicule.usageId ?? ""}
             placeholder={usageFieldLabel}
@@ -131,7 +133,7 @@ export function VehicleForm({
               ptc: undefined,
             })}
           />
-        </Field>
+        </Field>}
         <Field label="Marque" required error={errors[`vehicules.${index}.marqueId`]}>
           <AutocompleteSelect
             value={vehicule.marqueId ?? ""}

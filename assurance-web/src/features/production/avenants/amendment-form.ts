@@ -50,6 +50,15 @@ export const DEFAULT_VEHICLE: VehiculeInput = {
   valeurGlace: undefined,
 };
 
+export function inheritConventionVehicleUsage(
+  vehicles: VehiculeInput[],
+  contract?: Pick<ContratSummary, "typeContrat" | "usageId">
+): VehiculeInput[] {
+  return contract?.typeContrat === "CONVENTION"
+    ? vehicles.map(vehicle => ({ ...vehicle, usageId: contract.usageId }))
+    : vehicles;
+}
+
 export function normalizeVehicle(
   vehicle: VehiculeInput,
   dateEffet?: string,

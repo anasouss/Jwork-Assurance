@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAvenantAssistances,
+  DEFAULT_VEHICLE,
+  inheritConventionVehicleUsage,
   ensureRcGaranties,
   mapCurrentGaranties,
   restoreExtensionGaranties,
@@ -9,6 +11,25 @@ import {
 import type { ContratSummary, GarantieInput, ReferenceOption } from "../types";
 
 describe("amendment form adapters", () => {
+  it("inherits convention usage for new vehicles and reopened drafts without mutating them", () => {
+    const vehicles = [{ ...DEFAULT_VEHICLE, usageId: undefined }, { ...DEFAULT_VEHICLE, usageId: "old-usage" }];
+    expect(inheritConventionVehicleUsage(vehicles, { typeContrat: "CONVENTION", usageId: "contract-usage" }))
+      .toEqual([{ ...DEFAULT_VEHICLE, usageId: "contract-usage" }, { ...DEFAULT_VEHICLE, usageId: "contract-usage" }]);
+    expect(vehicles).toEqual([{ ...DEFAULT_VEHICLE, usageId: undefined }, { ...DEFAULT_VEHICLE, usageId: "old-usage" }]);
+  });
+
+  it("keeps fleet and mono vehicle usages unchanged", () => {
+    const vehicles = [{ ...DEFAULT_VEHICLE, usageId: "vehicle-usage" }];
+    expect(inheritConventionVehicleUsage(vehicles, { typeContrat: "FLOTTE", usageId: "contract-usage" })).toBe(vehicles);
+    expect(inheritConventionVehicleUsage(vehicles, { typeContrat: "PARTICULIER", usageId: "contract-usage" })).toBe(vehicles);
+    expect(inheritConventionVehicleUsage(vehicles)).toBe(vehicles);
+  });
+
+  it("does not invent a missing convention contract usage from an old draft", () => {
+    expect(inheritConventionVehicleUsage([{ ...DEFAULT_VEHICLE, usageId: "old-usage" }], { typeContrat: "CONVENTION" }))
+      .toEqual([{ ...DEFAULT_VEHICLE, usageId: undefined }]);
+  });
+
   it("retains existing person guarantees when restoring an old extension draft", () => {
     const pp: GarantieInput = { garantieId: "PP", modeSelectionne: "PROTECTION", montantDeces: 20000 };
     const pc: GarantieInput = { garantieId: "PC", modeSelectionne: "PROTECTION", montantDeces: 50000 };

@@ -30,6 +30,7 @@ import com.assurance.service.QuittancePrimeClientService;
 import com.assurance.service.QuittancePrimeSelectionService;
 import com.assurance.service.ReglementClientService;
 import com.assurance.service.RejetBancaireSuiviService;
+import com.assurance.service.RejetBancaireExportService;
 import com.assurance.service.TresorerieAccessService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -82,6 +83,7 @@ public class ReglementClientController {
     }
 
     private final ReglementClientService reglementClientService;
+    private final RejetBancaireExportService rejetBancaireExportService;
     private final ReglementClientPdfService reglementClientPdfService;
     private final QuittancePrimeClientService quittancePrimeClientService;
     private final QuittancePrimeSelectionService quittancePrimeSelectionService;
@@ -444,6 +446,31 @@ public class ReglementClientController {
                 TenantContext.getCurrentAgence(), mode, banqueId, dateDu, dateAu,
                 payeurType, payeurId, resolution, search, sortBy, sortDirection, page, size
         )));
+    }
+
+    @GetMapping("/instruments/rejets-bancaires/export")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<byte[]> exportBankRejections(
+            @RequestParam(required = false) ModeReglementClient mode,
+            @RequestParam(required = false) Long banqueId,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) String payeurType,
+            @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) ResolutionRejetBancaire resolution,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "RETURN_DATE") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDirection
+    ) {
+        byte[] content = rejetBancaireExportService.export(TenantContext.getCurrentAgence(), mode, banqueId,
+                dateDu, dateAu, payeurType, payeurId, resolution, search, sortBy, sortDirection);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("rejets-bancaires.xlsx").build().toString())
+                .body(content);
     }
 
     @PostMapping("/instruments/{instrumentId}/rejet-bancaire")

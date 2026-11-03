@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search, UserRound } from "lucide-react";
+import { Download, History, MoreHorizontal, Plus, RefreshCcw, RotateCcw, Search, UserRound } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -31,6 +31,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { toDateOnly } from "@/features/production/date";
 import { clientApi } from "@/features/production/api/clients";
 import { useAuthStore } from "@/store/auth-store";
+import { downloadBlob } from "@/lib/download";
 import { comptaApi } from "../api";
 import { BankRejectionDialog } from "../components/BankRejectionDialog";
 import { BankRejectionFollowUpDialog, BankRejectionPayerDialog } from "../components/BankRejectionFollowUpDialog";
@@ -96,17 +97,26 @@ export default function ImpayesClientsPage() {
     }
   }, [payerId, payerType, selectedPayer?.id, selectedPayer?.type, requestedClient.data, payerSearch.groups]);
 
+  const filters: Parameters<typeof comptaApi.exportBankRejections>[0] = {
+    mode: mode === "ALL" ? undefined : mode,
+    search: appliedSearch || undefined,
+    dateDu: dateFrom || undefined, dateAu: dateTo || undefined,
+    payeurType: payerId ? payerType : undefined, payeurId: payerId || undefined,
+    sortBy, sortDirection,
+  };
   const instruments = useQuery({
     queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, payerType, payerId, sortBy, sortDirection, page],
     queryFn: () => comptaApi.bankRejections({
-      mode: mode === "ALL" ? undefined : mode,
-      search: appliedSearch || undefined,
-      dateDu: dateFrom || undefined, dateAu: dateTo || undefined,
-      payeurType: payerId ? payerType : undefined, payeurId: payerId || undefined,
-      sortBy, sortDirection,
+      ...filters,
       page,
       size: TREASURY_PAGE_SIZE,
     }),
+  });
+
+  const exportExcel = useMutation({
+    mutationFn: () => comptaApi.exportBankRejections(filters),
+    onSuccess: blob => downloadBlob(blob, `rejets-bancaires-${toDateOnly(new Date())}.xlsx`),
+    onError: error => toast.error(error instanceof Error ? error.message : "Export Excel impossible"),
   });
 
   const representInstrument = useMutation({
@@ -243,7 +253,13 @@ export default function ImpayesClientsPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-md border bg-card">
+      <section className="min-w-0 space-y-2">
+        <div className="flex justify-end">
+          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" disabled={!instruments.data?.page.totalElements || instruments.isFetching || instruments.isError || exportExcel.isPending} onClick={() => exportExcel.mutate()}>
+            <Download className="size-4" />{exportExcel.isPending ? "Export..." : "Exporter Excel"}
+          </Button>
+        </div>
+        <div className="overflow-hidden rounded-md border bg-card">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white"><tr>
@@ -289,6 +305,7 @@ export default function ImpayesClientsPage() {
           </table>
         </div>
         {instruments.data && <ServerPagination page={instruments.data.page.number} totalPages={instruments.data.page.totalPages} totalElements={instruments.data.page.totalElements} loading={instruments.isFetching} onPageChange={(nextPage) => updateUrl({ page: nextPage })} />}
+        </div>
       </section>
 
       {rejectionOpen && <BankRejectionDialog onClose={() => setRejectionOpen(false)} />}

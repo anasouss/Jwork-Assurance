@@ -78,6 +78,19 @@ import type {
 
 const unwrap = <T,>(response: ApiResponse<T>) => response.data;
 
+type BankRejectionFilters = {
+  mode?: "CHEQUE" | "EFFET";
+  banqueId?: string;
+  dateDu?: string;
+  dateAu?: string;
+  payeurType?: "CLIENT" | "GROUPE";
+  payeurId?: string;
+  resolution?: "A_TRAITER" | "REMPLACE" | "REPRESENTE";
+  sortBy?: BankRejectionSort;
+  sortDirection?: "ASC" | "DESC";
+  search?: string;
+};
+
 export const comptaApi = {
   async banks(includeInactive = false) {
     return unwrap(await apiFetch<ApiResponse<BankReference[]>>(
@@ -706,17 +719,7 @@ export const comptaApi = {
     };
   },
 
-  async bankRejections(params: {
-    mode?: "CHEQUE" | "EFFET";
-    banqueId?: string;
-    dateDu?: string;
-    dateAu?: string;
-    payeurType?: "CLIENT" | "GROUPE";
-    payeurId?: string;
-    resolution?: "A_TRAITER" | "REMPLACE" | "REPRESENTE";
-    sortBy?: BankRejectionSort;
-    sortDirection?: "ASC" | "DESC";
-    search?: string;
+  async bankRejections(params: BankRejectionFilters & {
     page: number;
     size: number;
   }) {
@@ -724,6 +727,10 @@ export const comptaApi = {
       `/api/v1/compta/reglements-clients/instruments/rejets-bancaires${buildQueryString(params)}`
     ));
     return { ...result, rows: result.rows.map(normalizePaymentInstrument) };
+  },
+
+  async exportBankRejections(params: BankRejectionFilters): Promise<Blob> {
+    return apiFetchBlob(`/api/v1/compta/reglements-clients/instruments/rejets-bancaires/export${buildQueryString(params)}`);
   },
 
   async registerBankRejection(id: string, request: { dateOperation: string; motif: string }) {

@@ -53,7 +53,6 @@ export default function ImpayesClientsPage() {
   const page = parsePage(params.get("page"));
   const dateFrom = parseDate(params.get("dateDu"));
   const dateTo = parseDate(params.get("dateAu"));
-  const bankId = params.get("banqueId") ?? "";
   const payerType: PayerType = params.get("cible") === "GROUPE" ? "GROUPE" : "CLIENT";
   const payerId = params.get("payeurId") ?? "";
   const [selectedPayer, setSelectedPayer] = useState<PayerSelection>();
@@ -70,14 +69,14 @@ export default function ImpayesClientsPage() {
   useEffect(() => setSearch(appliedSearch), [appliedSearch]);
 
   useEffect(() => {
-    if (!params.has("resolution")) return;
+    if (!params.has("resolution") && !params.has("banqueId")) return;
     const next = new URLSearchParams(params);
     next.delete("resolution");
+    next.delete("banqueId");
     next.delete("page");
     setParams(next, { replace: true });
   }, [params, setParams]);
 
-  const banks = useQuery({ queryKey: ["compta", "banks", "all"], queryFn: () => comptaApi.banks(true) });
   const requestedClient = useQuery({
     queryKey: ["crm-client", payerId], queryFn: () => clientApi.getClientCrm(payerId),
     enabled: Boolean(payerId) && payerType === "CLIENT",
@@ -95,12 +94,11 @@ export default function ImpayesClientsPage() {
   }, [payerId, payerType, selectedPayer?.id, selectedPayer?.type, requestedClient.data, payerSearch.groups]);
 
   const instruments = useQuery({
-    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, bankId, payerType, payerId, page],
+    queryKey: ["compta", "treasury", "bank-rejections", mode, appliedSearch, dateFrom, dateTo, payerType, payerId, page],
     queryFn: () => comptaApi.bankRejections({
       mode: mode === "ALL" ? undefined : mode,
       search: appliedSearch || undefined,
       dateDu: dateFrom || undefined, dateAu: dateTo || undefined,
-      banqueId: bankId || undefined,
       payeurType: payerId ? payerType : undefined, payeurId: payerId || undefined,
       page,
       size: TREASURY_PAGE_SIZE,
@@ -123,10 +121,11 @@ export default function ImpayesClientsPage() {
     ),
   });
 
-  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; banqueId?: string; cible?: PayerType; payeurId?: string }) {
+  function updateUrl(next: { mode?: ModeFilter; search?: string; page?: number; dateDu?: string; dateAu?: string; cible?: PayerType; payeurId?: string }) {
     const nextParams = new URLSearchParams(params);
     nextParams.delete("resolution");
-    for (const key of ["dateDu", "dateAu", "banqueId", "cible", "payeurId"] as const) {
+    nextParams.delete("banqueId");
+    for (const key of ["dateDu", "dateAu", "cible", "payeurId"] as const) {
       const value = next[key];
       if (value === undefined) continue;
       if (!value || value === "ALL") nextParams.delete(key);
@@ -212,20 +211,6 @@ export default function ImpayesClientsPage() {
               <SelectItem value="EFFET">Effets</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow">
-          <Label>Banque émettrice</Label>
-          <AutocompleteSelect
-            options={[
-              { value: "ALL", label: "Toutes les banques" },
-              ...(banks.data ?? []).map(bank => ({ value: bank.id, label: bank.libelle, keywords: [bank.code, ...bank.aliases].join(" ") })),
-            ]}
-            value={bankId || "ALL"}
-            disabled={banks.isLoading}
-            onValueChange={value => updateUrl({ banqueId: value === "ALL" ? "" : value })}
-            placeholder="Nom, code ou ancien nom"
-            emptyText="Aucune banque trouvée."
-          />
         </div>
         <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
         <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>

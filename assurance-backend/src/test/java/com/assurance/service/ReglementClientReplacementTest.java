@@ -11,6 +11,7 @@ import com.assurance.repository.EcartReglementClientRepository;
 import com.assurance.repository.MouvementRejetBancaireRepository;
 import com.assurance.dto.request.AjouterMouvementRejetRequest;
 import com.assurance.exception.ResourceNotFoundException;
+import com.assurance.dto.response.SuiviRejetBancaireResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,6 +47,36 @@ class ReglementClientReplacementTest {
     private RejetBancaireSuiviService rejetSuiviService;
     @InjectMocks
     private ReglementClientService service;
+
+    @Test
+    void rejectionClientCardOnlyExposesIdentifiersMatchingTheClientType() {
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
+                mock(MouvementRejetBancaireRepository.class));
+        Client client = Client.builder().typeClient(TypeClient.PERSONNE_PHYSIQUE)
+                .cin("CIN-001").passport("PASS-001").rc("RC-001").ice("ICE-001").iff("IF-001").build();
+        SuiviRejetBancaireResponse.Client physical = ReflectionTestUtils.invokeMethod(followUp, "ficheClient", client);
+        assertThat(physical).isNotNull();
+        assertThat(physical.typeClient()).isEqualTo(TypeClient.PERSONNE_PHYSIQUE);
+        assertThat(physical.cin()).isEqualTo("CIN-001");
+        assertThat(physical.passport()).isEqualTo("PASS-001");
+        assertThat(physical.rc()).isNull();
+        assertThat(physical.ice()).isNull();
+        assertThat(physical.iff()).isNull();
+        client.setTypeClient(TypeClient.PERSONNE_MORALE);
+        client.setRaisonSociale("Company");
+        SuiviRejetBancaireResponse.Client company = ReflectionTestUtils.invokeMethod(followUp, "ficheClient", client);
+        assertThat(company).isNotNull();
+        assertThat(company.nom()).isEqualTo("Company");
+        assertThat(company.rc()).isEqualTo("RC-001");
+        assertThat(company.ice()).isEqualTo("ICE-001");
+        assertThat(company.cin()).isNull();
+        assertThat(company.passport()).isNull();
+        client.setTypeClient(null);
+        SuiviRejetBancaireResponse.Client unknown = ReflectionTestUtils.invokeMethod(followUp, "ficheClient", client);
+        assertThat(unknown).isNotNull();
+        assertThat(unknown.cin()).isNull();
+        assertThat(unknown.rc()).isNull();
+    }
 
     @Test
     void rejectionIsSettledOnlyAfterEveryCounterValueIsConfirmedIncludingReplacementChains() {

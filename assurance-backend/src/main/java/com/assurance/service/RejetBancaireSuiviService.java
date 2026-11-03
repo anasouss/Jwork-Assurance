@@ -12,6 +12,7 @@ import com.assurance.enums.StatutLigneBordereauRemise;
 import com.assurance.enums.StatutReglementClient;
 import com.assurance.enums.StatutSuiviRejetBancaire;
 import com.assurance.enums.TypeMouvementRejetBancaire;
+import com.assurance.enums.TypeClient;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.InstrumentReglementClientRepository;
@@ -202,9 +203,17 @@ public class RejetBancaireSuiviService {
         return new SuiviRejetBancaireResponse.FichePayeur(instrument.getReglement().getPayeurNom(),
                 instrument.getReglement().getGroupePayeur() == null ? null : instrument.getReglement().getGroupePayeur().getLibelle(),
                 clients.values().stream().filter(client -> Objects.equals(client.getAgence().getId(), agenceId))
-                        .map(client -> new SuiviRejetBancaireResponse.Client(client.getId(), client.getCodeClient(), client.getNomAffichage(),
-                                client.getCin(), client.getRc(), client.getIce(), client.getAdresse(),
-                                client.getVille() == null ? null : client.getVille().getNom(), client.getTelephone(), client.getEmail())).toList());
+                        .map(this::ficheClient).toList());
+    }
+
+    private SuiviRejetBancaireResponse.Client ficheClient(Client client) {
+        boolean physical = client.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE;
+        boolean company = client.getTypeClient() == TypeClient.PERSONNE_MORALE;
+        return new SuiviRejetBancaireResponse.Client(client.getId(), client.getCodeClient(), client.getNomAffichage(), client.getTypeClient(),
+                physical ? client.getCin() : null, physical ? client.getPassport() : null, physical ? client.getCarteResidence() : null,
+                company ? client.getRc() : null, company ? client.getIce() : null,
+                company ? client.getIff() : null, company ? client.getPatente() : null,
+                client.getAdresse(), client.getVille() == null ? null : client.getVille().getNom(), client.getTelephone(), client.getEmail());
     }
 
     private InstrumentReglementClient find(Long agenceId, Long id, boolean lock) {

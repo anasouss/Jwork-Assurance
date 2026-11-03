@@ -49,7 +49,7 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
       <DialogHeader className="shrink-0 border-b bg-orange-50/70 p-5 pr-12 text-left dark:bg-orange-950/20">
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-orange-600 text-white">{movement ? <Plus className="size-5" /> : <History className="size-5" />}</div>
-          <div className="min-w-0"><DialogTitle>{movement ? "Ajouter un mouvement" : "Historique du rejet"}</DialogTitle>
+          <div className="min-w-0"><DialogTitle>{movement ? "Ajouter un mouvement" : "Détail du rejet bancaire"}</DialogTitle>
             <DialogDescription className="mt-1 break-words">{paymentModeLabel(instrument.mode)} {instrument.referenceInstrument || "-"} · {instrument.payeurNom} · {formatTreasuryMoney(instrument.montant)}</DialogDescription></div>
         </div>
       </DialogHeader>
@@ -119,8 +119,23 @@ export function BankRejectionPayerDialog({ instrument, onClose }: { instrument: 
     <DialogHeader><div className="flex items-center gap-2"><UserRound className="size-5 text-emerald-600" /><DialogTitle>Fiche client</DialogTitle></div><DialogDescription>{instrument.payeurNom}</DialogDescription></DialogHeader>
     {query.isPending ? <p className="py-6 text-sm text-muted-foreground">Chargement...</p> : query.isError ? <div role="alert" className="space-y-3 text-sm"><p>{query.error instanceof Error ? query.error.message : "Chargement impossible"}</p><Button variant="outline" onClick={() => void query.refetch()}>Réessayer</Button></div> : <div className="space-y-5">
       {query.data.groupe && <p className="text-sm"><span className="text-muted-foreground">Groupe : </span>{query.data.groupe}</p>}
-      {query.data.clients.map(client => <section key={client.id} className="space-y-3 border-t pt-4"><h3 className="font-semibold">{client.nom} <span className="text-sm font-normal text-muted-foreground">{client.code}</span></h3><dl className="grid grid-cols-2 gap-4 text-sm">
-        <Info label="CIN">{client.cin || "-"}</Info><Info label="RC">{client.rc || "-"}</Info><Info label="ICE">{client.ice || "-"}</Info><Info label="Ville">{client.ville || "-"}</Info><div className="col-span-2"><Info label="Adresse">{client.adresse || "-"}</Info></div><Info label="Téléphone">{client.telephone || "-"}</Info><Info label="E-mail">{client.email || "-"}</Info>
+      {query.data.clients.map(client => <section key={client.id} className="space-y-3 border-t pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="min-w-0 break-words font-semibold">{client.nom} <span className="text-sm font-normal text-muted-foreground">{client.code}</span></h3>
+          <Badge variant="outline">{client.typeClient === "PERSONNE_PHYSIQUE" ? "Personne physique" : client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Type non renseigné"}</Badge>
+        </div>
+        <dl className="grid grid-cols-2 gap-4 text-sm">
+        {client.typeClient === "PERSONNE_PHYSIQUE" && <>
+          <Info label="CIN">{client.cin || "-"}</Info>
+          {client.passport && <Info label="Passeport">{client.passport}</Info>}
+          {client.carteResidence && <Info label="Carte de résidence">{client.carteResidence}</Info>}
+        </>}
+        {client.typeClient === "PERSONNE_MORALE" && <>
+          <Info label="RC">{client.rc || "-"}</Info><Info label="ICE">{client.ice || "-"}</Info>
+          {client.iff && <Info label="IF">{client.iff}</Info>}
+          {client.patente && <Info label="Taxe professionnelle">{client.patente}</Info>}
+        </>}
+        <Info label="Ville">{client.ville || "-"}</Info><div className="col-span-2"><Info label="Adresse">{client.adresse || "-"}</Info></div><Info label="Téléphone">{client.telephone || "-"}</Info><Info label="E-mail">{client.email || "-"}</Info>
       </dl></section>)}
       {!query.data.clients.length && <p className="py-4 text-sm text-muted-foreground">Aucune fiche client rattachée à ce payeur.</p>}
     </div>}

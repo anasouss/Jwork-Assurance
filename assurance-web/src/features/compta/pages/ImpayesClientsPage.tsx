@@ -156,7 +156,7 @@ export default function ImpayesClientsPage() {
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="mx-auto grid w-full max-w-[1600px] gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Trésorerie</div>
@@ -213,10 +213,20 @@ export default function ImpayesClientsPage() {
             </SelectContent>
           </Select>
         </div>
-        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow"><Label>Banque émettrice</Label><Select value={bankId || "ALL"} disabled={banks.isLoading} onValueChange={(value) => updateUrl({ banqueId: value === "ALL" ? "" : value })}>
-          <SelectTrigger><SelectValue placeholder="Toutes les banques" /></SelectTrigger><SelectContent>
-            <SelectItem value="ALL">Toutes les banques</SelectItem>{(banks.data ?? []).map((bank) => <SelectItem key={bank.id} value={bank.id}>{bank.libelle}</SelectItem>)}
-          </SelectContent></Select></div>
+        <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow">
+          <Label>Banque émettrice</Label>
+          <AutocompleteSelect
+            options={[
+              { value: "ALL", label: "Toutes les banques" },
+              ...(banks.data ?? []).map(bank => ({ value: bank.id, label: bank.libelle, keywords: [bank.code, ...bank.aliases].join(" ") })),
+            ]}
+            value={bankId || "ALL"}
+            disabled={banks.isLoading}
+            onValueChange={value => updateUrl({ banqueId: value === "ALL" ? "" : value })}
+            placeholder="Nom, code ou ancien nom"
+            emptyText="Aucune banque trouvée."
+          />
+        </div>
         <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow"><Label>Rejet du</Label><DatePicker date={dateFrom} maxDate={dateTo ? new Date(`${dateTo}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateDu: toDateOnly(value) ?? "" })} /></div>
         <div className="grid w-full min-w-0 gap-2 sm:w-44 sm:grow"><Label>Rejet au</Label><DatePicker date={dateTo} minDate={dateFrom ? new Date(`${dateFrom}T00:00:00`) : undefined} onSelect={(value) => updateUrl({ dateAu: toDateOnly(value) ?? "" })} /></div>
         <div className="grid w-full min-w-0 gap-2 sm:w-64 sm:grow">
@@ -268,7 +278,7 @@ export default function ImpayesClientsPage() {
                       <DropdownMenuTrigger asChild><Button size="icon" variant="ghost" title="Actions" aria-label={`Actions pour ${instrument.referenceInstrument || instrument.numeroReglement}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="min-w-60">
                         {canViewClient && <DropdownMenuItem onSelect={() => setPayerTarget(instrument)}><UserRound className="size-4 text-emerald-600 dark:text-emerald-400" /> Fiche client</DropdownMenuItem>}
-                        <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "history" })}><History className="size-4 text-blue-600 dark:text-blue-400" /> Historique du rejet</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "history" })}><History className="size-4 text-blue-600 dark:text-blue-400" /> Voir le détail</DropdownMenuItem>
                         {canManage && <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "movement" })}><Plus className="size-4 text-orange-600 dark:text-orange-400" /> Ajouter un mouvement</DropdownMenuItem>}
                         {canManage && instrument.statut === "REJETE" && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
                         {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Nouvelle remise en banque</DropdownMenuItem>}

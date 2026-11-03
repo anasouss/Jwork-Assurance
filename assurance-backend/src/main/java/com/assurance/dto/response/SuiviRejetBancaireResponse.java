@@ -4,6 +4,7 @@ import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.StatutSuiviRejetBancaire;
 import com.assurance.enums.TypeMouvementRejetBancaire;
+import com.assurance.enums.TypeClient;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,7 +34,8 @@ public record SuiviRejetBancaireResponse(
     public record FichePayeur(String nom, String groupe, List<Client> clients) {
     }
 
-    public record Client(Long id, String code, String nom, String cin, String rc, String ice,
+    public record Client(Long id, String code, String nom, TypeClient typeClient,
+                         String cin, String passport, String carteResidence, String rc, String ice, String iff, String patente,
                          String adresse, String ville, String telephone, String email) {
     }
 }

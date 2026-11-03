@@ -575,7 +575,9 @@ export type BankRejectionFollowUp = {
 export type BankRejectionPayer = {
   nom: string;
   groupe?: string | null;
-  clients: { id: string; code?: string | null; nom: string; cin?: string | null; rc?: string | null; ice?: string | null;
+  clients: { id: string; code?: string | null; nom: string; typeClient?: "PERSONNE_PHYSIQUE" | "PERSONNE_MORALE" | null;
+    cin?: string | null; passport?: string | null; carteResidence?: string | null;
+    rc?: string | null; ice?: string | null; iff?: string | null; patente?: string | null;
     adresse?: string | null; ville?: string | null; telephone?: string | null; email?: string | null }[];
 };
 

@@ -572,7 +572,7 @@ function ClientDialog({
             <Input value={draft.adresse ?? ""} onChange={(event) => update({ adresse: event.target.value })} />
           </Field>
           <div className="sm:col-span-2 lg:col-span-3">
-            <TelephoneList client={{ role: "SOUSCRIPTEUR", client: draft }} updateClient={update} />
+            <TelephoneList client={{ role: "SOUSCRIPTEUR", principalPourRole: true, client: draft }} updateClient={update} />
           </div>
           <Field label="Email">
             <Input type="email" value={draft.email ?? ""} onChange={(event) => update({ email: event.target.value })} />

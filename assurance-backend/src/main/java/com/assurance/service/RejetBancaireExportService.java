@@ -39,7 +39,7 @@ public class RejetBancaireExportService {
             String[] headers = {"Mode", "Référence", "Payeur", "Montant (MAD)", "Date du règlement",
                     "Date de retour", "Motif du retour", "Statut"};
             CellStyle headerStyle = workbook.createCellStyle();
-            headerStyle.setFillForegroundColor(IndexedColors.DARK_ORANGE.getIndex());
+            headerStyle.setFillForegroundColor(IndexedColors.ORANGE.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
             Font headerFont = workbook.createFont();
             headerFont.setBold(true);

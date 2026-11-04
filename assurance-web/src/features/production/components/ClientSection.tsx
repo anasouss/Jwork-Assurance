@@ -424,12 +424,6 @@ export function ClientSection({
                     <Field label="ICE">
                       <Input disabled={disabledByCopy} value={item.client.ice ?? ""} onChange={(event) => updateClient(index, { ice: event.target.value })} />
                     </Field>
-                    <Field label="Identifiant fiscal (IF)">
-                      <Input disabled={disabledByCopy} value={item.client.iff ?? ""} onChange={(event) => updateClient(index, { iff: event.target.value })} />
-                    </Field>
-                    <Field label="N° d'affiliation CNSS">
-                      <Input disabled={disabledByCopy} value={item.client.cnss ?? ""} onChange={(event) => updateClient(index, { cnss: event.target.value })} />
-                    </Field>
                   </>
                 ) : (
                   <>

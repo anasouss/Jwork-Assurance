@@ -9,6 +9,8 @@ import com.assurance.repository.LigneBordereauRemiseRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.EcartReglementClientRepository;
 import com.assurance.repository.MouvementRejetBancaireRepository;
+import com.assurance.repository.UtilisateurRepository;
+import com.assurance.security.TenantContext;
 import com.assurance.dto.request.AjouterMouvementRejetRequest;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.dto.response.SuiviRejetBancaireResponse;
@@ -45,13 +47,61 @@ class ReglementClientReplacementTest {
     private EcartReglementClientRepository ecartRepository;
     @Mock
     private RejetBancaireSuiviService rejetSuiviService;
+    @Mock
+    private UtilisateurRepository utilisateurs;
     @InjectMocks
     private ReglementClientService service;
 
     @Test
+    void rejectionOperatorUsesAgencyScopedNameSnapshotRatherThanLoginEmail() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        var instrument = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.REJETE, null);
+        when(utilisateurs.findFullNameByIdAndAgenceId(42L, 7L)).thenReturn(Optional.of("Mohammed Melymane"));
+        TenantContext.setCurrentUser(42L);
+        TenantContext.setCurrentUsername("operator@example.test");
+        try {
+            ReflectionTestUtils.invokeMethod(followUp, "enregistrer", instrument, instrument,
+                    TypeMouvementRejetBancaire.REJET, LocalDate.now(), "Provision insuffisante");
+            var captured = org.mockito.ArgumentCaptor.forClass(MouvementRejetBancaire.class);
+            verify(events).save(captured.capture());
+            assertThat(captured.getValue().getUtilisateurId()).isEqualTo(42L);
+            assertThat(captured.getValue().getUtilisateurNom()).isEqualTo("Mohammed Melymane");
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    @Test
+    void unavailableOperatorNameDoesNotFallBackToEmail() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        var instrument = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.REJETE, null);
+        when(utilisateurs.findFullNameByIdAndAgenceId(42L, 7L)).thenReturn(Optional.empty());
+        TenantContext.setCurrentUser(42L);
+        TenantContext.setCurrentUsername("operator@example.test");
+        try {
+            ReflectionTestUtils.invokeMethod(followUp, "enregistrer", instrument, instrument,
+                    TypeMouvementRejetBancaire.REJET, LocalDate.now(), "Provision insuffisante");
+            var captured = org.mockito.ArgumentCaptor.forClass(MouvementRejetBancaire.class);
+            verify(events).save(captured.capture());
+            assertThat(captured.getValue().getUtilisateurId()).isEqualTo(42L);
+            assertThat(captured.getValue().getUtilisateurNom()).isNull();
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    @Test
     void historyIncludesLegacyRemittancesAndMergesRecordedEventsWithoutInventingOperators() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -96,7 +146,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionClientCardOnlyExposesIdentifiersMatchingTheClientType() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class));
+                mock(MouvementRejetBancaireRepository.class), utilisateurs);
         Client client = Client.builder().typeClient(TypeClient.PERSONNE_PHYSIQUE)
                 .cin("CIN-001").passport("PASS-001").rc("RC-001").ice("ICE-001").iff("IF-001").build();
         SuiviRejetBancaireResponse.Client physical = ReflectionTestUtils.invokeMethod(followUp, "ficheClient", client);
@@ -126,7 +176,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionIsSettledOnlyAfterEveryCounterValueIsConfirmedIncludingReplacementChains() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class));
+                mock(MouvementRejetBancaireRepository.class), utilisateurs);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -151,7 +201,7 @@ class ReglementClientReplacementTest {
     @Test
     void preparingAResubmissionDoesNotMeanItHasBeenPresentedToTheBank() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class));
+                mock(MouvementRejetBancaireRepository.class), utilisateurs);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -164,7 +214,7 @@ class ReglementClientReplacementTest {
     @Test
     void manualFollowUpCannotInventSettlementOrReadAnotherAgency() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();

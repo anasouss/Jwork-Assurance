@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> {
+    @Query("select trim(concat(u.prenom, ' ', u.nom)) from Utilisateur u where u.id = :id and u.agence.id = :agenceId")
+    Optional<String> findFullNameByIdAndAgenceId(@Param("id") Long id, @Param("agenceId") Long agenceId);
+
     @EntityGraph(attributePaths = {"agence", "role", "role.permissions"})
     Optional<Utilisateur> findByEmail(String email);
 

@@ -49,6 +49,8 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
     queryFn: () => comptaApi.premiumReceiptOptions(payment.id),
   });
   const policies = options.data?.policies ?? [];
+  const hasExpandablePolicies = policies.some(policy => policy.mouvements.length > 1);
+  const showControls = scope === "SPECIFIC" || hasExpandablePolicies;
   const eligiblePolicies = policies.filter(policy => policy.eligible);
   const keys = scope === "ALL" ? undefined : policies.filter(p => selected.has(p.key)).map(p => p.key);
   const existing = options.data?.archives.find(archive => keys === undefined
@@ -119,17 +121,18 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
             <div className="min-w-[920px] rounded-md border">
               <table className="w-full table-fixed text-xs">
                 <colgroup>
-                  <col className="w-[8%]" /><col className="w-[14%]" /><col className="w-[13%]" /><col className="w-[14%]" />
+                  {showControls && <col className={scope === "SPECIFIC" ? (hasExpandablePolicies ? "w-16" : "w-8") : "w-11"} />}
+                  <col /><col className="w-[13%]" /><col className="w-[14%]" />
                   <col className="w-[18%]" /><col className="w-[11%]" /><col className="w-[9%]" /><col className="w-[13%]" />
                 </colgroup>
                 <thead className="sticky top-0 z-10 bg-orange-600 text-xs uppercase text-white"><tr>
-                  <th scope="col" className="rounded-tl-md px-2 py-3 text-left">
+                  {showControls && <th scope="col" className="rounded-tl-md px-2 py-3 text-left">
                     <span className="sr-only">Sélection et détails</span>
                     {scope === "SPECIFIC" && <Checkbox aria-label="Sélectionner toutes les polices réglées" disabled={busy || eligiblePolicies.length === 0}
                       checked={eligiblePolicies.length > 0 && eligiblePolicies.every(p => selected.has(p.key)) ? true : eligiblePolicies.some(p => selected.has(p.key)) ? "indeterminate" : false}
                       onCheckedChange={checked => setSelected(checked === true ? new Set(eligiblePolicies.map(p => p.key)) : new Set())} />}
-                  </th>
-                  <th scope="col" className="px-2 py-3 text-left">Client</th>
+                  </th>}
+                  <th scope="col" className={`px-2 py-3 text-left ${showControls ? "" : "rounded-tl-md"}`}>Client</th>
                   <th scope="col" className="px-2 py-3 text-left">N° police</th>
                   <th scope="col" className="px-2 py-3 text-left">Compagnie</th>
                   <th scope="col" className="px-2 py-3 text-left">Mouvement / prestation</th>
@@ -137,7 +140,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                   <th scope="col" className="px-2 py-3 text-right">Prime TTC</th>
                   <th scope="col" className="rounded-tr-md px-2 py-3 text-right">Situation</th>
                 </tr></thead>
-                {policies.map(policy => <PolicyRows key={policy.key} policy={policy} scope={scope} busy={busy}
+                {policies.map(policy => <PolicyRows key={policy.key} policy={policy} scope={scope} busy={busy} showControls={showControls}
                   selected={selected.has(policy.key)} onSelect={checked => toggle(policy.key, checked)} />)}
               </table>
               {policies.length === 0 && <p className="px-3 py-5 text-sm text-muted-foreground">Aucune police affectée à ce règlement.</p>}
@@ -190,8 +193,8 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
   );
 }
 
-function PolicyRows({ policy, scope, selected, busy, onSelect }: {
-  policy: Policy; scope: string; selected: boolean; busy: boolean; onSelect: (checked: boolean) => void;
+function PolicyRows({ policy, scope, selected, busy, showControls, onSelect }: {
+  policy: Policy; scope: string; selected: boolean; busy: boolean; showControls: boolean; onSelect: (checked: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
@@ -204,15 +207,14 @@ function PolicyRows({ policy, scope, selected, busy, onSelect }: {
   const policyLabel = policy.polices.length ? policy.polices.join("\n") : policy.descriptions.join("\n");
   return <>
     <tbody><tr className={`border-b hover:bg-muted/30 ${policy.eligible && (scope === "ALL" || selected) ? "bg-emerald-50/40 dark:bg-emerald-950/15" : "bg-background"}`}>
-      <td className="px-2 py-2 align-middle"><div className="flex items-center gap-1">
-        {scope === "SPECIFIC" ? <Checkbox id={checkboxId} disabled={busy || !policy.eligible} checked={selected}
-          onCheckedChange={checked => onSelect(checked === true)} aria-label={`Sélectionner ${policyLabel}`} /> : <span className="size-4 shrink-0" />}
-        {multiple ? <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" disabled={busy}
+      {showControls && <td className="px-2 py-2 align-middle"><div className="flex items-center gap-1">
+        {scope === "SPECIFIC" && <Checkbox id={checkboxId} disabled={busy || !policy.eligible} checked={selected}
+          onCheckedChange={checked => onSelect(checked === true)} aria-label={`Sélectionner ${policyLabel}`} />}
+        {multiple && <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" disabled={busy}
           aria-expanded={expanded} aria-controls={detailId} title={expanded ? "Masquer les mouvements" : "Afficher les mouvements"}
           aria-label={`${expanded ? "Masquer" : "Afficher"} les ${policy.mouvements.length} mouvements de ${policyLabel}`}
-          onClick={() => setExpanded(value => !value)}>{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</Button>
-          : <span className="size-7 shrink-0" />}
-      </div></td>
+          onClick={() => setExpanded(value => !value)}>{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</Button>}
+      </div></td>}
       <td className="whitespace-pre-line break-words px-2 py-2 font-medium">{policy.clients.join("\n") || "-"}</td>
       <th scope="row" className="whitespace-pre-line break-words px-2 py-2 text-left font-semibold"><label htmlFor={scope === "SPECIFIC" ? checkboxId : undefined}>{policyLabel}</label></th>
       <td className="whitespace-pre-line break-words px-2 py-2">{policy.compagnies.join("\n") || "-"}</td>
@@ -224,7 +226,7 @@ function PolicyRows({ policy, scope, selected, busy, onSelect }: {
       <td className="px-2 py-2 text-right"><PolicyState policy={policy} /></td>
     </tr></tbody>
     {multiple && <tbody id={detailId} hidden={!expanded} className="bg-muted/20">{policy.mouvements.map(movement => <tr key={`${movement.documentClientId ?? "direct"}:${movement.elementFacturableId}`} className="border-b">
-      <td className="px-2 py-2 text-right"><CornerDownRight className="ml-auto size-4 text-muted-foreground" /></td>
+      {showControls && <td className="px-2 py-2 text-right"><CornerDownRight className="ml-auto size-4 text-muted-foreground" /></td>}
       <td className="break-words px-2 py-2">{movement.clientNom || "-"}</td>
       <td className="break-words px-2 py-2">{movement.numeroPolice || "-"}</td>
       <td className="break-words px-2 py-2">{movement.compagnie || "-"}</td>

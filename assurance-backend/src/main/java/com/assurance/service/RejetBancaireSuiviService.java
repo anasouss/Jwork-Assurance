@@ -18,6 +18,7 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
 import com.assurance.repository.MouvementRejetBancaireRepository;
+import com.assurance.repository.UtilisateurRepository;
 import com.assurance.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class RejetBancaireSuiviService {
     private final InstrumentReglementClientRepository instruments;
     private final LigneBordereauRemiseRepository remises;
     private final MouvementRejetBancaireRepository mouvements;
+    private final UtilisateurRepository utilisateurs;
 
     public StatutSuiviRejetBancaire statut(InstrumentReglementClient instrument) {
         if (contreValeurSoldee(instrument)) return StatutSuiviRejetBancaire.REGLE_CV;
@@ -190,7 +192,11 @@ public class RejetBancaireSuiviService {
         event.setStatutSuivi(statut(instrument));
         event.setMotif(motif);
         event.setUtilisateurId(TenantContext.getCurrentUser());
-        event.setUtilisateurNom(TenantContext.getCurrentUsername());
+        Long userId = TenantContext.getCurrentUser();
+        String operatorName = userId == null ? null : utilisateurs
+                .findFullNameByIdAndAgenceId(userId, instrument.getAgence().getId())
+                .filter(name -> !name.isBlank()).orElse(null);
+        event.setUtilisateurNom(operatorName);
         mouvements.save(event);
     }
 

@@ -335,7 +335,7 @@ export default function ContratsPage() {
                   <TableHeaderCell className="sticky left-0 z-10 w-36 min-w-36 whitespace-nowrap bg-emerald-600 dark:bg-emerald-700 @min-[110rem]:static">
                     Dossier N°
                   </TableHeaderCell>
-                  <TableHeaderCell className="hidden w-10 @min-[110rem]:table-cell" />
+                  <TableHeaderCell className="w-10"><span className="sr-only">Type de dossier</span></TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[110rem]:table-cell">Code client</TableHeaderCell>
                   <TableHeaderCell>Souscripteur</TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[110rem]:table-cell">Branche</TableHeaderCell>
@@ -438,31 +438,30 @@ function ContratRow({
     <tr className={cn("group transition-colors hover:bg-muted/40 [&>td]:border-b", child && "bg-emerald-100/70 hover:bg-emerald-100 dark:bg-emerald-950/25 dark:hover:bg-emerald-950/35")}>
       <TableCellStrong className={cn("sticky left-0 z-10 bg-card @min-[110rem]:static", child && "bg-emerald-50 dark:bg-emerald-950")}>
         <span className="block">{dossierNumber(contrat)}</span>
-        <div className="mt-1.5 flex items-center gap-2 @min-[110rem]:hidden">
-          <TypeBadge contrat={contrat} />
-          <span className="text-xs font-normal text-muted-foreground">{clientCode(contrat)}</span>
-        </div>
+        <span className="mt-1 block whitespace-normal text-xs font-normal text-muted-foreground @min-[110rem]:hidden">{branchLabel(contrat)}</span>
       </TableCellStrong>
-      <td className="hidden px-2 py-2 text-center @min-[110rem]:table-cell"><TypeBadge contrat={contrat} /></td>
+      <td className="px-2 py-2 text-center"><TypeBadge contrat={contrat} /></td>
       <TableCell className="hidden @min-[110rem]:table-cell">{clientCode(contrat)}</TableCell>
-      <TableCell className="min-w-40 max-w-56 break-words font-medium uppercase">{mainClient(contrat)}</TableCell>
+      <TableCell className="min-w-40 max-w-56 break-words">
+        <span className="font-medium uppercase">{mainClient(contrat)}</span>
+        <span className="mt-1 block text-xs text-muted-foreground @min-[110rem]:hidden">{clientCode(contrat)}</span>
+      </TableCell>
       <TableCell className="hidden uppercase @min-[110rem]:table-cell">{branchLabel(contrat)}</TableCell>
       <TableCell>
         <div className="flex min-w-36 max-w-56 flex-col items-center gap-1 text-center">
           <span>{productLabel(contrat)}</span>
           {conventionLabel ? <span className="text-xs text-muted-foreground">{conventionLabel}</span> : null}
-          <span className="text-xs text-muted-foreground @min-[110rem]:hidden">{branchLabel(contrat)}</span>
           <span className="text-xs text-muted-foreground @min-[70rem]:hidden">{companyLabel}</span>
         </div>
       </TableCell>
       <TableCell className="hidden min-w-28 text-center @min-[70rem]:table-cell">
-        <span className="@min-[110rem]:hidden">N° </span>{movement.numeroMouvement}
+        {movement.numeroMouvement}
         <p className="mt-1 text-xs font-medium @min-[110rem]:hidden">{eventLabel(contrat, movement)}</p>
       </TableCell>
       <TableCell className="min-w-44 max-w-60 text-center">
         <span className="whitespace-nowrap uppercase">{contrat.numeroPolice ?? "-"}</span>
         <div className="mt-1 space-y-0.5 text-xs text-muted-foreground @min-[70rem]:hidden">
-          <p>Mvt n° {movement.numeroMouvement}</p>
+          <p>Mvt {movement.numeroMouvement}</p>
           <p className="font-medium text-foreground">{eventLabel(contrat, movement)}</p>
         </div>
       </TableCell>

@@ -573,6 +573,8 @@ export type BankRejectionFollowUp = {
     instrumentSourceId?: string | null;
     bordereauId?: string | null;
     numeroBordereau?: string | null;
+    rejetId?: string | null;
+    numeroRejet?: string | null;
     historiqueExistant?: boolean;
     libelle?: string | null;
   }[];
@@ -587,6 +589,25 @@ export type BankRejectionPayer = {
     cin?: string | null; passport?: string | null; carteResidence?: string | null;
     rc?: string | null; ice?: string | null; iff?: string | null; patente?: string | null;
     adresse?: string | null; ville?: string | null; telephone?: string | null; email?: string | null }[];
+};
+
+export type BankRejectionDetail = {
+  id: string;
+  numero: string;
+  instrumentId: string;
+  referenceInstrument?: string | null;
+  mode: ClientPaymentMode;
+  montant: number;
+  payeurNom: string;
+  reglementId: string;
+  numeroReglement: string;
+  dateRejet: string;
+  motif: string;
+  banque?: string | null;
+  utilisateur?: string | null;
+  bordereauId?: string | null;
+  numeroBordereau?: string | null;
+  mouvements: BankRejectionFollowUp["mouvements"];
 };
 
 export type PaymentInstrumentPage = {

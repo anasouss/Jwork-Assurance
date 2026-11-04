@@ -19,7 +19,8 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "mouvements_rejets_bancaires", indexes = {
-        @Index(name = "idx_mrb_agence_instrument", columnList = "agence_id,instrument_id,date_operation,id")
+        @Index(name = "idx_mrb_agence_instrument", columnList = "agence_id,instrument_id,date_operation,id"),
+        @Index(name = "idx_mrb_rejet", columnList = "rejet_id")
 })
 @Getter
 @Setter
@@ -36,6 +37,10 @@ public class MouvementRejetBancaire extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "instrument_source_id")
     private InstrumentReglementClient instrumentSource;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rejet_id")
+    private RejetBancaire rejet;
 
     @Column(name = "date_operation", nullable = false)
     private LocalDate dateOperation;

@@ -6,6 +6,7 @@ import com.assurance.entity.Client;
 import com.assurance.entity.InstrumentReglementClient;
 import com.assurance.entity.LigneBordereauRemise;
 import com.assurance.entity.MouvementRejetBancaire;
+import com.assurance.entity.RejetBancaire;
 import com.assurance.enums.StatutInstrumentReglement;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutLigneBordereauRemise;
@@ -19,6 +20,7 @@ import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
 import com.assurance.repository.MouvementRejetBancaireRepository;
 import com.assurance.repository.UtilisateurRepository;
+import com.assurance.repository.RejetBancaireRepository;
 import com.assurance.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class RejetBancaireSuiviService {
     private final LigneBordereauRemiseRepository remises;
     private final MouvementRejetBancaireRepository mouvements;
     private final UtilisateurRepository utilisateurs;
+    private final RejetBancaireRepository rejets;
 
     public StatutSuiviRejetBancaire statut(InstrumentReglementClient instrument) {
         if (contreValeurSoldee(instrument)) return StatutSuiviRejetBancaire.REGLE_CV;
@@ -96,10 +99,19 @@ public class RejetBancaireSuiviService {
         requireRejet(instrument, history);
         List<SuiviRejetBancaireResponse.Mouvement> events = new ArrayList<>(mouvements
                 .findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(agenceId, instrumentId).stream()
-                .map(event -> new SuiviRejetBancaireResponse.Mouvement(event.getId().toString(), event.getDateOperation(),
-                        event.getCreatedAt(), event.getType(), event.getStatutSuivi(), event.getMotif(), event.getUtilisateurNom(),
-                        event.getInstrumentSource() == null ? null : event.getInstrumentSource().getId(),
-                        null, null, false, null)).toList());
+                .map(this::movementResponse).toList());
+        List<RejetBancaire> occurrences = rejets.findByAgenceIdAndInstrumentIdOrderByIdAsc(agenceId, instrumentId);
+        for (RejetBancaire rejet : occurrences) {
+            if (events.stream().noneMatch(event -> event.type() == TypeMouvementRejetBancaire.REJET
+                    && Objects.equals(event.rejetId(), rejet.getId()))) {
+                var line = rejet.getLigneRemise();
+                events.add(new SuiviRejetBancaireResponse.Mouvement("rejet-" + rejet.getId(), rejet.getDateRejet(),
+                        rejet.getCreatedAt(), TypeMouvementRejetBancaire.REJET, StatutSuiviRejetBancaire.INSTANCE,
+                        rejet.getMotif(), rejet.getUtilisateurNom(), instrumentId,
+                        line == null ? null : line.getBordereau().getId(), line == null ? null : line.getBordereau().getNumero(),
+                        false, "Rejet bancaire", rejet.getId(), rejet.getNumero()));
+            }
+        }
         // Reconstruct dated bank events from existing slips without creating audit records.
         Long firstRejectedSlip = history.stream().filter(line -> line.getStatut() == StatutLigneBordereauRemise.REJETEE)
                 .map(line -> line.getBordereau().getId()).min(Long::compareTo).orElse(null);
@@ -110,8 +122,9 @@ public class RejetBancaireSuiviService {
             mergeBankEvent(events, history, line, instrumentId, TypeMouvementRejetBancaire.REMISE_EN_BANQUE,
                     line.getBordereau().getDateDepot(), represented ? "Nouvelle remise en banque" : "Remise initiale en banque", null);
             if (line.getStatut() == StatutLigneBordereauRemise.REJETEE) {
-                mergeBankEvent(events, history, line, instrumentId, TypeMouvementRejetBancaire.REJET,
-                        line.getDateTraitement(), "Rejet bancaire", line.getMotifRejet());
+                boolean linked = occurrences.stream().anyMatch(rejet -> rejet.getLigneRemise() != null
+                        && Objects.equals(rejet.getLigneRemise().getId(), line.getId()));
+                if (!linked) addLegacyBankRejection(events, line, instrumentId);
             } else if (line.getStatut() == StatutLigneBordereauRemise.ENCAISSEE) {
                 mergeBankEvent(events, history, line, instrumentId, TypeMouvementRejetBancaire.ENCAISSEMENT,
                         line.getDateTraitement(), "Encaissement confirmé", null);
@@ -146,6 +159,77 @@ public class RejetBancaireSuiviService {
                         child.getReferenceInstrument(), child.getMontant(), child.getStatut(), child.getInstrumentRemplace().getId())).toList());
     }
 
+    private SuiviRejetBancaireResponse.Mouvement movementResponse(MouvementRejetBancaire event) {
+        RejetBancaire rejet = event.getRejet();
+        var line = rejet == null || event.getType() != TypeMouvementRejetBancaire.REJET ? null : rejet.getLigneRemise();
+        String label = event.getType() == TypeMouvementRejetBancaire.REJET && rejet == null
+                ? "Trace de rejet non rattachée" : null;
+        return new SuiviRejetBancaireResponse.Mouvement(event.getId().toString(), event.getDateOperation(),
+                event.getCreatedAt(), event.getType(), event.getStatutSuivi(), event.getMotif(), event.getUtilisateurNom(),
+                event.getInstrumentSource() == null ? null : event.getInstrumentSource().getId(),
+                line == null ? null : line.getBordereau().getId(), line == null ? null : line.getBordereau().getNumero(),
+                false, label, rejet == null ? null : rejet.getId(), rejet == null ? null : rejet.getNumero());
+    }
+
+    private void addLegacyBankRejection(List<SuiviRejetBancaireResponse.Mouvement> events,
+                                         LigneBordereauRemise line, Long instrumentId) {
+        if (line.getDateTraitement() == null) return;
+        events.add(new SuiviRejetBancaireResponse.Mouvement("bordereau-" + line.getId() + "-REJET",
+                line.getDateTraitement(), null, TypeMouvementRejetBancaire.REJET, StatutSuiviRejetBancaire.INSTANCE,
+                line.getMotifRejet(), null, instrumentId, line.getBordereau().getId(), line.getBordereau().getNumero(),
+                true, "Rejet bancaire"));
+    }
+
+    @Transactional(readOnly = true)
+    public SuiviRejetBancaireResponse.RejetDetail detailRejet(Long agenceId, Long rejetId) {
+        RejetBancaire rejet = rejets.findByIdAndAgenceId(rejetId, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rejet bancaire", rejetId));
+        var instrument = rejet.getInstrument();
+        var payment = instrument.getReglement();
+        var line = rejet.getLigneRemise();
+        var events = mouvements.findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(agenceId, instrument.getId())
+                .stream().filter(event -> event.getRejet() != null && Objects.equals(event.getRejet().getId(), rejetId))
+                .map(this::movementResponse).toList();
+        return new SuiviRejetBancaireResponse.RejetDetail(rejet.getId(), rejet.getNumero(), instrument.getId(),
+                instrument.getReferenceInstrument(), instrument.getMode(), rejet.getMontant(), payment.getPayeurNom(),
+                payment.getId(), payment.getNumero(), rejet.getDateRejet(), rejet.getMotif(),
+                instrument.getBanqueEmettriceReference() == null ? null : instrument.getBanqueEmettriceReference().getLibelle(),
+                rejet.getUtilisateurNom(), line == null ? null : line.getBordereau().getId(),
+                line == null ? null : line.getBordereau().getNumero(), events);
+    }
+
+    @Transactional
+    public void enregistrerRejet(InstrumentReglementClient source, LigneBordereauRemise line, LocalDate date, String motif) {
+        Long agenceId = source.getAgence().getId();
+        if (line != null && (!Objects.equals(line.getInstrument().getId(), source.getId())
+                || !Objects.equals(line.getBordereau().getAgence().getId(), agenceId))) {
+            throw new BadRequestException("La remise ne correspond pas à l'instrument rejeté");
+        }
+        // The atomic upsert holds the agency/year counter lock until this transaction commits.
+        rejets.incrementSequence(agenceId, date.getYear());
+        RejetBancaire rejet = new RejetBancaire();
+        rejet.setAgence(source.getAgence());
+        rejet.setInstrument(source);
+        rejet.setLigneRemise(line);
+        rejet.setAnnee(date.getYear());
+        rejet.setSequenceNumero(rejets.currentSequence(agenceId, date.getYear()));
+        rejet.setNumero(String.format(java.util.Locale.ROOT, "REJ%02d-%04d", date.getYear() % 100, rejet.getSequenceNumero()));
+        rejet.setDateRejet(date);
+        rejet.setMotif(motif.trim());
+        rejet.setMontant(source.getMontant());
+        rejet.setUtilisateurId(TenantContext.getCurrentUser());
+        rejet.setUtilisateurNom(operatorName(source));
+        rejets.saveAndFlush(rejet);
+        InstrumentReglementClient current = source;
+        Set<Long> visited = new HashSet<>();
+        while (current != null && visited.add(current.getId())
+                && Objects.equals(current.getAgence().getId(), agenceId)
+                && Objects.equals(current.getReglement().getId(), source.getReglement().getId())) {
+            enregistrer(current, source, TypeMouvementRejetBancaire.REJET, date, motif.trim(), rejet);
+            current = current.getInstrumentRemplace();
+        }
+    }
+
     @Transactional
     public void ajouter(Long agenceId, Long instrumentId, AjouterMouvementRejetRequest request) {
         InstrumentReglementClient instrument = find(agenceId, instrumentId, true);
@@ -168,6 +252,9 @@ public class RejetBancaireSuiviService {
 
     @Transactional
     public void suivreOperation(InstrumentReglementClient source, TypeMouvementRejetBancaire type, LocalDate date, String motif) {
+        if (type == TypeMouvementRejetBancaire.REJET) {
+            throw new BadRequestException("Un rejet doit être enregistré avec sa référence et sa remise source");
+        }
         InstrumentReglementClient current = source;
         Set<Long> visited = new HashSet<>();
         while (current != null && visited.add(current.getId())
@@ -183,21 +270,38 @@ public class RejetBancaireSuiviService {
 
     private void enregistrer(InstrumentReglementClient instrument, InstrumentReglementClient source,
                              TypeMouvementRejetBancaire type, LocalDate date, String motif) {
+        RejetBancaire dernierRejet = mouvements
+                .findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(instrument.getAgence().getId(), instrument.getId())
+                .stream().filter(event -> event.getType() == TypeMouvementRejetBancaire.REJET && event.getRejet() != null)
+                .reduce((first, second) -> second).map(MouvementRejetBancaire::getRejet).orElse(null);
+        if (dernierRejet == null) {
+            dernierRejet = rejets.findByAgenceIdAndInstrumentIdOrderByIdAsc(instrument.getAgence().getId(), instrument.getId())
+                    .stream().reduce((first, second) -> second).orElse(null);
+        }
+        enregistrer(instrument, source, type, date, motif, dernierRejet);
+    }
+
+    private void enregistrer(InstrumentReglementClient instrument, InstrumentReglementClient source,
+                             TypeMouvementRejetBancaire type, LocalDate date, String motif, RejetBancaire rejet) {
         MouvementRejetBancaire event = new MouvementRejetBancaire();
         event.setAgence(instrument.getAgence());
         event.setInstrument(instrument);
         event.setInstrumentSource(source);
+        event.setRejet(rejet);
         event.setDateOperation(date);
         event.setType(type);
         event.setStatutSuivi(statut(instrument));
         event.setMotif(motif);
         event.setUtilisateurId(TenantContext.getCurrentUser());
+        event.setUtilisateurNom(operatorName(instrument));
+        mouvements.save(event);
+    }
+
+    private String operatorName(InstrumentReglementClient instrument) {
         Long userId = TenantContext.getCurrentUser();
-        String operatorName = userId == null ? null : utilisateurs
+        return userId == null ? null : utilisateurs
                 .findFullNameByIdAndAgenceId(userId, instrument.getAgence().getId())
                 .filter(name -> !name.isBlank()).orElse(null);
-        event.setUtilisateurNom(operatorName);
-        mouvements.save(event);
     }
 
     @Transactional(readOnly = true)
@@ -278,7 +382,8 @@ public class RejetBancaireSuiviService {
             var event = matches.get(0);
             events.set(events.indexOf(event), new SuiviRejetBancaireResponse.Mouvement(event.id(), event.date(), event.enregistreLe(),
                     event.type(), event.statut(), event.motif() != null ? event.motif() : reason, event.utilisateur(), event.instrumentSourceId(),
-                    line.getBordereau().getId(), line.getBordereau().getNumero(), event.historiqueExistant(), label));
+                    line.getBordereau().getId(), line.getBordereau().getNumero(), event.historiqueExistant(), label,
+                    event.rejetId(), event.numeroRejet()));
         } else {
             StatutSuiviRejetBancaire status = type == TypeMouvementRejetBancaire.REJET
                     ? StatutSuiviRejetBancaire.INSTANCE : StatutSuiviRejetBancaire.REPRESENTE;

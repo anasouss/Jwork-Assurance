@@ -62,6 +62,12 @@ import java.util.List;
 public class ReglementClientController {
     private final RejetBancaireSuiviService rejetSuiviService;
 
+    @GetMapping("/rejets-bancaires/{rejetId}")
+    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse.RejetDetail>> rejectionDetail(@PathVariable Long rejetId) {
+        return ResponseEntity.ok(ApiResponse.success(rejetSuiviService.detailRejet(TenantContext.getCurrentAgence(), rejetId)));
+    }
+
     @GetMapping("/instruments/{instrumentId}/suivi-rejet")
     @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
     public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse>> rejectionHistory(@PathVariable Long instrumentId) {

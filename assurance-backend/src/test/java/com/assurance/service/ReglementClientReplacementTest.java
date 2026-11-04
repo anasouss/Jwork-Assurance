@@ -10,6 +10,7 @@ import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.EcartReglementClientRepository;
 import com.assurance.repository.MouvementRejetBancaireRepository;
 import com.assurance.repository.UtilisateurRepository;
+import com.assurance.repository.RejetBancaireRepository;
 import com.assurance.security.TenantContext;
 import com.assurance.dto.request.AjouterMouvementRejetRequest;
 import com.assurance.exception.ResourceNotFoundException;
@@ -49,13 +50,87 @@ class ReglementClientReplacementTest {
     private RejetBancaireSuiviService rejetSuiviService;
     @Mock
     private UtilisateurRepository utilisateurs;
+    @Mock
+    private RejetBancaireRepository rejets;
     @InjectMocks
     private ReglementClientService service;
 
     @Test
+    void repeatedSameDayRejectionsKeepDistinctReferencesAndExactRemittanceLinks() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        payment.setId(12L);
+        var instrument = followUpInstrument(payment, 24L, "6475.00", StatutInstrumentReglement.REJETE, null);
+        LocalDate date = LocalDate.of(2026, 11, 4);
+        instrument.setDateRejet(date);
+        var firstSlip = BordereauRemise.builder().agence(agency).numero("BRC-5").dateDepot(date).build();
+        firstSlip.setId(7L);
+        var secondSlip = BordereauRemise.builder().agence(agency).numero("BRC-8").dateDepot(date).build();
+        secondSlip.setId(12L);
+        var firstLine = LigneBordereauRemise.builder().bordereau(firstSlip).instrument(instrument)
+                .statut(StatutLigneBordereauRemise.REJETEE).dateTraitement(date).motifRejet("INSUFF").build();
+        firstLine.setId(9L);
+        var secondLine = LigneBordereauRemise.builder().bordereau(secondSlip).instrument(instrument)
+                .statut(StatutLigneBordereauRemise.REJETEE).dateTraitement(date).motifRejet("INSUFF").build();
+        secondLine.setId(13L);
+        when(rejets.currentSequence(7L, 2026)).thenReturn(1L, 2L);
+        when(rejets.saveAndFlush(any(RejetBancaire.class))).thenAnswer(invocation -> {
+            RejetBancaire occurrence = invocation.getArgument(0);
+            occurrence.setId(occurrence.getSequenceNumero());
+            return occurrence;
+        });
+        var recorded = new java.util.ArrayList<MouvementRejetBancaire>();
+        when(events.save(any(MouvementRejetBancaire.class))).thenAnswer(invocation -> {
+            MouvementRejetBancaire event = invocation.getArgument(0);
+            event.setId((long) recorded.size() + 1);
+            recorded.add(event);
+            return event;
+        });
+        followUp.enregistrerRejet(instrument, firstLine, date, "INSUFF");
+        followUp.enregistrerRejet(instrument, secondLine, date, "INSUFF");
+        assertThat(recorded).hasSize(2);
+        assertThat(recorded).extracting(event -> event.getRejet().getNumero()).containsExactly("REJ26-0001", "REJ26-0002");
+        assertThat(recorded).extracting(event -> event.getRejet().getLigneRemise()).containsExactly(firstLine, secondLine);
+        verify(rejets, times(2)).incrementSequence(7L, 2026);
+        when(instrumentRepository.findByIdAndAgenceId(24L, 7L)).thenReturn(Optional.of(instrument));
+        when(remittanceLineRepository.findHistoryByAgenceIdAndInstrumentId(7L, 24L)).thenReturn(List.of(firstLine, secondLine));
+        when(events.findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(7L, 24L)).thenReturn(recorded);
+        when(rejets.findByAgenceIdAndInstrumentIdOrderByIdAsc(7L, 24L))
+                .thenReturn(recorded.stream().map(MouvementRejetBancaire::getRejet).toList());
+        var rejectionEvents = followUp.detail(7L, 24L).mouvements().stream()
+                .filter(event -> event.type() == TypeMouvementRejetBancaire.REJET).toList();
+        assertThat(rejectionEvents).hasSize(2);
+        assertThat(rejectionEvents).extracting(SuiviRejetBancaireResponse.Mouvement::numeroRejet)
+                .containsExactly("REJ26-0001", "REJ26-0002");
+    }
+
+    @Test
+    void rejectionDetailsCannotReadAnotherAgencyAndWrongSlipCannotAllocateReference() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        assertThatThrownBy(() -> followUp.detailRejet(8L, 1L)).isInstanceOf(ResourceNotFoundException.class);
+        verify(rejets).findByIdAndAgenceId(1L, 8L);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        Agence other = Agence.builder().build();
+        other.setId(8L);
+        var payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
+        var instrument = followUpInstrument(payment, 24L, "100.00", StatutInstrumentReglement.REJETE, null);
+        var line = LigneBordereauRemise.builder().instrument(instrument)
+                .bordereau(BordereauRemise.builder().agence(other).build()).build();
+        assertThatThrownBy(() -> followUp.enregistrerRejet(instrument, line, LocalDate.now(), "INSUFF"))
+                .isInstanceOf(BadRequestException.class);
+        verify(rejets, never()).incrementSequence(any(), anyInt());
+        verify(events, never()).save(any());
+    }
+
+    @Test
     void rejectionOperatorUsesAgencyScopedNameSnapshotRatherThanLoginEmail() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -78,7 +153,7 @@ class ReglementClientReplacementTest {
     @Test
     void unavailableOperatorNameDoesNotFallBackToEmail() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -101,7 +176,7 @@ class ReglementClientReplacementTest {
     @Test
     void historyIncludesLegacyRemittancesAndMergesRecordedEventsWithoutInventingOperators() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -146,7 +221,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionClientCardOnlyExposesIdentifiersMatchingTheClientType() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class), utilisateurs);
+                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets);
         Client client = Client.builder().typeClient(TypeClient.PERSONNE_PHYSIQUE)
                 .cin("CIN-001").passport("PASS-001").rc("RC-001").ice("ICE-001").iff("IF-001").build();
         SuiviRejetBancaireResponse.Client physical = ReflectionTestUtils.invokeMethod(followUp, "ficheClient", client);
@@ -176,7 +251,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionIsSettledOnlyAfterEveryCounterValueIsConfirmedIncludingReplacementChains() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class), utilisateurs);
+                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -201,7 +276,7 @@ class ReglementClientReplacementTest {
     @Test
     void preparingAResubmissionDoesNotMeanItHasBeenPresentedToTheBank() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class), utilisateurs);
+                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -214,7 +289,7 @@ class ReglementClientReplacementTest {
     @Test
     void manualFollowUpCannotInventSettlementOrReadAnotherAgency() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();

@@ -22,7 +22,22 @@ public record SuiviRejetBancaireResponse(
     public record Mouvement(String id, LocalDate date, LocalDateTime enregistreLe,
                             TypeMouvementRejetBancaire type, StatutSuiviRejetBancaire statut,
                             String motif, String utilisateur, Long instrumentSourceId,
-                            Long bordereauId, String numeroBordereau, boolean historiqueExistant, String libelle) {
+                            Long bordereauId, String numeroBordereau, boolean historiqueExistant, String libelle,
+                            Long rejetId, String numeroRejet) {
+        public Mouvement(String id, LocalDate date, LocalDateTime enregistreLe,
+                         TypeMouvementRejetBancaire type, StatutSuiviRejetBancaire statut,
+                         String motif, String utilisateur, Long instrumentSourceId,
+                         Long bordereauId, String numeroBordereau, boolean historiqueExistant, String libelle) {
+            this(id, date, enregistreLe, type, statut, motif, utilisateur, instrumentSourceId,
+                    bordereauId, numeroBordereau, historiqueExistant, libelle, null, null);
+        }
+    }
+
+    public record RejetDetail(Long id, String numero, Long instrumentId, String referenceInstrument,
+                              ModeReglementClient mode, BigDecimal montant, String payeurNom,
+                              Long reglementId, String numeroReglement, LocalDate dateRejet, String motif,
+                              String banque, String utilisateur, Long bordereauId, String numeroBordereau,
+                              List<Mouvement> mouvements) {
     }
 
     public record Remise(Long id, String numero, LocalDate dateDepot, LocalDate dateTraitement, String statut, String motif) {

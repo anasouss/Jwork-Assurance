@@ -936,12 +936,13 @@ public class ReglementClientService {
             );
         } else if (request.getStatut() == StatutInstrumentReglement.REJETE) {
             rejectInstrument(instrument, request.getMotif(), operationDate);
-            updateRemittanceLine(
+            LigneBordereauRemise rejectionLine = updateRemittanceLine(
                     instrument,
                     StatutLigneBordereauRemise.REJETEE,
                     operationDate,
                     request.getMotif() == null ? null : request.getMotif().trim()
             );
+            rejetSuiviService.enregistrerRejet(instrument, rejectionLine, operationDate, request.getMotif());
         } else {
             throw new BadRequestException("Cette transition de statut n'est pas autorisée");
         }
@@ -1838,7 +1839,6 @@ public class ReglementClientService {
         instrument.setSuiviRejet(StatutSuiviRejetBancaire.INSTANCE);
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.ANNULEE));
-        rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.REJET, operationDate, reason);
     }
 
     @Transactional
@@ -1940,16 +1940,17 @@ public class ReglementClientService {
         instrument.setDateStatut(operationDate);
         instrument.setMotifStatut(reason.trim());
         instrumentRepository.save(instrument);
-        updateRemittanceLine(
+        LigneBordereauRemise rejectionLine = updateRemittanceLine(
                 instrument,
                 StatutLigneBordereauRemise.REJETEE,
                 operationDate,
                 reason.trim()
         );
+        rejetSuiviService.enregistrerRejet(instrument, rejectionLine, operationDate, reason);
         refreshAfterInstrumentTransition(instrument);
     }
 
-    private void updateRemittanceLine(
+    private LigneBordereauRemise updateRemittanceLine(
             InstrumentReglementClient instrument,
             StatutLigneBordereauRemise status,
             LocalDate operationDate,
@@ -1969,13 +1970,17 @@ public class ReglementClientService {
                 ? remittanceLineRepository.findHistoryByInstrumentId(instrument.getId())
                 : activeLines;
         if (candidateLines.isEmpty()) {
-            return;
+            return null;
         }
         LigneBordereauRemise line = candidateLines.get(0);
+        if (status == StatutLigneBordereauRemise.REJETEE && line.getStatut() == StatutLigneBordereauRemise.REJETEE) {
+            return null;
+        }
         line.setStatut(status);
         line.setDateTraitement(operationDate);
         line.setMotifRejet(reason);
         remittanceLineRepository.save(line);
+        return line;
     }
 
     private void ensureNotReservedByDraftRemittance(InstrumentReglementClient instrument) {

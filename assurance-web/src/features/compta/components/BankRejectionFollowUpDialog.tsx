@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { ClientPaymentDetailsDialog } from "./ClientPaymentDetailsDialog";
+import { BankRejectionDetailsDialog } from "./BankRejectionDetailsDialog";
 import { comptaApi } from "../api";
 import { rejectionInstrumentLabels, rejectionStatusLabels, rejectionStatusVariants } from "../bank-rejection-status";
 import type { BankRejectionFollowUp, BankRejectionFollowUpStatus, PaymentInstrument } from "../types";
@@ -29,6 +30,7 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
   const queryClient = useQueryClient();
   const canViewPayment = useAuthStore(state => state.user?.permissions.includes("reglement-client:view") ?? false);
   const [paymentDetailId, setPaymentDetailId] = useState<string>();
+  const [rejectionDetailId, setRejectionDetailId] = useState<string>();
   const [date, setDate] = useState(TODAY);
   const [status, setStatus] = useState<BankRejectionFollowUpStatus>();
   const [reason, setReason] = useState("");
@@ -48,6 +50,8 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
     onError: error => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
   });
   const movement = mode === "movement";
+  if (rejectionDetailId) return <BankRejectionDetailsDialog rejectionId={rejectionDetailId}
+    onClose={() => setRejectionDetailId(undefined)} />;
   if (paymentDetailId) return <ClientPaymentDetailsDialog paymentId={paymentDetailId}
     closeLabel="Retour au rejet" onClose={() => setPaymentDetailId(undefined)} />;
   return <Dialog open onOpenChange={open => { if (!open && !save.isPending) onClose(); }}>
@@ -105,6 +109,9 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"><h4 className="text-sm font-semibold">{title}</h4><time dateTime={event.date} className="text-xs text-muted-foreground">{formatTreasuryDate(event.date)}</time></div>
                     {event.motif && event.motif !== title && <p className="whitespace-pre-wrap break-words text-sm">{event.motif}</p>}
+                    {rejected && event.rejetId && event.numeroRejet && <button type="button"
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300"
+                      onClick={() => setRejectionDetailId(event.rejetId!)}><CircleAlert className="size-3.5" />{event.numeroRejet}</button>}
                     {event.instrumentSourceId && event.instrumentSourceId !== instrument.id && <p className="text-xs text-muted-foreground">Sur une contre-valeur</p>}
                     {bank && event.bordereauId && <p className="flex flex-wrap items-baseline gap-x-1 text-xs text-muted-foreground">
                       <span>Remise :</span>

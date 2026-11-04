@@ -11,6 +11,7 @@ import type {
   BankStatementImportProfile,
   BankReference,
   BankRejectionFollowUp,
+  BankRejectionDetail,
   BankRejectionFollowUpStatus,
   BankRejectionPayer,
   BankRejectionSort,
@@ -747,10 +748,25 @@ export const comptaApi = {
     return {
       ...result, instrumentId: String(result.instrumentId), reglementId: String(result.reglementId),
       mouvements: result.mouvements.map(event => ({ ...event, id: String(event.id),
+        rejetId: event.rejetId == null ? null : String(event.rejetId),
         bordereauId: event.bordereauId == null ? null : String(event.bordereauId),
         instrumentSourceId: event.instrumentSourceId == null ? null : String(event.instrumentSourceId) })),
       remises: result.remises.map(line => ({ ...line, id: String(line.id) })),
       contreValeurs: result.contreValeurs.map(instrument => ({ ...instrument, id: String(instrument.id), instrumentRemplaceId: String(instrument.instrumentRemplaceId) })),
+    };
+  },
+
+  async bankRejectionDetail(id: string): Promise<BankRejectionDetail> {
+    const result = unwrap(await apiFetch<ApiResponse<BankRejectionDetail>>(
+      `/api/v1/compta/reglements-clients/rejets-bancaires/${id}`
+    ));
+    return {
+      ...result, id: String(result.id), instrumentId: String(result.instrumentId), reglementId: String(result.reglementId),
+      bordereauId: result.bordereauId == null ? null : String(result.bordereauId),
+      mouvements: result.mouvements.map(event => ({ ...event, id: String(event.id),
+        rejetId: event.rejetId == null ? null : String(event.rejetId),
+        bordereauId: event.bordereauId == null ? null : String(event.bordereauId),
+        instrumentSourceId: event.instrumentSourceId == null ? null : String(event.instrumentSourceId) })),
     };
   },
 

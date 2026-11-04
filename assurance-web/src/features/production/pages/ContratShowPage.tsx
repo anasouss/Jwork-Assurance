@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
-import { moneyAmount, numberOrZero, roundMoney, text } from "../utils/format";
+import { moneyAmount, numberOrZero, roundMoney, text, vehicleEngineCharacteristic } from "../utils/format";
 import type { AssistanceContrat, ClientResponse, ContratSummary, ReferenceOption } from "../types";
 import type { jsPDF as JsPDF } from "jspdf";
 
@@ -417,7 +417,7 @@ function VehicleSection({
             ["Immatriculation", text(vehicule.immatriculation)],
             ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
             ["Carburant", text(vehicule.carburant)],
-            [vehicule.cylindree ? "Cylindrée" : "Puissance fiscale", text(vehicule.cylindree ?? vehicule.puissanceFiscale)],
+            vehicleEngineCharacteristic(vehicule),
             ["Carrosserie", text(vehicule.carrosserie)],
             ["Nombre de places", text(vehicule.nombrePlaces)],
             ["CRM", text(vehicule.crm)],
@@ -1202,7 +1202,7 @@ async function generateContratPdfBlob(params: {
         ["Marque", text(vehicule.marque)],
         ["Immatriculation", text(vehicule.immatriculation)],
         ["Carburant", text(vehicule.carburant)],
-        [vehicule.cylindree ? "Cylindrée" : "Puissance fiscale", text(vehicule.cylindree ?? vehicule.puissanceFiscale)],
+        vehicleEngineCharacteristic(vehicule),
         ["Date de MC", formatDate(vehicule.datePremiereCirculation)],
         ["Carrosserie", text(vehicule.carrosserie)],
         ["Nombre de places", text(vehicule.nombrePlaces)],

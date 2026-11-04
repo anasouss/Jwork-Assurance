@@ -62,6 +62,11 @@ export function text(value: unknown) {
   return value === undefined || value === null || value === "" ? "-" : String(value);
 }
 
+export function vehicleEngineCharacteristic(vehicle: { cylindree?: string | null; puissanceFiscale?: string | null }): [string, string] {
+  const cylinderCapacity = vehicle.cylindree?.trim();
+  return cylinderCapacity ? ["Cylindrée", cylinderCapacity] : ["Puissance fiscale", text(vehicle.puissanceFiscale?.trim())];
+}
+
 export function range(min: unknown, max: unknown) {
   const left = text(min);
   const right = text(max);

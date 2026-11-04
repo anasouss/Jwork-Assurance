@@ -13,6 +13,20 @@ import {
   vehicleValidationMessage,
 } from "./amendment-form";
 import type { ContratSummary, GarantieInput, ReferenceOption } from "../types";
+import { vehicleEngineCharacteristic } from "../utils/format";
+
+describe("saved vehicle summary formatting", () => {
+  it("shows saved fiscal power when cylinder capacity is empty or whitespace", () => {
+    for (const cylindree of ["", "   ", null, undefined]) {
+      expect(vehicleEngineCharacteristic({ cylindree, puissanceFiscale: "7" })).toEqual(["Puissance fiscale", "7"]);
+    }
+  });
+
+  it("keeps cylinder capacity when supplied and does not invent a missing motor value", () => {
+    expect(vehicleEngineCharacteristic({ cylindree: " 125 ", puissanceFiscale: "7" })).toEqual(["Cylindrée", "125"]);
+    expect(vehicleEngineCharacteristic({ cylindree: "", puissanceFiscale: " " })).toEqual(["Puissance fiscale", "-"]);
+  });
+});
 
 describe("amendment form adapters", () => {
   it("inherits only the convention payment mode, not the original purchase order or full bulletin amount", () => {

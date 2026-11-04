@@ -31,6 +31,63 @@ import static org.mockito.Mockito.*;
 class ContratDraftCleanupTest {
 
     @Test
+    void amendmentSummaryUsesItsSavedAttestationAndPaymentFieldsInsteadOfTheParentHeader() {
+        var response = com.assurance.dto.response.ContratResponse.builder()
+                .typeContrat(TypeContrat.CONVENTION).numeroAttestation("90A195723197")
+                .modeReglement("facture").numeroBonCommande("PARENT-ORDER")
+                .montantBulletin(new java.math.BigDecimal("2455.04"))
+                .vehicules(List.of(com.assurance.dto.response.ContratResponse.VehiculeView.builder()
+                        .numeroAttestation("90A211050000").build()))
+                .remorques(List.of()).build();
+        var movement = new com.assurance.entity.MouvementContrat();
+        movement.setTypeMouvement(com.assurance.entity.TypeMouvementContrat.builder()
+                .code("CHV_M").categorie(com.assurance.enums.CategorieMouvementContrat.AVENANT).build());
+        movement.setModeReglementConvention(com.assurance.enums.ModeReglementConvention.FACTURE);
+        movement.setNumeroBonCommande("AMENDMENT-ORDER");
+        movement.setMontantBulletin(new java.math.BigDecimal("38.54"));
+        ReflectionTestUtils.invokeMethod(service, "applyMovementHeaderSnapshot", response, movement);
+        assertThat(response.getNumeroAttestation()).isEqualTo("90A211050000");
+        assertThat(response.getModeReglement()).isEqualTo("facture");
+        assertThat(response.getNumeroBonCommande()).isEqualTo("AMENDMENT-ORDER");
+        assertThat(response.getMontantBulletin()).isEqualByComparingTo("38.54");
+    }
+
+    @Test
+    void legacyAmendmentSummaryDoesNotInventMissingPaymentFieldsOrAttestation() {
+        var response = com.assurance.dto.response.ContratResponse.builder()
+                .typeContrat(TypeContrat.CONVENTION).numeroAttestation("PARENT-ATTESTATION")
+                .modeReglement("facture").numeroBonCommande("PARENT-ORDER")
+                .montantBulletin(java.math.BigDecimal.TEN).vehicules(List.of()).remorques(List.of()).build();
+        var movement = new com.assurance.entity.MouvementContrat();
+        movement.setTypeMouvement(com.assurance.entity.TypeMouvementContrat.builder()
+                .categorie(com.assurance.enums.CategorieMouvementContrat.AVENANT).build());
+        ReflectionTestUtils.invokeMethod(service, "applyMovementHeaderSnapshot", response, movement);
+        assertThat(response.getNumeroAttestation()).isNull();
+        assertThat(response.getModeReglement()).isNull();
+        assertThat(response.getNumeroBonCommande()).isNull();
+        assertThat(response.getMontantBulletin()).isNull();
+    }
+
+    @Test
+    void normalContractSummaryRemainsUnchangedAndTrailerSnapshotCanSupplyAttestation() {
+        var response = com.assurance.dto.response.ContratResponse.builder()
+                .typeContrat(TypeContrat.CONVENTION).numeroAttestation("ORIGINAL")
+                .modeReglement("bureau").numeroBonCommande("ORIGINAL-ORDER")
+                .montantBulletin(java.math.BigDecimal.TEN)
+                .vehicules(List.of(com.assurance.dto.response.ContratResponse.VehiculeView.builder()
+                        .numeroAttestation(" ").build()))
+                .remorques(List.of(com.assurance.dto.response.ContratResponse.RemorqueView.builder()
+                        .numeroAttestation("TRAILER-SNAPSHOT").build())).build();
+        ReflectionTestUtils.invokeMethod(service, "applyMovementHeaderSnapshot", response, (Object) null);
+        assertThat(response.getNumeroAttestation()).isEqualTo("ORIGINAL");
+        assertThat(response.getNumeroBonCommande()).isEqualTo("ORIGINAL-ORDER");
+        ReflectionTestUtils.invokeMethod(service, "applyMovementHeaderSnapshot", response, new com.assurance.entity.MouvementContrat());
+        assertThat(response.getNumeroAttestation()).isEqualTo("TRAILER-SNAPSHOT");
+        assertThat(response.getModeReglement()).isEqualTo("bureau");
+        assertThat(response.getMontantBulletin()).isEqualByComparingTo(java.math.BigDecimal.TEN);
+    }
+
+    @Test
     void conventionAmendmentInheritsPaymentModeWithoutChangingTheOriginalContract() {
         var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("bureau")
                 .numeroBonCommande("ORIGINAL").montantBulletin(new java.math.BigDecimal("9000.00")).build();

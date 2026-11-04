@@ -5907,7 +5907,7 @@ public class ContratService {
                 ? List.of()
                 : quittanceGenerale.getTargetSummaries();
 
-        return ContratResponse.builder()
+        ContratResponse response = ContratResponse.builder()
                 .id(contrat.getId())
                 .numeroContrat(contrat.getNumeroContrat())
                 .numeroDevis(contrat.getNumeroDevis())
@@ -5987,6 +5987,28 @@ public class ContratService {
                 .targetSummaries(targetSummaries)
                 .quittanceGenerale(quittanceGenerale)
                 .build();
+        applyMovementHeaderSnapshot(response, selectedMouvement);
+        return response;
+    }
+
+    private void applyMovementHeaderSnapshot(ContratResponse response, MouvementContrat mouvement) {
+        if (mouvement == null) return;
+        String attestation = response.getVehicules().stream()
+                .map(ContratResponse.VehiculeView::getNumeroAttestation)
+                .filter(value -> value != null && !value.isBlank()).findFirst().orElse(null);
+        if (attestation == null) {
+            attestation = response.getRemorques().stream()
+                    .map(ContratResponse.RemorqueView::getNumeroAttestation)
+                    .filter(value -> value != null && !value.isBlank()).findFirst().orElse(null);
+        }
+        response.setNumeroAttestation(attestation);
+        if (response.getTypeContrat() == TypeContrat.CONVENTION && mouvement.getTypeMouvement() != null
+                && mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AVENANT) {
+            response.setModeReglement(mouvement.getModeReglementConvention() == null ? null
+                    : mouvement.getModeReglementConvention().name().toLowerCase(Locale.ROOT));
+            response.setNumeroBonCommande(mouvement.getNumeroBonCommande());
+            response.setMontantBulletin(mouvement.getMontantBulletin());
+        }
     }
 
     private List<ContratResponse.GarantieView> inheritedGuaranteesAtMovement(

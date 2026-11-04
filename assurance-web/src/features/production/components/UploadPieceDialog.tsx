@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react";
+import { useId, useState, type DragEvent, type ReactNode } from "react";
 import { FileText, FileUp, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,10 @@ type UploadPieceDialogProps = {
   onCustomTypeLabelChange: (value: string) => void;
   onFiles: (files: File[]) => void;
   onUpload: () => void;
+  children?: ReactNode;
+  allowOther?: boolean;
+  title?: string;
+  disabled?: boolean;
 };
 
 export function UploadPieceDialog({
@@ -44,17 +48,25 @@ export function UploadPieceDialog({
   onCustomTypeLabelChange,
   onFiles,
   onUpload,
+  children,
+  allowOther = true,
+  title = "Ajouter un document",
+  disabled = false,
 }: UploadPieceDialogProps) {
   const [dragging, setDragging] = useState(false);
-  const inputId = "pj-upload";
+  const inputId = useId();
 
   function acceptFiles(nextFiles: File[]) {
     if (nextFiles.length > 1 && nextFiles.some((file) => !file.type.startsWith("image/"))) {
       toast.error("Plusieurs fichiers doivent être des images pour générer un PDF.");
       return;
     }
-    if (nextFiles.some((file) => !file.type.startsWith("image/") && file.type !== "application/pdf")) {
-      toast.error("Format non accepté.");
+    if (nextFiles.some((file) => !["image/jpeg", "image/png", "application/pdf"].includes(file.type))) {
+      toast.error("Formats acceptés : PDF, JPEG et PNG.");
+      return;
+    }
+    if (nextFiles.reduce((total, file) => total + file.size, 0) > 30 * 1024 * 1024) {
+      toast.error("Envoi limité à 30 Mo.");
       return;
     }
     onFiles(nextFiles);
@@ -67,10 +79,10 @@ export function UploadPieceDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!uploading) onOpenChange(next); }}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Ajouter un document</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Sélectionnez le type puis ajoutez un PDF ou des images.</DialogDescription>
         </DialogHeader>
 
@@ -84,10 +96,12 @@ export function UploadPieceDialog({
                     {type.libelle}{type.obligatoire ? " (obligatoire)" : ""}
                   </SelectItem>
                 ))}
-                <SelectItem value={OTHER_ATTACHMENT_TYPE}>Autre</SelectItem>
+                {allowOther && <SelectItem value={OTHER_ATTACHMENT_TYPE}>Autre</SelectItem>}
               </SelectContent>
             </Select>
           </Field>
+
+          {children}
 
           {selectedTypeId === OTHER_ATTACHMENT_TYPE ? (
             <Field label="Nom du document" required>
@@ -117,7 +131,7 @@ export function UploadPieceDialog({
               id={inputId}
               type="file"
               multiple
-              accept="image/*,.pdf"
+              accept="image/jpeg,image/png,application/pdf"
               className="sr-only"
               onClick={(event) => { event.currentTarget.value = ""; }}
               onChange={(event) => acceptFiles(Array.from(event.target.files ?? []))}
@@ -157,10 +171,10 @@ export function UploadPieceDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button type="button" variant="outline" disabled={uploading} onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
             type="button"
-            disabled={!selectedTypeId || !files.length || (selectedTypeId === OTHER_ATTACHMENT_TYPE && !customTypeLabel.trim()) || uploading}
+            disabled={disabled || !selectedTypeId || !files.length || (selectedTypeId === OTHER_ATTACHMENT_TYPE && !customTypeLabel.trim()) || uploading}
             onClick={onUpload}
           >
             <Upload className="size-4" />

@@ -1,3 +1,23 @@
+import type { DocumentOwnerOption, PieceJointe, TypePieceJointe } from "../types";
+
+export function documentValidityDate(type?: TypePieceJointe, owner?: Partial<DocumentOwnerOption>) {
+  switch (type?.documentValiditySource) {
+    case "CLIENT_CIN": return owner?.cinValidite ?? undefined;
+    case "CLIENT_PASSPORT": return owner?.passportValidite ?? undefined;
+    case "CLIENT_PERMIS": return owner?.dateValiditePermis ?? undefined;
+    case "VEHICULE_CARTE_GRISE": return owner?.dateExpirationCarteGrise ?? undefined;
+    default: return undefined;
+  }
+}
+
+export function documentStatus(piece: PieceJointe) {
+  return piece.status === "ARCHIVED" ? "Archivé" : piece.status === "EXPIRED" ? "Expiré" : "Disponible";
+}
+
+export function formatDocumentDate(value?: string | null) {
+  return value ? value.slice(0, 10).split("-").reverse().join("/") : "-";
+}
+
 export function numberValue(value: string) {
   const normalized = value.trim().replace(/\s/g, "").replace(",", ".");
   if (!normalized || normalized === ".") return undefined;

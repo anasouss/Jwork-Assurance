@@ -22,4 +22,7 @@ public class PiecesJointesContratResponse {
     private String mouvementLibelle;
     private List<TypePieceJointeResponse> types;
     private List<PieceJointeResponse> pieces;
+    private List<PieceJointeResponse> availableDocuments;
+    private List<DocumentOwnerOptionResponse> documentClients;
+    private List<DocumentOwnerOptionResponse> documentVehicles;
 }

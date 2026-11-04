@@ -7,6 +7,9 @@ import com.assurance.entity.TypePieceJointe;
 import com.assurance.enums.TypeAssistance;
 import com.assurance.enums.TypeClient;
 import com.assurance.enums.TypeContrat;
+import com.assurance.enums.DocumentOwner;
+import com.assurance.enums.DocumentExpiry;
+import com.assurance.enums.DocumentValiditySource;
 import com.assurance.repository.BrancheAssuranceRepository;
 import com.assurance.repository.NaturePieceJointeRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
@@ -191,10 +194,31 @@ public class PieceJointeTypeSeeder implements CommandLineRunner {
 
     private NaturePieceJointe nature(String libelle) {
         String key = libelle.trim().toUpperCase(Locale.ROOT);
+        DocumentOwner owner = switch (key) {
+            case "CIN", "CIN CONDUCTEUR", "PERMIS DE CONDUIRE", "PASSEPORT",
+                    "REGISTRE DE COMMERCE", "ICE", "STATUTS", "RIB" -> DocumentOwner.CLIENT;
+            case "CARTE GRISE", "VISITE TECHNIQUE" -> DocumentOwner.VEHICULE;
+            case "AUTRE DOCUMENT" -> DocumentOwner.CONTRAT;
+            default -> DocumentOwner.MOUVEMENT;
+        };
+        DocumentExpiry expiry = switch (key) {
+            case "CIN", "CIN CONDUCTEUR", "PERMIS DE CONDUIRE", "PASSEPORT", "CARTE GRISE", "VISITE TECHNIQUE" -> DocumentExpiry.OPTIONAL;
+            default -> DocumentExpiry.NONE;
+        };
+        DocumentValiditySource source = switch (key) {
+            case "CIN", "CIN CONDUCTEUR" -> DocumentValiditySource.CLIENT_CIN;
+            case "PERMIS DE CONDUIRE" -> DocumentValiditySource.CLIENT_PERMIS;
+            case "PASSEPORT" -> DocumentValiditySource.CLIENT_PASSPORT;
+            case "CARTE GRISE" -> DocumentValiditySource.VEHICULE_CARTE_GRISE;
+            default -> DocumentValiditySource.MANUAL;
+        };
         return naturePieceJointeRepository.findByAgenceIsNullAndCleNormalisee(key)
                 .orElseGet(() -> naturePieceJointeRepository.save(NaturePieceJointe.builder()
                         .cleNormalisee(key)
                         .libelle(libelle)
+                        .defaultOwner(owner)
+                        .defaultExpiry(expiry)
+                        .defaultValiditySource(source)
                         .actif(true)
                         .build()));
     }

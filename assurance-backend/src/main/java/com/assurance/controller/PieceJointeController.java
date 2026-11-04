@@ -15,6 +15,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -86,16 +87,103 @@ public class PieceJointeController {
             @RequestParam(required = false) Long mouvementId,
             @RequestParam(required = false) Long typePieceJointeId,
             @RequestParam(required = false) String customTypeLabel,
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long vehiculeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate expiresOn,
             @RequestPart("files") List<MultipartFile> files
     ) {
-        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.upload(
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.uploadForOwner(
                 TenantContext.getCurrentAgence(),
                 contratId,
                 mouvementId,
                 typePieceJointeId,
                 customTypeLabel,
-                files
+                files, clientId, vehiculeId, expiresOn
         ), "Piece jointe enregistree"));
+    }
+
+    @PutMapping("/api/v1/pieces-jointes/natures/{natureId}/policy")
+    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_config:manage')")
+    public ResponseEntity<ApiResponse<Void>> policy(@PathVariable Long natureId,
+            @RequestParam com.assurance.enums.DocumentOwner owner,
+            @RequestParam com.assurance.enums.DocumentExpiry expiry,
+            @RequestParam(required = false) com.assurance.enums.DocumentValiditySource source) {
+        pieceJointeService.updatePolicy(TenantContext.getCurrentAgence(), natureId, owner, expiry, source);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @GetMapping("/api/v1/clients/documents/types")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_client:create', 'PERM_client:manage')")
+    public ResponseEntity<ApiResponse<List<TypePieceJointeResponse>>> clientTypes(
+            @RequestParam com.assurance.enums.TypeClient typeClient) {
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.clientTypes(TenantContext.getCurrentAgence(), typeClient)));
+    }
+
+    @GetMapping("/api/v1/clients/{clientId}/pieces-jointes")
+    @PreAuthorize("hasAuthority('PERM_client:view')")
+    public ResponseEntity<ApiResponse<List<PieceJointeResponse>>> clientDocuments(@PathVariable Long clientId) {
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.clientDocuments(TenantContext.getCurrentAgence(), clientId)));
+    }
+
+    @PostMapping(path = "/api/v1/clients/{clientId}/pieces-jointes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    public ResponseEntity<ApiResponse<PieceJointeResponse>> uploadClient(@PathVariable Long clientId,
+            @RequestParam Long typePieceJointeId, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate expiresOn,
+            @RequestParam(required = false) Long previousVersionId, @RequestParam(required = false) String reason,
+            @RequestPart("files") List<MultipartFile> files) {
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.uploadClient(TenantContext.getCurrentAgence(),
+                clientId, typePieceJointeId, files, expiresOn, previousVersionId, reason)));
+    }
+
+    @DeleteMapping("/api/v1/clients/{clientId}/pieces-jointes/{pieceId}")
+    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable Long clientId, @PathVariable Long pieceId) {
+        pieceJointeService.deleteClientDocument(TenantContext.getCurrentAgence(), clientId, pieceId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @GetMapping("/api/v1/clients/{clientId}/pieces-jointes/{pieceId}/download")
+    @PreAuthorize("hasAuthority('PERM_client:view')")
+    public ResponseEntity<Resource> downloadClient(@PathVariable Long clientId, @PathVariable Long pieceId) {
+        PieceJointeService.DownloadedPiece download = pieceJointeService.downloadClientDocument(TenantContext.getCurrentAgence(), clientId, pieceId);
+        return ResponseEntity.ok().contentType(download.mediaType())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(download.fileName(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .body(download.resource());
+    }
+
+    @PostMapping("/api/v1/contrats/{contratId}/pieces-jointes/reuse")
+    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update') and hasAuthority('PERM_client:view')")
+    public ResponseEntity<ApiResponse<PieceJointeResponse>> reuse(@PathVariable Long contratId,
+            @RequestParam Long pieceId, @RequestParam Long typePieceJointeId,
+            @RequestParam(required = false) Long mouvementId) {
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.reuse(TenantContext.getCurrentAgence(),
+                contratId, mouvementId, pieceId, typePieceJointeId)));
+    }
+
+    @PostMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/owner")
+    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<PieceJointeResponse>> assignOwner(@PathVariable Long contratId, @PathVariable Long pieceId,
+            @RequestParam(required = false) Long clientId, @RequestParam(required = false) Long vehiculeId) {
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.assignOwner(TenantContext.getCurrentAgence(),
+                contratId, pieceId, clientId, vehiculeId)));
+    }
+
+    @DeleteMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/usage")
+    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<Void>> unlink(@PathVariable Long contratId, @PathVariable Long pieceId,
+            @RequestParam(required = false) Long mouvementId) {
+        pieceJointeService.unlink(TenantContext.getCurrentAgence(), contratId, mouvementId, pieceId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping(path = "/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/replace", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    public ResponseEntity<ApiResponse<PieceJointeResponse>> replace(@PathVariable Long contratId, @PathVariable Long pieceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate expiresOn, @RequestParam String reason,
+            @RequestPart("files") List<MultipartFile> files) {
+        return ResponseEntity.ok(ApiResponse.success(pieceJointeService.replaceContractDocument(TenantContext.getCurrentAgence(),
+                contratId, pieceId, files, expiresOn, reason)));
     }
 
     @GetMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/download")

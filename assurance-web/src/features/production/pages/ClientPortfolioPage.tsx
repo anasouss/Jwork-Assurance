@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, CircleDollarSign, FileText, FolderOpen, Landmark, Phone, Printer, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
 import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type { SinistreSummary } from "@/features/sinistre/types";
 import { useAuthStore } from "@/store/auth-store";
-import { attachmentApi } from "../api/attachments";
+import { ClientDocuments } from "@/features/crm/components/ClientDocuments";
 import { clientApi } from "../api/clients";
 import type { ClientCrm } from "../types";
 import { moneyAmount } from "../utils/format";
@@ -154,7 +154,7 @@ export default function ClientPortfolioPage() {
 
       <PortfolioRow
         main={<ClientIdentity portfolio={portfolio} />}
-        documents={<ClientDocumentsSection contracts={contracts} />}
+        documents={<DocumentPanel title="Documents client" description="Pièces d'identité et justificatifs." tone="blue"><ClientDocuments clientId={client.id} typeClient={client.typeClient} owner={client} /></DocumentPanel>}
       />
 
       {selectedContract ? (
@@ -572,57 +572,6 @@ function ClaimsSection({ allowed, loading, error, rows, totalElements, claimsUrl
         <EmptySection icon={<ShieldCheck className="size-6" />} text="Aucun sinistre pour ce périmètre." compact />
       )}
     </section>
-  );
-}
-
-function ClientDocumentsSection({ contracts }: { contracts: PortfolioContract[] }) {
-  const documentQueries = useQueries({
-    queries: contracts.map((contract) => ({
-      queryKey: ["production", "client-portfolio", "client-documents", contract.id],
-      queryFn: () => attachmentApi.getContratPiecesJointes(contract.id),
-      staleTime: 60_000,
-    })),
-  });
-  const documents = documentQueries.flatMap((query) => {
-    if (!query.data) return [];
-    const clientTypeIds = new Set(
-      query.data.types.filter((type) => Boolean(type.typeClient)).map((type) => type.id),
-    );
-    return query.data.pieces
-      .filter((piece) => piece.typePieceJointeId && clientTypeIds.has(piece.typePieceJointeId))
-      .map((piece) => ({
-        ...piece,
-        contractReference: query.data?.numeroPolice || query.data?.numeroDossier || `#${piece.contratId}`,
-      }));
-  });
-  const loading = documentQueries.some((query) => query.isLoading);
-  const error = documentQueries.some((query) => query.isError);
-  return (
-    <DocumentPanel title="Documents client" description="Pièces d'identité et justificatifs." tone="blue">
-      {loading ? (
-        <div className="grid gap-2 py-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
-      ) : error ? (
-        <DocumentEmpty text="Impossible de charger les documents client." />
-      ) : documents.length ? (
-        <div className="divide-y">
-          {documents.map((document) => (
-            <Link
-              key={`${document.contratId}-${document.id}`}
-              to={`/app/production/contrats/${document.contratId}/pieces-jointes`}
-              className="flex items-center justify-between gap-3 py-2.5 text-sm hover:text-blue-700"
-            >
-              <span className="min-w-0">
-                <span className="block truncate font-medium">{document.typePieceJointeLibelle || document.nomFichier}</span>
-                <span className="block truncate text-xs text-muted-foreground">{document.contractReference} · {document.nomFichier}</span>
-              </span>
-              <ArrowRight className="size-4 shrink-0" />
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <DocumentEmpty text="Aucun document client enregistré." />
-      )}
-    </DocumentPanel>
   );
 }
 

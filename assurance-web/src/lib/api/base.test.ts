@@ -46,6 +46,18 @@ describe("authenticated API requests", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("normalizes reusable document identifiers without changing validity or amounts", async () => {
+    saveAuth(session("access-1"));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      success: true,
+      data: { pieces: [{ id: 19, contratId: null, clientId: 42, vehiculeId: null,
+        naturePieceJointeId: 1, previousVersionId: 15, expiresOn: "2030-11-04", archived: false, tailleOctets: 512 }] },
+    })));
+    const response = await apiFetch("/api/v1/clients/42/pieces-jointes");
+    expect(response).toEqual({ success: true, data: { pieces: [{ id: "19", contratId: null, clientId: "42",
+      vehiculeId: null, naturePieceJointeId: "1", previousVersionId: "15", expiresOn: "2030-11-04", archived: false, tailleOctets: 512 }] } });
+  });
+
   it("preserves the HTTP status and business error code", async () => {
     saveAuth(session("access-1"));
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({

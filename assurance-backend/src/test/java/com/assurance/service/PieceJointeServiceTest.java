@@ -36,6 +36,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 
@@ -52,6 +55,10 @@ class PieceJointeServiceTest {
     @Mock private AssistanceContratRepository assistanceContratRepository;
     @Mock private BrancheAssuranceRepository brancheAssuranceRepository;
     @Mock private StorageLayoutService storageLayoutService;
+    @Mock private com.assurance.repository.DocumentPolicyRepository documentPolicyRepository;
+    @Mock private com.assurance.repository.DocumentUsageRepository documentUsageRepository;
+    @Mock private com.assurance.repository.ClientRepository clientRepository;
+    @Mock private com.assurance.repository.VehiculeRepository vehiculeRepository;
 
     private PieceJointeService service;
 
@@ -67,7 +74,7 @@ class PieceJointeServiceTest {
                 pieceJointeRepository,
                 assistanceContratRepository,
                 brancheAssuranceRepository,
-                storageLayoutService
+                storageLayoutService, documentPolicyRepository, documentUsageRepository, clientRepository, vehiculeRepository
         );
     }
 
@@ -219,5 +226,156 @@ class PieceJointeServiceTest {
                 .build();
         type.setId(id);
         return type;
+    }
+
+    @Test
+    void clientDocumentsNeverReadAnotherAgencyClient() {
+        when(clientRepository.findByAgenceIdAndId(7L, 42L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.clientDocuments(7L, 42L))
+                .isInstanceOf(com.assurance.exception.ResourceNotFoundException.class);
+        verify(pieceJointeRepository, never()).findByAgenceIdAndClientIdOrderByCreatedAtDesc(any(), any());
+    }
+
+    @Test
+    void clientStorageUsesTheSharedAgencyRootWithoutChangingLegacyContractPaths(@TempDir Path folder) {
+        StorageLayoutService layout = new StorageLayoutService();
+        ReflectionTestUtils.setField(layout, "root", folder);
+        assertThat(layout.resolveClientDocument(Path.of("7/clients/42/cin.pdf")))
+                .isEqualTo(folder.resolve("agencies/7/clients/42/documents/cin.pdf"));
+        assertThat(layout.resolveContractAttachment(Path.of("7/11/mouvement-2/cin.pdf")))
+                .isEqualTo(folder.resolve("agencies/7/contracts/11/attachments/mouvement-2/cin.pdf"));
+        assertThatThrownBy(() -> layout.resolveClientDocument(Path.of("../7/clients/42/cin.pdf")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void cannotDeleteAnotherClientsFile() {
+        var client = com.assurance.entity.Client.builder().build();
+        client.setId(99L);
+        PieceJointe piece = PieceJointe.builder().client(client).build();
+        when(pieceJointeRepository.lockOwned(7L, 15L)).thenReturn(Optional.of(piece));
+        assertThatThrownBy(() -> service.deleteClientDocument(7L, 42L, 15L))
+                .isInstanceOf(com.assurance.exception.ResourceNotFoundException.class);
+        verify(pieceJointeRepository, never()).delete(any());
+    }
+
+    @Test
+    void usedClientDocumentIsArchivedWithoutDeletingItsFile() {
+        var client = com.assurance.entity.Client.builder().build();
+        client.setId(42L);
+        PieceJointe piece = PieceJointe.builder().client(client).cheminStockage("7/clients/42/cin.pdf").build();
+        piece.setId(15L);
+        when(pieceJointeRepository.lockOwned(7L, 15L)).thenReturn(Optional.of(piece));
+        when(documentUsageRepository.existsByPieceId(15L)).thenReturn(true);
+        service.deleteClientDocument(7L, 42L, 15L);
+        assertThat(piece.getArchived()).isTrue();
+        assertThat(piece.getArchivedAt()).isNotNull();
+        verify(pieceJointeRepository, never()).delete(any());
+        verify(storageLayoutService, never()).resolveContractAttachment(any());
+    }
+
+    @Test
+    void unusedUploadCanBePermanentlyRemoved(@TempDir Path folder) throws Exception {
+        var client = com.assurance.entity.Client.builder().build();
+        client.setId(42L);
+        PieceJointe piece = PieceJointe.builder().client(client).cheminStockage("7/clients/42/cin.pdf").build();
+        piece.setId(15L);
+        Path file = folder.resolve("cin.pdf");
+        Files.writeString(file, "test");
+        when(pieceJointeRepository.lockOwned(7L, 15L)).thenReturn(Optional.of(piece));
+        when(storageLayoutService.resolveClientDocument(any())).thenReturn(file);
+        service.deleteClientDocument(7L, 42L, 15L);
+        verify(pieceJointeRepository).delete(piece);
+        assertThat(file).doesNotExist();
+    }
+
+    @Test
+    void expiredAndArchivedVersionsAreNotProposedForReuse() {
+        PieceJointe expired = PieceJointe.builder().expiresOn(java.time.LocalDate.now().minusDays(1)).build();
+        PieceJointe valid = PieceJointe.builder().expiresOn(java.time.LocalDate.now()).build();
+        PieceJointe archived = PieceJointe.builder().archived(true).build();
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(service, "isAvailable", expired)).isFalse();
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(service, "isAvailable", archived)).isFalse();
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(service, "isAvailable", valid)).isTrue();
+    }
+
+    @Test
+    void requiredExpiryIsValidatedOnTheServer() {
+        var policy = new com.assurance.entity.DocumentPolicy();
+        policy.setExpiry(com.assurance.enums.DocumentExpiry.REQUIRED);
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateExpiry", policy, null))
+                .isInstanceOf(com.assurance.exception.BadRequestException.class);
+    }
+
+    @Test
+    void validityComesFromTheHolderInformationAndDoesNotRewriteOlderSnapshots() {
+        var policy = new com.assurance.entity.DocumentPolicy();
+        policy.setValiditySource(com.assurance.enums.DocumentValiditySource.CLIENT_CIN);
+        var client = com.assurance.entity.Client.builder().cinValidite(java.time.LocalDate.of(2030, 5, 12)).build();
+        PieceJointe previous = PieceJointe.builder().expiresOn(java.time.LocalDate.of(2025, 5, 12)).build();
+        java.time.LocalDate expiry = ReflectionTestUtils.invokeMethod(service, "resolveExpiry", policy, client, null,
+                java.time.LocalDate.of(2099, 1, 1));
+        assertThat(expiry).isEqualTo(client.getCinValidite());
+        assertThat(previous.getExpiresOn()).isEqualTo(java.time.LocalDate.of(2025, 5, 12));
+        policy.setValiditySource(com.assurance.enums.DocumentValiditySource.VEHICULE_CARTE_GRISE);
+        var vehicle = com.assurance.entity.Vehicule.builder().dateExpirationCarteGrise(java.time.LocalDate.of(2028, 7, 10)).build();
+        expiry = ReflectionTestUtils.invokeMethod(service, "resolveExpiry", policy, null, vehicle, null);
+        assertThat(expiry).isEqualTo(vehicle.getDateExpirationCarteGrise());
+    }
+
+    @Test
+    void fakePdfIsRejectedBeforeStorage() {
+        var file = new MockMultipartFile("files", "cin.pdf", "application/pdf", "not a PDF".getBytes(StandardCharsets.UTF_8));
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateFiles", List.of(file)))
+                .isInstanceOf(com.assurance.exception.BadRequestException.class);
+        verify(storageLayoutService, never()).resolveContractAttachment(any());
+    }
+
+    @Test
+    void replacingClientDocumentKeepsOldReferenceAndCreatesNewVersion(@TempDir Path folder) throws Exception {
+        Agence agence = Agence.builder().build();
+        agence.setId(7L);
+        var client = com.assurance.entity.Client.builder().agence(agence)
+                .typeClient(com.assurance.enums.TypeClient.PERSONNE_PHYSIQUE)
+                .cinValidite(java.time.LocalDate.of(2031, 5, 12)).build();
+        client.setId(42L);
+        var nature = com.assurance.entity.NaturePieceJointe.builder().libelle("CIN")
+                .defaultOwner(com.assurance.enums.DocumentOwner.CLIENT)
+                .defaultValiditySource(com.assurance.enums.DocumentValiditySource.CLIENT_CIN)
+                .defaultExpiry(com.assurance.enums.DocumentExpiry.OPTIONAL).build();
+        nature.setId(1L);
+        TypePieceJointe type = type(1L, null, null, "CIN");
+        type.setNaturePieceJointe(nature);
+        PieceJointe previous = PieceJointe.builder().agence(agence).client(client).typePieceJointe(type)
+                .documentOwner(com.assurance.enums.DocumentOwner.CLIENT).expiresOn(java.time.LocalDate.of(2024, 5, 12))
+                .cheminStockage("old/cin.pdf").build();
+        previous.setId(15L);
+        when(clientRepository.findByAgenceIdAndId(7L, 42L)).thenReturn(Optional.of(client));
+        when(typePieceJointeRepository.findByAgenceIdOrAgenceIsNullOrderByLibelleAsc(7L)).thenReturn(List.of(type));
+        when(pieceJointeRepository.lockOwned(7L, 15L)).thenReturn(Optional.of(previous));
+        when(storageLayoutService.resolveClientDocument(any())).thenAnswer(call -> folder.resolve(call.getArgument(0, Path.class)));
+        when(pieceJointeRepository.save(any())).thenAnswer(call -> {
+            PieceJointe piece = call.getArgument(0);
+            piece.setId(16L);
+            return piece;
+        });
+        byte[] bytes;
+        try (var pdf = new org.apache.pdfbox.pdmodel.PDDocument(); var output = new java.io.ByteArrayOutputStream()) {
+            pdf.addPage(new org.apache.pdfbox.pdmodel.PDPage());
+            pdf.save(output);
+            bytes = output.toByteArray();
+        }
+        PieceJointeResponse response = service.uploadClient(7L, 42L, 1L,
+                List.of(new MockMultipartFile("files", "new-cin.pdf", "application/pdf", bytes)),
+                java.time.LocalDate.now().plusYears(5), 15L, "Renouvellement");
+        assertThat(previous.getArchived()).isTrue();
+        assertThat(previous.getCheminStockage()).isEqualTo("old/cin.pdf");
+        assertThat(previous.getExpiresOn()).isEqualTo(java.time.LocalDate.of(2024, 5, 12));
+        assertThat(response.getExpiresOn()).isEqualTo(client.getCinValidite());
+        assertThat(response.getPreviousVersionId()).isEqualTo(15L);
+        assertThat(response.getClientId()).isEqualTo(42L);
+        assertThat(response.getContratId()).isNull();
+        assertThat(response.getChangeReason()).isEqualTo("Renouvellement");
+        verify(pieceJointeRepository, never()).delete(any());
     }
 }

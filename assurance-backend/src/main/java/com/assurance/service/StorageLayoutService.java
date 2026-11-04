@@ -71,6 +71,15 @@ public class StorageLayoutService {
         return resolved.normalize();
     }
 
+    public Path resolveClientDocument(Path storageKey) {
+        Path key = validateKey(storageKey, 4);
+        if (!"clients".equals(key.getName(1).toString())) {
+            throw new IllegalArgumentException("Invalid client document storage key");
+        }
+        return agencyRoot(key).resolve("clients").resolve(key.getName(2).toString())
+                .resolve("documents").resolve(key.getName(3).toString()).normalize();
+    }
+
     public Path resolveClaimDocument(Path storageKey) {
         Path key = validateKey(storageKey, 3);
         return agencyRoot(key)

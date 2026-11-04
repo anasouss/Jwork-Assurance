@@ -2634,7 +2634,8 @@ public class ContratService {
         if (request == null || !originalCode.equalsIgnoreCase(request.getCodeTypeMouvement())) {
             throw new BadRequestException("Le type de l'avenant rectifie ne peut pas etre modifie");
         }
-        if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0) {
+        if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0
+                || pieceJointeRepository.countDocumentUsagesByMouvementId(mouvementId) > 0) {
             throw new BadRequestException("Cet avenant contient des pieces jointes. Retirez-les avant la rectification.");
         }
         if (carteVerteRepository.countByMouvementContratIdAndActifTrue(mouvementId) > 0) {
@@ -3063,7 +3064,8 @@ public class ContratService {
     }
 
     private void assertNoBlockingMovementReferences(Long mouvementId) {
-        if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0) {
+        if (pieceJointeRepository.countByMouvementContratId(mouvementId) > 0
+                || pieceJointeRepository.countDocumentUsagesByMouvementId(mouvementId) > 0) {
             throw new BadRequestException("Impossible de supprimer ce mouvement: des pieces jointes y sont liees.");
         }
         if (assistanceContratRepository.countByMouvementContratIdAndActifTrue(mouvementId) > 0) {

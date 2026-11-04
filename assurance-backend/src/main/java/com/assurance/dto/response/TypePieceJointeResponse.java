@@ -10,6 +10,9 @@ import lombok.Data;
 @Builder
 public class TypePieceJointeResponse {
     private Long id;
+    private com.assurance.enums.DocumentOwner documentOwner;
+    private com.assurance.enums.DocumentExpiry documentExpiry;
+    private com.assurance.enums.DocumentValiditySource documentValiditySource;
     private String libelle;
     private Long naturePieceJointeId;
     private String naturePieceJointeLibelle;

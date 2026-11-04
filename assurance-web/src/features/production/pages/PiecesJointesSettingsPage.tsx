@@ -14,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { referenceKeys } from "@/lib/query-keys";
 import { attachmentSettingsApi } from "../api/attachment-settings";
+import { attachmentApi } from "../api/attachments";
 import { referenceApi } from "../api/references";
-import type { TypeClient, TypeContrat, TypePieceJointe, UpsertTypePieceJointeRequest } from "../types";
+import type { DocumentOwner, DocumentExpiry, DocumentValiditySource, TypeClient, TypeContrat, TypePieceJointe, UpsertTypePieceJointeRequest } from "../types";
 
 const ALL = "__ALL__";
 const PAGE_SIZE = 10;
@@ -295,6 +296,8 @@ export default function PiecesJointesSettingsPage() {
           <DialogHeader><DialogTitle>{selectedDocument?.libelle ?? "Ajouter un document"}</DialogTitle></DialogHeader>
           {selectedDocument && !ruleEditorOpen ? (
             <div className="grid gap-3">
+              {selectedDocument.natureId && <DocumentPolicyEditor key={selectedDocument.natureId} natureId={selectedDocument.natureId}
+                rule={selectedDocument.rules[0]} />}
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">Chaque ligne définit un contexte dans lequel ce document est attendu.</p>
                 <Button type="button" size="sm" onClick={openCreateRule}><Plus className="size-4" />Ajouter une règle</Button>
@@ -382,6 +385,36 @@ export default function PiecesJointesSettingsPage() {
       </Dialog>
     </div>
   );
+}
+
+function DocumentPolicyEditor({ natureId, rule }: { natureId: string; rule: TypePieceJointe }) {
+  const cache = useQueryClient();
+  const [owner, setOwner] = useState<DocumentOwner>(rule.documentOwner ?? "CONTRAT");
+  const [expiry, setExpiry] = useState<DocumentExpiry>(rule.documentExpiry ?? "NONE");
+  const [source, setSource] = useState<DocumentValiditySource>(rule.documentValiditySource ?? "MANUAL");
+  const mutation = useMutation({
+    mutationFn: () => attachmentApi.savePolicy(natureId, owner, expiry, source),
+    onSuccess: async () => {
+      await cache.invalidateQueries({ queryKey: ["pieces-jointes-types"] });
+      await cache.invalidateQueries({ queryKey: ["client-document-types"] });
+      await cache.invalidateQueries({ queryKey: ["contrat-pieces-jointes"] });
+      toast.success("Paramètres du document enregistrés");
+    },
+    onError: error => toast.error(error instanceof Error ? error.message : "Enregistrement impossible"),
+  });
+  return <div className="grid items-end gap-3 border-b pb-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
+    <Field label="Rattachement"><Select value={owner} onValueChange={value => { setOwner(value as DocumentOwner); setSource("MANUAL"); }}><SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="CLIENT">Client</SelectItem><SelectItem value="VEHICULE">Véhicule</SelectItem>
+        <SelectItem value="CONTRAT">Contrat</SelectItem><SelectItem value="MOUVEMENT">Mouvement</SelectItem></SelectContent></Select></Field>
+    <Field label="Date de validité"><Select value={expiry} onValueChange={value => { setExpiry(value as DocumentExpiry); if (value === "NONE") setSource("MANUAL"); }}><SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="NONE">Non applicable</SelectItem><SelectItem value="OPTIONAL">Facultative</SelectItem><SelectItem value="REQUIRED">Obligatoire</SelectItem></SelectContent></Select></Field>
+    <Field label="Source de validité"><Select value={source} disabled={expiry === "NONE"} onValueChange={value => setSource(value as DocumentValiditySource)}><SelectTrigger><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="MANUAL">Document</SelectItem>
+        {owner === "CLIENT" && <><SelectItem value="CLIENT_CIN">CIN du client</SelectItem><SelectItem value="CLIENT_PASSPORT">Passeport du client</SelectItem><SelectItem value="CLIENT_PERMIS">Permis du client</SelectItem></>}
+        {owner === "VEHICULE" && <SelectItem value="VEHICULE_CARTE_GRISE">Carte grise du véhicule</SelectItem>}
+      </SelectContent></Select></Field>
+    <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Enregistrer</Button>
+  </div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

@@ -1511,6 +1511,9 @@ export type UpsertSousClasseRequest = UpsertCodeReferenceRequest & {
 
 export type TypePieceJointe = {
   id: string;
+  documentOwner?: DocumentOwner;
+  documentExpiry?: DocumentExpiry;
+  documentValiditySource?: DocumentValiditySource;
   libelle: string;
   naturePieceJointeId?: string | null;
   naturePieceJointeLibelle?: string | null;
@@ -1542,9 +1545,38 @@ export type UpsertTypePieceJointeRequest = {
   ordreAffichage?: number | null;
 };
 
+export type DocumentOwner = "CLIENT" | "VEHICULE" | "CONTRAT" | "MOUVEMENT";
+export type DocumentExpiry = "NONE" | "OPTIONAL" | "REQUIRED";
+export type DocumentValiditySource = "MANUAL" | "CLIENT_CIN" | "CLIENT_PASSPORT" | "CLIENT_PERMIS" | "VEHICULE_CARTE_GRISE";
+export type DocumentOwnerOption = {
+  id: string;
+  libelle: string;
+  typeClient?: TypeClient;
+  cinValidite?: string | null;
+  passportValidite?: string | null;
+  dateValiditePermis?: string | null;
+  dateExpirationCarteGrise?: string | null;
+};
+
 export type PieceJointe = {
   id: string;
-  contratId: string;
+  contratId: string | null;
+  clientId?: string | null;
+  vehiculeId?: string | null;
+  ownerName?: string | null;
+  naturePieceJointeId?: string | null;
+  previousVersionId?: string | null;
+  documentOwner?: DocumentOwner;
+  expiresOn?: string | null;
+  archived?: boolean;
+  status?: "VALID" | "EXPIRED" | "ARCHIVED";
+  changeReason?: string | null;
+  createdBy?: string | null;
+  canDelete?: boolean;
+  canUnlink?: boolean;
+  expectedOwner?: DocumentOwner;
+  archivedBy?: string | null;
+  archivedAt?: string | null;
   mouvementContratId?: string | null;
   typePieceJointeId?: string | null;
   typePieceJointeLibelle?: string | null;
@@ -1568,6 +1600,9 @@ export type PiecesJointesContrat = {
   mouvementLibelle?: string | null;
   types: TypePieceJointe[];
   pieces: PieceJointe[];
+  availableDocuments?: PieceJointe[];
+  documentClients?: DocumentOwnerOption[];
+  documentVehicles?: DocumentOwnerOption[];
 };
 
 export type ContratSummary = {

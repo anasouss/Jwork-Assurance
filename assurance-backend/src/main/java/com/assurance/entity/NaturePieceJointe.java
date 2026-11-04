@@ -1,7 +1,12 @@
 package com.assurance.entity;
 
+import com.assurance.enums.DocumentOwner;
+import com.assurance.enums.DocumentExpiry;
+import com.assurance.enums.DocumentValiditySource;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -36,6 +41,21 @@ public class NaturePieceJointe extends BaseEntity {
 
     @Column(nullable = false, length = 160)
     private String libelle;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_owner", nullable = false, length = 20)
+    @Builder.Default
+    private DocumentOwner defaultOwner = DocumentOwner.CONTRAT;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_expiry", nullable = false, length = 20)
+    @Builder.Default
+    private DocumentExpiry defaultExpiry = DocumentExpiry.NONE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_validity_source", nullable = false, length = 40)
+    @Builder.Default
+    private DocumentValiditySource defaultValiditySource = DocumentValiditySource.MANUAL;
 
     @Builder.Default
     @Column(nullable = false)

@@ -42,6 +42,8 @@ import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientRecordDialog } from "@/features/crm/components/ClientRecordDialog";
+import { ClientDocuments, ClientDocumentDrafts, type ClientDocumentDraft } from "@/features/crm/components/ClientDocuments";
+import { attachmentApi } from "@/features/production/api/attachments";
 import { referenceApi } from "@/features/production/api/references";
 import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
@@ -428,6 +430,8 @@ function ClientDialog({
   onSaved: (clientId: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<ClientDraft>(() => emptyClientDraft());
+  const [documents, setDocuments] = useState<ClientDocumentDraft[]>([]);
+  const [createdClient, setCreatedClient] = useState<ClientResponse | null>(null);
   const villesQuery = useQuery({
     queryKey: ["referentiel", "villes"],
     queryFn: () => referenceApi.list("villes"),
@@ -444,7 +448,7 @@ function ClientDialog({
   const telephones = draft.telephones ?? [];
   const createMutation = useMutation({
     mutationFn: async () => {
-      const client = await clientApi.createClient({
+      const client = createdClient ?? await clientApi.createClient({
         typeClient: draft.typeClient,
         genre: draft.genre,
         prenom: clean(draft.prenom),
@@ -465,12 +469,21 @@ function ClientDialog({
         telephones: telephones.map((telephone) => ({ ...telephone, numero: telephone.numero.trim() })),
         acquisition: draft.acquisition,
       });
+      setCreatedClient(client);
+      for (const document of documents) {
+        await attachmentApi.uploadClient(client.id, {
+          typePieceJointeId: document.type.id, files: document.files, expiresOn: document.expiresOn,
+        });
+        setDocuments(current => current.filter(item => item.key !== document.key));
+      }
       return client;
     },
     onSuccess: async (client) => {
       await onSaved(client.id);
       toast.success("Client créé");
       setDraft(emptyClientDraft());
+      setDocuments([]);
+      setCreatedClient(null);
       onOpenChange(false);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
@@ -486,12 +499,22 @@ function ClientDialog({
   );
   const acquisitionValid = isAcquisitionValid(draft.acquisition, acquisitionOptionsQuery.data);
 
+  async function closeClientDialog() {
+    if (createMutation.isPending) return;
+    if (createdClient) await onSaved(createdClient.id);
+    setCreatedClient(null);
+    setDocuments([]);
+    setDraft(emptyClientDraft());
+    onOpenChange(false);
+  }
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         if (!createMutation.isPending) {
-          onOpenChange(next);
+          if (next) onOpenChange(true);
+          else void closeClientDialog();
         }
       }}
     >
@@ -500,15 +523,17 @@ function ClientDialog({
           <DialogTitle>Nouveau client</DialogTitle>
           <DialogDescription>Créez la fiche CRM puis rattachez-la éventuellement à un groupe.</DialogDescription>
         </DialogHeader>
+        {createdClient && <p className="text-sm text-amber-700">Le client est créé. Les pièces restantes peuvent être envoyées à nouveau.</p>}
+        <fieldset disabled={createMutation.isPending || !!createdClient} className="contents">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Type de client">
             <Select
               value={draft.typeClient}
-              onValueChange={(value) => setDraft({
+              onValueChange={(value) => { setDocuments([]); setDraft({
                 ...emptyClientDraft(value as TypeClient),
                 groupeClientId: draft.groupeClientId,
                 relationGroupe: draft.relationGroupe,
-              })}
+              }); }}
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -621,15 +646,17 @@ function ClientDialog({
             />
           </div>
         </section>
+        </fieldset>
+        <ClientDocumentDrafts typeClient={draft.typeClient} value={documents} onChange={setDocuments} disabled={createMutation.isPending} owner={draft} />
         <DialogFooter>
-          <Button type="button" variant="outline" disabled={createMutation.isPending} onClick={() => onOpenChange(false)}>Annuler</Button>
+          <Button type="button" variant="outline" disabled={createMutation.isPending} onClick={() => void closeClientDialog()}>{createdClient ? "Fermer" : "Annuler"}</Button>
           <Button
             type="button"
             className="bg-blue-600 text-white hover:bg-blue-700"
             disabled={!valid || !acquisitionValid || createMutation.isPending}
             onClick={() => createMutation.mutate()}
           >
-            {createMutation.isPending ? "Enregistrement..." : "Créer le client"}
+            {createMutation.isPending ? "Enregistrement..." : createdClient ? "Envoyer les pièces restantes" : "Créer le client"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -817,6 +844,9 @@ function ClientDetail({
                 ))}
               </div>
             ) : <EmptyState text="Aucune autre entité liée." />}
+        </PortfolioSection>
+        <PortfolioSection title="Documents client" icon={<Paperclip className="size-4" />} tone="blue">
+          <ClientDocuments clientId={client.id} typeClient={client.typeClient} owner={client} />
         </PortfolioSection>
         <PortfolioSection title="Espaces liés" icon={<ArrowRight className="size-4" />} tone="amber">
             <div className="grid gap-2">

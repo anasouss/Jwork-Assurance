@@ -340,10 +340,10 @@ export default function ContratsPage() {
                   <TableHeaderCell>Souscripteur</TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[110rem]:table-cell">Branche</TableHeaderCell>
                   <TableHeaderCell><span className="@min-[110rem]:hidden">Contrat</span><span className="hidden @min-[110rem]:inline">Produit</span></TableHeaderCell>
-                  <TableHeaderCell className="hidden @min-[70rem]:table-cell">Mouvement<span className="hidden @min-[110rem]:inline"> N°</span></TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[70rem]:table-cell">Mouvement N°</TableHeaderCell>
                   <TableHeaderCell><span className="@min-[70rem]:hidden">Police / Mouvement</span><span className="hidden @min-[70rem]:inline">{appliedAssistanceBranch ? "Contrat assistance N°" : "Police N°"}</span></TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[70rem]:table-cell">Compagnie</TableHeaderCell>
-                  <TableHeaderCell className="hidden @min-[110rem]:table-cell">Événement</TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[70rem]:table-cell">Événement</TableHeaderCell>
                   <TableHeaderCell><span className="@min-[110rem]:hidden">Période</span><span className="hidden @min-[110rem]:inline">Date d'effet</span></TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[110rem]:table-cell">Date d'échéance</TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[70rem]:table-cell">Statut</TableHeaderCell>
@@ -454,9 +454,8 @@ function ContratRow({
           <span className="text-xs text-muted-foreground @min-[70rem]:hidden">{companyLabel}</span>
         </div>
       </TableCell>
-      <TableCell className="hidden min-w-28 text-center @min-[70rem]:table-cell">
+      <TableCell className="hidden text-center @min-[70rem]:table-cell">
         {movement.numeroMouvement}
-        <p className="mt-1 text-xs font-medium @min-[110rem]:hidden">{eventLabel(contrat, movement)}</p>
       </TableCell>
       <TableCell className="min-w-44 max-w-60 text-center">
         <span className="whitespace-nowrap uppercase">{contrat.numeroPolice ?? "-"}</span>
@@ -466,7 +465,7 @@ function ContratRow({
         </div>
       </TableCell>
       <TableCell className="hidden min-w-28 text-center @min-[70rem]:table-cell">{companyLabel}</TableCell>
-      <TableCell className="hidden text-center font-semibold @min-[110rem]:table-cell">
+      <TableCell className="hidden min-w-32 text-center font-semibold @min-[70rem]:table-cell">
         <div className="flex flex-col items-center">
           <span>{eventLabel(contrat, movement)}</span>
         </div>

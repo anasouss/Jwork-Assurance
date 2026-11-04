@@ -58,7 +58,14 @@ export default function LoginPage() {
       </header>
 
       <main className="pointer-events-none relative mx-auto grid w-full max-w-[1440px] flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-24 lg:px-14 lg:py-16 xl:gap-40">
-        <div aria-hidden="true" className="hidden lg:block" />
+        <div className="hidden max-w-md self-end space-y-4 pb-6 text-[#132a3b] lg:block dark:text-[#edf2f5]">
+          <p className="max-w-sm text-3xl font-semibold leading-tight">
+            Votre espace de gestion d’assurance.
+          </p>
+          <p className="max-w-sm text-base leading-7 text-[#40586a] dark:text-[#becdd7]">
+            Contrats, clients, sinistres et comptabilité réunis au même endroit.
+          </p>
+        </div>
         <section aria-labelledby="login-title" className="pointer-events-auto mx-auto w-full max-w-[400px]">
           <div className="mb-9 space-y-3">
             <h1 id="login-title" className="text-3xl font-semibold leading-tight">Connexion</h1>

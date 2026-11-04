@@ -37,7 +37,6 @@ import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
-import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
 import com.itextpdf.layout.property.VerticalAlignment;
@@ -102,7 +101,7 @@ public class ReglementClientPdfService {
                             bold
                     ));
 
-            writeHeader(document, payment, regular, bold);
+            writeHeader(document, payment, bold);
             writeOverview(document, payment, regular, bold);
             writeInstruments(document, payment, regular, bold);
             writeAllocations(document, payment, regular, bold);
@@ -121,7 +120,6 @@ public class ReglementClientPdfService {
     private void writeHeader(
             Document document,
             ReglementClient payment,
-            PdfFont regular,
             PdfFont bold
     ) {
         Table header = new Table(new float[]{1.2f, 1.8f})
@@ -145,11 +143,8 @@ public class ReglementClientPdfService {
         title.add(new Paragraph(payment.getNumero())
                 .setFont(bold).setFontSize(10.5f).setFontColor(TABLE_HEADER)
                 .setMarginTop(5).setMarginBottom(0));
-        title.add(new Paragraph(paymentStatus(payment))
-                .setFont(regular).setFontSize(8).setFontColor(MUTED)
-                .setMarginTop(3).setMarginBottom(0));
-        title.add(new Paragraph(city(payment.getAgence()) + " · " + DATE_FORMAT.format(payment.getDateReglement()))
-                .setFont(regular).setFontSize(8).setFontColor(MUTED)
+        title.add(new Paragraph(joinAvailable(city(payment.getAgence()), date(payment.getDateReglement())))
+                .setFont(bold).setFontSize(10.5f).setFontColor(TABLE_HEADER)
                 .setMarginTop(3).setMarginBottom(0));
         header.addCell(title);
         document.add(header);
@@ -159,33 +154,24 @@ public class ReglementClientPdfService {
     }
 
     private void writeOverview(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
-        Table overview = new Table(new float[]{1.7f, 0.8f, 1.1f, 1.1f})
-                .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(12);
-        overview.addCell(infoCell("PAYEUR", payerIdentity(payment), regular, bold));
-        overview.addCell(infoCell("DATE DU RÈGLEMENT", date(payment.getDateReglement()), regular, bold));
-        overview.addCell(infoCell("STATUT", paymentStatus(payment), regular, bold));
-        overview.addCell(infoCell("ENREGISTRÉ PAR",
+        Table overview = new Table(new float[]{2.1f, 1})
+                .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(12).setKeepTogether(true);
+        boolean multiPayer = Boolean.TRUE.equals(payment.getMultiPayeur());
+        overview.addCell(infoCell(multiPayer ? "REPRÉSENTANT" : "PAYEUR",
+                multiPayer ? payment.getDeposantNom() : payerIdentity(payment), regular, bold));
+        overview.addCell(infoCell("OPÉRATEUR",
                 payment.getCreePar() == null ? null : payment.getCreePar().getFullName(), regular, bold));
         document.add(overview);
 
-        Table totals = new Table(new float[]{1, 1})
-                .setWidth(UnitValue.createPercentValue(55))
-                .setHorizontalAlignment(HorizontalAlignment.RIGHT)
-                .setMarginBottom(15);
-        totals.addCell(totalLabelCell("Montant total", bold));
-        totals.addCell(totalValueCell(amount(payment.getMontantTotal()) + " MAD", bold));
-        totals.addCell(totalLabelCell("Non affecté", bold));
-        totals.addCell(totalValueCell(amount(payment.getMontantNonAffecte()) + " MAD", bold));
-        document.add(totals);
     }
 
     private void writeInstruments(Document document, ReglementClient payment, PdfFont regular, PdfFont bold) {
-        document.add(sectionTitle("Moyens de paiement", bold));
+        document.add(sectionTitle("Mode de règlement", bold));
         boolean showDueDate = payment.getInstruments().stream()
                 .anyMatch(instrument -> instrument.getMode() == ModeReglementClient.EFFET);
         Table table = new Table(showDueDate
-                ? new float[]{0.9f, 0.8f, 0.8f, 1.1f, 1.35f, 0.9f, 0.85f}
-                : new float[]{0.9f, 0.8f, 1.1f, 1.35f, 0.9f, 0.85f})
+                ? new float[]{1f, 0.8f, 0.8f, 1.35f, 1.35f, 0.9f}
+                : new float[]{1.05f, 0.8f, 1.4f, 1.4f, 0.9f})
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "MODE", bold, TextAlignment.LEFT);
         addHeader(table, "DATE", bold, TextAlignment.CENTER);
@@ -194,7 +180,6 @@ public class ReglementClientPdfService {
         }
         addHeader(table, "RÉFÉRENCE", bold, TextAlignment.LEFT);
         addHeader(table, "BANQUE / COMPTE", bold, TextAlignment.LEFT);
-        addHeader(table, "STATUT", bold, TextAlignment.LEFT);
         addHeader(table, "MONTANT", bold, TextAlignment.RIGHT);
 
         int index = 0;
@@ -206,10 +191,6 @@ public class ReglementClientPdfService {
                             ? null : instrument.getBanqueEmettriceReference().getLibelle(),
                     instrument.getCompteTresorerie() == null
                             ? null : instrument.getCompteTresorerie().getLibelle());
-            String status = instrumentStatus(instrument);
-            if (instrument.getMotifStatut() != null && !instrument.getMotifStatut().isBlank()) {
-                status += "\n" + instrument.getMotifStatut().trim();
-            }
             addBody(table, modeLabel(instrument.getMode()), regular, TextAlignment.LEFT, background);
             addBody(table, date(instrument.getDateInstrument()), regular, TextAlignment.CENTER, background);
             if (showDueDate) {
@@ -218,7 +199,6 @@ public class ReglementClientPdfService {
             }
             addBody(table, value(instrument.getReferenceInstrument()), regular, TextAlignment.LEFT, background);
             addBody(table, bank, regular, TextAlignment.LEFT, background);
-            addBody(table, status, regular, TextAlignment.LEFT, background);
             addBody(table, amount(instrument.getMontant()), bold, TextAlignment.RIGHT, background);
         }
         document.add(table);
@@ -274,6 +254,8 @@ public class ReglementClientPdfService {
                     .setTextAlignment(TextAlignment.CENTER).setFontColor(MUTED)
                     .setBorder(new SolidBorder(BORDER, 0.45f)).setPadding(10));
         }
+        table.addCell(totalLabelCell("TOTAL DU RÈGLEMENT (MAD)", columns.length - 1, bold));
+        table.addCell(totalValueCell(amount(payment.getMontantTotal()), bold));
         document.add(table);
     }
 
@@ -438,13 +420,13 @@ public class ReglementClientPdfService {
         return new Paragraph(text).setFont(bold).setFontSize(10).setFontColor(INK).setMarginBottom(7);
     }
 
-    private Cell totalLabelCell(String label, PdfFont bold) {
-        return new Cell()
+    private Cell totalLabelCell(String label, int colspan, PdfFont bold) {
+        return new Cell(1, colspan)
                 .add(new Paragraph(label).setFont(bold).setFontSize(8.5f)
-                        .setFontColor(ColorConstants.WHITE).setMargin(0))
-                .setTextAlignment(TextAlignment.CENTER)
-                .setBorder(new SolidBorder(ACCENT, 0.65f))
-                .setBackgroundColor(TABLE_HEADER)
+                        .setFontColor(INK).setMargin(0))
+                .setTextAlignment(TextAlignment.RIGHT)
+                .setBorder(new SolidBorder(BORDER, 0.45f))
+                .setBackgroundColor(SOFT_ACCENT)
                 .setPadding(5);
     }
 
@@ -453,7 +435,7 @@ public class ReglementClientPdfService {
                 .add(new Paragraph(content).setFont(bold).setFontSize(8.5f)
                         .setFontColor(INK).setMargin(0))
                 .setTextAlignment(TextAlignment.RIGHT)
-                .setBorder(new SolidBorder(ACCENT, 0.65f))
+                .setBorder(new SolidBorder(BORDER, 0.45f))
                 .setBackgroundColor(SOFT_ACCENT)
                 .setPadding(5);
     }
@@ -492,26 +474,6 @@ public class ReglementClientPdfService {
         return new Cell().setBorder(Border.NO_BORDER).setPadding(0);
     }
 
-    private String paymentStatus(ReglementClient payment) {
-        if (payment.getStatut() == StatutReglementClient.ANNULE) {
-            return "ANNULÉ";
-        }
-        if (!payment.getInstruments().isEmpty() && payment.getInstruments().stream()
-                .allMatch(instrument -> instrument.getStatut() == StatutInstrumentReglement.CONFIRME)) {
-            return "ENCAISSÉ";
-        }
-        if (payment.getInstruments().stream().anyMatch(instrument ->
-                instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE
-                        || instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE)) {
-            return "ENCAISSEMENT EN COURS";
-        }
-        if (payment.getInstruments().stream().anyMatch(instrument ->
-                instrument.getStatut() == StatutInstrumentReglement.REJETE)) {
-            return "INSTRUMENT IMPAYÉ";
-        }
-        return "ENREGISTRÉ";
-    }
-
     private String modeLabel(ModeReglementClient mode) {
         return switch (mode) {
             case ESPECES -> "Espèces";
@@ -519,17 +481,6 @@ public class ReglementClientPdfService {
             case EFFET -> "Effet";
             case VIREMENT -> "Virement";
             case VERSEMENT_BANCAIRE -> "Versement bancaire";
-        };
-    }
-
-    private String instrumentStatus(InstrumentReglementClient instrument) {
-        return switch (instrument.getStatut()) {
-            case EN_ATTENTE -> Boolean.TRUE.equals(instrument.getReglementBureau())
-                    ? "Règlement au bureau" : "En attente de bordereau";
-            case REMIS_EN_BANQUE -> "Remis en banque";
-            case CONFIRME -> "Confirmé";
-            case REJETE -> "Impayé";
-            case REMPLACE -> "Remplacé";
         };
     }
 
@@ -557,9 +508,6 @@ public class ReglementClientPdfService {
     }
 
     private String payerIdentity(ReglementClient payment) {
-        if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
-            return value(payment.getPayeurNom()) + "\nDéposant : " + value(payment.getDeposantNom());
-        }
         String address = payerAddress(payment);
         return address.equals("-")
                 ? value(payment.getPayeurNom())

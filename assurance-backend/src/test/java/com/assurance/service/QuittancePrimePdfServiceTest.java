@@ -152,6 +152,38 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
+    void multiClientReceiptUsesDepositorAndKeepsSubscribersWithTheirPolicies() throws Exception {
+        ReglementClient payment = payment(2);
+        payment.setMultiPayeur(true);
+        payment.setDeposantNom("AGADIR 3");
+        Contrat second = payment.getInstruments().get(0).getAffectations().get(1).getElementFacturable().getContrat();
+        Client other = Client.builder().nom("Autre souscripteur").adresse("Adresse non affichee")
+                .ville(Ville.builder().nom("Rabat").build()).build();
+        other.setId(12L);
+        second.getClients().forEach(link -> link.setClient(other));
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now()))) {
+            String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
+            assertThat(text).contains("REPRÉSENTANT", "Nom : AGADIR 3", "POLICE-1", "POLICE-2",
+                    "Souscripteur test", "Autre souscripteur");
+            assertThat(text).doesNotContain("SOUSCRIPTEUR", "Rue du client", "Adresse non affichee", "Ville :");
+            assertThat(text.indexOf("Souscripteur test")).isGreaterThan(text.indexOf("CATÉGORIE"));
+            assertThat(pdf.getNumberOfPages()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void multiClientReceiptDoesNotInventMissingRepresentativeEvenForOneSelectedPolicy() throws Exception {
+        ReglementClient payment = payment(2);
+        payment.setMultiPayeur(true);
+        payment.setDeposantNom(null);
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "1", LocalDate.now(), Set.of("C:1")))) {
+            String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
+            assertThat(text).contains("REPRÉSENTANT", "Nom : -", "POLICE-1", "Souscripteur test");
+            assertThat(text).doesNotContain("SOUSCRIPTEUR", "POLICE-2", "Rue du client", "Période de garantie");
+        }
+    }
+
+    @Test
     void selectionOnlyIncludesItsPoliciesAndAllocatedAmounts() throws Exception {
         ReglementClient payment = payment(2);
         assertThat(service.policies(payment)).hasSize(2);
@@ -177,11 +209,15 @@ class QuittancePrimePdfServiceTest {
             assertThat(option.key()).isEqualTo("C:1");
             assertThat(option.montant()).isEqualByComparingTo("400.00");
             assertThat(option.eligible()).isTrue();
+            assertThat(option.clients()).containsExactly("Souscripteur test");
+            assertThat(option.polices()).containsExactly("POLICE-1");
             assertThat(option.mouvements()).extracting(QuittancePrimePdfService.MovementOption::libelle)
                     .containsExactly("Affaire nouvelle", "Extension garanties");
             assertThat(option.mouvements()).extracting(QuittancePrimePdfService.MovementOption::elementFacturableId)
                     .containsExactly(1L, 2L);
             assertThat(option.mouvements()).allSatisfy(movement -> {
+                assertThat(movement.clientNom()).isEqualTo("Souscripteur test");
+                assertThat(movement.numeroPolice()).isEqualTo("POLICE-1");
                 assertThat(movement.montant()).isEqualByComparingTo("200.00");
                 assertThat(movement.statut()).isEqualTo("REGLEE");
                 assertThat(movement.dateDebut()).isEqualTo(LocalDate.of(2026, 10, 1));

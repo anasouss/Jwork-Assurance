@@ -57,6 +57,25 @@ describe("premium receipt options", () => {
     expect(normalizePremiumReceiptOptions({ policies: [policy], archives: [] }).policies[0].mouvements).toEqual([]);
   });
 
+  it("preserves structured clients, policies and companies without parsing descriptions", () => {
+    const movement = { elementFacturableId: "10", libelle: "Assistance - Wafa Schengen", montant: 50,
+      statut: "REGLEE", clientNom: "CLIENT A", numeroPolice: "00000123", compagnie: "WAFA IMA ASSISTANCE" };
+    const row = { ...policy, descriptions: ["Legacy display label"], clients: ["CLIENT A"], polices: ["00000123"],
+      compagnies: ["WAFA IMA ASSISTANCE"], mouvements: [movement] };
+    const result = normalizePremiumReceiptOptions({ policies: [row], archives: [] }).policies[0];
+    expect(result).toEqual(row);
+    expect(result.key).toBe(policy.key);
+    expect(result.eligible).toBe(true);
+  });
+
+  it("keeps older responses readable without inventing client or company metadata", () => {
+    const result = normalizePremiumReceiptOptions({ policies: [policy], archives: [] }).policies[0];
+    expect(result.clients).toEqual([]);
+    expect(result.polices).toEqual([]);
+    expect(result.compagnies).toEqual([]);
+    expect(result.descriptions).toEqual(policy.descriptions);
+  });
+
   it("rejects malformed movement details instead of dropping movements silently", () => {
     expect(() => normalizePremiumReceiptOptions({ policies: [{ ...policy, mouvements: [{ libelle: "Extension garanties" }] }], archives: [] })).toThrow();
   });

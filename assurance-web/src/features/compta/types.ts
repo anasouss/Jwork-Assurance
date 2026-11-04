@@ -682,6 +682,9 @@ export type CreateRemittanceSlipRequest = {
 export type PremiumReceiptOptions = {
   policies: {
     key: string;
+    clients: string[];
+    polices: string[];
+    compagnies: string[];
     descriptions: string[];
     montant: number;
     eligible: boolean;
@@ -690,6 +693,9 @@ export type PremiumReceiptOptions = {
       elementFacturableId: string;
       documentClientId?: string | null;
       libelle: string;
+      clientNom?: string | null;
+      numeroPolice?: string | null;
+      compagnie?: string | null;
       dateDebut?: string | null;
       dateFin?: string | null;
       montant: number;

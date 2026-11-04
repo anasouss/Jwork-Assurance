@@ -132,7 +132,8 @@ public class QuittancePrimePdfService {
             });
             List<PrimeRow> detailRows = detailRows(rows);
             PrimeRow firstRow = detailRows.get(0);
-            boolean sharedPolicyAndPeriod = detailRows.stream().allMatch(row ->
+            boolean multiPayer = Boolean.TRUE.equals(payment.getMultiPayeur());
+            boolean sharedPolicyAndPeriod = !multiPayer && detailRows.stream().allMatch(row ->
                     row.selectionKey().equals(firstRow.selectionKey())
                             && Objects.equals(row.element.getDateDebut(), firstRow.element.getDateDebut())
                             && Objects.equals(row.element.getDateFin(), firstRow.element.getDateFin()));
@@ -158,7 +159,12 @@ public class QuittancePrimePdfService {
                 add(detail, row.branchNames(assistance), normal, false);
                 add(detail, movementLabel(row, assistance), normal, false);
                 if (!sharedPolicyAndPeriod) {
-                    add(detail, row.policyNumbers(assistance), normal, false);
+                    String policyIdentity = row.policyNumbers(assistance);
+                    if (multiPayer) {
+                        Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);
+                        policyIdentity += "\n" + value(subscriber == null ? null : subscriber.getNomAffichage());
+                    }
+                    add(detail, policyIdentity, normal, false);
                     add(detail, date(row.element.getDateDebut()), normal, false);
                     add(detail, date(row.element.getDateFin()), normal, false);
                 }
@@ -221,8 +227,12 @@ public class QuittancePrimePdfService {
         String status = !coverage.covered().contains(row.element.getId()) ? "NON_SOLDEE"
                 : confirmed && coverage.collected().contains(row.element.getId()) ? "REGLEE"
                 : "EN_ATTENTE_ENCAISSEMENT";
+        Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);
         return new MovementOption(row.element.getId(), row.document == null ? null : row.document.getId(),
-                movementLabel(row, assistance), row.element.getDateDebut(), row.element.getDateFin(), row.total(), status);
+                movementLabel(row, assistance), row.element.getDateDebut(), row.element.getDateFin(), row.total(), status,
+                subscriber == null ? null : subscriber.getNomAffichage(),
+                row.policyNumber(row.element, assistance.get(row.element.getId())),
+                row.company(row.element, assistance.get(row.element.getId())));
     }
 
     private String movementLabel(PrimeRow row, Map<Long, AssistanceContrat> assistance) {
@@ -307,10 +317,26 @@ public class QuittancePrimePdfService {
 
     public record PolicyOption(String key, List<String> descriptions, BigDecimal montant, boolean eligible,
                                List<MovementOption> mouvements, String motifBlocage) {
+        @com.fasterxml.jackson.annotation.JsonProperty("clients")
+        public List<String> clients() {
+            return mouvements.stream().map(MovementOption::clientNom).filter(Objects::nonNull)
+                    .filter(name -> !name.isBlank()).distinct().toList();
+        }
+
+        @com.fasterxml.jackson.annotation.JsonProperty("polices")
+        public List<String> polices() {
+            return mouvements.stream().map(MovementOption::numeroPolice).filter(Objects::nonNull).distinct().toList();
+        }
+
+        @com.fasterxml.jackson.annotation.JsonProperty("compagnies")
+        public List<String> compagnies() {
+            return mouvements.stream().map(MovementOption::compagnie).filter(Objects::nonNull).distinct().toList();
+        }
     }
 
     public record MovementOption(Long elementFacturableId, Long documentClientId, String libelle,
-                                 LocalDate dateDebut, LocalDate dateFin, BigDecimal montant, String statut) {
+                                 LocalDate dateDebut, LocalDate dateFin, BigDecimal montant, String statut,
+                                 String clientNom, String numeroPolice, String compagnie) {
     }
 
     private void writeHeader(Document document, ReglementClient payment, String reference,
@@ -341,6 +367,13 @@ public class QuittancePrimePdfService {
         }
         identity.addCell(details);
         Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
+        if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
+            parties.add(new Paragraph("REPRÉSENTANT").setFont(bold).setFontSize(8).setMarginBottom(6));
+            addField(parties, "Nom", payment.getDeposantNom(), normal, bold);
+            identity.addCell(parties);
+            document.add(identity);
+            return;
+        }
         Map<Client, List<PrimeRow>> bySubscriber = new LinkedHashMap<>();
         for (PrimeRow row : rows) {
             Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);

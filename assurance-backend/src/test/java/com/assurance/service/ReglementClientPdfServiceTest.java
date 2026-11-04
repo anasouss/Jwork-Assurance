@@ -69,10 +69,17 @@ class ReglementClientPdfServiceTest {
             assertThat(pdf.getNumberOfPages()).isEqualTo(1);
             assertThat(text)
                     .contains("11 moyens de paiement · 1 destination affectée")
+                    .contains("Mode de règlement", "OPÉRATEUR", "TOTAL DU RÈGLEMENT (MAD)")
                     .contains("N° POLICE", "MOUVEMENT / PRESTATION", "26500001")
                     .contains("MONTANT AFFECTÉ")
                     .contains("55 000,00")
-                    .doesNotContain("ÉCHÉANCE", "DATE CHÈQUE", "13/11/2026", "CRÉANCE / DOCUMENT", "MATU26-0021");
+                    .doesNotContain("ÉCHÉANCE", "DATE CHÈQUE", "13/11/2026", "CRÉANCE / DOCUMENT", "MATU26-0021",
+                            "DATE DU RÈGLEMENT", "ENREGISTRÉ PAR", "Non affecté", "Montant total");
+            assertThat(text.substring(0, text.indexOf("Mode de règlement"))).doesNotContain("STATUT", "ENCAISSÉ");
+            assertThat(text.substring(text.indexOf("Mode de règlement"), text.indexOf("Affectations")))
+                    .doesNotContain("STATUT", "TOTAL DU RÈGLEMENT", "En attente de bordereau");
+            assertThat(text.indexOf("TOTAL DU RÈGLEMENT")).isGreaterThan(text.indexOf("Affectations"));
+            assertThat(occurrences(text, "TOTAL DU RÈGLEMENT")).isEqualTo(1);
             assertThat(occurrences(text, "Affaire nouvelle")).isEqualTo(1);
             assertThat(occurrences(text, "26500001")).isEqualTo(1);
         }
@@ -118,6 +125,56 @@ class ReglementClientPdfServiceTest {
         try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
             assertThat(new PDFTextStripper().getText(pdf)).contains("ÉCHÉANCE", "11/12/2030")
                     .doesNotContain("11/12/2031", "DATE CHÈQUE");
+        }
+    }
+
+    @Test
+    void multiClientHeaderShowsTheRepresentativeAndOperatorWithoutDuplicatedStatuses() throws Exception {
+        ReglementClient payment = paymentWithElevenCheques();
+        payment.setMultiPayeur(true);
+        payment.setPayeurNom("Plusieurs clients");
+        payment.setDeposantNom("AGADIR 3");
+        payment.getInstruments().forEach(instrument -> instrument.setStatut(StatutInstrumentReglement.CONFIRME));
+        when(paymentRepository.findByIdAndAgenceId(50L, 1L)).thenReturn(Optional.of(payment));
+        when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L)).thenReturn(payment.getInstruments());
+        ReglementClientPdfService service = new ReglementClientPdfService(paymentRepository, instrumentRepository, logoStorageService);
+        try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
+            String text = new PDFTextStripper().getText(pdf);
+            String header = text.substring(0, text.indexOf("Mode de règlement"));
+            assertThat(header).contains("REPRÉSENTANT", "AGADIR 3", "OPÉRATEUR", "Mohammed Melymane", "Agadir");
+            assertThat(header).doesNotContain("Plusieurs clients", "Déposant", "STATUT", "ENCAISSÉ", "DATE DU RÈGLEMENT");
+            assertThat(text.substring(text.indexOf("Mode de règlement"), text.indexOf("Affectations"))).doesNotContain("STATUT", "Confirmé");
+        }
+    }
+
+    @Test
+    void longAllocationTablesShowThePaymentTotalOnlyOnceAtTheEnd() throws Exception {
+        ReglementClient payment = paymentWithElevenCheques();
+        InstrumentReglementClient instrument = payment.getInstruments().get(0);
+        payment.getInstruments().clear();
+        payment.getInstruments().add(instrument);
+        instrument.getAffectations().clear();
+        payment.setMontantTotal(new BigDecimal("600.00"));
+        instrument.setMontant(payment.getMontantTotal());
+        for (int index = 0; index < 60; index++) {
+            Contrat contract = Contrat.builder().numeroPolice("POL-LAYOUT-" + index).build();
+            ElementFacturable element = ElementFacturable.builder().contrat(contract).libelle("Assistance voyage").build();
+            element.setId(1000L + index);
+            AffectationReglementClient allocation = AffectationReglementClient.builder().instrument(instrument)
+                    .elementFacturable(element).payeurNomSnapshot("Client " + index).montant(new BigDecimal("10.00"))
+                    .statut(StatutAffectationReglement.CONFIRMEE).build();
+            allocation.setId(2000L + index);
+            instrument.getAffectations().add(allocation);
+        }
+        when(paymentRepository.findByIdAndAgenceId(50L, 1L)).thenReturn(Optional.of(payment));
+        when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L)).thenReturn(payment.getInstruments());
+        ReglementClientPdfService service = new ReglementClientPdfService(paymentRepository, instrumentRepository, logoStorageService);
+        try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
+            String text = new PDFTextStripper().getText(pdf);
+            assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+            assertThat(occurrences(text, "TOTAL DU RÈGLEMENT")).isEqualTo(1);
+            assertThat(text.indexOf("TOTAL DU RÈGLEMENT")).isGreaterThan(text.indexOf("POL-LAYOUT-59"));
+            assertThat(text).contains("600,00");
         }
     }
 

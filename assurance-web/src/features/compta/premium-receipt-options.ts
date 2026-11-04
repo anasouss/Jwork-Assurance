@@ -9,6 +9,9 @@ const archiveFields = {
 const optionsSchema = z.object({
   policies: z.array(z.object({
     key: z.string(),
+    clients: z.array(z.string()).default([]),
+    polices: z.array(z.string()).default([]),
+    compagnies: z.array(z.string()).default([]),
     descriptions: z.array(z.string()).min(1),
     montant: z.number().finite(),
     eligible: z.boolean().default(false),
@@ -17,6 +20,9 @@ const optionsSchema = z.object({
       elementFacturableId: z.string(),
       documentClientId: z.string().nullish(),
       libelle: z.string(),
+      clientNom: z.string().nullish(),
+      numeroPolice: z.string().nullish(),
+      compagnie: z.string().nullish(),
       dateDebut: z.string().nullish(),
       dateFin: z.string().nullish(),
       montant: z.number().finite(),

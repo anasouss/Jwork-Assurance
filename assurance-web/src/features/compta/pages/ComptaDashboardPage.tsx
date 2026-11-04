@@ -165,7 +165,7 @@ export default function ComptaDashboardPage() {
                             : "flex h-12 items-center gap-3 rounded-md border bg-background px-4 text-sm font-semibold transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-orange-800 dark:hover:border-orange-900 dark:hover:bg-orange-950/30 dark:hover:text-orange-200"
                         }
                       >
-                        <action.icon className="size-4 shrink-0" />
+                        <action.icon className={`size-4 shrink-0 ${action.primary ? "text-white" : "text-orange-600 dark:text-orange-400"}`} />
                         <span>{action.title}</span>
                       </Link>
                     );

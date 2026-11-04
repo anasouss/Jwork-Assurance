@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import TopoBackground from "@/components/kokonutui/topo-background";
 import { DeveloperCredit } from "@/components/shared/developer-credit";
+import { SessionSplash } from "@/components/shared/session-splash";
 import skayLogo from "@/assets/logo.webp";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -41,6 +42,8 @@ export default function LoginPage() {
       navigate("/app", { replace: true });
     }
   };
+
+  if (!isHydrated) return <SessionSplash />;
 
   return (
     <div className="relative isolate flex min-h-svh flex-col bg-zinc-100 text-foreground selection:bg-primary selection:text-primary-foreground dark:bg-background">

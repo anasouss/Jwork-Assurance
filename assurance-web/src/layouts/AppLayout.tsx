@@ -3,7 +3,8 @@ import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppHeader } from "@/components/app-header";
 import { moduleForPath, routeRequiresAgencyContext } from "@/components/app-navigation";
 import { AppSidebar } from "@/components/app-sidebar";
-import { AccessDenied, LoadingPage } from "@/components/shared";
+import { AccessDenied } from "@/components/shared";
+import { SessionSplash } from "@/components/shared/session-splash";
 import { DeveloperCredit } from "@/components/shared/developer-credit";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
@@ -27,7 +28,7 @@ export default function AppLayout() {
   }, [isAuthenticated, isHydrated, navigate]);
 
   if (!isHydrated) {
-    return <LoadingPage message="Chargement de la session" />;
+    return <SessionSplash />;
   }
 
   if (!isAuthenticated || !user) {

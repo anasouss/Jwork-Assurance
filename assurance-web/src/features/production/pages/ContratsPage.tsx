@@ -167,7 +167,7 @@ export default function ContratsPage() {
   return (
     <div className="grid min-w-0 gap-4 overflow-x-hidden">
       <Card className="min-w-0 border-border/70 shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardHeader className="flex flex-col items-start justify-between gap-3 space-y-0 sm:flex-row sm:items-center">
           <CardTitle className="text-base">Liste des dossiers</CardTitle>
           {canCreateContrat ? (
             <Button asChild size="sm">
@@ -312,6 +312,7 @@ export default function ContratsPage() {
                 type="button"
                 variant="outline"
                 size="icon"
+                aria-label="Réinitialiser les filtres"
                 className="h-9 w-9"
                 onClick={() => {
                   setFilters(DEFAULT_CONTRACT_FILTERS);
@@ -326,27 +327,27 @@ export default function ContratsPage() {
       </Card>
 
       <Card className="min-w-0 border-border/70 shadow-none">
-        <CardContent className="min-w-0 p-0">
-          <div className="max-w-full overflow-x-auto p-4">
-            <table className="w-full min-w-[1320px] border-collapse text-sm">
+        <CardContent className="@container min-w-0 p-0">
+          <div className="max-w-full overflow-x-auto p-2 sm:p-4" role="region" aria-label="Liste des dossiers" tabIndex={0}>
+            <table className="w-full min-w-[960px] border-separate border-spacing-0 text-sm @min-[70rem]:min-w-[1200px] @min-[110rem]:min-w-[1320px]">
               <thead className="bg-emerald-600 text-xs uppercase leading-tight text-white dark:bg-emerald-700">
                 <tr>
-                  <TableHeaderCell className="w-36 min-w-36 whitespace-nowrap">
+                  <TableHeaderCell className="sticky left-0 z-10 w-36 min-w-36 whitespace-nowrap bg-emerald-600 dark:bg-emerald-700 @min-[110rem]:static">
                     Dossier N°
                   </TableHeaderCell>
-                  <TableHeaderCell className="w-10" />
-                  <TableHeaderCell>Code client</TableHeaderCell>
+                  <TableHeaderCell className="hidden w-10 @min-[110rem]:table-cell" />
+                  <TableHeaderCell className="hidden @min-[110rem]:table-cell">Code client</TableHeaderCell>
                   <TableHeaderCell>Souscripteur</TableHeaderCell>
-                  <TableHeaderCell>Branche</TableHeaderCell>
-                  <TableHeaderCell>Produit</TableHeaderCell>
-                  <TableHeaderCell>Mouvement N°</TableHeaderCell>
-                  <TableHeaderCell>{appliedAssistanceBranch ? "Contrat assistance N°" : "Police N°"}</TableHeaderCell>
-                  <TableHeaderCell>Compagnie</TableHeaderCell>
-                  <TableHeaderCell>Événement</TableHeaderCell>
-                  <TableHeaderCell>Date d'effet</TableHeaderCell>
-                  <TableHeaderCell>Date d'échéance</TableHeaderCell>
-                  <TableHeaderCell>Statut</TableHeaderCell>
-                  <TableHeaderCell>Actions</TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[110rem]:table-cell">Branche</TableHeaderCell>
+                  <TableHeaderCell><span className="@min-[110rem]:hidden">Contrat</span><span className="hidden @min-[110rem]:inline">Produit</span></TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[70rem]:table-cell">Mouvement<span className="hidden @min-[110rem]:inline"> N°</span></TableHeaderCell>
+                  <TableHeaderCell><span className="@min-[70rem]:hidden">Police / Mouvement</span><span className="hidden @min-[70rem]:inline">{appliedAssistanceBranch ? "Contrat assistance N°" : "Police N°"}</span></TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[70rem]:table-cell">Compagnie</TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[110rem]:table-cell">Événement</TableHeaderCell>
+                  <TableHeaderCell><span className="@min-[110rem]:hidden">Période</span><span className="hidden @min-[110rem]:inline">Date d'effet</span></TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[110rem]:table-cell">Date d'échéance</TableHeaderCell>
+                  <TableHeaderCell className="hidden @min-[70rem]:table-cell">Statut</TableHeaderCell>
+                  <TableHeaderCell className="sticky right-0 z-10 min-w-28 bg-emerald-600 dark:bg-emerald-700 @min-[110rem]:static"><span className="@min-[70rem]:hidden">Statut / </span>Actions</TableHeaderCell>
                 </tr>
               </thead>
               <tbody>
@@ -434,35 +435,58 @@ function ContratRow({
   );
 
   return (
-    <tr className={cn("border-b transition-colors hover:bg-muted/40", child && "bg-emerald-100/70 hover:bg-emerald-100 dark:bg-emerald-950/25 dark:hover:bg-emerald-950/35")}>
-      <TableCellStrong>{dossierNumber(contrat)}</TableCellStrong>
-      <td className="px-2 py-2 text-center"><TypeBadge contrat={contrat} /></td>
-      <TableCell>{clientCode(contrat)}</TableCell>
-      <TableCell className="font-medium uppercase">{mainClient(contrat)}</TableCell>
-      <TableCell className="uppercase">{branchLabel(contrat)}</TableCell>
+    <tr className={cn("group transition-colors hover:bg-muted/40 [&>td]:border-b", child && "bg-emerald-100/70 hover:bg-emerald-100 dark:bg-emerald-950/25 dark:hover:bg-emerald-950/35")}>
+      <TableCellStrong className={cn("sticky left-0 z-10 bg-card @min-[110rem]:static", child && "bg-emerald-50 dark:bg-emerald-950")}>
+        <span className="block">{dossierNumber(contrat)}</span>
+        <div className="mt-1.5 flex items-center gap-2 @min-[110rem]:hidden">
+          <TypeBadge contrat={contrat} />
+          <span className="text-xs font-normal text-muted-foreground">{clientCode(contrat)}</span>
+        </div>
+      </TableCellStrong>
+      <td className="hidden px-2 py-2 text-center @min-[110rem]:table-cell"><TypeBadge contrat={contrat} /></td>
+      <TableCell className="hidden @min-[110rem]:table-cell">{clientCode(contrat)}</TableCell>
+      <TableCell className="min-w-40 max-w-56 break-words font-medium uppercase">{mainClient(contrat)}</TableCell>
+      <TableCell className="hidden uppercase @min-[110rem]:table-cell">{branchLabel(contrat)}</TableCell>
       <TableCell>
-        <div className="flex flex-col items-center text-center">
+        <div className="flex min-w-36 max-w-56 flex-col items-center gap-1 text-center">
           <span>{productLabel(contrat)}</span>
           {conventionLabel ? <span className="text-xs text-muted-foreground">{conventionLabel}</span> : null}
+          <span className="text-xs text-muted-foreground @min-[110rem]:hidden">{branchLabel(contrat)}</span>
+          <span className="text-xs text-muted-foreground @min-[70rem]:hidden">{companyLabel}</span>
         </div>
       </TableCell>
-      <TableCell className="text-center">{movement.numeroMouvement}</TableCell>
-      <TableCell className="text-center uppercase">{contrat.numeroPolice ?? "-"}</TableCell>
-      <TableCell className="text-center">{companyLabel}</TableCell>
-      <TableCell className="text-center font-semibold">
+      <TableCell className="hidden min-w-28 text-center @min-[70rem]:table-cell">
+        <span className="@min-[110rem]:hidden">N° </span>{movement.numeroMouvement}
+        <p className="mt-1 text-xs font-medium @min-[110rem]:hidden">{eventLabel(contrat, movement)}</p>
+      </TableCell>
+      <TableCell className="min-w-44 max-w-60 text-center">
+        <span className="whitespace-nowrap uppercase">{contrat.numeroPolice ?? "-"}</span>
+        <div className="mt-1 space-y-0.5 text-xs text-muted-foreground @min-[70rem]:hidden">
+          <p>Mvt n° {movement.numeroMouvement}</p>
+          <p className="font-medium text-foreground">{eventLabel(contrat, movement)}</p>
+        </div>
+      </TableCell>
+      <TableCell className="hidden min-w-28 text-center @min-[70rem]:table-cell">{companyLabel}</TableCell>
+      <TableCell className="hidden text-center font-semibold @min-[110rem]:table-cell">
         <div className="flex flex-col items-center">
           <span>{eventLabel(contrat, movement)}</span>
         </div>
       </TableCell>
-      <TableCell className="text-center">{formatDate(movement.dateEffet ?? contrat.dateEffet)}</TableCell>
-      <TableCell className="text-center">{formatDate(movement.dateEcheance ?? contrat.dateEcheance)}</TableCell>
-      <TableCell className="text-center">
+      <TableCell className="whitespace-nowrap text-center tabular-nums">
+        <span className="@min-[110rem]:hidden">Du </span>{formatDate(movement.dateEffet ?? contrat.dateEffet)}
+        <p className="mt-1 text-xs text-muted-foreground @min-[110rem]:hidden">Au {formatDate(movement.dateEcheance ?? contrat.dateEcheance)}</p>
+      </TableCell>
+      <TableCell className="hidden whitespace-nowrap text-center tabular-nums @min-[110rem]:table-cell">{formatDate(movement.dateEcheance ?? contrat.dateEcheance)}</TableCell>
+      <TableCell className="hidden text-center @min-[70rem]:table-cell">
         <StatusBadge statut={statusLabel(contrat, movement)} progression={contrat.progressionBrouillon} />
       </TableCell>
-      <td className="px-2 py-2">
-        <div className="flex items-center justify-center gap-2">
+      <td className={cn("sticky right-0 z-10 bg-card px-2 py-2 @min-[110rem]:static", child && "bg-emerald-50 dark:bg-emerald-950")}>
+        <div className="mb-1.5 text-center @min-[70rem]:hidden">
+          <StatusBadge statut={statusLabel(contrat, movement)} progression={contrat.progressionBrouillon} />
+        </div>
+        <div className="flex items-center justify-center gap-1 @min-[110rem]:gap-2">
           {canViewContrat && !contrat.assistanceLiee ? (
-            <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Ouvrir le PDF">
+            <Button asChild variant="ghost" size="icon" className="size-8 text-sky-600 hover:text-sky-700" title="Ouvrir le PDF" aria-label="Ouvrir le PDF">
               <Link
                 to={showContratPath(contrat, movement)}
                 target="_blank"
@@ -474,7 +498,7 @@ function ContratRow({
           ) : null}
           <RowActions contrat={contrat} movement={movement} child={child} />
           {canExpand ? (
-            <Button type="button" size="icon" className="size-8 bg-blue-600 hover:bg-blue-700" onClick={onToggle} title={expanded ? "Masquer les mouvements" : `Afficher ${movementCount - 1} mouvement(s)`}>
+            <Button type="button" size="icon" className="size-8 bg-blue-600 hover:bg-blue-700" onClick={onToggle} aria-expanded={expanded} aria-label={expanded ? "Masquer les mouvements" : `Afficher ${movementCount - 1} mouvement(s)`} title={expanded ? "Masquer les mouvements" : `Afficher ${movementCount - 1} mouvement(s)`}>
               <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} />
             </Button>
           ) : null}
@@ -937,9 +961,9 @@ function TableCell({ className, children }: { className?: string; children?: Rea
   return <td className={cn("px-3 py-2 align-middle", className)}>{children}</td>;
 }
 
-function TableCellStrong({ children }: { children?: React.ReactNode }) {
+function TableCellStrong({ className, children }: { className?: string; children?: React.ReactNode }) {
   return (
-    <td className="w-36 min-w-36 whitespace-nowrap px-3 py-2 align-middle font-medium">
+    <td className={cn("w-36 min-w-36 whitespace-nowrap px-3 py-2 align-middle font-medium", className)}>
       {children}
     </td>
   );

@@ -339,7 +339,7 @@ export default function ContratsPage() {
                   <TableHeaderCell className="hidden @min-[110rem]:table-cell">Code client</TableHeaderCell>
                   <TableHeaderCell>Souscripteur</TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[110rem]:table-cell">Branche</TableHeaderCell>
-                  <TableHeaderCell><span className="@min-[110rem]:hidden">Contrat</span><span className="hidden @min-[110rem]:inline">Produit</span></TableHeaderCell>
+                  <TableHeaderCell>Produit</TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[70rem]:table-cell">Mouvement N°</TableHeaderCell>
                   <TableHeaderCell><span className="@min-[70rem]:hidden">Police / Mouvement</span><span className="hidden @min-[70rem]:inline">{appliedAssistanceBranch ? "Contrat assistance N°" : "Police N°"}</span></TableHeaderCell>
                   <TableHeaderCell className="hidden @min-[70rem]:table-cell">Compagnie</TableHeaderCell>

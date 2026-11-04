@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -22,7 +22,6 @@ import { toast } from "sonner";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
@@ -42,6 +41,8 @@ import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientRecordDialog } from "@/features/crm/components/ClientRecordDialog";
+import { CreateClientGroupDialog } from "@/features/crm/components/CreateClientGroupDialog";
+import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
 import { ClientDocuments, ClientDocumentDrafts, type ClientDocumentDraft } from "@/features/crm/components/ClientDocuments";
 import { attachmentApi } from "@/features/production/api/attachments";
 import { referenceApi } from "@/features/production/api/references";
@@ -227,7 +228,7 @@ export default function ClientCrmPage() {
         </DialogContent>
       </Dialog>
 
-      <GroupDialog
+      <CreateClientGroupDialog
         open={groupDialogOpen}
         onOpenChange={setGroupDialogOpen}
         onSaved={refreshCrm}
@@ -605,18 +606,10 @@ function ClientDialog({
             <Input type="email" value={draft.email ?? ""} onChange={(event) => update({ email: event.target.value })} />
           </Field>
           <Field label="Groupe">
-            <Select value={draft.groupeClientId ?? "INDEPENDANT"} onValueChange={(value) => update({
+            <ClientGroupSelect value={draft.groupeClientId ?? "INDEPENDANT"} groups={groupes} disabled={createMutation.isPending || Boolean(createdClient)} onValueChange={(value) => update({
               groupeClientId: value === "INDEPENDANT" ? undefined : value,
               relationGroupe: value === "INDEPENDANT" ? undefined : draft.relationGroupe ?? "FILIALE",
-            })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="INDEPENDANT">Client indépendant</SelectItem>
-                {groupes.filter((groupe) => groupe.actif).map((groupe) => (
-                  <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            })} />
           </Field>
           {draft.groupeClientId ? (
             <Field label="Relation au groupe">
@@ -1200,122 +1193,6 @@ function WorkspaceLink({ to, icon, title, detail, tone }: {
   );
 }
 
-function GroupDialog({
-  open,
-  onOpenChange,
-  onSaved,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSaved: () => Promise<void>;
-}) {
-  const [code, setCode] = useState("");
-  const [libelle, setLibelle] = useState("");
-  const [clientSearch, setClientSearch] = useState("");
-  const deferredSearch = useDeferredValue(clientSearch.trim());
-  const [clientTeteId, setClientTeteId] = useState("");
-  const [clientTresorerieId, setClientTresorerieId] = useState("");
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, ClientOption>>({});
-  const [consolidated, setConsolidated] = useState(false);
-  const clientsQuery = useQuery({
-    queryKey: ["clients", "group-responsible-search", deferredSearch],
-    queryFn: () => clientApi.listClients({ query: deferredSearch, size: 25 }),
-    enabled: open && deferredSearch.length >= 2,
-  });
-  const remoteOptions = (clientsQuery.data?.items ?? []).map((client) => ({
-    value: client.id,
-    label: client.nomAffichage ?? client.id,
-    keywords: [client.rc, client.cin, client.ice].filter(Boolean).join(" "),
-  }));
-  const options = useMemo(() => {
-    const byId = new Map(Object.values(selectedOptions).map((option) => [option.value, option]));
-    remoteOptions.forEach((option) => byId.set(option.value, option));
-    return [...byId.values()];
-  }, [remoteOptions, selectedOptions]);
-  const selectResponsible = (value: string, setter: (next: string) => void) => {
-    setter(value);
-    const option = remoteOptions.find((item) => item.value === value);
-    if (option) {
-      setSelectedOptions((current) => ({ ...current, [value]: option }));
-    }
-  };
-  const createMutation = useMutation({
-    mutationFn: clientApi.createGroupeClient,
-    onSuccess: async () => {
-      await onSaved();
-      toast.success("Groupe client créé");
-      onOpenChange(false);
-      setCode("");
-      setLibelle("");
-      setClientTeteId("");
-      setClientTresorerieId("");
-      setClientSearch("");
-      setSelectedOptions({});
-      setConsolidated(false);
-    },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Nouveau groupe client</DialogTitle>
-          <DialogDescription>Définissez la structure du groupe et l'entité qui centralise ses paiements.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Code">
-            <Input value={code} onChange={(event) => setCode(event.target.value)} />
-          </Field>
-          <Field label="Nom du groupe">
-            <Input value={libelle} onChange={(event) => setLibelle(event.target.value)} />
-          </Field>
-          <Field label="Tête de groupe">
-            <AutocompleteSelect
-              value={clientTeteId}
-              onValueChange={(value) => selectResponsible(value, setClientTeteId)}
-              onQueryChange={setClientSearch}
-              options={options}
-              placeholder="RC, CIN ou nom"
-            />
-          </Field>
-          <Field label="Entité responsable des paiements">
-            <AutocompleteSelect
-              value={clientTresorerieId}
-              onValueChange={(value) => selectResponsible(value, setClientTresorerieId)}
-              onQueryChange={setClientSearch}
-              options={options}
-              placeholder="RC, CIN ou nom"
-            />
-          </Field>
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
-            <Checkbox checked={consolidated} onCheckedChange={(checked) => setConsolidated(Boolean(checked))} />
-            Facturation consolidée par défaut
-          </label>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button
-            type="button"
-            className="bg-blue-600 text-white hover:bg-blue-700"
-            disabled={!code.trim() || !libelle.trim() || createMutation.isPending}
-            onClick={() => createMutation.mutate({
-              code: code.trim(),
-              libelle: libelle.trim(),
-              clientTeteId: clientTeteId || undefined,
-              clientTresorerieId: clientTresorerieId || undefined,
-              facturationConsolideeDefaut: consolidated,
-              actif: true,
-            })}
-          >
-            Enregistrer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function AssignmentDialog({
   open,
   onOpenChange,
@@ -1368,15 +1245,7 @@ function AssignmentDialog({
         </DialogHeader>
         <div className="grid gap-4">
           <Field label="Groupe">
-            <Select value={groupId} onValueChange={setGroupId}>
-              <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="INDEPENDANT">Client indépendant</SelectItem>
-                {groupes.filter((groupe) => groupe.actif).map((groupe) => (
-                  <SelectItem key={groupe.id} value={groupe.id}>{groupe.code} - {groupe.libelle}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <ClientGroupSelect value={groupId} groups={groupes} onValueChange={setGroupId} disabled={mutation.isPending} />
           </Field>
           {groupId !== "INDEPENDANT" ? (
             <Field label="Relation">
@@ -1514,12 +1383,6 @@ function dateLabel(value?: string | null) {
 function label(value?: string | null) {
   return value ? value.replaceAll("_", " ").toLocaleLowerCase("fr").replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase("fr")) : "-";
 }
-
-type ClientOption = {
-  value: string;
-  label: string;
-  keywords: string;
-};
 
 function principalMembershipId(detail?: Awaited<ReturnType<typeof clientApi.getClientCrm>>) {
   if (!detail) return undefined;

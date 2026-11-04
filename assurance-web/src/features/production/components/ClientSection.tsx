@@ -15,6 +15,7 @@ import { Field } from "./Field";
 import { toDateOnly } from "../date";
 import { clientApi } from "../api/clients";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
+import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
 import type { ClientInput, ClientResponse, GenreClient, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -631,9 +632,11 @@ export function ClientSection({
                 <div className="mt-4 space-y-4 border-t pt-4">
                   <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                     <Field label="Organisation">
-                    <Select
+                    <ClientGroupSelect
                       value={item.groupeClientId ?? "INDEPENDANT"}
-                      onValueChange={(value) => {
+                      groups={groupesClients}
+                      disabled={saving}
+                      onValueChange={(value, selectedGroup) => {
                         if (value === "INDEPENDANT") {
                           updateClientLink(index, {
                             groupeClientId: undefined,
@@ -643,7 +646,6 @@ export function ClientSection({
                           onSouscripteurGroupChange?.();
                           return;
                         }
-                        const selectedGroup = groupesClients.find((groupe) => groupe.id === value);
                         updateClientLink(index, {
                           groupeClientId: value,
                           relationGroupe: item.relationGroupe ?? "FILIALE",
@@ -651,17 +653,7 @@ export function ClientSection({
                         });
                         onSouscripteurGroupChange?.(selectedGroup);
                       }}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="INDEPENDANT">Client indépendant</SelectItem>
-                        {groupesClients.filter((groupe) => groupe.actif).map((groupe) => (
-                          <SelectItem key={groupe.id} value={groupe.id}>
-                            {groupe.code} - {groupe.libelle}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                     </Field>
                     {item.groupeClientId ? (
                     <>

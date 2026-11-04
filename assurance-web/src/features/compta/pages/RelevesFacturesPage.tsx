@@ -379,7 +379,7 @@ export default function RelevesFacturesPage() {
   }
 
   return (
-    <div className="grid min-w-0 gap-4 overflow-x-hidden">
+    <div className="mx-auto grid w-full min-w-0 max-w-[1440px] gap-4 overflow-x-hidden">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase text-amber-700">Comptabilité client</div>

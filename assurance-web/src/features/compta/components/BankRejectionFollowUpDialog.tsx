@@ -106,7 +106,14 @@ export function BankRejectionFollowUpDialog({ instrument, mode, onClose }: {
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"><h4 className="text-sm font-semibold">{title}</h4><time dateTime={event.date} className="text-xs text-muted-foreground">{formatTreasuryDate(event.date)}</time></div>
                     {event.motif && event.motif !== title && <p className="whitespace-pre-wrap break-words text-sm">{event.motif}</p>}
                     {event.instrumentSourceId && event.instrumentSourceId !== instrument.id && <p className="text-xs text-muted-foreground">Sur une contre-valeur</p>}
-                    {event.bordereauId && <Link className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${event.bordereauId}`}><Landmark className="size-3.5" />{event.numeroBordereau || "Bordereau"}</Link>}
+                    {event.bordereauId && <p className="flex flex-wrap items-baseline gap-x-1 text-xs text-muted-foreground">
+                      <span>{bank ? "Remise" : "Remise associée"} :</span>
+                      <Link className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300"
+                        title="Voir le bordereau de remise bancaire"
+                        to={`/app/compta/tresorerie/bordereaux-remise/${event.bordereauId}`}>
+                        <Landmark aria-hidden="true" className="size-3.5" />{event.numeroBordereau || "Voir le bordereau"}
+                      </Link>
+                    </p>}
                     <p className="text-xs text-muted-foreground">{event.historiqueExistant ? "Historique existant" : event.utilisateur || "Utilisateur non renseigné"}</p>
                   </div>
                 </li>;

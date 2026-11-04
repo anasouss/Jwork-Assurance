@@ -44,8 +44,8 @@ export default function LoginPage() {
 
   return (
     <div className="relative isolate flex min-h-svh flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      <div aria-hidden="true" className="absolute inset-y-0 left-0 -z-10 hidden w-[48%] border-r border-border bg-zinc-100 lg:block xl:w-[54%] dark:bg-zinc-900">
-        <TopoBackground className="h-full min-h-0 bg-transparent text-[#956d32] dark:bg-transparent dark:text-[#bd985a]"
+      <div aria-hidden="true" className="absolute inset-y-3 left-3 -z-10 hidden w-[calc(48%-0.75rem)] overflow-hidden rounded-2xl bg-[#e9ecef] lg:block xl:w-[calc(54%-0.75rem)] dark:bg-zinc-900">
+        <TopoBackground className="h-full min-h-0 bg-transparent text-[#855e28] dark:bg-transparent dark:text-[#bd985a]"
           speed={0.7} interactive labels={false} seed={26} interval={0.09}>
           {null}
         </TopoBackground>

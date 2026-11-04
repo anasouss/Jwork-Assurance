@@ -1333,8 +1333,10 @@ export default function AvenantContratPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-1.5 text-xs font-semibold uppercase text-slate-700 dark:text-neutral-300"><span>{label}</span>{children}</label>;
+function Field({ label, children, required = false }: { label: string; children: React.ReactNode; required?: boolean }) {
+  return <label className="grid gap-1.5 text-xs font-semibold uppercase text-slate-700 dark:text-neutral-300">
+    <span>{label}{required && <span className="ml-1 text-red-500">*</span>}</span>{children}
+  </label>;
 }
 
 function errorMessage(error: unknown) {

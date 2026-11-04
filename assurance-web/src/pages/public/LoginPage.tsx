@@ -58,11 +58,12 @@ export default function LoginPage() {
       </header>
 
       <main className="pointer-events-none relative mx-auto grid w-full max-w-[1440px] flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-24 lg:px-14 lg:py-16 xl:gap-40">
-        <div className="hidden max-w-sm self-end space-y-5 pb-6 text-[#132a3b] lg:block dark:text-[#edf2f5]">
-          <p className="max-w-[340px] text-balance text-3xl font-semibold leading-[1.25]">
-            Votre espace de gestion d’assurance.
+        <div className="hidden min-w-0 max-w-md self-end space-y-6 pb-6 text-[#132a3b] lg:block dark:text-[#edf2f5]">
+          <p className="max-w-[420px] text-4xl font-semibold leading-[1.2]">
+            <span className="block">Votre espace de</span>
+            <span className="block text-[#805a19] dark:text-[#e1b86b]">gestion d’assurance.</span>
           </p>
-          <p className="max-w-[320px] text-pretty text-sm leading-6 text-[#40586a] dark:text-[#becdd7]">
+          <p className="max-w-[360px] text-pretty text-base leading-7 text-[#354f61] dark:text-[#becdd7]">
             Contrats, clients, sinistres et comptabilité réunis au même endroit.
           </p>
         </div>

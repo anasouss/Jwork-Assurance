@@ -43,6 +43,8 @@ class ReleveClientPdfRendererTest {
             DocumentClient source = statement(count);
             source.setPayeurNom(null);
             var line = source.getLignes().get(0);
+            line.setDateOperation(java.time.LocalDate.of(2026, 10, 1));
+            line.setDateEcheance(java.time.LocalDate.of(2027, 9, 30));
             line.setPrimeNette(new BigDecimal("20402.76"));
             line.setTaxes(new BigDecimal("3450.39"));
             line.setMontantTtc(new BigDecimal("23904.16"));
@@ -56,7 +58,7 @@ class ReleveClientPdfRendererTest {
             try (PDDocument pdf = PDDocument.load(renderLinesAndTotals(source))) {
                 String text = new PDFTextStripper().getText(pdf);
                 assertThat(text).contains("20 402,76", "3 450,39", "23 904,16", "22 904,16",
-                        "123 456 789 012,34", "12 345 678 901,23", "135 802 467 913,57");
+                        "123 456 789 012,34", "12 345 678 901,23", "135 802 467 913,57", "01/10/26", "30/09/27");
                 if (count == 75) assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
             }
         }

@@ -311,8 +311,8 @@ public class ReleveClientPdfRenderer {
                 || source.getLignes().stream().anyMatch(line -> !value(statementInsuredName(source, line, subscriberNames))
                         .equalsIgnoreCase(source.getPayeurNom().trim()));
         float[] columns = showAdvance
-                ? new float[]{14, 10.5f, 8, 8, 10, 9, 10.5f, 9, 10.5f, 19}
-                : new float[]{14, 10.5f, 8, 8, 10, 9, 10.5f, 10.5f, 19};
+                ? new float[]{14, 13, 8, 8, 10, 9, 10.5f, 9, 10.5f, 16.5f}
+                : new float[]{14, 13, 8, 8, 10, 9, 10.5f, 10.5f, 16.5f};
         float[] visibleColumns = showInsured ? columns : java.util.Arrays.copyOfRange(columns, 1, columns.length);
         float totalWeight = 0;
         for (float column : visibleColumns) totalWeight += column;
@@ -420,7 +420,7 @@ public class ReleveClientPdfRenderer {
         if (showInsured) {
             addValue(table, statementInsuredName(source, line, subscriberNames), TextAlignment.LEFT, null, fontSize, cellPadding);
         }
-        addValue(table, statementReference(line), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addSingleLineValue(table, statementReference(line), regular, fontSize, cellPadding, cellWidths[1]);
         addSingleLineValue(table, date(line.getDateOperation()), regular, fontSize, cellPadding, cellWidths[2]);
         addSingleLineValue(table, date(line.getDateEcheance()), regular, fontSize, cellPadding, cellWidths[3]);
         addSingleLineValue(table, amount(line.getPrimeNette()), regular, fontSize, cellPadding, cellWidths[4]);
@@ -594,7 +594,7 @@ public class ReleveClientPdfRenderer {
     }
 
     private void addSingleLineValue(Table table, String text, PdfFont font, float fontSize, float cellPadding, float cellWidth) {
-        // Fit dates and amounts before layout so iText never breaks them across lines.
+        // Fit policy numbers, dates and amounts before layout to keep each value on one line.
         float availableWidth = Math.max(1, cellWidth - 2 * cellPadding - 1.2f);
         float textWidth = font.getWidth(text, fontSize);
         float fittedSize = textWidth > availableWidth ? fontSize * availableWidth / textWidth : fontSize;

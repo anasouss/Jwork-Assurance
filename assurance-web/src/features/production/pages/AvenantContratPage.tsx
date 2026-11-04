@@ -16,6 +16,7 @@ import {
   assistanceValidationMessage,
   buildAvenantAssistances,
   buildAvenantAssistancesForTarget,
+  conventionPaymentDefaults,
   DEFAULT_VEHICLE,
   ensureRcGaranties,
   hydrateAvenantAssistances,
@@ -61,6 +62,7 @@ import { AvenantTargetsSection } from "../components/AvenantTargetsSections";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { AvenantManualQuittanceTable, emptyAvenantQuittance, hasAvenantQuittanceAmounts } from "../components/AvenantManualQuittanceTable";
 import { toDateOnly } from "../date";
+import { numberValue } from "../utils/format";
 import type { AssistanceDraft, AvenantRequest, GarantieInput, QuittanceInput, QuittancePreview, RemorqueInput, VehiculeInput } from "../types";
 
 export default function AvenantContratPage() {
@@ -73,6 +75,9 @@ export default function AvenantContratPage() {
   const [dateEffet, setDateEffet] = useState<string>();
   const [dateEcheance, setDateEcheance] = useState<string>();
   const [libelleReleve, setLibelleReleve] = useState("");
+  const [modeReglement, setModeReglement] = useState<AvenantRequest["modeReglement"]>();
+  const [numeroBonCommande, setNumeroBonCommande] = useState("");
+  const [montantBulletin, setMontantBulletin] = useState("");
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [precisionDrafts, setPrecisionDrafts] = useState<Record<string, PrecisionDraft>>({});
   const [duplicataAttestationDrafts, setDuplicataAttestationDrafts] = useState<Record<string, DuplicataAttestationDraft>>({});
@@ -347,6 +352,10 @@ export default function AvenantContratPage() {
     }
     hydratedDraftCodeRef.current = hydrationKey;
     const request = validatedMovementId ? rectificationQuery.data : draftQuery.data?.request;
+    const payment = conventionPaymentDefaults(contrat, request ?? undefined);
+    setModeReglement(payment.mode);
+    setNumeroBonCommande(payment.numeroBonCommande);
+    setMontantBulletin(payment.montantBulletin);
     if (!request) {
       if (isVehicleTargetCreationCode(movementCode)) {
         setVehicules([{ ...DEFAULT_VEHICLE }]);
@@ -494,6 +503,10 @@ export default function AvenantContratPage() {
         queryClient.invalidateQueries({ queryKey: contractKeys.all }),
         queryClient.invalidateQueries({ queryKey: amendmentKeys.context(contratId) }),
         queryClient.invalidateQueries({ queryKey: attestationStockKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "client-receivable-selection"] }),
       ]);
       setCreationSuccess(saved);
     },
@@ -505,6 +518,9 @@ export default function AvenantContratPage() {
     const request: AvenantRequest = {
       codeTypeMouvement: movementCode,
       libelleReleve: libelleReleve.trim() || undefined,
+      modeReglement: contrat?.typeContrat === "CONVENTION" ? modeReglement : undefined,
+      numeroBonCommande: contrat?.typeContrat === "CONVENTION" && modeReglement === "facture" ? numeroBonCommande.trim() || undefined : undefined,
+      montantBulletin: contrat?.typeContrat === "CONVENTION" && modeReglement === "facture" ? numberValue(montantBulletin) : undefined,
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
       quittances: supportsManualQuittance ? quittanceLines : undefined,
@@ -834,6 +850,9 @@ export default function AvenantContratPage() {
     targetAssistances,
     quittanceLines,
     saisiePrimeNette,
+    modeReglement,
+    numeroBonCommande,
+    montantBulletin,
   ]);
 
   useEffect(() => {
@@ -871,6 +890,12 @@ export default function AvenantContratPage() {
   ]);
 
   const save = () => {
+    if (contrat?.typeContrat === "CONVENTION" && preview?.requiresConventionPayment) {
+      if (!modeReglement) { toast.error("Sélectionnez le mode de règlement de l'avenant"); return; }
+      if (modeReglement === "facture" && (!numeroBonCommande.trim() || !(Number(numberValue(montantBulletin)) > 0))) {
+        toast.error("Renseignez le bon de commande et le montant du bulletin de l'avenant"); return;
+      }
+    }
     const request = buildRequest();
     if (request) saveMutation.mutate(request);
   };
@@ -1069,6 +1094,20 @@ export default function AvenantContratPage() {
               onChange={(event) => setLibelleReleve(event.target.value.replace(/[\r\n]+/g, " "))}
             />
           </Field>
+          {contrat?.typeContrat === "CONVENTION" && preview?.requiresConventionPayment !== false && <>
+            <Field label="Mode de règlement de l'avenant">
+              <Select value={modeReglement ?? ""} onValueChange={value => {
+                setModeReglement(value as AvenantRequest["modeReglement"]);
+                if (value !== "facture") { setNumeroBonCommande(""); setMontantBulletin(""); }
+              }}><SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>
+                <SelectItem value="bureau">Règlement bureau</SelectItem><SelectItem value="facture">Règlement facture</SelectItem>
+              </SelectContent></Select>
+            </Field>
+            {modeReglement === "facture" && <>
+              <Field label="N° bon de commande de l'avenant"><Input maxLength={120} value={numeroBonCommande} onChange={event => setNumeroBonCommande(event.target.value)} /></Field>
+              <Field label="Montant du bulletin de l'avenant"><Input inputMode="decimal" value={montantBulletin} onChange={event => setMontantBulletin(event.target.value)} /></Field>
+            </>}
+          </>}
         </CardContent>
       </Card>
 

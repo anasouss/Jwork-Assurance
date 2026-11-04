@@ -25,6 +25,17 @@ public interface EcheanceFacturationConventionRepository
 
     List<EcheanceFacturationConvention> findByContratIdAndActifTrueOrderByNumeroPeriodeAsc(Long contratId);
 
+    List<EcheanceFacturationConvention> findByContratIdOrderByNumeroPeriodeAsc(Long contratId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("""
+            update EcheanceFacturationConvention e set e.actif = false
+            where e.agence.id = :agenceId and e.statut = com.assurance.enums.StatutEcheanceFacturationConvention.A_FACTURER
+              and e.mouvement.id in (select m.id from MouvementContrat m
+                  where m.agence.id = :agenceId and m.statut <> com.assurance.enums.StatutMouvementContrat.VALIDE)
+            """)
+    void deactivateCancelledMovementSchedules(@Param("agenceId") Long agenceId);
+
     List<EcheanceFacturationConvention> findByDocumentClientId(Long documentClientId);
 
     @EntityGraph(attributePaths = {

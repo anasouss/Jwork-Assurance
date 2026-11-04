@@ -30,6 +30,91 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ContratDraftCleanupTest {
 
+    @Test
+    void conventionAmendmentInheritsPaymentModeWithoutChangingTheOriginalContract() {
+        var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("bureau")
+                .numeroBonCommande("ORIGINAL").montantBulletin(new java.math.BigDecimal("9000.00")).build();
+        var movement = new com.assurance.entity.MouvementContrat();
+        ConventionPaymentPolicy.apply(original, movement, new AvenantRequest(),
+                com.assurance.dto.response.QuittanceResponse.builder().primeTotale(new java.math.BigDecimal("100.00")).build());
+        assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.BUREAU);
+        assertThat(original.getModeReglement()).isEqualTo("bureau");
+        assertThat(original.getNumeroBonCommande()).isEqualTo("ORIGINAL");
+        assertThat(original.getMontantBulletin()).isEqualByComparingTo("9000.00");
+    }
+
+    @Test
+    void conventionAmendmentInvoiceRequiresItsOwnOrderAndAmount() {
+        var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("facture")
+                .numeroBonCommande("OLD-ORDER").montantBulletin(new java.math.BigDecimal("9000")).build();
+        var request = new AvenantRequest();
+        var preview = com.assurance.dto.response.QuittanceResponse.builder().primeTotale(new java.math.BigDecimal("100")).build();
+        assertThatThrownBy(() -> ConventionPaymentPolicy.apply(original, new com.assurance.entity.MouvementContrat(), request, preview))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("bon de commande");
+        request.setNumeroBonCommande("NEW-ORDER");
+        assertThatThrownBy(() -> ConventionPaymentPolicy.apply(original, new com.assurance.entity.MouvementContrat(), request, preview))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("bulletin");
+        request.setMontantBulletin(new java.math.BigDecimal("100.00"));
+        var movement = new com.assurance.entity.MouvementContrat();
+        ConventionPaymentPolicy.apply(original, movement, request, preview);
+        assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.FACTURE);
+        assertThat(movement.getNumeroBonCommande()).isEqualTo("NEW-ORDER");
+        assertThat(movement.getMontantBulletin()).isEqualByComparingTo("100.00");
+        assertThat(original.getNumeroBonCommande()).isEqualTo("OLD-ORDER");
+    }
+
+    @Test
+    void bureauOverrideDoesNotKeepInvoiceFieldsOrChangeAnInvoiceContract() {
+        var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("facture").build();
+        var request = new AvenantRequest();
+        request.setModeReglement(com.assurance.enums.ModeReglementConvention.BUREAU);
+        request.setNumeroBonCommande("IGNORED");
+        request.setMontantBulletin(java.math.BigDecimal.TEN);
+        var movement = new com.assurance.entity.MouvementContrat();
+        ConventionPaymentPolicy.apply(original, movement, request,
+                com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.TEN).build());
+        assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.BUREAU);
+        assertThat(movement.getNumeroBonCommande()).isNull();
+        assertThat(movement.getMontantBulletin()).isNull();
+        assertThat(original.getModeReglement()).isEqualTo("facture");
+    }
+
+    @Test
+    void zeroAndRefundAmendmentsDoNotRequirePaymentDetails() {
+        var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("facture").build();
+        for (var preview : List.of(
+                com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.ZERO).build(),
+                com.assurance.dto.response.QuittanceResponse.builder().typeImpactMouvement("RETOUR_PRIME").primeTotale(java.math.BigDecimal.TEN).build(),
+                com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.TEN.negate()).build())) {
+            var movement = new com.assurance.entity.MouvementContrat();
+            ConventionPaymentPolicy.apply(original, movement, new AvenantRequest(), preview);
+            assertThat(preview.getRequiresConventionPayment()).isFalse();
+            assertThat(movement.getModeReglementConvention()).isNull();
+        }
+    }
+
+    @Test
+    void assistanceOnlyChargeStillRequiresAConventionPaymentChoice() {
+        var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("bureau").build();
+        var preview = com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.ZERO)
+                .assistances(List.of(com.assurance.dto.response.AssistanceContratResponse.builder().primeTotale(java.math.BigDecimal.TEN).build())).build();
+        var movement = new com.assurance.entity.MouvementContrat();
+        ConventionPaymentPolicy.apply(original, movement, new AvenantRequest(), preview);
+        assertThat(preview.getRequiresConventionPayment()).isTrue();
+        assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.BUREAU);
+    }
+
+    @Test
+    void conventionPaymentFieldsAreRejectedForOtherContractTypes() {
+        var request = new AvenantRequest();
+        request.setModeReglement(com.assurance.enums.ModeReglementConvention.FACTURE);
+        for (TypeContrat kind : List.of(TypeContrat.PARTICULIER, TypeContrat.FLOTTE)) {
+            assertThatThrownBy(() -> ConventionPaymentPolicy.apply(Contrat.builder().typeContrat(kind).build(),
+                    new com.assurance.entity.MouvementContrat(), request, com.assurance.dto.response.QuittanceResponse.builder().build()))
+                    .isInstanceOf(BadRequestException.class);
+        }
+    }
+
     @Mock private AssistanceContratRepository assistanceContratRepository;
     @Mock private QuittanceRepository quittanceRepository;
     @Mock private LigneDocumentClientRepository ligneDocumentClientRepository;

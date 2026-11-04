@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAvenantAssistances,
+  conventionPaymentDefaults,
   DEFAULT_VEHICLE,
   inheritConventionVehicleUsage,
   inheritConventionVehicleCrm,
@@ -14,6 +15,26 @@ import {
 import type { ContratSummary, GarantieInput, ReferenceOption } from "../types";
 
 describe("amendment form adapters", () => {
+  it("inherits only the convention payment mode, not the original purchase order or full bulletin amount", () => {
+    expect(conventionPaymentDefaults({ typeContrat: "CONVENTION", modeReglement: " facture " })).toEqual({
+      mode: "facture", numeroBonCommande: "", montantBulletin: "",
+    });
+  });
+
+  it("restores amendment-specific billing information when reopening or rectifying", () => {
+    expect(conventionPaymentDefaults({ typeContrat: "CONVENTION", modeReglement: "bureau" }, {
+      codeTypeMouvement: "CHV_M", modeReglement: "facture", numeroBonCommande: "BC-AV-1", montantBulletin: 1250.5,
+    })).toEqual({ mode: "facture", numeroBonCommande: "BC-AV-1", montantBulletin: "1250.5" });
+  });
+
+  it("does not invent a missing payment mode or apply convention fields to mono or fleet", () => {
+    expect(conventionPaymentDefaults({ typeContrat: "CONVENTION", modeReglement: null }).mode).toBeUndefined();
+    expect(conventionPaymentDefaults({ typeContrat: "PARTICULIER", modeReglement: "facture" })).toEqual({
+      mode: undefined, numeroBonCommande: "", montantBulletin: "",
+    });
+    expect(conventionPaymentDefaults({ typeContrat: "FLOTTE", modeReglement: "facture" }).mode).toBeUndefined();
+  });
+
   it("inherits shared convention CRM instead of accepting a stale draft coefficient", () => {
     const vehicles = [{ ...DEFAULT_VEHICLE, crm: "1.50" }];
     expect(inheritConventionVehicleCrm(vehicles, {

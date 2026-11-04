@@ -23,8 +23,8 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "echeances_facturation_convention",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_echeance_facturation_convention_periode",
-                columnNames = {"contrat_id", "periode_debut", "periode_fin"}
+                name = "uk_echeance_convention_source_periode",
+                columnNames = {"contrat_id", "source_key", "periode_debut", "periode_fin"}
         ),
         indexes = {
                 @Index(name = "idx_echeance_facturation_convention_agence", columnList = "agence_id"),
@@ -45,6 +45,14 @@ public class EcheanceFacturationConvention extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contrat_id", nullable = false)
     private Contrat contrat;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mouvement_id")
+    private MouvementContrat mouvement;
+
+    @Column(name = "source_key", nullable = false, length = 80)
+    @Builder.Default
+    private String sourceKey = "CONTRAT";
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_client_id")

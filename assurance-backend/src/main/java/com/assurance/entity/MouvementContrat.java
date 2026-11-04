@@ -96,6 +96,16 @@ public class MouvementContrat extends BaseEntity {
     @Column(name = "saisie_prime_nette")
     private Boolean saisiePrimeNette;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_reglement_convention", length = 20)
+    private com.assurance.enums.ModeReglementConvention modeReglementConvention;
+
+    @Column(name = "numero_bon_commande", length = 120)
+    private String numeroBonCommande;
+
+    @Column(name = "montant_bulletin", precision = 14, scale = 2)
+    private BigDecimal montantBulletin;
+
     @OneToMany(mappedBy = "mouvementContrat", orphanRemoval = true)
     @Builder.Default
     private List<MouvementVehicule> vehicules = new ArrayList<>();

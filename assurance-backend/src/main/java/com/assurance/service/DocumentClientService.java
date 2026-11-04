@@ -1012,8 +1012,7 @@ public class DocumentClientService {
         if (contract == null || Boolean.TRUE.equals(contract.getProspection())) {
             throw new BadRequestException("L'écriture sélectionnée n'appartient pas à un contrat validé");
         }
-        if (contract.getTypeContrat() == TypeContrat.CONVENTION
-                && "facture".equalsIgnoreCase(trimToNull(contract.getModeReglement()))) {
+        if (ConventionPaymentPolicy.isInvoice(element)) {
             throw new BadRequestException(
                     "Les conventions réglées sur facture doivent être traitées dans la facturation des conventions"
             );

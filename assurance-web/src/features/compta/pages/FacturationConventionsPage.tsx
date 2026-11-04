@@ -322,6 +322,8 @@ export default function FacturationConventionsPage() {
                   <td className="px-3 py-3">
                     <div className="font-medium">{row.convention || "Convention"}</div>
                     <div className="text-xs text-muted-foreground">{row.numeroDossier || row.numeroPolice || "-"}</div>
+                    {row.mouvementId && <div className="text-xs text-muted-foreground">Avenant {row.numeroMouvement || row.mouvementId}</div>}
+                    {row.numeroBonCommande && <div className="text-xs text-muted-foreground">BC : {row.numeroBonCommande}</div>}
                   </td>
                   <td className="px-3 py-3">{row.compagnie || "-"}</td>
                   <td className="px-3 py-3">

@@ -26,6 +26,13 @@ public class AvenantRequest {
 
     private Boolean saisiePrimeNette;
 
+    private com.assurance.enums.ModeReglementConvention modeReglement;
+
+    @Size(max = 120)
+    private String numeroBonCommande;
+
+    private java.math.BigDecimal montantBulletin;
+
     @Valid
     private List<CreateContratRequest.QuittanceInput> quittances;
 

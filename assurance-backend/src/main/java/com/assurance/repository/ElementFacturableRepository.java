@@ -135,7 +135,8 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               ), 0) < e.primeTotale
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
-                    and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+                    and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
+                         or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )
               and (:brancheId is null
                    or (e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
@@ -330,7 +331,8 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               ), 0) < e.primeTotale
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
-                    and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+                    and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
+                         or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )
               and (:brancheId is null
                    or (e.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE

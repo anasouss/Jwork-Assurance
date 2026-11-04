@@ -2703,6 +2703,9 @@ public class ContratService {
         request.setDateEcheance(mouvement.getDateEcheance());
         request.setNotes(mouvement.getNotes());
         request.setLibelleReleve(mouvement.getLibelleReleve());
+        request.setModeReglement(mouvement.getModeReglementConvention());
+        request.setNumeroBonCommande(mouvement.getNumeroBonCommande());
+        request.setMontantBulletin(mouvement.getMontantBulletin());
         request.setSaisiePrimeNette(mouvement.getSaisiePrimeNette() != null
                 ? mouvement.getSaisiePrimeNette() : mouvement.getContrat().getSaisiePrimeNette());
         if (mouvement.getContrat().getTypeContrat() == TypeContrat.PARTICULIER
@@ -3322,7 +3325,7 @@ public class ContratService {
             );
             quittance.setTargetSummaries(graph.targetSummaries());
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
-            return quittance;
+            return ConventionPaymentPolicy.preview(graph.contrat(), quittance);
         }
         AvenantGraph graph = resolveAvenantGraphForPreview(agenceId, contratId, request, mouvementId);
         validateAvenantAssistances(request, graph.vehicules());
@@ -3358,7 +3361,7 @@ public class ContratService {
                         : differentialTargetSummaries(graph, request, montantsOverride));
             }
             quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
-            return quittance;
+            return ConventionPaymentPolicy.preview(graph.contrat(), quittance);
         }
         QuittanceResponse quittance = mouvementContratService.previsualiserMouvementSpecialise(
                 graph.contrat(),
@@ -3369,7 +3372,7 @@ public class ContratService {
                 graph.remorques()
         );
         quittance.setAssistances(previewAvenantAssistances(graph.contrat(), graph.vehicules(), request));
-        return quittance;
+        return ConventionPaymentPolicy.preview(graph.contrat(), quittance);
     }
 
     @Transactional
@@ -3419,6 +3422,7 @@ public class ContratService {
                     quittance.getMouvementContratId()
             ));
             deleteAvenantDraft(graph.contrat(), request);
+            saveConventionAmendmentPayment(graph.contrat(), request, quittance);
             return quittance;
         }
         AvenantGraph graph = resolveAvenantGraph(agenceId, contratId, request, true);
@@ -3512,7 +3516,19 @@ public class ContratService {
             });
         }
         deleteAvenantDraft(graph.contrat(), request);
+        saveConventionAmendmentPayment(graph.contrat(), request, quittance);
         return quittance;
+    }
+
+    private void saveConventionAmendmentPayment(Contrat contract, AvenantRequest request, QuittanceResponse response) {
+        if (contract.getTypeContrat() != TypeContrat.CONVENTION) {
+            ConventionPaymentPolicy.apply(contract, new MouvementContrat(), request, response);
+            return;
+        }
+        MouvementContrat movement = mouvementContratRepository.findByContratIdAndId(contract.getId(), response.getMouvementContratId())
+                .orElseThrow(() -> new ResourceNotFoundException("MouvementContrat", response.getMouvementContratId()));
+        ConventionPaymentPolicy.apply(contract, movement, request, response);
+        mouvementContratRepository.save(movement);
     }
 
     private void deleteAvenantDraft(Contrat contrat, AvenantRequest request) {

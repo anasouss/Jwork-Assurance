@@ -14,6 +14,9 @@ import com.assurance.entity.EcheanceFacturationConvention;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.GroupeClient;
 import com.assurance.entity.LigneDocumentClient;
+import com.assurance.entity.MouvementContrat;
+import com.assurance.enums.ModeReglementConvention;
+import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.entity.SequenceDocumentClient;
 import com.assurance.enums.Fractionnement;
 import com.assurance.enums.ModeFacturationContrat;
@@ -312,41 +315,65 @@ public class FacturationConventionService {
     }
 
     private void synchronizeSchedules(Long agenceId) {
+        echeanceRepository.deactivateCancelledMovementSchedules(agenceId);
         for (Contrat contract : contratRepository.findConventionInvoiceContracts(agenceId)) {
             Fractionnement fractionnement = contract.getFractionnement() == null
                     ? Fractionnement.ANNUEL
                     : contract.getFractionnement();
-            List<Period> expected = buildPeriods(contract.getDateEffet(), contract.getDateEcheance(), fractionnement);
+            List<Period> contractPeriods = buildPeriods(contract.getDateEffet(), contract.getDateEcheance(), fractionnement);
+            Map<String, MouvementContrat> movements = contract.getMouvements().stream()
+                    .filter(movement -> movement.getStatut() == StatutMouvementContrat.VALIDE)
+                    .filter(movement -> movement.getModeReglementConvention() == ModeReglementConvention.FACTURE)
+                    .sorted(Comparator.comparing(MouvementContrat::getId))
+                    .collect(Collectors.toMap(movement -> "MOUVEMENT-" + movement.getId(), Function.identity(),
+                            (first, second) -> first, java.util.LinkedHashMap::new));
+            Map<String, List<Period>> expectedBySource = new java.util.LinkedHashMap<>();
+            if (ConventionPaymentPolicy.inheritedMode(contract) == ModeReglementConvention.FACTURE) {
+                expectedBySource.put("CONTRAT", contractPeriods);
+            }
+            movements.forEach((source, movement) -> expectedBySource.put(source, contractPeriods.stream()
+                    .filter(period -> overlaps(movement.getDateEffet(), movement.getDateEcheance(), period.start(), period.end()))
+                    .map(period -> new Period(period.start().isBefore(movement.getDateEffet()) ? movement.getDateEffet() : period.start(),
+                            period.end().isAfter(movement.getDateEcheance()) ? movement.getDateEcheance() : period.end()))
+                    .toList()));
             Map<String, EcheanceFacturationConvention> existing = echeanceRepository
-                    .findByContratIdAndActifTrueOrderByNumeroPeriodeAsc(contract.getId()).stream()
-                    .collect(Collectors.toMap(this::periodKey, Function.identity()));
-            Set<String> expectedKeys = expected.stream().map(this::periodKey).collect(Collectors.toSet());
+                    .findByContratIdOrderByNumeroPeriodeAsc(contract.getId()).stream()
+                    .collect(Collectors.toMap(item -> item.getSourceKey() + ":" + periodKey(item), Function.identity()));
+            Set<String> expectedKeys = expectedBySource.entrySet().stream()
+                    .flatMap(entry -> entry.getValue().stream().map(period -> entry.getKey() + ":" + periodKey(period)))
+                    .collect(Collectors.toSet());
 
             existing.values().stream()
                     .filter(item -> item.getStatut() == StatutEcheanceFacturationConvention.A_FACTURER)
-                    .filter(item -> !expectedKeys.contains(periodKey(item)))
+                    .filter(item -> !expectedKeys.contains(item.getSourceKey() + ":" + periodKey(item)))
                     .forEach(item -> item.setActif(false));
 
             List<EcheanceFacturationConvention> toSave = new ArrayList<>(existing.values());
-            for (int index = 0; index < expected.size(); index++) {
-                Period period = expected.get(index);
-                EcheanceFacturationConvention item = existing.get(periodKey(period));
-                if (item == null) {
-                    item = EcheanceFacturationConvention.builder()
-                            .agence(contract.getAgence())
-                            .contrat(contract)
-                            .numeroPeriode(index + 1)
-                            .nombrePeriodes(expected.size())
-                            .periodeDebut(period.start())
-                            .periodeFin(period.end())
-                            .dateEcheance(period.start())
-                            .fractionnement(fractionnement)
-                            .build();
-                    toSave.add(item);
-                } else if (item.getStatut() == StatutEcheanceFacturationConvention.A_FACTURER) {
-                    item.setNumeroPeriode(index + 1);
-                    item.setNombrePeriodes(expected.size());
-                    item.setFractionnement(fractionnement);
+            for (Map.Entry<String, List<Period>> source : expectedBySource.entrySet()) {
+                List<Period> expected = source.getValue();
+                for (int index = 0; index < expected.size(); index++) {
+                    Period period = expected.get(index);
+                    EcheanceFacturationConvention item = existing.get(source.getKey() + ":" + periodKey(period));
+                    if (item == null) {
+                        item = EcheanceFacturationConvention.builder()
+                                .agence(contract.getAgence())
+                                .contrat(contract)
+                                .mouvement(movements.get(source.getKey()))
+                                .sourceKey(source.getKey())
+                                .numeroPeriode(index + 1)
+                                .nombrePeriodes(expected.size())
+                                .periodeDebut(period.start())
+                                .periodeFin(period.end())
+                                .dateEcheance(period.start())
+                                .fractionnement(fractionnement)
+                                .build();
+                        toSave.add(item);
+                    } else if (item.getStatut() == StatutEcheanceFacturationConvention.A_FACTURER) {
+                        item.setActif(true);
+                        item.setNumeroPeriode(index + 1);
+                        item.setNombrePeriodes(expected.size());
+                        item.setFractionnement(fractionnement);
+                    }
                 }
             }
             echeanceRepository.saveAll(toSave);
@@ -396,6 +423,9 @@ public class FacturationConventionService {
         return EcheanceFacturationConventionPageResponse.Row.builder()
                 .id(item.getId())
                 .contratId(contract.getId())
+                .mouvementId(item.getMouvement() == null ? null : item.getMouvement().getId())
+                .numeroMouvement(item.getMouvement() == null ? null : item.getMouvement().getNumeroMouvement())
+                .numeroBonCommande(item.getMouvement() == null ? contract.getNumeroBonCommande() : item.getMouvement().getNumeroBonCommande())
                 .documentId(item.getDocumentClient() == null ? null : item.getDocumentClient().getId())
                 .payeurId(payer.group() == null ? payer.client().getId() : payer.group().getId())
                 .payeurType(payer.group() == null ? "CLIENT" : "GROUPE")
@@ -425,7 +455,12 @@ public class FacturationConventionService {
             EcheanceFacturationConvention target,
             List<EcheanceFacturationConvention> schedules
     ) {
-        if (!isBillable(element)) {
+        if (!isBillable(element) || !ConventionPaymentPolicy.isInvoice(element)) {
+            return Amount.ZERO;
+        }
+        MouvementContrat movement = element.getMouvementContrat();
+        Long sourceMovementId = movement != null && movement.getModeReglementConvention() != null ? movement.getId() : null;
+        if (!Objects.equals(sourceMovementId, target.getMouvement() == null ? null : target.getMouvement().getId())) {
             return Amount.ZERO;
         }
         LocalDate sourceStart = element.getDateDebut() == null
@@ -435,6 +470,7 @@ public class FacturationConventionService {
                 ? element.getContrat().getDateEcheance()
                 : element.getDateFin();
         List<EcheanceFacturationConvention> overlaps = schedules.stream()
+                .filter(item -> Objects.equals(item.getSourceKey(), target.getSourceKey()))
                 .filter(item -> overlaps(sourceStart, sourceEnd, item.getPeriodeDebut(), item.getPeriodeFin()))
                 .toList();
         int index = overlaps.indexOf(target);
@@ -476,6 +512,7 @@ public class FacturationConventionService {
 
     private boolean isBillable(ElementFacturable element) {
         return Boolean.TRUE.equals(element.getActif())
+                && (element.getMouvementContrat() == null || element.getMouvementContrat().getStatut() == StatutMouvementContrat.VALIDE)
                 && element.getStatut() != StatutElementFacturable.BROUILLON
                 && element.getStatut() != StatutElementFacturable.ANNULE;
     }

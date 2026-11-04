@@ -31,7 +31,10 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
               and c.statut = com.assurance.enums.StatutContrat.ACTIVE
               and c.prospection = false
               and c.brouillon = false
-              and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+              and (lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+                   or exists (select m.id from MouvementContrat m where m.contrat = c
+                       and m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+                       and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE))
               and c.dateEffet is not null
               and c.dateEcheance is not null
             order by c.dateEffet, c.id

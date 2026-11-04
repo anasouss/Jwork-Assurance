@@ -41,6 +41,9 @@ public class EcheanceFacturationConventionPageResponse {
     public static class Row {
         private Long id;
         private Long contratId;
+        private Long mouvementId;
+        private String numeroMouvement;
+        private String numeroBonCommande;
         private Long documentId;
         private Long payeurId;
         private String payeurType;

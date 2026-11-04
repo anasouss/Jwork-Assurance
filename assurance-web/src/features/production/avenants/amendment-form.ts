@@ -10,6 +10,15 @@ import type {
   VehiculeInput,
 } from "../types";
 
+export function conventionPaymentDefaults(contract: Pick<ContratSummary, "typeContrat" | "modeReglement">, request?: AvenantRequest): {
+  mode: AvenantRequest["modeReglement"]; numeroBonCommande: string; montantBulletin: string;
+} {
+  if (contract.typeContrat !== "CONVENTION") return { mode: undefined, numeroBonCommande: "", montantBulletin: "" };
+  const inherited = contract.modeReglement?.trim().toLowerCase();
+  const mode = request?.modeReglement ?? (inherited === "bureau" || inherited === "facture" ? inherited : undefined);
+  return { mode, numeroBonCommande: request?.numeroBonCommande ?? "", montantBulletin: request?.montantBulletin == null ? "" : String(request.montantBulletin) };
+}
+
 export type AmendmentTarget = {
   kind: "vehicule" | "remorque";
   id: string;

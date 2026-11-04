@@ -252,6 +252,9 @@ export type Fractionnement = "MENSUEL" | "TRIMESTRIEL" | "SEMESTRIEL" | "ANNUEL"
 
 export type ConventionBillingInstallment = {
   id: string;
+  mouvementId?: string | null;
+  numeroMouvement?: string | null;
+  numeroBonCommande?: string | null;
   contratId: string;
   documentId?: string | null;
   payeurId: string;

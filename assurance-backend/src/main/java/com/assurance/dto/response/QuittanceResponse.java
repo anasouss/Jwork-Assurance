@@ -17,6 +17,7 @@ public class QuittanceResponse {
     private String numeroMouvement;
     private String codeMouvement;
     private String typeImpactMouvement;
+    private Boolean requiresConventionPayment;
     private Long elementFacturableId;
     private String numeroQuittance;
     private String type;

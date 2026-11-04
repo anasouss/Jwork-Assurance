@@ -473,7 +473,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and c.prospection = false
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
-                    and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+                    and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
+                         or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )
               and q.payee = false
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)
@@ -560,7 +561,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and c.prospection = false
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
-                    and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'
+                    and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
+                         or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )
               and q.payee = false
               and (:brancheId is null or c.brancheAssurance.id = :brancheId)

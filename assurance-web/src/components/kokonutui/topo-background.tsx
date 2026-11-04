@@ -556,10 +556,10 @@ export default function TopoBackground({
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
       ctx.lineCap = "round";
-      ctx.globalAlpha = 0.22;
+      ctx.globalAlpha = 0.28;
       ctx.lineWidth = 0.75;
       ctx.stroke(minor);
-      ctx.globalAlpha = 0.42;
+      ctx.globalAlpha = 0.52;
       ctx.lineWidth = 1.1;
       ctx.stroke(major);
       if (labels) {

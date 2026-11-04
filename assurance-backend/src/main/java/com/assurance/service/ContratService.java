@@ -6001,7 +6001,13 @@ public class ContratService {
                     .map(ContratResponse.RemorqueView::getNumeroAttestation)
                     .filter(value -> value != null && !value.isBlank()).findFirst().orElse(null);
         }
-        response.setNumeroAttestation(attestation);
+        boolean initialMovement = mouvement.getTypeMouvement() != null
+                && (mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AFFAIRE_NOUVELLE
+                || mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.RENOUVELLEMENT);
+        // Older initial snapshots predate assignment of the contract-header attestation.
+        if (attestation != null || !initialMovement) {
+            response.setNumeroAttestation(attestation);
+        }
         if (response.getTypeContrat() == TypeContrat.CONVENTION && mouvement.getTypeMouvement() != null
                 && mouvement.getTypeMouvement().getCategorie() == CategorieMouvementContrat.AVENANT) {
             response.setModeReglement(mouvement.getModeReglementConvention() == null ? null

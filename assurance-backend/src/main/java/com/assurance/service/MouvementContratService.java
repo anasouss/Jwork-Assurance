@@ -306,13 +306,13 @@ public class MouvementContratService {
                 .build());
         contrat.getMouvements().add(mouvement);
 
-        snapshotVehicules(mouvement, vehicules, snapshotNature);
-        snapshotRemorques(mouvement, remorques, snapshotNature);
-        snapshotGaranties(mouvement, garanties, snapshotNature);
-
         if (consommerStock && Boolean.TRUE.equals(typeMouvement.getConsommeAttestation())) {
             consommerAttestations(contrat, mouvement, vehicules, remorques);
         }
+
+        snapshotVehicules(mouvement, vehicules, snapshotNature);
+        snapshotRemorques(mouvement, remorques, snapshotNature);
+        snapshotGaranties(mouvement, garanties, snapshotNature);
 
         Quittance quittance = null;
         if (Boolean.TRUE.equals(typeMouvement.getGenereQuittance())) {
@@ -514,10 +514,10 @@ public class MouvementContratService {
                 .build());
         contrat.getMouvements().add(mouvement);
 
+        consommerAttestations(contrat, mouvement, vehicules, remorques);
         snapshotVehicules(mouvement, vehicules, NatureSnapshotMouvement.AJOUT);
         snapshotRemorques(mouvement, remorques, NatureSnapshotMouvement.AJOUT);
         snapshotGaranties(mouvement, garanties, NatureSnapshotMouvement.AJOUT);
-        consommerAttestations(contrat, mouvement, vehicules, remorques);
 
         if (Boolean.TRUE.equals(typeMouvement.getGenereQuittance())) {
             if (quittanceManuelle != null) {

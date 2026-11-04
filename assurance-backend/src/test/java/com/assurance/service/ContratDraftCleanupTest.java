@@ -31,6 +31,62 @@ import static org.mockito.Mockito.*;
 class ContratDraftCleanupTest {
 
     @Test
+    void initialAndRenewalSummariesKeepTheOriginalHeaderWhenLegacyTargetAttestationsAreEmpty() {
+        for (var category : List.of(com.assurance.enums.CategorieMouvementContrat.AFFAIRE_NOUVELLE,
+                com.assurance.enums.CategorieMouvementContrat.RENOUVELLEMENT)) {
+            var response = com.assurance.dto.response.ContratResponse.builder()
+                    .typeContrat(TypeContrat.CONVENTION).numeroAttestation("90A211049994")
+                    .modeReglement("facture").numeroBonCommande("121")
+                    .montantBulletin(new java.math.BigDecimal("1252.54"))
+                    .vehicules(List.of(com.assurance.dto.response.ContratResponse.VehiculeView.builder()
+                            .numeroAttestation(" ").build())).remorques(List.of()).build();
+            var movement = new com.assurance.entity.MouvementContrat();
+            movement.setTypeMouvement(com.assurance.entity.TypeMouvementContrat.builder().categorie(category).build());
+            ReflectionTestUtils.invokeMethod(service, "applyMovementHeaderSnapshot", response, movement);
+            assertThat(response.getNumeroAttestation()).isEqualTo("90A211049994");
+            assertThat(response.getModeReglement()).isEqualTo("facture");
+            assertThat(response.getNumeroBonCommande()).isEqualTo("121");
+            assertThat(response.getMontantBulletin()).isEqualByComparingTo("1252.54");
+            response.setVehicules(List.of(com.assurance.dto.response.ContratResponse.VehiculeView.builder()
+                    .numeroAttestation("SAVED-SNAPSHOT").build()));
+            ReflectionTestUtils.invokeMethod(service, "applyMovementHeaderSnapshot", response, movement);
+            assertThat(response.getNumeroAttestation()).isEqualTo("SAVED-SNAPSHOT");
+        }
+    }
+
+    @Test
+    void initialVehicleSnapshotIsTakenAfterAttestationAssignmentAndNormalization() {
+        var typeRepository = mock(TypeMouvementContratRepository.class);
+        var movementRepository = mock(MouvementContratRepository.class);
+        var snapshots = mock(MouvementVehiculeRepository.class);
+        var stock = mock(AttestationStockService.class);
+        var movements = new MouvementContratService(typeRepository, mock(ContratRepository.class), movementRepository,
+                snapshots, mock(MouvementRemorqueRepository.class), mock(MouvementGarantieRepository.class),
+                mock(QuittanceRepository.class), mock(LigneQuittanceRepository.class), stock,
+                mock(QuittanceProductionService.class), mock(QuittanceCalculService.class), mock(ElementFacturableCibleService.class));
+        var type = com.assurance.entity.TypeMouvementContrat.builder().code("AN").actif(true)
+                .categorie(com.assurance.enums.CategorieMouvementContrat.AFFAIRE_NOUVELLE).genereQuittance(false).build();
+        when(typeRepository.findByCodeIgnoreCase("AN")).thenReturn(java.util.Optional.of(type));
+        when(movementRepository.save(any(com.assurance.entity.MouvementContrat.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(snapshots.save(any(com.assurance.entity.MouvementVehicule.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        var usage = Usage.builder().build();
+        var contract = Contrat.builder().typeContrat(TypeContrat.CONVENTION).usage(usage)
+                .numeroAttestation("211049994").build();
+        var vehicle = Vehicule.builder().contrat(contract).usage(usage).typeVehicule(TypeVehiculeContrat.AUTOMOBILE).build();
+        when(stock.normaliserNumero("211049994", contract, usage)).thenReturn("90A211049994");
+        var zero = java.math.BigDecimal.ZERO;
+        movements.creerAffaireNouvelle(contract, List.of(vehicle), List.of(), List.of(),
+                new QuittanceCalculService.Resultat(List.of(), zero, zero, zero, zero, zero, zero));
+        var captured = org.mockito.ArgumentCaptor.forClass(com.assurance.entity.MouvementVehicule.class);
+        verify(snapshots).save(captured.capture());
+        assertThat(captured.getValue().getNumeroAttestation()).isEqualTo("90A211049994");
+        assertThat(vehicle.getNumeroAttestation()).isEqualTo("90A211049994");
+        assertThat(contract.getNumeroAttestation()).isEqualTo("90A211049994");
+    }
+
+    @Test
     void amendmentSummaryUsesItsSavedAttestationAndPaymentFieldsInsteadOfTheParentHeader() {
         var response = com.assurance.dto.response.ContratResponse.builder()
                 .typeContrat(TypeContrat.CONVENTION).numeroAttestation("90A195723197")

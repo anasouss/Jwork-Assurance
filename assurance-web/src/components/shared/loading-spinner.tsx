@@ -1,4 +1,5 @@
 import { Loader2 } from "lucide-react";
+import { InfinityLoop } from "@/components/loading-ui/infinity";
 import { cn } from "@/lib/utils";
 
 type LoadingSpinnerProps = {
@@ -22,9 +23,9 @@ type LoadingPageProps = {
 
 export function LoadingPage({ message }: LoadingPageProps) {
   return (
-    <div className="flex h-[50vh] flex-col items-center justify-center gap-4">
-      <LoadingSpinner size="lg" />
-      <p className="text-muted-foreground">{message ?? "Chargement"}</p>
+    <div role="status" aria-live="polite" className="flex min-h-svh flex-col items-center justify-center gap-3 bg-background px-6">
+      <InfinityLoop aria-hidden="true" className="h-20 w-20 text-[#a86d17] dark:text-primary" />
+      <p className="text-center text-sm text-muted-foreground">{message ?? "Chargement"}</p>
     </div>
   );
 }

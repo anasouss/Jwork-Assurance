@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import TopoBackground from "@/components/kokonutui/topo-background";
 import { DeveloperCredit } from "@/components/shared/developer-credit";
-import { SessionSplash } from "@/components/shared/session-splash";
 import skayLogo from "@/assets/logo.webp";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -43,8 +42,6 @@ export default function LoginPage() {
     }
   };
 
-  if (!isHydrated) return <SessionSplash />;
-
   return (
     <div className="relative isolate flex min-h-svh flex-col bg-zinc-100 text-foreground selection:bg-primary selection:text-primary-foreground dark:bg-background">
       <div aria-hidden="true" className="absolute inset-y-3 left-3 -z-10 hidden w-[calc(50%-0.75rem)] overflow-hidden rounded-2xl bg-[#dce5eb] lg:block dark:bg-[#1c252d]">
@@ -61,11 +58,11 @@ export default function LoginPage() {
       </header>
 
       <main className="pointer-events-none relative mx-auto grid w-full max-w-[1440px] flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-24 lg:px-14 lg:py-16 xl:gap-40">
-        <div className="hidden max-w-md self-end space-y-4 pb-6 text-[#132a3b] lg:block dark:text-[#edf2f5]">
-          <p className="max-w-sm text-3xl font-semibold leading-tight">
+        <div className="hidden max-w-sm self-end space-y-5 pb-6 text-[#132a3b] lg:block dark:text-[#edf2f5]">
+          <p className="max-w-[340px] text-balance text-3xl font-semibold leading-[1.25]">
             Votre espace de gestion d’assurance.
           </p>
-          <p className="max-w-sm text-base leading-7 text-[#40586a] dark:text-[#becdd7]">
+          <p className="max-w-[320px] text-pretty text-sm leading-6 text-[#40586a] dark:text-[#becdd7]">
             Contrats, clients, sinistres et comptabilité réunis au même endroit.
           </p>
         </div>

@@ -38,6 +38,31 @@ class ReleveClientPdfRendererTest {
             contractClients);
 
     @Test
+    void amountsStayOnOneLineWithInsuredAndAdvanceColumnsInNormalAndDenseStatements() throws Exception {
+        for (int count : List.of(3, 75)) {
+            DocumentClient source = statement(count);
+            source.setPayeurNom(null);
+            var line = source.getLignes().get(0);
+            line.setPrimeNette(new BigDecimal("20402.76"));
+            line.setTaxes(new BigDecimal("3450.39"));
+            line.setMontantTtc(new BigDecimal("23904.16"));
+            line.setDebit(new BigDecimal("23904.16"));
+            line.setCredit(new BigDecimal("1000.00"));
+            var large = source.getLignes().get(1);
+            large.setPrimeNette(new BigDecimal("123456789012.34"));
+            large.setTaxes(new BigDecimal("12345678901.23"));
+            large.setMontantTtc(new BigDecimal("135802467913.57"));
+            large.setDebit(new BigDecimal("135802467913.57"));
+            try (PDDocument pdf = PDDocument.load(renderLinesAndTotals(source))) {
+                String text = new PDFTextStripper().getText(pdf);
+                assertThat(text).contains("20 402,76", "3 450,39", "23 904,16", "22 904,16",
+                        "123 456 789 012,34", "12 345 678 901,23", "135 802 467 913,57");
+                if (count == 75) assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+            }
+        }
+    }
+
+    @Test
     void hidesAdvanceColumnAndTotalWhenThereAreNoAdvances() throws Exception {
         DocumentClient source = statement(2);
         try (PDDocument pdf = PDDocument.load(renderLinesAndTotals(source))) {

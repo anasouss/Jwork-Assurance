@@ -39,6 +39,8 @@ import com.itextpdf.layout.property.HorizontalAlignment;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.UnitValue;
 import com.itextpdf.layout.property.VerticalAlignment;
+import com.itextpdf.layout.property.Property;
+import com.itextpdf.layout.splitting.ISplitCharacters;
 import com.itextpdf.layout.renderer.CellRenderer;
 import com.itextpdf.layout.renderer.DrawContext;
 import com.itextpdf.layout.renderer.IRenderer;
@@ -309,10 +311,21 @@ public class ReleveClientPdfRenderer {
                 || source.getLignes().stream().anyMatch(line -> !value(statementInsuredName(source, line, subscriberNames))
                         .equalsIgnoreCase(source.getPayeurNom().trim()));
         float[] columns = showAdvance
-                ? new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 7, 9, 23}
-                : new float[]{17, 9.5f, 6.2f, 6.2f, 8, 6.5f, 7.5f, 9, 23};
-        Table table = new Table(showInsured ? columns : java.util.Arrays.copyOfRange(columns, 1, columns.length))
+                ? new float[]{14, 10.5f, 6.5f, 6.5f, 10, 9, 10.5f, 9, 10.5f, 22}
+                : new float[]{14, 10.5f, 6.5f, 6.5f, 10, 9, 10.5f, 10.5f, 22};
+        float[] visibleColumns = showInsured ? columns : java.util.Arrays.copyOfRange(columns, 1, columns.length);
+        float totalWeight = 0;
+        for (float column : visibleColumns) totalWeight += column;
+        float tableWidth = document.getPdfDocument().getDefaultPageSize().getWidth()
+                - document.getLeftMargin() - document.getRightMargin();
+        float[] amountWidths = new float[showAdvance ? 5 : 4];
+        for (int index = 0; index < amountWidths.length; index++) {
+            amountWidths[index] = tableWidth * columns[index + 4] / totalWeight;
+        }
+        PdfFont regular = document.getProperty(Property.FONT);
+        Table table = new Table(UnitValue.createPercentArray(visibleColumns))
                 .setWidth(UnitValue.createPercentValue(100))
+                .setFixedLayout()
                 .setKeepTogether(false);
         if (showInsured) {
             addHeader(table, "L’assuré", tableHeader, fontSize, cellPadding);
@@ -341,7 +354,9 @@ public class ReleveClientPdfRenderer {
                         showInsured,
                         showAdvance,
                         fontSize,
-                        cellPadding
+                        cellPadding,
+                        regular,
+                        amountWidths
                 ));
         document.add(table);
     }
@@ -397,7 +412,9 @@ public class ReleveClientPdfRenderer {
             boolean showInsured,
             boolean showAdvance,
             float fontSize,
-            float cellPadding
+            float cellPadding,
+            PdfFont regular,
+            float[] amountWidths
     ) {
         BigDecimal balance = money(line.getDebit()).subtract(money(line.getCredit()));
         if (showInsured) {
@@ -406,13 +423,13 @@ public class ReleveClientPdfRenderer {
         addValue(table, statementReference(line), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, date(line.getDateOperation()), TextAlignment.CENTER, null, fontSize, cellPadding);
         addValue(table, date(line.getDateEcheance()), TextAlignment.CENTER, null, fontSize, cellPadding);
-        addValue(table, amount(line.getPrimeNette()), TextAlignment.CENTER, null, fontSize, cellPadding);
-        addValue(table, amount(line.getTaxes()), TextAlignment.CENTER, null, fontSize, cellPadding);
-        addValue(table, amount(line.getMontantTtc()), TextAlignment.CENTER, null, fontSize, cellPadding);
+        addAmountValue(table, amount(line.getPrimeNette()), regular, fontSize, cellPadding, amountWidths[0]);
+        addAmountValue(table, amount(line.getTaxes()), regular, fontSize, cellPadding, amountWidths[1]);
+        addAmountValue(table, amount(line.getMontantTtc()), regular, fontSize, cellPadding, amountWidths[2]);
         if (showAdvance) {
-            addValue(table, positiveAmount(statementAdvance(line)), TextAlignment.CENTER, null, fontSize, cellPadding);
+            addAmountValue(table, positiveAmount(statementAdvance(line)), regular, fontSize, cellPadding, amountWidths[3]);
         }
-        addValue(table, amount(balance), TextAlignment.CENTER, bold, fontSize, cellPadding);
+        addAmountValue(table, amount(balance), bold, fontSize, cellPadding, amountWidths[showAdvance ? 4 : 3]);
         addValue(table, lineLabelService.label(line, fleetAnnexNumber), TextAlignment.LEFT, null,
                 fontSize, cellPadding);
     }
@@ -571,6 +588,26 @@ public class ReleveClientPdfRenderer {
                 .add(paragraph)
                 .setKeepTogether(true)
                 .setTextAlignment(alignment)
+                .setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setBorder(BODY_BORDER)
+                .setPadding(cellPadding));
+    }
+
+    private void addAmountValue(Table table, String text, PdfFont font, float fontSize, float cellPadding, float cellWidth) {
+        // Fit the formatted amount before layout so iText never breaks it at a thousands separator.
+        float availableWidth = Math.max(1, cellWidth - 2 * cellPadding - 1.2f);
+        float textWidth = font.getWidth(text, fontSize);
+        float fittedSize = textWidth > availableWidth ? fontSize * availableWidth / textWidth : fontSize;
+        Paragraph paragraph = new Paragraph(text)
+                .setFont(font)
+                .setFontSize(fittedSize)
+                .setFixedLeading(fontSize + 1.4f)
+                .setMargin(0);
+        paragraph.setProperty(Property.SPLIT_CHARACTERS, (ISplitCharacters) (glyphs, position) -> false);
+        table.addCell(new Cell()
+                .add(paragraph)
+                .setKeepTogether(true)
+                .setTextAlignment(TextAlignment.RIGHT)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(BODY_BORDER)
                 .setPadding(cellPadding));

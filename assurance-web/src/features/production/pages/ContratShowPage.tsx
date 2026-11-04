@@ -185,7 +185,7 @@ export default function ContratShowPage() {
                 ...(contrat.modeFacturation === "CONSOLIDEE_GROUPE"
                   ? [["Facturation", billingModeLabel(contrat.modeFacturation)] as [string, ReactNode]]
                   : []),
-                ...(contrat.modeReglement
+                ...(contrat.typeContrat === "CONVENTION" || contrat.modeReglement
                   ? [["Mode de règlement", contractPaymentModeLabel(contrat.modeReglement)] as [string, ReactNode]]
                   : []),
                 ...(contrat.numeroBonCommande
@@ -1176,7 +1176,7 @@ async function generateContratPdfBlob(params: {
       ...(params.contrat.modeFacturation === "CONSOLIDEE_GROUPE"
         ? [["Facturation", billingModeLabel(params.contrat.modeFacturation)] as [string, string]]
         : []),
-      ...(params.contrat.modeReglement
+      ...(params.contrat.typeContrat === "CONVENTION" || params.contrat.modeReglement
         ? [["Mode de règlement", contractPaymentModeLabel(params.contrat.modeReglement)] as [string, string]]
         : []),
       ...(params.contrat.numeroBonCommande

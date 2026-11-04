@@ -59,6 +59,7 @@ import { CreationSuccessDialog } from "../components/CreationSuccessDialog";
 import { GrilleTarifaireConfigurator } from "../components/GrilleTarifaireConfigurator";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
 import { AvenantTargetsSection } from "../components/AvenantTargetsSections";
+import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { AvenantManualQuittanceTable, emptyAvenantQuittance, hasAvenantQuittanceAmounts } from "../components/AvenantManualQuittanceTable";
 import { toDateOnly } from "../date";
@@ -138,6 +139,8 @@ export default function AvenantContratPage() {
       : vehicleInputs,
     [vehicleInputs, contrat, movementCode]
   );
+  const showConventionAttestation = contrat?.typeContrat === "CONVENTION"
+    && isVehicleTargetCreationCode(movementCode) && vehicules.length === 1;
   const grilleTarifaireId = contrat?.grilleTarifaireId ? String(contrat.grilleTarifaireId) : undefined;
   const supportsManualQuittance = contrat?.typeContrat === "PARTICULIER" && isGuaranteeModificationCode(movementCode);
   const {
@@ -1086,6 +1089,23 @@ export default function AvenantContratPage() {
             <Input readOnly aria-invalid={!contrat.usageId} value={[contrat.usageCode, contrat.usageLibelle].filter(Boolean).join(" - ") || "Non renseigné"} />
             {!contrat.usageId && <span className="text-xs font-normal normal-case text-destructive">L'usage doit être renseigné sur le contrat avant de créer cet avenant.</span>}
           </Field>}
+          {showConventionAttestation && <Field label="N° attestation"
+            required={Boolean(avenantTargetUsages.find(usage => usage.id === vehicules[0].usageId)?.consommeAttestation)}>
+            <AttestationNumberInput
+              value={vehicules[0].numeroAttestation ?? ""}
+              onChange={numeroAttestation => setVehicules(current => current.map((vehicle, index) =>
+                index === 0 ? { ...vehicle, numeroAttestation } : vehicle))}
+              numeroCourant={vehicules[0].numeroAttestationInitiale}
+              compagnieAssuranceId={contrat?.compagnieAssuranceId}
+              usageId={vehicules[0].usageId}
+              categorieClientId={contrat?.categorieClientId}
+              groupeUsageAttestationCode={contrat?.groupeUsageAttestationCode}
+              compagnies={compagnies.data ?? []}
+              usages={avenantTargetUsages}
+              required={Boolean(avenantTargetUsages.find(usage => usage.id === vehicules[0].usageId)?.consommeAttestation)}
+              disabled={saveMutation.isPending || draftMutation.isPending}
+            />
+          </Field>}
           <Field label="Libellé du relevé (facultatif)">
             <Input
               value={libelleReleve}
@@ -1168,6 +1188,7 @@ export default function AvenantContratPage() {
           crmPartage={Boolean(contrat?.crmPartage)}
           crmPartageValeur={contrat?.crmPartageValeur ?? ""}
           showVehicleCrm={false}
+          showVehicleAttestation={!showConventionAttestation}
           maxRemorques={null}
           targetAssistances={targetAssistances}
           setTargetAssistances={setTargetAssistances}

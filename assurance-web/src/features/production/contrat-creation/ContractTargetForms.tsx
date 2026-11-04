@@ -31,6 +31,7 @@ type VehicleFormProps = {
   crmPartageValeur: string;
   showCrm: boolean;
   showUsage?: boolean;
+  showAttestation?: boolean;
   prospectionMode: boolean;
   controleStockAttestation: boolean;
   showTowingExtension?: boolean;
@@ -56,6 +57,7 @@ export function VehicleForm({
   crmPartageValeur,
   showCrm,
   showUsage = true,
+  showAttestation = true,
   prospectionMode,
   controleStockAttestation,
   showTowingExtension = false,
@@ -241,7 +243,7 @@ export function VehicleForm({
             </Select>
           </Field>
         ) : null}
-        {!prospectionMode ? (
+        {!prospectionMode && showAttestation ? (
           <Field label="N° attestation">
             <AttestationNumberInput
               value={vehicule.numeroAttestation ?? ""}

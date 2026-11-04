@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, CircleAlert, Eye, EyeOff, Loader2, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { ArrowRight, CircleAlert, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/theme-toggle";
 import TopoBackground from "@/components/kokonutui/topo-background";
 import { DeveloperCredit } from "@/components/shared/developer-credit";
 import skayLogo from "@/assets/logo.webp";
@@ -16,9 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
-  const { resolvedTheme, setTheme } = useTheme();
   const busy = isLoading || !isHydrated;
-  const themeLabel = resolvedTheme === "dark" ? "Activer le thème clair" : "Activer le thème sombre";
 
   useEffect(() => {
     void hydrate();
@@ -45,30 +43,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative isolate flex min-h-svh flex-col bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-100">
-      <div aria-hidden="true" className="absolute inset-y-0 left-0 -z-10 hidden w-[48%] border-r border-zinc-200/70 bg-[#eef2ef] lg:block xl:w-[54%] dark:border-zinc-800 dark:bg-[#131a17]">
-        <TopoBackground className="h-full min-h-0 bg-transparent text-emerald-900 dark:bg-transparent dark:text-emerald-200"
-          speed={0} interactive={false} labels={false} seed={26} interval={0.09}>
+    <div className="relative isolate flex min-h-svh flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+      <div aria-hidden="true" className="absolute inset-y-0 left-0 -z-10 hidden w-[48%] border-r border-border bg-zinc-100 lg:block xl:w-[54%] dark:bg-zinc-900">
+        <TopoBackground className="h-full min-h-0 bg-transparent text-primary dark:bg-transparent dark:text-primary"
+          speed={0.7} interactive labels={false} seed={26} interval={0.09}>
           {null}
         </TopoBackground>
       </div>
 
-      <header className="relative mx-auto flex w-full max-w-[1440px] items-center justify-between gap-6 px-6 pt-6 sm:px-10 lg:px-14 lg:pt-8">
+      <header className="pointer-events-none relative mx-auto flex w-full max-w-[1440px] items-center justify-between gap-6 px-6 pt-6 sm:px-10 lg:px-14 lg:pt-8">
         <img src={skayLogo} alt="Skay Assurance" width={1200} height={666}
           className="h-16 w-48 max-w-[70%] object-cover lg:h-20 lg:w-64 dark:brightness-0 dark:invert" />
-        <Button type="button" variant="ghost" size="icon" aria-label={themeLabel} title={themeLabel}
-          className="size-11 rounded-md border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
-          {resolvedTheme === "dark" ? <Sun aria-hidden="true" className="size-4" /> : <Moon aria-hidden="true" className="size-4" />}
-        </Button>
+        <ThemeToggle className="pointer-events-auto size-11 border border-border bg-background text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
       </header>
 
-      <main className="relative mx-auto grid w-full max-w-[1440px] flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-24 lg:px-14 lg:py-16 xl:gap-40">
+      <main className="pointer-events-none relative mx-auto grid w-full max-w-[1440px] flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-24 lg:px-14 lg:py-16 xl:gap-40">
         <div aria-hidden="true" className="hidden lg:block" />
-        <section aria-labelledby="login-title" className="mx-auto w-full max-w-[400px]">
+        <section aria-labelledby="login-title" className="pointer-events-auto mx-auto w-full max-w-[400px]">
           <div className="mb-9 space-y-3">
             <h1 id="login-title" className="text-3xl font-semibold leading-tight">Connexion</h1>
-            <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">Accédez à votre espace Skay Assurance.</p>
+            <p className="text-sm leading-6 text-muted-foreground">Accédez à votre espace Skay Assurance.</p>
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit} aria-busy={busy}>
@@ -77,7 +71,7 @@ export default function LoginPage() {
               <Input id="login-email" name="email" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
                 value={email} onChange={event => setEmail(event.target.value)} placeholder="vous@agence.ma"
                 disabled={busy} aria-describedby={error ? "login-error" : undefined}
-                className="h-12 rounded-md border-zinc-300 bg-white px-3.5 md:text-base focus-visible:border-orange-700 focus-visible:ring-orange-700/20 dark:border-zinc-700 dark:bg-zinc-900/60 dark:focus-visible:border-orange-400 dark:focus-visible:ring-orange-400/25"
+                className="h-12 rounded-md border-input bg-card px-3.5 text-foreground caret-primary md:text-base focus-visible:border-ring focus-visible:ring-ring/30 dark:border-input dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground"
                 required />
             </div>
             <div className="space-y-2">
@@ -86,13 +80,13 @@ export default function LoginPage() {
                 <Input id="login-password" name="password" type={passwordVisible ? "text" : "password"} autoComplete="current-password"
                   value={password} onChange={event => setPassword(event.target.value)} disabled={busy}
                   aria-describedby={error ? "login-error" : undefined}
-                  className="h-12 rounded-md border-zinc-300 bg-white pl-3.5 pr-12 md:text-base focus-visible:border-orange-700 focus-visible:ring-orange-700/20 dark:border-zinc-700 dark:bg-zinc-900/60 dark:focus-visible:border-orange-400 dark:focus-visible:ring-orange-400/25"
+                  className="h-12 rounded-md border-input bg-card pl-3.5 pr-12 text-foreground caret-primary md:text-base focus-visible:border-ring focus-visible:ring-ring/30 dark:border-input dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground"
                   required />
                 <Button type="button" variant="ghost" size="icon" disabled={busy}
                   aria-label={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   title={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   aria-pressed={passwordVisible} aria-controls="login-password"
-                  className="absolute right-0.5 top-0.5 size-11 text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  className="absolute right-0.5 top-0.5 size-11 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   onClick={() => setPasswordVisible(current => !current)}>
                   {passwordVisible ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
                 </Button>
@@ -103,13 +97,13 @@ export default function LoginPage() {
               <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 break-words">{error}</span>
             </div>}
             <Button type="submit" disabled={busy}
-              className="h-12 w-full justify-between rounded-md bg-orange-700 px-4 text-sm font-semibold text-white hover:bg-orange-800 focus-visible:ring-orange-700/30 dark:bg-orange-400 dark:text-zinc-950 dark:hover:bg-orange-300">
+              className="h-12 w-full justify-between rounded-md px-4 text-sm font-semibold focus-visible:ring-ring/30">
               <span>{!isHydrated ? "Vérification de la session..." : isLoading ? "Connexion..." : "Se connecter"}</span>
               {busy ? <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /> : <ArrowRight aria-hidden="true" className="size-4" />}
             </Button>
           </form>
 
-          <p className="mt-8 border-t border-zinc-200 pt-6 text-sm leading-6 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+          <p className="mt-8 border-t border-border pt-6 text-sm leading-6 text-muted-foreground">
             Un problème d’accès ? Contactez votre administrateur.
           </p>
         </section>

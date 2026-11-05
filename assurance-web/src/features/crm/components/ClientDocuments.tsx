@@ -36,13 +36,12 @@ export function DocumentValidity({ type, value, onChange, owner }: {
   </label>;
 }
 
-function DocumentUpload({ types, open, onClose, onSave, uploading, previous, owner, initialTypeId }: {
+function DocumentUpload({ types, open, onClose, onSave, uploading, previous, owner }: {
   types: TypePieceJointe[]; open: boolean; onClose: () => void;
   onSave: (draft: ClientDocumentDraft, reason: string) => void; uploading: boolean; previous?: PieceJointe;
   owner?: Partial<DocumentOwnerOption>;
-  initialTypeId?: string;
 }) {
-  const [typeId, setTypeId] = useState(previous?.typePieceJointeId ?? initialTypeId ?? "");
+  const [typeId, setTypeId] = useState(previous?.typePieceJointeId ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [expiry, setExpiry] = useState("");
   const [reason, setReason] = useState("");
@@ -88,18 +87,13 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
   const cache = useQueryClient();
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canManage = permissions.includes("client:manage") || permissions.includes("client:create");
-  const [upload, setUpload] = useState<{ previous?: PieceJointe; typeId?: string }>();
+  const [upload, setUpload] = useState<{ previous?: PieceJointe }>();
   const [confirm, setConfirm] = useState<PieceJointe>();
   const [showArchives, setShowArchives] = useState(false);
   const documents = useQuery({ queryKey: attachmentKeys.client(clientId), queryFn: () => attachmentApi.clientDocuments(clientId) });
   const types = useQuery({ queryKey: attachmentKeys.clientTypes(typeClient), queryFn: () => attachmentApi.clientTypes(typeClient) });
   const currentDocuments = (documents.data ?? []).filter(piece => !piece.archived);
   const archivedDocuments = (documents.data ?? []).filter(piece => piece.archived);
-  const missingTypes = documents.isSuccess && types.isSuccess ? types.data.filter(type =>
-    !currentDocuments.some(piece => type.naturePieceJointeId
-      ? piece.naturePieceJointeId === type.naturePieceJointeId
-      : piece.typePieceJointeId === type.id)
-  ) : [];
   async function refresh() {
     await cache.invalidateQueries({ queryKey: attachmentKeys.client(clientId) });
     await cache.invalidateQueries({ queryKey: ["contrat-pieces-jointes"] });
@@ -170,18 +164,14 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
       <Button type="button" variant="outline" onClick={() => documents.refetch()}>Réessayer</Button> :
       <div className="divide-y">
         {currentDocuments.map(documentRow)}
-        {missingTypes.map(type => <div key={type.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-          <div className="min-w-0"><p className="break-words font-medium">{type.libelle}</p><p className="mt-1 text-xs text-muted-foreground">Non fourni</p></div>
-          {canManage && <Button type="button" variant="ghost" size="icon" title={`Ajouter : ${type.libelle}`} aria-label={`Ajouter : ${type.libelle}`} onClick={() => setUpload({ typeId: type.id })}><Plus className="size-4" /></Button>}
-        </div>)}
-        {!currentDocuments.length && !missingTypes.length && <p className="py-4 text-sm text-muted-foreground">{types.isLoading ? "Chargement des types de documents..." : "Aucun document actuel."}</p>}
+        {!currentDocuments.length && <p className="py-4 text-sm text-muted-foreground">Aucun document actuel.</p>}
       </div>}
     {showArchives && archivedDocuments.length > 0 && <div className="border-t pt-3">
       <h4 className="text-sm font-medium">Archives</h4>
       <div className="divide-y">{archivedDocuments.map(documentRow)}</div>
     </div>}
-    {upload && <DocumentUpload key={upload.previous?.id ?? upload.typeId ?? "new"} types={types.data ?? []} open onClose={() => setUpload(undefined)}
-      previous={upload.previous} initialTypeId={upload.typeId} uploading={save.isPending} owner={owner} onSave={(draft, reason) => save.mutate({ draft, reason })} />}
+    {upload && <DocumentUpload key={upload.previous?.id ?? "new"} types={types.data ?? []} open onClose={() => setUpload(undefined)}
+      previous={upload.previous} uploading={save.isPending} owner={owner} onSave={(draft, reason) => save.mutate({ draft, reason })} />}
     <Dialog open={!!confirm} onOpenChange={open => { if (!open && !remove.isPending) setConfirm(undefined); }}><DialogContent>
       <DialogHeader><DialogTitle>{confirm?.canDelete ? "Supprimer le fichier ?" : "Archiver le document ?"}</DialogTitle></DialogHeader>
       <p className="text-sm">{confirm?.canDelete ? "Le fichier sera définitivement supprimé." : "Le document restera dans l’historique et dans les contrats qui l’utilisent."}</p>

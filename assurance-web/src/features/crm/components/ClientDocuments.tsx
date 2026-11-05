@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Download, History, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,12 +36,13 @@ export function DocumentValidity({ type, value, onChange, owner }: {
   </label>;
 }
 
-function DocumentUpload({ types, open, onClose, onSave, uploading, previous, owner }: {
+function DocumentUpload({ types, open, onClose, onSave, uploading, previous, owner, initialTypeId }: {
   types: TypePieceJointe[]; open: boolean; onClose: () => void;
   onSave: (draft: ClientDocumentDraft, reason: string) => void; uploading: boolean; previous?: PieceJointe;
   owner?: Partial<DocumentOwnerOption>;
+  initialTypeId?: string;
 }) {
-  const [typeId, setTypeId] = useState(previous?.typePieceJointeId ?? "");
+  const [typeId, setTypeId] = useState(previous?.typePieceJointeId ?? initialTypeId ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [expiry, setExpiry] = useState("");
   const [reason, setReason] = useState("");
@@ -86,11 +88,18 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
   const cache = useQueryClient();
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canManage = permissions.includes("client:manage") || permissions.includes("client:create");
-  const [upload, setUpload] = useState<{ previous?: PieceJointe }>();
+  const [upload, setUpload] = useState<{ previous?: PieceJointe; typeId?: string }>();
   const [confirm, setConfirm] = useState<PieceJointe>();
-  const [history, setHistory] = useState(false);
+  const [showArchives, setShowArchives] = useState(false);
   const documents = useQuery({ queryKey: attachmentKeys.client(clientId), queryFn: () => attachmentApi.clientDocuments(clientId) });
-  const types = useQuery({ queryKey: attachmentKeys.clientTypes(typeClient), queryFn: () => attachmentApi.clientTypes(typeClient), enabled: canManage });
+  const types = useQuery({ queryKey: attachmentKeys.clientTypes(typeClient), queryFn: () => attachmentApi.clientTypes(typeClient) });
+  const currentDocuments = (documents.data ?? []).filter(piece => !piece.archived);
+  const archivedDocuments = (documents.data ?? []).filter(piece => piece.archived);
+  const missingTypes = documents.isSuccess && types.isSuccess ? types.data.filter(type =>
+    !currentDocuments.some(piece => type.naturePieceJointeId
+      ? piece.naturePieceJointeId === type.naturePieceJointeId
+      : piece.typePieceJointeId === type.id)
+  ) : [];
   async function refresh() {
     await cache.invalidateQueries({ queryKey: attachmentKeys.client(clientId) });
     await cache.invalidateQueries({ queryKey: ["contrat-pieces-jointes"] });
@@ -112,28 +121,67 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
     try { downloadBlob(await attachmentApi.downloadClient(clientId, piece.id), piece.nomFichier); }
     catch (error) { toast.error(error instanceof Error ? error.message : "Téléchargement impossible"); }
   }
+  function documentRow(piece: PieceJointe) {
+    const previous = documents.data?.find(item => item.id === piece.previousVersionId);
+    return <Collapsible key={piece.id} className="py-3 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <strong className="font-medium">{piece.typePieceJointeLibelle ?? "Document"}</strong>
+            <span className={piece.status === "EXPIRED" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{documentStatus(piece)}</span>
+          </div>
+          <p className="mt-1 break-all text-muted-foreground">{piece.nomFichier}</p>
+          {piece.expiresOn && <p className="mt-1 text-xs text-muted-foreground">Validité : {formatDocumentDate(piece.expiresOn)}</p>}
+        </div>
+        <div className="flex shrink-0 gap-1">
+          <Button type="button" size="icon" variant="ghost" title="Télécharger" aria-label={`Télécharger ${piece.nomFichier}`} onClick={() => download(piece)}><Download className="size-4" /></Button>
+          {canManage && !piece.archived && <>
+            <Button type="button" size="icon" variant="ghost" title="Remplacer" aria-label={`Remplacer ${piece.nomFichier}`} disabled={!types.data?.some(type => type.naturePieceJointeId === piece.naturePieceJointeId)} onClick={() => setUpload({ previous: piece })}><RefreshCw className="size-4" /></Button>
+            <Button type="button" size="icon" variant="ghost" title={piece.canDelete ? "Supprimer" : "Archiver"} aria-label={`${piece.canDelete ? "Supprimer" : "Archiver"} ${piece.nomFichier}`} onClick={() => setConfirm(piece)}>{piece.canDelete ? <Trash2 className="size-4 text-destructive" /> : <Archive className="size-4" />}</Button>
+          </>}
+        </div>
+      </div>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="mt-1 h-7 px-1 text-xs text-muted-foreground" aria-label={`Historique de ${piece.nomFichier}`}>
+          <History className="size-3.5" />Historique
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 space-y-1 border-l pl-3 text-xs leading-5 text-muted-foreground">
+        <p>Ajouté le {formatDocumentDate(piece.createdAt)}{piece.createdBy ? ` par ${piece.createdBy}` : ""}</p>
+        {piece.changeReason && <p className="break-words">Motif : {piece.changeReason}</p>}
+        {piece.previousVersionId && <p className="break-all">Remplace : {previous?.nomFichier ?? `version #${piece.previousVersionId}`}</p>}
+        {piece.archivedAt && <p>Archivé le {formatDocumentDate(piece.archivedAt)}{piece.archivedBy ? ` par ${piece.archivedBy}` : ""}</p>}
+      </CollapsibleContent>
+    </Collapsible>;
+  }
   return <section className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <label className="flex items-center gap-2 text-sm"><Checkbox checked={history} onCheckedChange={value => setHistory(value === true)} /><History className="size-4" />Historique</label>
+      <h3 className="text-sm font-medium">Documents actuels</h3>
       {canManage && <Button type="button" size="sm" variant="outline" disabled={!types.data?.length} onClick={() => setUpload({})}><Plus className="size-4" />Ajouter un document</Button>}
     </div>
+    {archivedDocuments.length > 0 && <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
+      <Switch checked={showArchives} onCheckedChange={setShowArchives} />
+      Afficher les archives ({archivedDocuments.length})
+    </label>}
+    {types.isError && <div role="alert" className="text-sm text-destructive">
+      Types de documents indisponibles. <button type="button" className="underline" onClick={() => types.refetch()}>Réessayer</button>
+    </div>}
     {documents.isLoading ? <p className="text-sm text-muted-foreground">Chargement...</p> : documents.isError ?
       <Button type="button" variant="outline" onClick={() => documents.refetch()}>Réessayer</Button> :
-      <div className="divide-y">{(documents.data ?? []).filter(piece => history || !piece.archived).map(piece => <div key={piece.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><strong>{piece.typePieceJointeLibelle}</strong>
-          <span className={piece.status === "EXPIRED" ? "text-destructive" : "text-muted-foreground"}>{documentStatus(piece)}</span></div>
-          <p className="break-all text-muted-foreground">{piece.nomFichier}</p>
-          {piece.expiresOn && <p className="text-xs text-muted-foreground">Validité : {formatDocumentDate(piece.expiresOn)}</p>}
-          {history && <p className="text-xs text-muted-foreground">{formatDocumentDate(piece.createdAt)}{piece.createdBy ? ` · ${piece.createdBy}` : ""}{piece.changeReason ? ` · ${piece.changeReason}` : ""}{piece.previousVersionId ? ` · Remplace la version #${piece.previousVersionId}` : ""}</p>}
-          {history && piece.archivedAt && <p className="text-xs text-muted-foreground">Archivé le {formatDocumentDate(piece.archivedAt)}{piece.archivedBy ? ` · ${piece.archivedBy}` : ""}</p>}
-        </div>
-        <div className="flex gap-1"><Button type="button" size="icon" variant="ghost" title="Télécharger" onClick={() => download(piece)}><Download className="size-4" /></Button>
-          {canManage && !piece.archived && <><Button type="button" size="icon" variant="ghost" title="Remplacer" disabled={!types.data?.some(type => type.naturePieceJointeId === piece.naturePieceJointeId)} onClick={() => setUpload({ previous: piece })}><RefreshCw className="size-4" /></Button>
-            <Button type="button" size="icon" variant="ghost" title={piece.canDelete ? "Supprimer" : "Archiver"} onClick={() => setConfirm(piece)}>{piece.canDelete ? <Trash2 className="size-4 text-destructive" /> : <Archive className="size-4" />}</Button></>}
-        </div>
-      </div>)}{!documents.data?.some(piece => history || !piece.archived) && <p className="py-4 text-sm text-muted-foreground">Aucun document.</p>}</div>}
-    {upload && <DocumentUpload key={upload.previous?.id ?? "new"} types={types.data ?? []} open onClose={() => setUpload(undefined)}
-      previous={upload.previous} uploading={save.isPending} owner={owner} onSave={(draft, reason) => save.mutate({ draft, reason })} />}
+      <div className="divide-y">
+        {currentDocuments.map(documentRow)}
+        {missingTypes.map(type => <div key={type.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+          <div className="min-w-0"><p className="break-words font-medium">{type.libelle}</p><p className="mt-1 text-xs text-muted-foreground">Non fourni</p></div>
+          {canManage && <Button type="button" variant="ghost" size="icon" title={`Ajouter : ${type.libelle}`} aria-label={`Ajouter : ${type.libelle}`} onClick={() => setUpload({ typeId: type.id })}><Plus className="size-4" /></Button>}
+        </div>)}
+        {!currentDocuments.length && !missingTypes.length && <p className="py-4 text-sm text-muted-foreground">{types.isLoading ? "Chargement des types de documents..." : "Aucun document actuel."}</p>}
+      </div>}
+    {showArchives && archivedDocuments.length > 0 && <div className="border-t pt-3">
+      <h4 className="text-sm font-medium">Archives</h4>
+      <div className="divide-y">{archivedDocuments.map(documentRow)}</div>
+    </div>}
+    {upload && <DocumentUpload key={upload.previous?.id ?? upload.typeId ?? "new"} types={types.data ?? []} open onClose={() => setUpload(undefined)}
+      previous={upload.previous} initialTypeId={upload.typeId} uploading={save.isPending} owner={owner} onSave={(draft, reason) => save.mutate({ draft, reason })} />}
     <Dialog open={!!confirm} onOpenChange={open => { if (!open && !remove.isPending) setConfirm(undefined); }}><DialogContent>
       <DialogHeader><DialogTitle>{confirm?.canDelete ? "Supprimer le fichier ?" : "Archiver le document ?"}</DialogTitle></DialogHeader>
       <p className="text-sm">{confirm?.canDelete ? "Le fichier sera définitivement supprimé." : "Le document restera dans l’historique et dans les contrats qui l’utilisent."}</p>

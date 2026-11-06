@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.CompanyAssignmentActivity;
 import com.assurance.dto.request.EnregistrerAffectationQuittanceRequest;
 import com.assurance.dto.request.EnregistrerLotAffectationQuittanceRequest;
 import com.assurance.dto.request.UpsertRegleAffectationQuittanceRequest;
@@ -104,6 +107,7 @@ public class AffectationQuittanceService {
     private final AgenceRepository agenceRepository;
     private final BrancheAssuranceRepository brancheAssuranceRepository;
     private final TiersCompagnieService tiersCompagnieService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<TiersCompagnieResponse> listAvailableCompanies(Long agenceId, Long brancheId) {
@@ -492,6 +496,7 @@ public class AffectationQuittanceService {
             EnregistrerAffectationQuittanceRequest request
     ) {
         Quittance quittance = requireQuittance(agenceId, quittanceId);
+        var before = affectationRepository.findByAgenceIdAndQuittanceIdIn(agenceId, List.of(quittanceId));
         RegleAffectationQuittance regle = requireEffectiveRule(agenceId, quittance);
         validateMode(quittance.getContrat().getTypeContrat(), regle, request.getSource());
 
@@ -509,6 +514,10 @@ public class AffectationQuittanceService {
         affectationRepository.flush();
         affectationRepository.saveAll(entities);
 
+        activityRecorder.record(CompanyAssignmentActivity.command(List.of(quittance), before, entities,
+                before.isEmpty() ? ActivityAction.ALLOCATED : ActivityAction.UPDATED,
+                before.isEmpty() ? "Quittance affectee a la compagnie" : "Affectation compagnie modifiee", "COMPANY_QUITTANCE_ASSIGNMENT"));
+
         String souscripteur = resolveSouscripteurs(Set.of(quittance.getContrat().getId()))
                 .get(quittance.getContrat().getId());
         return toResponse(quittance, entities, souscripteur, regle, true);
@@ -521,6 +530,7 @@ public class AffectationQuittanceService {
             EnregistrerLotAffectationQuittanceRequest request
     ) {
         List<Quittance> quittances = requireCompatibleFleetBatch(agenceId, request.getQuittanceIds());
+        var before = affectationRepository.findByAgenceIdAndQuittanceIdIn(agenceId, quittances.stream().map(Quittance::getId).toList());
         Map<Long, Quittance> byId = quittances.stream()
                 .collect(Collectors.toMap(Quittance::getId, Function.identity()));
         Map<Long, List<EnregistrerAffectationQuittanceRequest.Ligne>> linesByQuittance = request.getLignes().stream()
@@ -562,13 +572,18 @@ public class AffectationQuittanceService {
         byId.keySet().forEach(affectationRepository::deleteByQuittanceId);
         affectationRepository.flush();
         affectationRepository.saveAll(entities);
+        activityRecorder.record(CompanyAssignmentActivity.command(quittances, before, entities, ActivityAction.SAVED,
+                "Affectation groupee de " + quittances.size() + " quittances enregistree", "COMPANY_QUITTANCE_BATCH_ASSIGNMENT"));
         return buildBatchResponse(quittances, entities, expected, batchRule);
     }
 
     @Transactional
     public void clear(Long agenceId, Long quittanceId) {
-        requireQuittance(agenceId, quittanceId);
+        Quittance quittance = requireQuittance(agenceId, quittanceId);
+        var before = affectationRepository.findByAgenceIdAndQuittanceIdIn(agenceId, List.of(quittanceId));
         affectationRepository.deleteByQuittanceId(quittanceId);
+        if (!before.isEmpty()) activityRecorder.record(CompanyAssignmentActivity.command(List.of(quittance), before, List.of(),
+                ActivityAction.UNASSIGNED, "Affectation compagnie retiree", "COMPANY_QUITTANCE_ASSIGNMENT_REMOVAL"));
     }
 
     @Transactional(readOnly = true)
@@ -697,7 +712,9 @@ public class AffectationQuittanceService {
         applyTiers(entity, tiers);
         entity.setBrancheAssurance(branche);
         applyRule(entity, request);
-        return toRuleResponse(regleRepository.save(entity));
+        entity = regleRepository.save(entity);
+        activityRecorder.record(CompanyAssignmentActivity.ruleCommand(entity, Map.of(), ActivityAction.CREATED, List.of()));
+        return toRuleResponse(entity);
     }
 
     @Transactional
@@ -708,6 +725,8 @@ public class AffectationQuittanceService {
     ) {
         RegleAffectationQuittance entity = regleRepository.findByAgenceIdAndId(agenceId, ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règle d'affectation", ruleId));
+        var before = CompanyAssignmentActivity.snapshot(entity);
+        var oldReferences = CompanyAssignmentActivity.ruleReferences(entity);
         if (isRuleUsed(entity) && hasVersionedChanges(entity, request)) {
             throw new BadRequestException(
                     "Cette règle a déjà produit des affectations. "
@@ -721,7 +740,9 @@ public class AffectationQuittanceService {
         applyTiers(entity, tiers);
         entity.setBrancheAssurance(branche);
         applyRule(entity, request);
-        return toRuleResponse(regleRepository.save(entity));
+        entity = regleRepository.save(entity);
+        activityRecorder.record(CompanyAssignmentActivity.ruleCommand(entity, before, ActivityAction.UPDATED, oldReferences));
+        return toRuleResponse(entity);
     }
 
     @Transactional
@@ -729,7 +750,9 @@ public class AffectationQuittanceService {
         RegleAffectationQuittance entity = regleRepository.findByAgenceIdAndId(agenceId, ruleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règle d'affectation", ruleId));
         requireUnusedRule(entity);
+        var command = CompanyAssignmentActivity.ruleCommand(entity, CompanyAssignmentActivity.snapshot(entity), ActivityAction.DELETED, List.of());
         regleRepository.delete(entity);
+        activityRecorder.record(command);
     }
 
     private void requireUnusedRule(RegleAffectationQuittance rule) {

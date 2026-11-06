@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.TreasuryActivity;
 import com.assurance.dto.request.UpsertCompteTresorerieRequest;
 import com.assurance.dto.response.CompteTresorerieResponse;
 import com.assurance.dto.response.MouvementTresorerieResponse;
@@ -46,6 +49,7 @@ public class TresorerieService {
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieAccessService accessService;
     private final BanqueService banqueService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<CompteTresorerieResponse> listAccounts(Long agenceId, boolean administration) {
@@ -76,6 +80,8 @@ public class TresorerieService {
         accessService.assignCreatorAsSupervisor(account);
         accessService.ensureCashOwnerAccess(account);
         accessService.synchronizeCentralCashAccess(account);
+        activityRecorder.record(TreasuryActivity.accountCommand(account, java.util.Map.of(), ActivityAction.CREATED,
+                "Compte de tresorerie cree", "TREASURY_ACCOUNT_CREATION"));
         return toResponse(account);
     }
 
@@ -86,6 +92,7 @@ public class TresorerieService {
             UpsertCompteTresorerieRequest request
     ) {
         CompteTresorerie account = requireAccount(agenceId, accountId);
+        var before = TreasuryActivity.snapshot(account);
         if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE
                 && account.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE) {
             throw new BadRequestException(
@@ -119,6 +126,8 @@ public class TresorerieService {
         }
         accessService.ensureCashOwnerAccess(account);
         accessService.synchronizeCentralCashAccess(account);
+        activityRecorder.record(TreasuryActivity.accountCommand(account, before, ActivityAction.UPDATED,
+                "Compte de tresorerie modifie", "TREASURY_ACCOUNT_UPDATE"));
         return toResponse(account);
     }
 
@@ -129,6 +138,7 @@ public class TresorerieService {
             Boolean active
     ) {
         CompteTresorerie account = requireAccount(agenceId, accountId);
+        var before = TreasuryActivity.snapshot(account);
         if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE
                 && account.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE) {
             throw new BadRequestException(
@@ -138,6 +148,9 @@ public class TresorerieService {
         account.setActif(Boolean.TRUE.equals(active));
         account = compteRepository.save(account);
         accessService.synchronizeCentralCashAccess(account);
+        activityRecorder.record(TreasuryActivity.accountCommand(account, before, ActivityAction.UPDATED,
+                Boolean.TRUE.equals(account.getActif()) ? "Compte de tresorerie active" : "Compte de tresorerie desactive",
+                "TREASURY_ACCOUNT_STATUS"));
         return toResponse(account);
     }
 
@@ -220,7 +233,7 @@ public class TresorerieService {
         if (mouvementRepository.existsByInstrumentReglementIdAndMouvementExtourneIdIsNull(instrument.getId())) {
             throw new BadRequestException("Cet instrument possède déjà une écriture de trésorerie");
         }
-        return mouvementRepository.save(MouvementTresorerie.builder()
+        MouvementTresorerie movement = mouvementRepository.save(MouvementTresorerie.builder()
                 .agence(instrument.getAgence())
                 .compteTresorerie(account)
                 .instrumentReglement(instrument)
@@ -233,6 +246,9 @@ public class TresorerieService {
                 .reference(instrument.getReferenceInstrument())
                 .libelle("Règlement client " + instrument.getReglement().getNumero())
                 .build());
+        activityRecorder.record(TreasuryActivity.movementCommand(movement,
+                "Encaissement client comptabilise", "TREASURY_CLIENT_COLLECTION"));
+        return movement;
     }
 
     @Transactional
@@ -256,7 +272,7 @@ public class TresorerieService {
                 original.getCompteTresorerie().getId(),
                 NiveauAccesCompteTresorerie.UTILISATION
         );
-        return mouvementRepository.save(MouvementTresorerie.builder()
+        MouvementTresorerie movement = mouvementRepository.save(MouvementTresorerie.builder()
                 .agence(original.getAgence())
                 .compteTresorerie(original.getCompteTresorerie())
                 .instrumentReglement(instrument)
@@ -269,6 +285,9 @@ public class TresorerieService {
                 .libelle("Extourne " + original.getLibelle() + " - " + reason)
                 .mouvementExtourneId(original.getId())
                 .build());
+        activityRecorder.record(TreasuryActivity.movementCommand(movement,
+                "Encaissement client extourne", "TREASURY_CLIENT_COLLECTION_REVERSAL"));
+        return movement;
     }
 
     @Transactional
@@ -293,7 +312,7 @@ public class TresorerieService {
         )) {
             throw new BadRequestException("Ce moyen de paiement possède déjà une écriture de trésorerie");
         }
-        return mouvementRepository.save(MouvementTresorerie.builder()
+        MouvementTresorerie movement = mouvementRepository.save(MouvementTresorerie.builder()
                 .agence(instrument.getAgence())
                 .compteTresorerie(account)
                 .instrumentReglementCompagnie(instrument)
@@ -305,6 +324,9 @@ public class TresorerieService {
                 .reference(instrument.getReferenceInstrument())
                 .libelle("Règlement compagnie " + instrument.getReglement().getNumero())
                 .build());
+        activityRecorder.record(TreasuryActivity.movementCommand(movement,
+                "Decaissement compagnie comptabilise", "TREASURY_COMPANY_PAYMENT"));
+        return movement;
     }
 
     @Transactional
@@ -328,7 +350,7 @@ public class TresorerieService {
                 original.getCompteTresorerie().getId(),
                 NiveauAccesCompteTresorerie.UTILISATION
         );
-        return mouvementRepository.save(MouvementTresorerie.builder()
+        MouvementTresorerie movement = mouvementRepository.save(MouvementTresorerie.builder()
                 .agence(original.getAgence())
                 .compteTresorerie(original.getCompteTresorerie())
                 .instrumentReglementCompagnie(instrument)
@@ -341,6 +363,9 @@ public class TresorerieService {
                 .libelle("Extourne " + original.getLibelle() + " - " + reason)
                 .mouvementExtourneId(original.getId())
                 .build());
+        activityRecorder.record(TreasuryActivity.movementCommand(movement,
+                "Decaissement compagnie extourne", "TREASURY_COMPANY_PAYMENT_REVERSAL"));
+        return movement;
     }
 
     public CompteTresorerie findAccount(Long agenceId, Long accountId) {
@@ -381,6 +406,8 @@ public class TresorerieService {
                         TypeCompteTresorerie.CAISSE,
                         NatureCaisseTresorerie.INDIVIDUELLE
                 );
+        var beforeAccounts = new java.util.LinkedHashMap<Long, java.util.Map<String, String>>();
+        personalAccounts.forEach(account -> beforeAccounts.put(account.getId(), TreasuryActivity.snapshot(account)));
         CompteTresorerie current = user.getAgence() == null
                 ? null
                 : personalAccounts.stream()
@@ -402,6 +429,7 @@ public class TresorerieService {
                 current = compteRepository.save(current);
                 accessService.ensureCashOwnerAccess(current);
             }
+            recordPersonalCashChanges(personalAccounts, beforeAccounts);
             return;
         }
         if (current == null) {
@@ -426,6 +454,20 @@ public class TresorerieService {
         }
         current = compteRepository.save(current);
         accessService.ensureCashOwnerAccess(current);
+        var affectedAccounts = new java.util.ArrayList<>(personalAccounts);
+        if (!beforeAccounts.containsKey(current.getId())) affectedAccounts.add(current);
+        recordPersonalCashChanges(affectedAccounts, beforeAccounts);
+    }
+
+    private void recordPersonalCashChanges(List<CompteTresorerie> accounts,
+            java.util.Map<Long, java.util.Map<String, String>> beforeAccounts) {
+        for (var account : accounts) {
+            boolean created = !beforeAccounts.containsKey(account.getId());
+            activityRecorder.record(TreasuryActivity.accountCommand(account, beforeAccounts.get(account.getId()),
+                    created ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                    created ? "Caisse individuelle creee avec l'utilisateur" : "Caisse individuelle synchronisee avec l'utilisateur",
+                    "TREASURY_PERSONAL_CASH_SYNC"));
+        }
     }
 
     private CompteTresorerie apply(

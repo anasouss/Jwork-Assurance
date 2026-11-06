@@ -83,6 +83,8 @@ class BankRejectionServiceTest {
     private InstrumentReglementClientRepository instrumentRepository;
     @Mock
     private EcartReglementClientRepository ecartRepository;
+    @Mock
+    private RejetBancaireSuiviService rejetSuiviService;
 
     @Spy
     @InjectMocks

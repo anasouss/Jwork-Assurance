@@ -486,7 +486,13 @@ export default function AvenantContratPage() {
     onError: (error) => toast.error(errorMessage(error)),
   });
   const draftMutation = useMutation({
-    mutationFn: (request: AvenantRequest) => avenantApi.saveAvenantDraft(contratId, request),
+    mutationFn: ({ request, target, section }: {
+      request: AvenantRequest;
+      target?: FlotteSectionTarget;
+      section?: "INFO" | "GARANTIES";
+    }) => avenantApi.saveAvenantDraft(contratId, request, target && section
+      ? { intent: "SAVE_TARGET", targetKind: target.kind === "vehicule" ? "VEHICULE" : "REMORQUE", targetIndex: target.index, section }
+      : { intent: "SAVE_DRAFT" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: amendmentKeys.draft(contratId, movementCode) });
     },
@@ -497,7 +503,7 @@ export default function AvenantContratPage() {
       if (validatedMovementId) {
         return avenantApi.rectifyAvenant(contratId, validatedMovementId, request);
       }
-      await avenantApi.saveAvenantDraft(contratId, request);
+      await avenantApi.saveAvenantDraft(contratId, request, { intent: "PREPARE_VALIDATION" });
       return avenantApi.createAvenant(contratId, request);
     },
     onSuccess: async (saved) => {
@@ -904,7 +910,7 @@ export default function AvenantContratPage() {
   };
 
   const saveDraft = () => {
-    draftMutation.mutate(buildDraftRequest(), {
+    draftMutation.mutate({ request: buildDraftRequest() }, {
       onSuccess: () => toast.success("Brouillon d'avenant enregistré"),
     });
   };
@@ -1012,7 +1018,7 @@ export default function AvenantContratPage() {
       return true;
     }
     const request = buildDraftRequest();
-    draftMutation.mutate(request, {
+    draftMutation.mutate({ request, target, section: part === "info" ? "INFO" : "GARANTIES" }, {
       onSuccess: () => {
         toast.success(`${label} enregistré`);
         onSuccess?.();

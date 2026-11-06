@@ -12,6 +12,8 @@ import com.assurance.entity.ReglementClient;
 import com.assurance.enums.StatutAffectationReglement;
 import com.assurance.enums.TypeDocumentClient;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import com.assurance.activity.ActivityRecorderFixture;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -41,6 +43,11 @@ class ReglementClientServicePolicyTest {
     @Mock private com.assurance.repository.ContratRepository conventionContractRepository;
     @Mock private com.assurance.repository.EcheanceFacturationConventionRepository conventionScheduleRepository;
     @InjectMocks private FacturationConventionService conventionBilling;
+
+    @BeforeEach
+    void activityRecorder() {
+        ReflectionTestUtils.setField(service, "businessActivityRecorder", new ActivityRecorderFixture().recorder);
+    }
 
     @Test
     void movementBillingModeOverridesTheOriginalContractForInvoiceAndCollectionRouting() {

@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.TreasuryActivity;
 import com.assurance.dto.request.AnnulerOperationTresorerieRequest;
 import com.assurance.dto.request.CreerAjustementTresorerieRequest;
 import com.assurance.dto.request.CreerTransfertTresorerieRequest;
@@ -55,6 +58,7 @@ public class OperationTresorerieService {
     private final AgenceRepository agenceRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieAccessService accessService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public OperationTresoreriePageResponse search(
@@ -147,6 +151,8 @@ public class OperationTresorerieService {
                 "Transfert depuis " + source.getLibelle(),
                 null
         ));
+        activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
+                "Transfert de tresorerie confirme", "TREASURY_TRANSFER", null));
         return toResponse(operation);
     }
 
@@ -198,6 +204,8 @@ public class OperationTresorerieService {
                 "Versement espèces depuis " + source.getLibelle(),
                 null
         ));
+        activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
+                "Versement d'especes transfere en banque", "TREASURY_CASH_DEPOSIT_TRANSFER", null));
         return toResponse(operation);
     }
 
@@ -233,6 +241,8 @@ public class OperationTresorerieService {
                 "Ajustement de trésorerie",
                 null
         ));
+        activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
+                "Ajustement de tresorerie confirme", "TREASURY_ADJUSTMENT", null));
         return toResponse(operation);
     }
 
@@ -280,6 +290,8 @@ public class OperationTresorerieService {
                 reason,
                 null
         ));
+        activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
+                "Operation de sinistre comptabilisee en tresorerie", "TREASURY_CLAIM_MOVEMENT", null));
         return operation;
     }
 
@@ -291,6 +303,7 @@ public class OperationTresorerieService {
     ) {
         OperationTresorerie original = operationRepository.findByIdAndAgenceId(operationId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Opération de trésorerie", operationId));
+        var before = TreasuryActivity.snapshot(original);
         if (original.getStatut() == StatutOperationTresorerie.ANNULEE
                 || operationRepository.existsByAgenceIdAndOperationExtourneeId(agenceId, operationId)) {
             throw new BadRequestException("Cette opération est déjà annulée");
@@ -342,6 +355,8 @@ public class OperationTresorerieService {
         original.setAnnuleeLe(LocalDateTime.now());
         original.setMotifAnnulation(request.getMotif().trim());
         operationRepository.save(original);
+        activityRecorder.record(TreasuryActivity.operationCommand(original, before, ActivityAction.CANCELLED,
+                "Operation de tresorerie annulee", "TREASURY_OPERATION_CANCELLATION", reversal));
         return toResponse(reversal);
     }
 

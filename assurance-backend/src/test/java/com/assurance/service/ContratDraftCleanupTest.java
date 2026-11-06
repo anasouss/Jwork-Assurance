@@ -63,7 +63,8 @@ class ContratDraftCleanupTest {
         var movements = new MouvementContratService(typeRepository, mock(ContratRepository.class), movementRepository,
                 snapshots, mock(MouvementRemorqueRepository.class), mock(MouvementGarantieRepository.class),
                 mock(QuittanceRepository.class), mock(LigneQuittanceRepository.class), stock,
-                mock(QuittanceProductionService.class), mock(QuittanceCalculService.class), mock(ElementFacturableCibleService.class));
+                mock(QuittanceProductionService.class), mock(QuittanceCalculService.class), mock(ElementFacturableCibleService.class),
+                mock(com.assurance.activity.BusinessActivityRecorder.class));
         var type = com.assurance.entity.TypeMouvementContrat.builder().code("AN").actif(true)
                 .categorie(com.assurance.enums.CategorieMouvementContrat.AFFAIRE_NOUVELLE).genereQuittance(false).build();
         when(typeRepository.findByCodeIgnoreCase("AN")).thenReturn(java.util.Optional.of(type));

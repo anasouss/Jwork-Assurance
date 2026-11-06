@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.AdministrationActivity;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.dto.request.ResetUserPasswordRequest;
 import com.assurance.dto.request.UpsertAgenceRequest;
 import com.assurance.dto.request.UpsertPlatformAdminRequest;
@@ -37,6 +41,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -55,6 +61,7 @@ public class AdminService {
     private final AgencySignatureStorageService agencySignatureStorageService;
     private final AcquisitionClientService acquisitionClientService;
     private final TresorerieService tresorerieService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listPlatformAdmins() {
@@ -86,7 +93,10 @@ public class AdminService {
                 .telephone(blankToNull(request.getTelephone()))
                 .actif(request.getActif() == null || request.getActif())
                 .build();
-        return AdminUtilisateurResponse.from(utilisateurRepository.save(user));
+        Utilisateur saved = utilisateurRepository.save(user);
+        activityRecorder.recordPlatform(AdministrationActivity.user(saved, null, ActivityAction.CREATED,
+                "Administrateur plateforme cree", "PLATFORM_ADMIN_CREATE"));
+        return AdminUtilisateurResponse.from(saved);
     }
 
     @Transactional
@@ -99,6 +109,7 @@ public class AdminService {
         if (utilisateurRepository.existsByEmailIgnoreCaseAndIdNot(request.getEmail(), id)) {
             throw new BadRequestException("Email deja utilise");
         }
+        Map<String, String> before = AdministrationActivity.userSnapshot(user);
         user.setAgence(null);
         user.setRole(platformAdminRole());
         user.setEmail(request.getEmail().trim().toLowerCase());
@@ -114,6 +125,8 @@ public class AdminService {
         if (!active) {
             refreshSessionRepository.revokeAllByUserId(id);
         }
+        activityRecorder.recordPlatform(AdministrationActivity.user(saved, before, ActivityAction.UPDATED,
+                "Administrateur plateforme modifie", "PLATFORM_ADMIN_UPDATE"));
         return AdminUtilisateurResponse.from(saved);
     }
 
@@ -123,9 +136,12 @@ public class AdminService {
         requirePlatformAdmin(actor);
         Utilisateur user = platformAdmin(id);
         validatePlatformAdminDeactivation(actor, user, false);
+        Map<String, String> before = AdministrationActivity.userSnapshot(user);
         user.setActif(false);
         utilisateurRepository.save(user);
         refreshSessionRepository.revokeAllByUserId(id);
+        activityRecorder.recordPlatform(AdministrationActivity.user(user, before, ActivityAction.UPDATED,
+                "Administrateur plateforme desactive", "PLATFORM_ADMIN_DEACTIVATE"));
     }
 
     @Transactional
@@ -206,9 +222,8 @@ public class AdminService {
                 .telephone(blankToNull(request.getTelephone()))
                 .actif(request.getActif() == null || request.getActif())
                 .build();
-        user = utilisateurRepository.save(user);
-        tresorerieService.synchronizePersonalCashAccount(user);
-        return AdminUtilisateurResponse.from(user);
+        return saveAgencyUser(user, null, ActivityAction.CREATED, "Utilisateur cree", "USER_CREATE",
+                agence.getId());
     }
 
     @Transactional
@@ -224,6 +239,8 @@ public class AdminService {
         }
         Agence agence = resolveManagedAgence(actor, request.getAgenceId());
         Role role = resolveAssignableRole(actor, request.getRoleId(), agence);
+        Map<String, String> before = AdministrationActivity.userSnapshot(user);
+        Long previousAgencyId = AdministrationActivity.agencyId(user);
         user.setAgence(agence);
         user.setRole(role);
         user.setEmail(request.getEmail().trim().toLowerCase());
@@ -234,9 +251,7 @@ public class AdminService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        user = utilisateurRepository.save(user);
-        tresorerieService.synchronizePersonalCashAccount(user);
-        return AdminUtilisateurResponse.from(user);
+        return saveAgencyUser(user, before, ActivityAction.UPDATED, "Utilisateur modifie", "USER_UPDATE", previousAgencyId);
     }
 
     @Transactional
@@ -250,10 +265,15 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
         ensureAgencyUser(user);
         ensureManagedAgence(actor, user.getAgence());
+        Map<String, String> before = AdministrationActivity.userSnapshot(user);
         user.setActif(false);
-        utilisateurRepository.save(user);
-        tresorerieService.synchronizePersonalCashAccount(user);
-        refreshSessionRepository.revokeAllByUserId(id);
+        activityRecorder.perform(() -> {
+            utilisateurRepository.save(user);
+            tresorerieService.synchronizePersonalCashAccount(user);
+            refreshSessionRepository.revokeAllByUserId(id);
+            return user;
+        }, saved -> AdministrationActivity.user(saved, before, ActivityAction.UPDATED,
+                "Utilisateur desactive", "USER_DEACTIVATE"));
     }
 
     @Transactional
@@ -334,7 +354,9 @@ public class AdminService {
                 .systemRole(Boolean.TRUE.equals(request.getSystemRole()) && can(actor, "config:manage"))
                 .permissions(resolvePermissions(actor, request.getPermissionIds()))
                 .build();
-        return AdminRoleResponse.from(roleRepository.save(role));
+        Role saved = roleRepository.save(role);
+        activityRecorder.record(AdministrationActivity.role(saved, null, ActivityAction.CREATED, "Role cree", "ROLE_CREATE"));
+        return AdminRoleResponse.from(saved);
     }
 
     @Transactional
@@ -350,6 +372,8 @@ public class AdminService {
         }
         Agence agence = resolveRoleAgence(actor, request.getAgenceId());
         ensureUniqueRoleCode(agence, request.getCode(), id);
+        Map<String, String> before = AdministrationActivity.roleSnapshot(role);
+        Long previousAgencyId = role.getAgence().getId();
         role.setAgence(agence);
         role.setCode(request.getCode().trim().toUpperCase());
         role.setNom(request.getNom().trim());
@@ -358,7 +382,11 @@ public class AdminService {
             role.setSystemRole(Boolean.TRUE.equals(request.getSystemRole()));
         }
         role.setPermissions(resolvePermissions(actor, request.getPermissionIds()));
-        return AdminRoleResponse.from(roleRepository.save(role));
+        Role saved = roleRepository.save(role);
+        ActivityCommand command = AdministrationActivity.role(saved, before, ActivityAction.UPDATED, "Role modifie", "ROLE_UPDATE");
+        if (Objects.equals(previousAgencyId, saved.getAgence().getId())) activityRecorder.record(command);
+        else activityRecorder.recordPlatform(AdministrationActivity.platform(command));
+        return AdminRoleResponse.from(saved);
     }
 
     @Transactional
@@ -375,7 +403,10 @@ public class AdminService {
         if (utilisateurRepository.existsByRoleId(id)) {
             throw new BadRequestException("Role utilise par des utilisateurs");
         }
+        ActivityCommand command = AdministrationActivity.role(role, AdministrationActivity.roleSnapshot(role),
+                ActivityAction.DELETED, "Role supprime", "ROLE_DELETE");
         roleRepository.delete(role);
+        activityRecorder.record(command);
     }
 
     @Transactional(readOnly = true)
@@ -426,8 +457,18 @@ public class AdminService {
                 .rib(blankToNull(request.getRib()))
                 .statut(request.getStatut() == null ? StatutAgence.ACTIVE : request.getStatut())
                 .build();
-        Agence saved = agenceRepository.save(agence);
-        acquisitionClientService.provisionDefaultOrigins(saved.getId());
+        Agence saved = activityRecorder.perform(() -> {
+            Agence created = agenceRepository.save(agence);
+            acquisitionClientService.provisionDefaultOrigins(created.getId());
+            return created;
+        }, created -> {
+            ActivityCommand command = AdministrationActivity.agency(created, null, ActivityAction.CREATED, "Agence creee", "AGENCY_CREATE");
+            if (isSuperAdmin(actor) && actor.getAgence() == null) {
+                activityRecorder.recordPlatform(AdministrationActivity.platform(command));
+                return null;
+            }
+            return command;
+        });
         return AdminAgenceResponse.from(saved);
     }
 
@@ -436,6 +477,7 @@ public class AdminService {
         Utilisateur actor = currentUser();
         requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
+        Map<String, String> before = AdministrationActivity.agencySnapshot(agence);
         boolean managesPlatformAgencies = can(actor, "agence:create") || can(actor, "config:manage");
         if (managesPlatformAgencies) {
             if (agenceRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode(), id)) {
@@ -457,7 +499,9 @@ public class AdminService {
         agence.setDateAgrement(request.getDateAgrement());
         agence.setBanque(blankToNull(request.getBanque()));
         agence.setRib(blankToNull(request.getRib()));
-        return AdminAgenceResponse.from(agenceRepository.save(agence));
+        Agence saved = agenceRepository.save(agence);
+        activityRecorder.record(AdministrationActivity.agency(saved, before, ActivityAction.UPDATED, "Agence modifiee", "AGENCY_UPDATE"));
+        return AdminAgenceResponse.from(saved);
     }
 
     @Transactional
@@ -466,12 +510,16 @@ public class AdminService {
         requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         String previousStorageKey = agence.getLogoCheminStockage();
+        boolean existed = previousStorageKey != null && !previousStorageKey.isBlank();
         AgencyLogoStorageService.StoredLogo stored = agencyLogoStorageService.store(agence.getId(), agence.getCode(), file);
         agence.setLogoCheminStockage(stored.storageKey());
         agence.setLogoTypeMime(stored.contentType());
         agence.setLogoNomFichier(stored.fileName());
         agencyLogoStorageService.deleteAfterCommit(previousStorageKey);
-        return AdminAgenceResponse.from(agenceRepository.save(agence));
+        Agence saved = agenceRepository.save(agence);
+        activityRecorder.record(AdministrationActivity.branding(saved, existed, true, false,
+                existed ? ActivityAction.REPLACED : ActivityAction.SAVED));
+        return AdminAgenceResponse.from(saved);
     }
 
     @Transactional
@@ -479,11 +527,14 @@ public class AdminService {
         Utilisateur actor = currentUser();
         requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
+        boolean existed = agence.getLogoCheminStockage() != null && !agence.getLogoCheminStockage().isBlank();
         agencyLogoStorageService.deleteAfterCommit(agence.getLogoCheminStockage());
         agence.setLogoCheminStockage(null);
         agence.setLogoTypeMime(null);
         agence.setLogoNomFichier(null);
-        return AdminAgenceResponse.from(agenceRepository.save(agence));
+        Agence saved = agenceRepository.save(agence);
+        activityRecorder.record(AdministrationActivity.branding(saved, existed, false, false, ActivityAction.UPDATED));
+        return AdminAgenceResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -507,6 +558,7 @@ public class AdminService {
         requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         String previousStorageKey = agence.getSignatureCheminStockage();
+        boolean existed = previousStorageKey != null && !previousStorageKey.isBlank();
         AgencySignatureStorageService.StoredSignature stored = agencySignatureStorageService.store(
                 agence.getId(),
                 agence.getCode(),
@@ -516,7 +568,10 @@ public class AdminService {
         agence.setSignatureTypeMime(stored.contentType());
         agence.setSignatureNomFichier(stored.fileName());
         agencySignatureStorageService.deleteAfterCommit(previousStorageKey);
-        return AdminAgenceResponse.from(agenceRepository.save(agence));
+        Agence saved = agenceRepository.save(agence);
+        activityRecorder.record(AdministrationActivity.branding(saved, existed, true, true,
+                existed ? ActivityAction.REPLACED : ActivityAction.SAVED));
+        return AdminAgenceResponse.from(saved);
     }
 
     @Transactional
@@ -524,11 +579,14 @@ public class AdminService {
         Utilisateur actor = currentUser();
         requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
+        boolean existed = agence.getSignatureCheminStockage() != null && !agence.getSignatureCheminStockage().isBlank();
         agencySignatureStorageService.deleteAfterCommit(agence.getSignatureCheminStockage());
         agence.setSignatureCheminStockage(null);
         agence.setSignatureTypeMime(null);
         agence.setSignatureNomFichier(null);
-        return AdminAgenceResponse.from(agenceRepository.save(agence));
+        Agence saved = agenceRepository.save(agence);
+        activityRecorder.record(AdministrationActivity.branding(saved, existed, false, true, ActivityAction.UPDATED));
+        return AdminAgenceResponse.from(saved);
     }
 
     @Transactional(readOnly = true)
@@ -544,6 +602,24 @@ public class AdminService {
                 agence.getSignatureTypeMime(),
                 agence.getSignatureNomFichier()
         );
+    }
+
+    private AdminUtilisateurResponse saveAgencyUser(Utilisateur user, Map<String, String> before, ActivityAction action,
+            String title, String origin, Long previousAgencyId) {
+        Utilisateur saved = activityRecorder.perform(() -> {
+            Utilisateur persisted = utilisateurRepository.save(user);
+            tresorerieService.synchronizePersonalCashAccount(persisted);
+            return persisted;
+        }, persisted -> {
+            ActivityCommand command = AdministrationActivity.user(persisted, before, action, title, origin);
+            if (!Objects.equals(previousAgencyId, AdministrationActivity.agencyId(persisted))) {
+                // A transfer's old/new roles belong only in the platform history.
+                activityRecorder.recordPlatform(AdministrationActivity.platform(command));
+                return null;
+            }
+            return command;
+        });
+        return AdminUtilisateurResponse.from(saved);
     }
 
     private Agence managedAgency(Utilisateur actor, Long id) {

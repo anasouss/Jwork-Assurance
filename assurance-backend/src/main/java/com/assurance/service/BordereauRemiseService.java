@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BankRemittanceActivity;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.PaymentActivity;
 import com.assurance.dto.request.CreerBordereauRemiseRequest;
 import com.assurance.dto.request.CreerTransfertTresorerieRequest;
 import com.assurance.dto.request.DeposerBordereauRemiseRequest;
@@ -78,6 +82,7 @@ public class BordereauRemiseService {
     private final TresorerieService tresorerieService;
     private final OperationTresorerieService operationTresorerieService;
     private final ReglementClientService reglementClientService;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public List<JourneeCaisseVersementResponse> eligibleCashDays(Long agenceId) {
@@ -210,6 +215,13 @@ public class BordereauRemiseService {
 
     @Transactional
     public BordereauRemiseResponse create(Long agenceId, CreerBordereauRemiseRequest request) {
+        BordereauRemise slip = businessActivityRecorder.perform(() -> createRecord(agenceId, request), result ->
+                BankRemittanceActivity.command(result, Map.of(), ActivityAction.CREATED,
+                        "Bordereau bancaire provisoire cree", "BANK_REMITTANCE_DRAFT_CREATION", List.of()));
+        return toResponse(slip, true);
+    }
+
+    private BordereauRemise createRecord(Long agenceId, CreerBordereauRemiseRequest request) {
         CompteTresorerie destination = requireAccount(
                 agenceId,
                 request.getCompteDestinationId(),
@@ -234,7 +246,7 @@ public class BordereauRemiseService {
         } else {
             configureInstrumentSlip(agenceId, slip, request);
         }
-        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+        return bordereauRepository.saveAndFlush(slip);
     }
 
     @Transactional
@@ -244,10 +256,14 @@ public class BordereauRemiseService {
             List<Long> instrumentIds
     ) {
         BordereauRemise slip = findForUpdate(agenceId, bordereauId);
-        requireDraftInstrumentSlip(slip);
-        appendInstrumentLines(agenceId, slip, instrumentIds);
-        recalculateInstrumentTotal(slip);
-        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+        var before = BankRemittanceActivity.snapshot(slip);
+        return toResponse(businessActivityRecorder.perform(() -> {
+            requireDraftInstrumentSlip(slip);
+            appendInstrumentLines(agenceId, slip, instrumentIds);
+            recalculateInstrumentTotal(slip);
+            return bordereauRepository.saveAndFlush(slip);
+        }, result -> BankRemittanceActivity.command(result, before, ActivityAction.ASSIGNED,
+                "Moyens de paiement ajoutes au bordereau", "BANK_REMITTANCE_ADD_INSTRUMENTS", List.of())), true);
     }
 
     @Transactional
@@ -268,6 +284,13 @@ public class BordereauRemiseService {
             DeposerBordereauRemiseRequest request
     ) {
         BordereauRemise slip = findForUpdate(agenceId, id);
+        var before = BankRemittanceActivity.snapshot(slip);
+        return toResponse(businessActivityRecorder.perform(() -> depositRecord(agenceId, slip, request), result ->
+                BankRemittanceActivity.command(result, before, ActivityAction.REMITTED,
+                        "Bordereau remis a la banque", "BANK_REMITTANCE_DEPOSIT", List.of())), true);
+    }
+
+    private BordereauRemise depositRecord(Long agenceId, BordereauRemise slip, DeposerBordereauRemiseRequest request) {
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
             throw new BadRequestException("Seul un bordereau provisoire peut être remis à la banque");
         }
@@ -294,7 +317,7 @@ public class BordereauRemiseService {
             });
             slip.setStatut(StatutBordereauRemise.DEPOSE);
         }
-        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+        return bordereauRepository.saveAndFlush(slip);
     }
 
     @Transactional
@@ -308,13 +331,18 @@ public class BordereauRemiseService {
         LigneBordereauRemise line = findLine(slip, lineId);
         requireRemittedLine(line);
         requireOperationAfterDeposit(slip, request.getDateOperation());
-        reglementClientService.confirmInstrumentFromRemittance(
-                agenceId,
-                line.getInstrument().getId(),
-                slip.getCompteDestination().getId(),
-                request.getDateOperation()
-        );
-        return toResponse(findForUpdate(agenceId, bordereauId), true);
+        var before = BankRemittanceActivity.snapshot(slip);
+        return toResponse(businessActivityRecorder.perform(() -> {
+            reglementClientService.confirmInstrumentFromRemittance(
+                    agenceId,
+                    line.getInstrument().getId(),
+                    slip.getCompteDestination().getId(),
+                    request.getDateOperation()
+            );
+            return findForUpdate(agenceId, bordereauId);
+        }, result -> BankRemittanceActivity.command(result, before, ActivityAction.CONFIRMED,
+                "Encaissement confirme sur le bordereau", "BANK_REMITTANCE_LINE_COLLECTION",
+                List.of(PaymentActivity.reference(line.getInstrument())))), true);
     }
 
     @Transactional
@@ -331,13 +359,18 @@ public class BordereauRemiseService {
         LigneBordereauRemise line = findLine(slip, lineId);
         requireRemittedLine(line);
         requireOperationAfterDeposit(slip, request.getDateOperation());
-        reglementClientService.rejectInstrumentFromRemittance(
-                agenceId,
-                line.getInstrument().getId(),
-                request.getMotif(),
-                request.getDateOperation()
-        );
-        return toResponse(findForUpdate(agenceId, bordereauId), true);
+        var before = BankRemittanceActivity.snapshot(slip);
+        return toResponse(businessActivityRecorder.perform(() -> {
+            reglementClientService.rejectInstrumentFromRemittance(
+                    agenceId,
+                    line.getInstrument().getId(),
+                    request.getMotif(),
+                    request.getDateOperation()
+            );
+            return findForUpdate(agenceId, bordereauId);
+        }, result -> BankRemittanceActivity.command(result, before, ActivityAction.REJECTED,
+                "Rejet bancaire enregistre sur le bordereau", "BANK_REMITTANCE_LINE_REJECTION",
+                List.of(PaymentActivity.reference(line.getInstrument())))), true);
     }
 
     @Transactional
@@ -346,8 +379,11 @@ public class BordereauRemiseService {
         if (slip.getStatut() != StatutBordereauRemise.BROUILLON) {
             throw new BadRequestException("Seul un bordereau provisoire peut être supprimé définitivement");
         }
+        var command = BankRemittanceActivity.command(slip, BankRemittanceActivity.snapshot(slip), ActivityAction.DELETED,
+                "Bordereau bancaire provisoire supprime", "BANK_REMITTANCE_DRAFT_DELETION", List.of());
         bordereauRepository.delete(slip);
         bordereauRepository.flush();
+        businessActivityRecorder.record(command);
     }
 
     @Transactional
@@ -362,9 +398,14 @@ public class BordereauRemiseService {
         if (line.getStatut() != StatutLigneBordereauRemise.PREPAREE) {
             throw new BadRequestException("Seul un instrument préparé peut être retiré");
         }
+        var before = BankRemittanceActivity.snapshot(slip);
+        var removed = PaymentActivity.reference(line.getInstrument());
         slip.getLignes().remove(line);
         recalculateInstrumentTotal(slip);
-        return toResponse(bordereauRepository.saveAndFlush(slip), true);
+        BordereauRemise saved = bordereauRepository.saveAndFlush(slip);
+        businessActivityRecorder.record(BankRemittanceActivity.command(saved, before, ActivityAction.UNASSIGNED,
+                "Moyen de paiement retire du bordereau provisoire", "BANK_REMITTANCE_REMOVE_INSTRUMENT", List.of(removed)));
+        return toResponse(saved, true);
     }
 
     private void configureCashSlip(

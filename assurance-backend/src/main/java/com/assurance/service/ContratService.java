@@ -1,5 +1,15 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityChange;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.AmendmentActivity;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ContractActivity;
 import com.assurance.service.renewal.RenewalPolicy;
 
 import com.assurance.dto.request.CreateClientRequest;
@@ -108,6 +118,8 @@ public class ContratService {
     private final RenewalPolicy renewalPolicy;
     private final ContractDirectModificationPolicy directModificationPolicy;
     private final AuditEventService auditEventService;
+    private final BusinessActivityRecorder businessActivityRecorder;
+    private final AmendmentActivity amendmentActivity;
 
     private void bindAgence(CreateContratRequest request, Long agenceId) {
         if (agenceId == null) {
@@ -146,7 +158,9 @@ public class ContratService {
     public ContratResponse create(Long agenceId, CreateContratRequest request) {
         bindAgence(request, agenceId);
         validateSubclassDriverRequirements(request);
-        return createContrat(request);
+        return businessActivityRecorder.perform(() -> createContrat(request), result ->
+                ContractActivity.command(null, result, ActivityAction.CREATED,
+                        Boolean.TRUE.equals(result.getProspection()) ? "Devis créé" : "Contrat créé", "CONTRACT_CREATION"));
     }
 
     @Transactional
@@ -169,7 +183,12 @@ public class ContratService {
         if (existingDraft != null) {
             return toResponse(existingDraft);
         }
+        return businessActivityRecorder.perform(() -> createRenewalDraftRecord(source, modeTerme), result ->
+                ContractActivity.command(null, result, ActivityAction.CREATED,
+                        "Brouillon de renouvellement cree", "RENEWAL_DRAFT_CREATION"));
+    }
 
+    private ContratResponse createRenewalDraftRecord(Contrat source, ModeTermeRenouvellement modeTerme) {
         List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(source, true);
         CreateContratRequest request = buildRenewalDraftRequest(source, modeTerme);
         Contrat draft = Contrat.builder()
@@ -213,7 +232,13 @@ public class ContratService {
         if (draft.getStatut() != StatutContrat.DRAFT || !Boolean.TRUE.equals(draft.getBrouillon())) {
             throw new BadRequestException("Le brouillon de renouvellement a déjà été finalisé ou n'est plus modifiable");
         }
+        ContratResponse before = toResponse(draft);
+        return businessActivityRecorder.perform(() -> finalizeRenewalDraftRecord(draft, source, modeTerme), result ->
+                ContractActivity.command(before, result, ActivityAction.RENEWED,
+                        "Renouvellement valide", "RENEWAL_VALIDATION"));
+    }
 
+    private ContratResponse finalizeRenewalDraftRecord(Contrat draft, Contrat source, ModeTermeRenouvellement modeTerme) {
         ModeTermeRenouvellement resolvedMode = modeTerme == null
                 ? ModeTermeRenouvellement.CABINET
                 : modeTerme;
@@ -262,6 +287,12 @@ public class ContratService {
 
     @Transactional
     public ContratResponse createDraft(Long agenceId, CreateContratRequest request) {
+        return businessActivityRecorder.perform(() -> createDraftRecord(agenceId, request), result ->
+                ContractActivity.command(null, result, ActivityAction.CREATED,
+                        "Brouillon de contrat créé", "CONTRACT_DRAFT_CREATION"));
+    }
+
+    private ContratResponse createDraftRecord(Long agenceId, CreateContratRequest request) {
         bindAgence(request, agenceId);
         if (request.getTypeContrat() == null) {
             throw new BadRequestException("Le type de contrat est obligatoire");
@@ -289,6 +320,23 @@ public class ContratService {
     @Transactional
     public ContratResponse updateDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        ContratResponse before = toResponse(contrat);
+        String operation = com.assurance.security.AuditRequestContext.getOperationCode();
+        String title = switch (operation == null ? "" : operation) {
+            case "CONTRACT_SUBSCRIBER_SAVED" -> "Souscripteur enregistré";
+            case "CONTRACT_OWNER_SAVED" -> "Propriétaire enregistré";
+            case "CONTRACT_DETAILS_SAVED" -> "Informations du contrat enregistrées";
+            case "CONTRACT_TARIFF_GRID_SELECTED" -> "Grille tarifaire sélectionnée";
+            case "CONTRACT_GUARANTEES_SAVED" -> "Garanties enregistrées";
+            case "CONTRACT_VEHICLE_SAVED" -> "Informations véhicule enregistrées";
+            default -> "Dossier enregistré";
+        };
+        return businessActivityRecorder.perform(() -> updateDraftRecord(agenceId, contrat, request), result ->
+                ContractActivity.command(before, result, ActivityAction.SAVED, title,
+                        operation == null ? "CONTRACT_DRAFT_SAVE" : operation));
+    }
+
+    private ContratResponse updateDraftRecord(Long agenceId, Contrat contrat, CreateContratRequest request) {
         bindAgence(request, agenceId);
         enforceRenewalPeriod(contrat, request);
         if (isCorrectionAffaireNouvelle(contrat)) {
@@ -301,10 +349,15 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehicule(Long agenceId, Long contratId, int index, CreateContratRequest.VehiculeInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
-        enforceRenewalPeriod(contrat, input);
-        saveVehiculeTarget(contrat, index, input);
-        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
-        return toResponse(contrat);
+        ContratResponse before = toResponse(contrat);
+        boolean created = index >= (before.getVehicules() == null ? 0 : before.getVehicules().size());
+        return businessActivityRecorder.perform(() -> {
+            enforceRenewalPeriod(contrat, input);
+            saveVehiculeTarget(contrat, index, input);
+            rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
+            return toResponse(contrat);
+        }, result -> ContractActivity.command(before, result, created ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                created ? "Véhicule ajouté au dossier" : "Informations véhicule modifiées", "CONTRACT_VEHICLE_SAVE"));
     }
 
     private ContratResponse saveVehiculeTarget(Contrat contrat, int index, CreateContratRequest.VehiculeInput input) {
@@ -366,10 +419,14 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehiculeGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
-        MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
-        saveVehiculeGarantiesTarget(contrat, index, inputs);
-        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
-        return toResponse(contrat);
+        ContratResponse before = toResponse(contrat);
+        return businessActivityRecorder.perform(() -> {
+            MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
+            saveVehiculeGarantiesTarget(contrat, index, inputs);
+            rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
+            return toResponse(contrat);
+        }, result -> ContractActivity.command(before, result, ActivityAction.SAVED,
+                "Garanties du véhicule enregistrées", "CONTRACT_VEHICLE_GUARANTEES_SAVE"));
     }
 
     private ContratResponse saveVehiculeGarantiesTarget(Contrat contrat, int index, List<CreateContratRequest.GarantieInput> inputs) {
@@ -394,10 +451,15 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
-        enforceRenewalPeriod(contrat, input);
-        saveRemorqueTarget(contrat, index, input);
-        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
-        return toResponse(contrat);
+        ContratResponse before = toResponse(contrat);
+        boolean created = index >= (before.getRemorques() == null ? 0 : before.getRemorques().size());
+        return businessActivityRecorder.perform(() -> {
+            enforceRenewalPeriod(contrat, input);
+            saveRemorqueTarget(contrat, index, input);
+            rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
+            return toResponse(contrat);
+        }, result -> ContractActivity.command(before, result, created ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                created ? "Remorque ajoutée au dossier" : "Informations remorque modifiées", "CONTRACT_TRAILER_SAVE"));
     }
 
     private ContratResponse saveRemorqueTarget(Contrat contrat, int index, CreateContratRequest.RemorqueInput input) {
@@ -427,10 +489,14 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorqueGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
-        MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
-        saveRemorqueGarantiesTarget(contrat, index, inputs);
-        rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
-        return toResponse(contrat);
+        ContratResponse before = toResponse(contrat);
+        return businessActivityRecorder.perform(() -> {
+            MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
+            saveRemorqueGarantiesTarget(contrat, index, inputs);
+            rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, mouvementInitial);
+            return toResponse(contrat);
+        }, result -> ContractActivity.command(before, result, ActivityAction.SAVED,
+                "Garanties de la remorque enregistrées", "CONTRACT_TRAILER_GUARANTEES_SAVE"));
     }
 
     @Transactional(readOnly = true)
@@ -443,6 +509,13 @@ public class ContratService {
     public ContratResponse applyDraftTariffRecalculation(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        ContratResponse before = toResponse(contrat);
+        return businessActivityRecorder.perform(() -> applyDraftTariffRecalculationRecord(contrat), result ->
+                ContractActivity.command(before, result, ActivityAction.RECALCULATED,
+                        "Tarifs du brouillon recalculés", "CONTRACT_TARIFF_RECALCULATION"));
+    }
+
+    private ContratResponse applyDraftTariffRecalculationRecord(Contrat contrat) {
         validateDraftForTariffRecalculation(contrat);
         DraftTariffRecalculation recalculation = buildDraftTariffRecalculation(contrat);
         if (!recalculation.response().isApplicable()) {
@@ -601,6 +674,16 @@ public class ContratService {
     @Transactional
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        ContratResponse before = toResponse(contrat);
+        boolean correction = isCorrectionAffaireNouvelle(contrat);
+        return businessActivityRecorder.perform(() -> finalizeDraftRecord(agenceId, contrat, request), result ->
+                ContractActivity.command(before, result,
+                        correction ? ActivityAction.UPDATED : ActivityAction.VALIDATED,
+                        correction ? "Contrat modifié" : Boolean.TRUE.equals(result.getProspection()) ? "Devis enregistré" : "Contrat validé",
+                        correction ? "CONTRACT_CORRECTION" : "CONTRACT_VALIDATION"));
+    }
+
+    private ContratResponse finalizeDraftRecord(Long agenceId, Contrat contrat, CreateContratRequest request) {
         bindAgence(request, agenceId);
         validateSubclassDriverRequirements(request);
         Contrat contratOrigine = contrat.getContratOrigine();
@@ -2434,6 +2517,13 @@ public class ContratService {
     public ContratResponse convertirProspection(Long agenceId, Long contratId, ConvertirProspectionRequest request) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        ContratResponse before = toResponse(contrat);
+        return businessActivityRecorder.perform(() -> convertProspectionRecord(contrat, request), result ->
+                ContractActivity.command(before, result, ActivityAction.VALIDATED,
+                        "Devis converti en contrat", "QUOTE_CONVERSION"));
+    }
+
+    private ContratResponse convertProspectionRecord(Contrat contrat, ConvertirProspectionRequest request) {
         if (!Boolean.TRUE.equals(contrat.getProspection())) {
             throw new BadRequestException("Ce devis est deja converti en contrat");
         }
@@ -2630,6 +2720,17 @@ public class ContratService {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
         MouvementContrat mouvement = resolveRectifiableMovement(agenceId, contrat, mouvementId);
+        ContratResponse before = toResponse(contrat);
+        AvenantDetailResponse previous = getAvenantDetail(agenceId, contratId, mouvementId);
+        Map<String, String> previousValues = amendmentActivity.snapshot(previous.getDonneesEnregistrees(), contrat);
+        return businessActivityRecorder.perform(() -> rectifyAmendmentRecord(agenceId, contrat, mouvement, request), result ->
+                amendmentCommand(contrat, before, result, ActivityAction.REPLACED,
+                        "Avenant rectifie", "AMENDMENT_RECTIFICATION", previous, previousValues));
+    }
+
+    private QuittanceResponse rectifyAmendmentRecord(Long agenceId, Contrat contrat,
+            MouvementContrat mouvement, AvenantRequest request) {
+        Long mouvementId = mouvement.getId();
         String originalCode = mouvement.getTypeMouvement().getCode();
         if (request == null || !originalCode.equalsIgnoreCase(request.getCodeTypeMouvement())) {
             throw new BadRequestException("Le type de l'avenant rectifie ne peut pas etre modifie");
@@ -2674,7 +2775,7 @@ public class ContratService {
 
         request.setNumeroMouvement(null);
         request.setNotes(appendNote(request.getNotes(), "Rectification du mouvement " + mouvement.getNumeroMouvement()));
-        return creerAvenant(agenceId, contratId, request);
+        return createAmendmentRecord(agenceId, contrat.getId(), request);
     }
 
     private MouvementContrat resolveRectifiableMovement(Long agenceId, Contrat contrat, Long mouvementId) {
@@ -3019,7 +3120,11 @@ public class ContratService {
         if (!isDraftLike(contrat)) {
             throw new BadRequestException("Impossible de supprimer un contrat valide. Utilisez un avenant d'annulation ou de resiliation.");
         }
+        ContratResponse before = toResponse(contrat);
         contratRepository.delete(contrat);
+        businessActivityRecorder.record(ContractActivity.command(before, null, ActivityAction.DELETED,
+                Boolean.TRUE.equals(before.getProspection()) ? "Devis supprimé" : "Brouillon de contrat supprimé",
+                "CONTRACT_DELETION"));
     }
 
     @Transactional
@@ -3040,6 +3145,24 @@ public class ContratService {
         }
         assertNoBlockingMovementReferences(mouvement.getId());
         assertTargetIdentitySnapshots(mouvement);
+        ContratResponse before = toResponse(contrat);
+        ActivityReference movementReference = movementActivityReference(mouvement);
+        businessActivityRecorder.perform(() -> {
+            deleteMovementRecord(contrat, mouvement);
+            return toResponse(contrat);
+        }, after -> {
+            var changes = new ArrayList<>(ContractActivity.changes(before, after));
+            changes.add(new ActivityChange("Mouvement supprime", movementReference.label(), null));
+            var references = new ArrayList<>(ContractActivity.references(before, after).stream()
+                    .filter(reference -> reference.type() != ActivityRecordType.MOUVEMENT_CONTRAT).toList());
+            references.add(ContractActivity.reference(contrat));
+            return new ActivityCommand(contrat.getAgence().getId(), ActivityModule.PRODUCTION, ActivityAction.DELETED,
+                    "Mouvement de contrat supprime", "CONTRACT_MOVEMENT_DELETION", movementReference,
+                    references, changes);
+        });
+    }
+
+    private void deleteMovementRecord(Contrat contrat, MouvementContrat mouvement) {
         libererStockMouvement(contrat, mouvement);
         rollbackCurrentStateForMovementDeletion(mouvement);
         deleteMovementGeneratedData(mouvement.getId());
@@ -3377,6 +3500,15 @@ public class ContratService {
 
     @Transactional
     public QuittanceResponse creerAvenant(Long agenceId, Long contratId, AvenantRequest request) {
+        Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        ContratResponse before = toResponse(contrat);
+        return businessActivityRecorder.perform(() -> createAmendmentRecord(agenceId, contratId, request), result ->
+                amendmentCommand(contrat, before, result, ActivityAction.VALIDATED,
+                        "Avenant valide", "AMENDMENT_VALIDATION", null, Map.of()));
+    }
+
+    private QuittanceResponse createAmendmentRecord(Long agenceId, Long contratId, AvenantRequest request) {
         if (request.getQuittances() != null && !isModificationGarantiesAvenant(request)) {
             throw new BadRequestException("La quittance manuelle n'est pas applicable a ce type d'avenant.");
         }
@@ -3518,6 +3650,52 @@ public class ContratService {
         deleteAvenantDraft(graph.contrat(), request);
         saveConventionAmendmentPayment(graph.contrat(), request, quittance);
         return quittance;
+    }
+
+    private ActivityCommand amendmentCommand(Contrat contrat, ContratResponse before, QuittanceResponse result,
+            ActivityAction action, String title, String origin, AvenantDetailResponse previous,
+            Map<String, String> previousValues) {
+        AvenantDetailResponse saved = getAvenantDetail(contrat.getAgence().getId(), contrat.getId(), result.getMouvementContratId());
+        ContratResponse after = toResponse(contrat);
+        List<ActivityChange> changes = new ArrayList<>(ContractActivity.changes(before, after));
+        ActivityValues.changes(previousValues, amendmentActivity.snapshot(saved.getDonneesEnregistrees(), contrat))
+                .forEach(change -> changes.add(new ActivityChange("Avenant - " + change.label(), change.beforeValue(), change.afterValue())));
+        var beforeFinancial = new ActivityValues();
+        if (previous != null) ContractActivity.valuesFromQuittance(beforeFinancial, previous.getImpactFinancier(), "Impact de l'avenant - ");
+        var afterFinancial = new ActivityValues();
+        ContractActivity.valuesFromQuittance(afterFinancial, saved.getImpactFinancier(), "Impact de l'avenant - ");
+        changes.addAll(ActivityValues.changes(beforeFinancial.snapshot(), afterFinancial.snapshot()));
+        var references = new ArrayList<>(amendmentActivity.references(contrat, saved.getDonneesEnregistrees()));
+        references.addAll(ContractActivity.references(before, after).stream()
+                .filter(reference -> reference.type() != ActivityRecordType.MOUVEMENT_CONTRAT).toList());
+        references.addAll(movementTargetReferences(saved.getMouvement().getId()));
+        if (previous != null) references.add(ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT,
+                previous.getMouvement().getId(), previous.getMouvement().getLibelle() + " - " + previous.getMouvement().getNumeroMouvement()));
+        var movement = saved.getMouvement();
+        return new ActivityCommand(contrat.getAgence().getId(), ActivityModule.PRODUCTION, action, title, origin,
+                ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT, movement.getId(),
+                        movement.getLibelle() + " - " + movement.getNumeroMouvement()), references, changes);
+    }
+
+    private ActivityReference movementActivityReference(MouvementContrat mouvement) {
+        return ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT, mouvement.getId(),
+                (mouvement.getTypeMouvement() == null ? "Mouvement" : mouvement.getTypeMouvement().getLibelle())
+                        + " - " + mouvement.getNumeroMouvement());
+    }
+
+    private List<ActivityReference> movementTargetReferences(Long movementId) {
+        List<ActivityReference> references = new ArrayList<>();
+        for (MouvementVehicule snapshot : mouvementVehiculeRepository.findByMouvementContratId(movementId)) {
+            if (snapshot.getVehicule() != null) references.add(ActivityReference.of(ActivityRecordType.VEHICULE,
+                    snapshot.getVehicule().getId(), hasText(snapshot.getImmatriculation())
+                            ? snapshot.getImmatriculation() : "Vehicule du mouvement"));
+        }
+        for (MouvementRemorque snapshot : mouvementRemorqueRepository.findByMouvementContratId(movementId)) {
+            if (snapshot.getRemorque() != null) references.add(ActivityReference.of(ActivityRecordType.REMORQUE,
+                    snapshot.getRemorque().getId(), hasText(snapshot.getImmatriculation())
+                            ? snapshot.getImmatriculation() : "Remorque du mouvement"));
+        }
+        return references.stream().distinct().toList();
     }
 
     private void saveConventionAmendmentPayment(Contrat contract, AvenantRequest request, QuittanceResponse response) {
@@ -5921,11 +6099,14 @@ public class ContratService {
                 .brancheAssuranceCode(contrat.getBrancheAssurance() != null ? contrat.getBrancheAssurance().getCode() : null)
                 .brancheAssuranceLibelle(contrat.getBrancheAssurance() != null ? contrat.getBrancheAssurance().getLibelle() : null)
                 .compagnieAssuranceId(contrat.getCompagnieAssurance() != null ? contrat.getCompagnieAssurance().getId() : null)
+                .compagnieAssuranceNom(contrat.getCompagnieAssurance() != null ? contrat.getCompagnieAssurance().getNom() : null)
                 .conventionId(contrat.getConvention() != null ? contrat.getConvention().getId() : null)
+                .conventionIntitule(contrat.getConvention() != null ? contrat.getConvention().getIntitule() : null)
                 .categorieClientId(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getId() : null)
                 .categorieClientCode(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getCode() : null)
                 .categorieClientLibelle(contrat.getCategorieClient() != null ? contrat.getCategorieClient().getLibelle() : null)
                 .contratOrigineId(contrat.getContratOrigine() != null ? contrat.getContratOrigine().getId() : null)
+                .contratOrigineReference(contrat.getContratOrigine() != null ? ContractActivity.reference(contrat.getContratOrigine()).label() : null)
                 .renouvele(contrat.getRenouvele())
                 .modeTermeRenouvellement(contrat.getModeTermeRenouvellement())
                 .renouvellementTermeCompagnieEligible(renewalPolicy.isCompanyTermEligible(contrat))
@@ -5940,6 +6121,7 @@ public class ContratService {
                                 : null)
                 .consommeAttestation(contrat.getUsage() != null ? contrat.getUsage().getConsommeAttestation() : null)
                 .grilleTarifaireId(contrat.getGrilleTarifaire() != null ? contrat.getGrilleTarifaire().getId() : null)
+                .grilleTarifaireLibelle(contrat.getGrilleTarifaire() != null ? contrat.getGrilleTarifaire().getLibelle() : null)
                 .dateEffet(contrat.getDateEffet())
                 .dateEcheance(contrat.getDateEcheance())
                 .numeroAttestation(contrat.getNumeroAttestation())
@@ -5977,6 +6159,7 @@ public class ContratService {
                 .crmPartage(contrat.getCrmPartage())
                 .crmPartageValeur(contrat.getCrmPartageValeur())
                 .libelleReleve(contrat.getLibelleReleve())
+                .notes(contrat.getNotes())
                 .clients(clients)
                 .vehicules(vehicules)
                 .remorques(remorques)

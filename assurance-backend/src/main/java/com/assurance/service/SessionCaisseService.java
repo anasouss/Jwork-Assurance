@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.TreasuryActivity;
 import com.assurance.dto.request.CloturerSessionCaisseRequest;
 import com.assurance.dto.request.OuvrirSessionCaisseRequest;
 import com.assurance.dto.response.SessionCaisseResponse;
@@ -38,6 +41,7 @@ public class SessionCaisseService {
     private final MouvementTresorerieRepository mouvementRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieAccessService accessService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<SessionCaisseResponse> list(Long agenceId) {
@@ -84,7 +88,10 @@ public class SessionCaisseService {
                 .ecartOuverture(discrepancy)
                 .noteOuverture(trimToNull(request.getNote()))
                 .build();
-        return toResponse(sessionRepository.save(session));
+        session = sessionRepository.save(session);
+        activityRecorder.record(TreasuryActivity.sessionCommand(session, java.util.Map.of(), ActivityAction.OPENED,
+                "Session de caisse ouverte", "CASH_SESSION_OPEN"));
+        return toResponse(session);
     }
 
     @Transactional
@@ -95,6 +102,7 @@ public class SessionCaisseService {
     ) {
         SessionCaisse session = sessionRepository.findByIdAndAgenceId(sessionId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session de caisse", sessionId));
+        var before = TreasuryActivity.snapshot(session);
         if (session.getStatut() != StatutSessionCaisse.OUVERTE) {
             throw new BadRequestException("Cette session de caisse est déjà clôturée");
         }
@@ -122,7 +130,10 @@ public class SessionCaisseService {
         session.setMontantCompteCloture(counted);
         session.setEcartCloture(discrepancy);
         session.setNoteCloture(trimToNull(request.getNote()));
-        return toResponse(sessionRepository.save(session));
+        session = sessionRepository.save(session);
+        activityRecorder.record(TreasuryActivity.sessionCommand(session, before, ActivityAction.CLOSED,
+                "Session de caisse cloturee", "CASH_SESSION_CLOSE"));
+        return toResponse(session);
     }
 
     private CompteTresorerie requireCashAccount(Long agenceId, Long accountId) {

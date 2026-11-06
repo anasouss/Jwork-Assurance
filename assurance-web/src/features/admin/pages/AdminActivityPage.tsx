@@ -1,0 +1,182 @@
+import { useState } from "react";
+import { Link, Navigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Eye, RotateCcw, Search } from "lucide-react";
+import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
+import { toDateOnly } from "@/features/production/date";
+import { adminApi } from "../api";
+import { activityActions, activityKeys, activityModules, getBusinessActivity, searchBusinessActivities,
+  type ActivityFilters, type ActivityReference, type BusinessActivity } from "../business-activity";
+import { useAdminAccess } from "./admin-access";
+
+type Filters = { search: string; module: string; action: string; actor: string; from: string; to: string };
+const emptyFilters: Filters = { search: "", module: "ALL", action: "ALL", actor: "ALL", from: "", to: "" };
+
+function recordPath(reference: ActivityReference) {
+  const id = encodeURIComponent(reference.id);
+  switch (reference.type) {
+    case "CONTRAT": return `/app/production/contrats/${id}/pdf`;
+    case "REGLEMENT_CLIENT": return `/app/compta/reglements/${id}`;
+    case "BORDEREAU_BANCAIRE": return `/app/compta/tresorerie/bordereaux-remise/${id}`;
+    case "BORDEREAU_COMPAGNIE": return `/app/compta/bordereaux-compagnies/${id}`;
+    case "SINISTRE": return `/app/sinistre/dossiers/${id}`;
+    default: return null;
+  }
+}
+
+function dateTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : new Intl.DateTimeFormat("fr-MA", {
+    dateStyle: "short", timeStyle: "short",
+  }).format(date);
+}
+
+function contextReferences(event: BusinessActivity) {
+  const priority = ["SINISTRE", "REGLEMENT_CLIENT", "REGLEMENT_COMPAGNIE", "CONTRAT", "CLIENT", "GROUPE_CLIENT", "BORDEREAU_BANCAIRE", "BORDEREAU_COMPAGNIE"];
+  return event.references.filter(reference => priority.includes(reference.type))
+    .sort((first, second) => priority.indexOf(first.type) - priority.indexOf(second.type)).slice(0, 2);
+}
+
+export default function AdminActivityPage() {
+  const access = useAdminAccess();
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState(emptyFilters);
+  const [filters, setFilters] = useState(emptyFilters);
+  const [page, setPage] = useState(0);
+  const scope = `${access.user?.agenceId ?? "platform"}:${access.user?.id ?? ""}`;
+  const [selection, setSelection] = useState<{ scope: string; event: BusinessActivity }>();
+  const selected = selection?.scope === scope ? selection.event : undefined;
+  const params: ActivityFilters = {
+    search: filters.search.trim() || undefined,
+    module: filters.module === "ALL" ? undefined : filters.module as ActivityFilters["module"],
+    action: filters.action === "ALL" ? undefined : filters.action as ActivityFilters["action"],
+    actorUserId: filters.actor === "ALL" ? undefined : filters.actor,
+    dateFrom: filters.from ? `${filters.from}T00:00:00` : undefined,
+    dateTo: filters.to ? `${filters.to}T23:59:59.999999` : undefined,
+    page, size: 25,
+  };
+  const activities = useQuery({ queryKey: activityKeys.list(access.user?.agenceId, params),
+    queryFn: () => searchBusinessActivities(params), enabled: access.canViewActivity, refetchOnMount: "always" });
+  const operators = useQuery({
+    queryKey: ["admin", "activity-operators", access.user?.agenceId ?? "platform", access.user?.id, Boolean(access.user?.platformAdmin)],
+    queryFn: async () => {
+      const [users, platformAdmins] = await Promise.all([
+        adminApi.users(), access.user?.platformAdmin ? adminApi.platformAdmins() : Promise.resolve([]),
+      ]);
+      return [...new Map([...users, ...platformAdmins].map(user => [user.id, { id: user.id, fullName: user.fullName }])).values()]
+        .sort((first, second) => first.fullName.localeCompare(second.fullName, "fr"));
+    },
+    enabled: access.canViewActivity && access.canViewUsers,
+  });
+  const activityDetail = useQuery({
+    queryKey: activityKeys.detail(access.user?.agenceId, selected?.id),
+    queryFn: () => getBusinessActivity(selected!.id),
+    enabled: access.canViewActivity && !!selected,
+  });
+  const detail = activityDetail.data;
+
+  if (!access.canViewActivity) return <Navigate to={access.defaultPath} replace />;
+
+  function referenceLabel(reference: ActivityReference, event: BusinessActivity) {
+    const path = recordPath(reference);
+    const requirement = path ? permissionRequirementForPath(path) : null;
+    const sameAgency = Boolean(access.user?.agenceId && access.user.agenceId === event.agenceId);
+    const deletedSubject = event.action === "DELETED" && event.subject.type === reference.type && event.subject.id === reference.id;
+    return path && sameAgency && !deletedSubject && requirement
+      && satisfiesPermissionRequirement(access.user?.permissions ?? [], requirement)
+      ? <Link className="break-words text-sky-700 underline-offset-4 hover:underline dark:text-sky-400" to={path}>{reference.label}</Link>
+      : <span className="break-words">{reference.label}</span>;
+  }
+
+  return <div className="grid min-w-0 gap-4">
+    <form className="grid items-end gap-3 border-b pb-4 sm:grid-cols-2 xl:grid-cols-4" onSubmit={event => {
+      event.preventDefault(); setPage(0); setFilters(draft);
+      void queryClient.invalidateQueries({ queryKey: activityKeys.scope(access.user?.agenceId) });
+    }}>
+      <FilterField label="Recherche"><Input placeholder="Opération, référence ou opérateur" value={draft.search} onChange={event => setDraft({ ...draft, search: event.target.value })} /></FilterField>
+      <FilterField label="Module"><Select value={draft.module} onValueChange={module => setDraft({ ...draft, module })}>
+        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les modules</SelectItem>
+          {Object.entries(activityModules).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+        </SelectContent></Select></FilterField>
+      <FilterField label="Action"><Select value={draft.action} onValueChange={action => setDraft({ ...draft, action })}>
+        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les actions</SelectItem>
+          {Object.entries(activityActions).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}
+        </SelectContent></Select></FilterField>
+      {access.canViewUsers && <FilterField label="Opérateur"><Select value={draft.actor} disabled={operators.isPending || operators.isError} onValueChange={actor => setDraft({ ...draft, actor })}>
+        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les opérateurs</SelectItem>
+          {(operators.data ?? []).map(user => <SelectItem key={user.id} value={user.id}>{user.fullName}</SelectItem>)}
+        </SelectContent></Select>
+        {operators.isError && <div role="alert" className="mt-1 flex items-center gap-1 text-xs text-destructive">
+          Opérateurs indisponibles.
+          <Button type="button" variant="ghost" size="icon" className="size-6 shrink-0" title="Recharger les opérateurs" aria-label="Recharger les opérateurs" onClick={() => operators.refetch()}>
+            <RotateCcw className="size-3" />
+          </Button>
+        </div>}
+      </FilterField>}
+      <FilterField label="Du"><DatePicker date={draft.from || undefined} onSelect={date => setDraft({ ...draft, from: toDateOnly(date) ?? "" })} /></FilterField>
+      <FilterField label="Au"><DatePicker date={draft.to || undefined} minDate={draft.from ? new Date(`${draft.from}T00:00:00`) : undefined} onSelect={date => setDraft({ ...draft, to: toDateOnly(date) ?? "" })} /></FilterField>
+      <div className="flex gap-2"><Button type="submit" disabled={activities.isFetching}><Search className="size-4" />Rechercher</Button>
+        <Button type="button" variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser les filtres" onClick={() => {
+          setDraft(emptyFilters); setFilters(emptyFilters); setPage(0);
+        }}><RotateCcw className="size-4" /></Button></div>
+    </form>
+    {activities.isError ? <div role="alert" className="space-y-2 text-sm text-destructive">
+      <p>{activities.error instanceof Error ? activities.error.message : "Chargement impossible."}</p>
+      <Button type="button" variant="outline" onClick={() => activities.refetch()}>Réessayer</Button>
+    </div> : <div className="min-w-0 overflow-x-auto rounded-md border">
+      <table className="w-full min-w-[820px] text-sm">
+        <thead className="bg-muted text-left text-muted-foreground"><tr>
+          {["Date", "Opérateur", "Module", "Activité", "Dossier / Référence", "Détails"].map(label => <th key={label} className="px-3 py-3 font-medium">{label}</th>)}
+        </tr></thead>
+        <tbody>{activities.isPending ? <TableRowsSkeleton rows={6} colSpan={6} /> : activities.data?.items.length
+          ? activities.data.items.map(event => <tr key={event.id} className="border-t align-top">
+            <td className="whitespace-nowrap px-3 py-3 tabular-nums">{dateTime(event.occurredAt)}</td>
+            <td className="px-3 py-3">{event.actorName}</td>
+            <td className="px-3 py-3">{activityModules[event.module]}</td>
+            <td className="max-w-sm px-3 py-3"><p className="break-words font-medium">{event.title}</p>
+              <Badge variant="secondary" className="mt-1 rounded">{activityActions[event.action]}</Badge></td>
+            <td className="max-w-xs px-3 py-3"><p>{referenceLabel(event.subject, event)}</p>
+              {contextReferences(event).map(reference => <p key={`${reference.type}-${reference.id}`} className="mt-1 text-xs text-muted-foreground">
+                  {referenceLabel(reference, event)}
+                </p>)}
+            </td>
+            <td className="px-3 py-3"><Button type="button" variant="ghost" size="icon" title="Voir les détails" aria-label={`Détails : ${event.title}`} onClick={() => setSelection({ scope, event })}><Eye className="size-4" /></Button></td>
+          </tr>) : <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground">Aucune activité ne correspond aux filtres.</td></tr>}
+        </tbody>
+      </table>
+    </div>}
+    <ServerPagination page={page} totalPages={activities.data?.page.totalPages ?? 1} totalElements={activities.data?.page.totalElements}
+      loading={activities.isFetching} onPageChange={setPage} />
+    <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelection(undefined); }}>
+      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader><DialogTitle>{selected?.title}</DialogTitle></DialogHeader>
+        {activityDetail.isPending && <p role="status" className="py-6 text-sm text-muted-foreground">Chargement des détails...</p>}
+        {activityDetail.isError && <div role="alert" className="space-y-3 text-sm text-destructive">
+          <p>{activityDetail.error instanceof Error ? activityDetail.error.message : "Chargement impossible."}</p>
+          <Button type="button" variant="outline" onClick={() => activityDetail.refetch()}>Réessayer</Button>
+        </div>}
+        {selected && detail && <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">{dateTime(detail.occurredAt)} · {detail.actorName} · {activityModules[detail.module]}</p>
+          <p className="text-sm"><span className="text-muted-foreground">Depuis : </span>{detail.surfaceLabel}</p>
+          <div className="space-y-2 text-sm"><p className="font-medium">{referenceLabel(detail.subject, detail)}</p>
+            {detail.references.map(reference => <p key={`${reference.type}-${reference.id}`}>{referenceLabel(reference, detail)}</p>)}
+          </div>
+          {detail.changes.length > 0 && <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm"><thead className="bg-muted text-left"><tr>
+              <th className="px-3 py-2 font-medium">Information</th><th className="px-3 py-2 font-medium">Avant</th><th className="px-3 py-2 font-medium">Après</th>
+            </tr></thead><tbody>{detail.changes.map((change, index) => <tr key={`${change.label}-${index}`} className="border-t align-top">
+              <td className="px-3 py-2 font-medium">{change.label}</td><td className="whitespace-pre-wrap break-words px-3 py-2">{change.beforeValue ?? "-"}</td><td className="whitespace-pre-wrap break-words px-3 py-2">{change.afterValue ?? "-"}</td>
+            </tr>)}</tbody></table>
+          </div>}
+        </div>}
+      </DialogContent>
+    </Dialog>
+  </div>;
+}

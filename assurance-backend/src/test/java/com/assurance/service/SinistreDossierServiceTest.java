@@ -1,6 +1,12 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.AddSinistreOperationRequest;
+import com.assurance.dto.response.SinistreDetailResponse;
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityRecorderFixture;
+import com.assurance.activity.ClaimActivity;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
 import com.assurance.entity.CompagnieAssurance;
@@ -32,12 +38,17 @@ import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 
 class SinistreDossierServiceTest {
 
@@ -58,6 +69,8 @@ class SinistreDossierServiceTest {
     private final SinistreEvenementService events = mock(SinistreEvenementService.class);
     private final SinistreResponseMapper mapper = mock(SinistreResponseMapper.class);
     private final OperationTresorerieService treasuryOperations = mock(OperationTresorerieService.class);
+    private final ActivityRecorderFixture activity = new ActivityRecorderFixture();
+    private final List<SinistreOperation> savedOperations = new ArrayList<>();
 
     private final SinistreDossierService service = new SinistreDossierService(
             claims,
@@ -76,7 +89,8 @@ class SinistreDossierServiceTest {
             readiness,
             events,
             mapper,
-            treasuryOperations
+            treasuryOperations,
+            activity.recorder
     );
 
     private Sinistre claim;
@@ -100,6 +114,7 @@ class SinistreDossierServiceTest {
                 .agence(agency)
                 .client(client)
                 .compagnieAssurance(insurer)
+                .numeroSinistre("SIN-26-000035")
                 .statut(StatutSinistre.EN_ATTENTE_REGLEMENT)
                 .dateSinistre(LocalDate.now().minusDays(2))
                 .build();
@@ -112,6 +127,20 @@ class SinistreDossierServiceTest {
         when(workflow.isEditable(StatutSinistre.EN_ATTENTE_REGLEMENT)).thenReturn(true);
         when(readiness.totalIndemnisable(35L)).thenReturn(new BigDecimal("1000.00"));
         when(readiness.totalSettled(35L)).thenReturn(BigDecimal.ZERO);
+        when(operations.save(any())).thenAnswer(call -> {
+            SinistreOperation operation = call.getArgument(0);
+            operation.setId(100L + savedOperations.size());
+            savedOperations.add(operation);
+            return operation;
+        });
+        when(mapper.toDetail(claim)).thenAnswer(call -> SinistreDetailResponse.builder()
+                .id(claim.getId()).numeroSinistre(claim.getNumeroSinistre()).statut(claim.getStatut())
+                .operations(savedOperations.stream().map(operation -> SinistreDetailResponse.Operation.builder()
+                        .id(operation.getId()).type(operation.getType()).dateOperation(operation.getDateOperation())
+                        .montant(operation.getMontant()).reference(operation.getReference())
+                        .contrepartie(operation.getContrepartieNomSnapshot()).typeContrepartie(operation.getTypeContrepartie())
+                        .modeReglement(operation.getModeReglement()).circuitFinancier(operation.getCircuitFinancier())
+                        .build()).toList()).build());
     }
 
     @Test
@@ -130,6 +159,9 @@ class SinistreDossierServiceTest {
         assertThat(saved.getModeReglement()).isEqualTo(ModeReglementSinistre.VIREMENT);
         assertThat(saved.getCircuitFinancier()).isEqualTo(CircuitFinancierSinistre.DIRECT_COMPAGNIE);
         assertThat(saved.getOperationTresorerie()).isNull();
+        verify(activity.events).save(argThat(event -> event.getModule() == ActivityModule.SINISTRES
+                && event.getSubjectType() == ActivityRecordType.OPERATION_SINISTRE
+                && event.getChangesJson().contains("Direct compagnie")));
     }
 
     @Test
@@ -140,6 +172,7 @@ class SinistreDossierServiceTest {
         assertThatThrownBy(() -> service.addOperation(1L, 7L, 35L, request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("référence est obligatoire");
+        verifyNoInteractions(activity.events);
     }
 
     @Test
@@ -182,5 +215,19 @@ class SinistreDossierServiceTest {
         request.setTypeContrepartie(TypeContrepartieSinistre.CLIENT);
         request.setModeReglement(ModeReglementSinistre.VIREMENT);
         return request;
+    }
+
+    @Test
+    void deletingOnePartyDoesNotReportUnchangedRemainingPartyAsModified() {
+        var first = SinistreDetailResponse.Partie.builder().id(1L).nom("Amine").build();
+        var remaining = SinistreDetailResponse.Partie.builder().id(2L).nom("Nadia").build();
+        var before = ClaimActivity.snapshot(SinistreDetailResponse.builder().numeroSinistre(claim.getNumeroSinistre())
+                .parties(List.of(first, remaining)).build());
+        var after = SinistreDetailResponse.builder().numeroSinistre(claim.getNumeroSinistre()).parties(List.of(remaining)).build();
+        var command = ClaimActivity.target(ClaimActivity.command(claim, before, after, ActivityAction.DELETED,
+                "Partie retiree du sinistre", "CLAIM_PARTY_REMOVAL"), before, after, ActivityRecordType.PARTIE_SINISTRE, 1L);
+        assertThat(command.subject().type()).isEqualTo(ActivityRecordType.PARTIE_SINISTRE);
+        assertThat(command.references()).anyMatch(reference -> reference.type() == ActivityRecordType.SINISTRE);
+        assertThat(command.changes()).allMatch(change -> !change.label().contains("Nadia"));
     }
 }

@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.GreenCardActivity;
 import com.assurance.dto.request.UpsertCarteVerteRequest;
 import com.assurance.dto.response.CarteVerteContextResponse;
 import com.assurance.dto.response.CarteVerteResponse;
@@ -27,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -45,6 +50,7 @@ public class CarteVerteService {
     private final CarteVerteRepository carteVerteRepository;
     private final ElementFacturableRepository elementFacturableRepository;
     private final ParametreApplicationService parametreApplicationService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public CarteVerteContextResponse getContext(Long agenceId, Long contratId, Long mouvementId) {
@@ -96,10 +102,16 @@ public class CarteVerteService {
         CarteVerte carte = carteVerteRepository
                 .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contrat.getId(), vehicule.getId())
                 .orElse(null);
+        var before = carte == null ? null : GreenCardActivity.snapshot(carte);
+        var previousReferences = new ArrayList<>(carte == null
+                ? List.<ActivityReference>of() : GreenCardActivity.references(carte));
+        boolean replaced = false;
         if (carte != null
                 && mouvement != null
                 && (carte.getMouvementContrat() == null
                     || !mouvement.getId().equals(carte.getMouvementContrat().getId()))) {
+            replaced = true;
+            previousReferences.add(GreenCardActivity.reference(carte));
             carte.setActif(false);
             if (carte.getElementFacturable() != null) {
                 carte.getElementFacturable().setActif(false);
@@ -156,6 +168,11 @@ public class CarteVerteService {
         carte.setElementFacturable(element);
         carte = carteVerteRepository.save(carte);
 
+        activityRecorder.record(GreenCardActivity.command(carte, before, previousReferences,
+                replaced ? ActivityAction.REPLACED : before == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                replaced ? "Carte verte remplacee" : before == null ? "Carte verte ajoutee" : "Carte verte modifiee",
+                "GREEN_CARD_SAVE"));
+
         return toResponse(carte);
     }
 
@@ -167,12 +184,16 @@ public class CarteVerteService {
         if (carte.getContrat() == null || !carte.getContrat().getId().equals(contrat.getId())) {
             throw new BadRequestException("La carte verte ne correspond pas au contrat");
         }
+        var before = GreenCardActivity.snapshot(carte);
+        var previousReferences = GreenCardActivity.references(carte);
         carte.setActif(false);
         if (carte.getElementFacturable() != null) {
             carte.getElementFacturable().setActif(false);
             elementFacturableRepository.save(carte.getElementFacturable());
         }
         carteVerteRepository.save(carte);
+        activityRecorder.record(GreenCardActivity.command(carte, before, previousReferences, ActivityAction.UPDATED,
+                "Carte verte desactivee", "GREEN_CARD_DEACTIVATE"));
     }
 
     private Contrat resolveContrat(Long agenceId, Long contratId) {

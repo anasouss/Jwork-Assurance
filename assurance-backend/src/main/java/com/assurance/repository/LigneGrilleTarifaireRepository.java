@@ -12,6 +12,17 @@ import java.util.Optional;
 import java.util.Set;
 
 public interface LigneGrilleTarifaireRepository extends JpaRepository<LigneGrilleTarifaire, Long> {
+    @EntityGraph(attributePaths = {"grilleTarifaire", "garantie", "usage"})
+    @Query("""
+            select l from LigneGrilleTarifaire l
+            where l.grilleTarifaire.id = :grilleId and l.actif = true
+              and (l.grilleTarifaire.agence is null or l.grilleTarifaire.agence.id = :agenceId)
+              and (:usageId is null or l.usage is null or l.usage.id = :usageId)
+              and (:garantieId is null or l.garantie.id = :garantieId)
+            """)
+    List<LigneGrilleTarifaire> findAccessibleOptions(@Param("agenceId") Long agenceId, @Param("grilleId") Long grilleId,
+            @Param("usageId") Long usageId, @Param("garantieId") Long garantieId);
+
     @Query("""
             select ligne
             from LigneGrilleTarifaire ligne

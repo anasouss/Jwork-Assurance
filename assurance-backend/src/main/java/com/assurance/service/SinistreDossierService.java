@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClaimActivity;
 import com.assurance.dto.request.AddProvisionSinistreRequest;
 import com.assurance.dto.request.AddSinistreOperationRequest;
 import com.assurance.dto.request.AnnulerOperationTresorerieRequest;
@@ -70,6 +74,7 @@ public class SinistreDossierService {
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
     private final OperationTresorerieService operationTresorerieService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional
     public SinistreDetailResponse updateGuarantee(
@@ -80,27 +85,30 @@ public class SinistreDossierService {
             UpdateSinistreGarantieRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        SinistreGarantie garantie = garantieRepository.findByIdAndSinistreId(garantieId, sinistreId)
-                .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", garantieId));
-        validateGuaranteeDecision(request);
-        applyGuaranteeDecision(
-                garantie,
-                request.getDecisionCouverture(),
-                request.getImpliquee(),
-                request.getFranchiseAppliquee(),
-                request.getMontantIndemnisable()
-        );
-        garantieRepository.save(garantie);
-        validateIndemnityAgainstSettlements(sinistreId);
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.MODIFICATION,
-                "Décision de couverture mise à jour pour la garantie " + garantie.getSnapshotCode()
-        );
-        synchronizeSettlementStatus(context);
-        return responseMapper.toDetail(context.sinistre());
+        return recordChange(context, ActivityAction.UPDATED, "Decision de couverture modifiee", "CLAIM_GUARANTEE_DECISION",
+                ActivityRecordType.GARANTIE_SINISTRE, garantieId, () -> {
+            assertEditable(context.sinistre());
+            SinistreGarantie garantie = garantieRepository.findByIdAndSinistreId(garantieId, sinistreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", garantieId));
+            validateGuaranteeDecision(request);
+            applyGuaranteeDecision(
+                    garantie,
+                    request.getDecisionCouverture(),
+                    request.getImpliquee(),
+                    request.getFranchiseAppliquee(),
+                    request.getMontantIndemnisable()
+            );
+            garantieRepository.save(garantie);
+            validateIndemnityAgainstSettlements(sinistreId);
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.MODIFICATION,
+                    "Décision de couverture mise à jour pour la garantie " + garantie.getSnapshotCode()
+            );
+            synchronizeSettlementStatus(context);
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -111,43 +119,46 @@ public class SinistreDossierService {
             UpdateSinistreGarantiesRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        Set<Long> ids = new HashSet<>();
-        request.getGaranties().forEach(item -> {
-            if (!ids.add(item.getId())) {
-                throw new BadRequestException("Une garantie ne peut être mise à jour qu'une seule fois");
-            }
-            SinistreGarantie garantie = garantieRepository
-                    .findByIdAndSinistreId(item.getId(), sinistreId)
-                    .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", item.getId()));
-            validateGuaranteeDecision(
-                    item.getDecisionCouverture(),
-                    item.getImpliquee(),
-                    item.getMontantIndemnisable()
+        return recordChange(context, ActivityAction.UPDATED, "Garanties du sinistre enregistrees", "CLAIM_GUARANTEE_DECISIONS", null, null, () -> {
+            assertEditable(context.sinistre());
+            Set<Long> ids = new HashSet<>();
+            request.getGaranties().forEach(item -> {
+                if (!ids.add(item.getId())) {
+                    throw new BadRequestException("Une garantie ne peut être mise à jour qu'une seule fois");
+                }
+                SinistreGarantie garantie = garantieRepository
+                        .findByIdAndSinistreId(item.getId(), sinistreId)
+                        .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", item.getId()));
+                validateGuaranteeDecision(
+                        item.getDecisionCouverture(),
+                        item.getImpliquee(),
+                        item.getMontantIndemnisable()
+                );
+                applyGuaranteeDecision(
+                        garantie,
+                        item.getDecisionCouverture(),
+                        item.getImpliquee(),
+                        item.getFranchiseAppliquee(),
+                        item.getMontantIndemnisable()
+                );
+                garantieRepository.save(garantie);
+            });
+            validateIndemnityAgainstSettlements(sinistreId);
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.MODIFICATION,
+                    "Garanties du sinistre mises à jour (" + ids.size() + ")"
             );
-            applyGuaranteeDecision(
-                    garantie,
-                    item.getDecisionCouverture(),
-                    item.getImpliquee(),
-                    item.getFranchiseAppliquee(),
-                    item.getMontantIndemnisable()
-            );
-            garantieRepository.save(garantie);
+            synchronizeSettlementStatus(context);
+            return responseMapper.toDetail(context.sinistre());
         });
-        validateIndemnityAgainstSettlements(sinistreId);
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.MODIFICATION,
-                "Garanties du sinistre mises à jour (" + ids.size() + ")"
-        );
-        synchronizeSettlementStatus(context);
-        return responseMapper.toDetail(context.sinistre());
     }
 
     @Transactional
     public void deleteEarlyClaim(Long agenceId, Long sinistreId) {
         Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
+        var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
         if (!DELETABLE_STATUSES.contains(sinistre.getStatut())) {
             throw new BadRequestException(
                     "Seul un dossier brouillon, déclaré ou incomplet peut être supprimé"
@@ -166,6 +177,8 @@ public class SinistreDossierService {
         garantieRepository.deleteBySinistreId(sinistreId);
         couvertureRepository.deleteBySinistreId(sinistreId);
         sinistreRepository.delete(sinistre);
+        activityRecorder.record(ClaimActivity.command(sinistre, before, null, ActivityAction.DELETED,
+                "Dossier de sinistre supprime", "CLAIM_EARLY_DELETION"));
     }
 
     @Transactional
@@ -176,26 +189,29 @@ public class SinistreDossierService {
             AddSinistrePartieRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        partieRepository.save(SinistrePartie.builder()
-                .sinistre(context.sinistre())
-                .type(request.getType())
-                .nom(request.getNom().trim())
-                .telephone(trimToNull(request.getTelephone()))
-                .cin(trimToNull(request.getCin()))
-                .numeroPermis(trimToNull(request.getNumeroPermis()))
-                .immatriculation(trimToNull(request.getImmatriculation()))
-                .compagnieAdverse(trimToNull(request.getCompagnieAdverse()))
-                .numeroPoliceAdverse(trimToNull(request.getNumeroPoliceAdverse()))
-                .notes(trimToNull(request.getNotes()))
-                .build());
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.MODIFICATION,
-                "Partie impliquée ajoutée : " + request.getNom().trim()
-        );
-        return responseMapper.toDetail(context.sinistre());
+        return recordChange(context, ActivityAction.CREATED, "Partie ajoutee au sinistre", "CLAIM_PARTY_ADDITION",
+                ActivityRecordType.PARTIE_SINISTRE, null, () -> {
+            assertEditable(context.sinistre());
+            partieRepository.save(SinistrePartie.builder()
+                    .sinistre(context.sinistre())
+                    .type(request.getType())
+                    .nom(request.getNom().trim())
+                    .telephone(trimToNull(request.getTelephone()))
+                    .cin(trimToNull(request.getCin()))
+                    .numeroPermis(trimToNull(request.getNumeroPermis()))
+                    .immatriculation(trimToNull(request.getImmatriculation()))
+                    .compagnieAdverse(trimToNull(request.getCompagnieAdverse()))
+                    .numeroPoliceAdverse(trimToNull(request.getNumeroPoliceAdverse()))
+                    .notes(trimToNull(request.getNotes()))
+                    .build());
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.MODIFICATION,
+                    "Partie impliquée ajoutée : " + request.getNom().trim()
+            );
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -207,26 +223,29 @@ public class SinistreDossierService {
             AddSinistrePartieRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
-                .orElseThrow(() -> new ResourceNotFoundException("SinistrePartie", partieId));
-        partie.setType(request.getType());
-        partie.setNom(request.getNom().trim());
-        partie.setTelephone(trimToNull(request.getTelephone()));
-        partie.setCin(trimToNull(request.getCin()));
-        partie.setNumeroPermis(trimToNull(request.getNumeroPermis()));
-        partie.setImmatriculation(trimToNull(request.getImmatriculation()));
-        partie.setCompagnieAdverse(trimToNull(request.getCompagnieAdverse()));
-        partie.setNumeroPoliceAdverse(trimToNull(request.getNumeroPoliceAdverse()));
-        partie.setNotes(trimToNull(request.getNotes()));
-        partieRepository.save(partie);
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.MODIFICATION,
-                "Partie impliquée mise à jour : " + partie.getNom()
-        );
-        return responseMapper.toDetail(context.sinistre());
+        return recordChange(context, ActivityAction.UPDATED, "Partie du sinistre modifiee", "CLAIM_PARTY_UPDATE",
+                ActivityRecordType.PARTIE_SINISTRE, partieId, () -> {
+            assertEditable(context.sinistre());
+            SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SinistrePartie", partieId));
+            partie.setType(request.getType());
+            partie.setNom(request.getNom().trim());
+            partie.setTelephone(trimToNull(request.getTelephone()));
+            partie.setCin(trimToNull(request.getCin()));
+            partie.setNumeroPermis(trimToNull(request.getNumeroPermis()));
+            partie.setImmatriculation(trimToNull(request.getImmatriculation()));
+            partie.setCompagnieAdverse(trimToNull(request.getCompagnieAdverse()));
+            partie.setNumeroPoliceAdverse(trimToNull(request.getNumeroPoliceAdverse()));
+            partie.setNotes(trimToNull(request.getNotes()));
+            partieRepository.save(partie);
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.MODIFICATION,
+                    "Partie impliquée mise à jour : " + partie.getNom()
+            );
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -237,23 +256,26 @@ public class SinistreDossierService {
             Long partieId
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
-                .orElseThrow(() -> new ResourceNotFoundException("SinistrePartie", partieId));
-        if (operationRepository.existsByContrepartiePartieId(partieId)) {
-            throw new BadRequestException(
-                    "Cette partie est utilisée par une opération financière et ne peut pas être supprimée"
+        return recordChange(context, ActivityAction.DELETED, "Partie retiree du sinistre", "CLAIM_PARTY_REMOVAL",
+                ActivityRecordType.PARTIE_SINISTRE, partieId, () -> {
+            assertEditable(context.sinistre());
+            SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SinistrePartie", partieId));
+            if (operationRepository.existsByContrepartiePartieId(partieId)) {
+                throw new BadRequestException(
+                        "Cette partie est utilisée par une opération financière et ne peut pas être supprimée"
+                );
+            }
+            String nom = partie.getNom();
+            partieRepository.delete(partie);
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.MODIFICATION,
+                    "Partie impliquée retirée : " + nom
             );
-        }
-        String nom = partie.getNom();
-        partieRepository.delete(partie);
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.MODIFICATION,
-                "Partie impliquée retirée : " + nom
-        );
-        return responseMapper.toDetail(context.sinistre());
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -264,25 +286,28 @@ public class SinistreDossierService {
             AddProvisionSinistreRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
-            throw new BadRequestException("Déclarez le sinistre avant d'enregistrer une provision");
-        }
-        validateDossierDate(context.sinistre(), request.getDateProvision(), "provision");
-        provisionRepository.save(ProvisionSinistre.builder()
-                .sinistre(context.sinistre())
-                .saisiePar(context.acteur())
-                .dateProvision(request.getDateProvision())
-                .montant(request.getMontant())
-                .motif(request.getMotif().trim())
-                .build());
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.PROVISION,
-                "Provision actualisée à " + request.getMontant()
-        );
-        return responseMapper.toDetail(context.sinistre());
+        return recordChange(context, ActivityAction.CREATED, "Provision du sinistre enregistree", "CLAIM_PROVISION",
+                ActivityRecordType.PROVISION_SINISTRE, null, () -> {
+            assertEditable(context.sinistre());
+            if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
+                throw new BadRequestException("Déclarez le sinistre avant d'enregistrer une provision");
+            }
+            validateDossierDate(context.sinistre(), request.getDateProvision(), "provision");
+            provisionRepository.save(ProvisionSinistre.builder()
+                    .sinistre(context.sinistre())
+                    .saisiePar(context.acteur())
+                    .dateProvision(request.getDateProvision())
+                    .montant(request.getMontant())
+                    .motif(request.getMotif().trim())
+                    .build());
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.PROVISION,
+                    "Provision actualisée à " + request.getMontant()
+            );
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -294,49 +319,53 @@ public class SinistreDossierService {
             UpsertMissionExpertiseRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        validateNotBeforeSinistre(context.sinistre(), request.getDateMission(), "mission d'expertise");
-        if (request.getDateRapport() != null) {
-            validateDossierDate(context.sinistre(), request.getDateRapport(), "rapport d'expertise");
-            if (request.getDateRapport().isBefore(request.getDateMission())) {
-                throw new BadRequestException("La date du rapport ne peut pas précéder la mission");
+        return recordChange(context, missionId == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                missionId == null ? "Mission d'expertise creee" : "Mission d'expertise modifiee", "CLAIM_EXPERT_MISSION",
+                ActivityRecordType.MISSION_EXPERTISE, missionId, () -> {
+            assertEditable(context.sinistre());
+            validateNotBeforeSinistre(context.sinistre(), request.getDateMission(), "mission d'expertise");
+            if (request.getDateRapport() != null) {
+                validateDossierDate(context.sinistre(), request.getDateRapport(), "rapport d'expertise");
+                if (request.getDateRapport().isBefore(request.getDateMission())) {
+                    throw new BadRequestException("La date du rapport ne peut pas précéder la mission");
+                }
             }
-        }
-        ExpertSinistre expert = expertRepository.findByIdAndAgenceId(request.getExpertId(), agenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("ExpertSinistre", request.getExpertId()));
-        if (!expert.isActif()) {
-            throw new BadRequestException("L'expert sélectionné est inactif");
-        }
-        GarageSinistre garage = request.getGarageId() == null
-                ? null
-                : garageRepository.findByIdAndAgenceId(request.getGarageId(), agenceId)
-                .orElseThrow(() -> new ResourceNotFoundException("GarageSinistre", request.getGarageId()));
-        if (garage != null && !garage.isActif()) {
-            throw new BadRequestException("Le garage sélectionné est inactif");
-        }
-        MissionExpertise mission = missionId == null
-                ? MissionExpertise.builder().sinistre(context.sinistre()).build()
-                : missionRepository.findByIdAndSinistreId(missionId, sinistreId)
-                .orElseThrow(() -> new ResourceNotFoundException("MissionExpertise", missionId));
-        mission.setExpert(expert);
-        mission.setGarage(garage);
-        mission.setExpertNomSnapshot(expert.getNom());
-        mission.setGarageNomSnapshot(garage == null ? null : garage.getRaisonSociale());
-        mission.setReferenceMission(trimToNull(request.getReferenceMission()));
-        mission.setDateMission(request.getDateMission());
-        mission.setDateRapport(request.getDateRapport());
-        mission.setMontantEstime(request.getMontantEstime());
-        mission.setMontantAccepte(request.getMontantAccepte());
-        mission.setStatut(request.getStatut());
-        mission.setNotes(trimToNull(request.getNotes()));
-        missionRepository.save(mission);
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.EXPERTISE,
-                "Mission d'expertise enregistrée pour " + expert.getNom()
-        );
-        return responseMapper.toDetail(context.sinistre());
+            ExpertSinistre expert = expertRepository.findByIdAndAgenceId(request.getExpertId(), agenceId)
+                    .orElseThrow(() -> new ResourceNotFoundException("ExpertSinistre", request.getExpertId()));
+            if (!expert.isActif()) {
+                throw new BadRequestException("L'expert sélectionné est inactif");
+            }
+            GarageSinistre garage = request.getGarageId() == null
+                    ? null
+                    : garageRepository.findByIdAndAgenceId(request.getGarageId(), agenceId)
+                    .orElseThrow(() -> new ResourceNotFoundException("GarageSinistre", request.getGarageId()));
+            if (garage != null && !garage.isActif()) {
+                throw new BadRequestException("Le garage sélectionné est inactif");
+            }
+            MissionExpertise mission = missionId == null
+                    ? MissionExpertise.builder().sinistre(context.sinistre()).build()
+                    : missionRepository.findByIdAndSinistreId(missionId, sinistreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("MissionExpertise", missionId));
+            mission.setExpert(expert);
+            mission.setGarage(garage);
+            mission.setExpertNomSnapshot(expert.getNom());
+            mission.setGarageNomSnapshot(garage == null ? null : garage.getRaisonSociale());
+            mission.setReferenceMission(trimToNull(request.getReferenceMission()));
+            mission.setDateMission(request.getDateMission());
+            mission.setDateRapport(request.getDateRapport());
+            mission.setMontantEstime(request.getMontantEstime());
+            mission.setMontantAccepte(request.getMontantAccepte());
+            mission.setStatut(request.getStatut());
+            mission.setNotes(trimToNull(request.getNotes()));
+            missionRepository.save(mission);
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.EXPERTISE,
+                    "Mission d'expertise enregistrée pour " + expert.getNom()
+            );
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -347,97 +376,100 @@ public class SinistreDossierService {
             AddSinistreOperationRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
-            throw new BadRequestException("Déclarez le sinistre avant d'enregistrer une opération financière");
-        }
-        validateDossierDate(context.sinistre(), request.getDateOperation(), "opération financière");
-        if (request.getType() == TypeOperationSinistre.ANNULATION) {
-            throw new BadRequestException("Utilisez l'action d'annulation d'une opération existante");
-        }
-        if (request.getType() == TypeOperationSinistre.REGLEMENT
-                && !SETTLEMENT_STATUSES.contains(context.sinistre().getStatut())) {
-            throw new BadRequestException(
-                    "Passez le sinistre en attente de règlement avant d'enregistrer une indemnisation"
-            );
-        }
-        if (request.getType() == TypeOperationSinistre.REGLEMENT) {
-            BigDecimal indemnity = readinessService.totalIndemnisable(sinistreId);
-            BigDecimal afterPayment = readinessService.totalSettled(sinistreId).add(request.getMontant());
-            if (indemnity.signum() <= 0) {
-                throw new BadRequestException("Aucun montant indemnisable accepté n'est enregistré");
+        return recordChange(context, ActivityAction.CREATED, "Operation financiere du sinistre enregistree", "CLAIM_FINANCIAL_OPERATION",
+                ActivityRecordType.OPERATION_SINISTRE, null, () -> {
+            assertEditable(context.sinistre());
+            if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
+                throw new BadRequestException("Déclarez le sinistre avant d'enregistrer une opération financière");
             }
-            if (afterPayment.compareTo(indemnity) > 0) {
+            validateDossierDate(context.sinistre(), request.getDateOperation(), "opération financière");
+            if (request.getType() == TypeOperationSinistre.ANNULATION) {
+                throw new BadRequestException("Utilisez l'action d'annulation d'une opération existante");
+            }
+            if (request.getType() == TypeOperationSinistre.REGLEMENT
+                    && !SETTLEMENT_STATUSES.contains(context.sinistre().getStatut())) {
                 throw new BadRequestException(
-                        "Le règlement dépasse le solde indemnisable restant"
+                        "Passez le sinistre en attente de règlement avant d'enregistrer une indemnisation"
                 );
             }
-        }
-        validatePaymentReference(request);
-        ResolvedCounterparty counterparty = resolveCounterparty(context, request);
-        CircuitFinancierSinistre circuit = request.getCircuitFinancier() == null
-                ? CircuitFinancierSinistre.DIRECT_COMPAGNIE
-                : request.getCircuitFinancier();
-        if (circuit == CircuitFinancierSinistre.TRESORERIE_AGENCE
-                && request.getModeReglement() == ModeReglementSinistre.COMPENSATION) {
-            throw new BadRequestException("Une compensation ne mouvemente pas la trésorerie de l'agence");
-        }
-        OperationTresorerie treasuryOperation = null;
-        if (circuit == CircuitFinancierSinistre.TRESORERIE_AGENCE
-                && request.getModeReglement() != ModeReglementSinistre.COMPENSATION) {
-            if (request.getCompteTresorerieId() == null) {
-                throw new BadRequestException("Sélectionnez le compte de trésorerie utilisé");
+            if (request.getType() == TypeOperationSinistre.REGLEMENT) {
+                BigDecimal indemnity = readinessService.totalIndemnisable(sinistreId);
+                BigDecimal afterPayment = readinessService.totalSettled(sinistreId).add(request.getMontant());
+                if (indemnity.signum() <= 0) {
+                    throw new BadRequestException("Aucun montant indemnisable accepté n'est enregistré");
+                }
+                if (afterPayment.compareTo(indemnity) > 0) {
+                    throw new BadRequestException(
+                            "Le règlement dépasse le solde indemnisable restant"
+                    );
+                }
             }
-            treasuryOperation = operationTresorerieService.createClaimMovement(
-                    agenceId,
-                    request.getCompteTresorerieId(),
-                    request.getType(),
-                    request.getModeReglement(),
-                    request.getMontant(),
-                    request.getDateOperation(),
-                    request.getReference(),
-                    context.sinistre().getNumeroSinistre(),
-                    counterparty.name()
+            validatePaymentReference(request);
+            ResolvedCounterparty counterparty = resolveCounterparty(context, request);
+            CircuitFinancierSinistre circuit = request.getCircuitFinancier() == null
+                    ? CircuitFinancierSinistre.DIRECT_COMPAGNIE
+                    : request.getCircuitFinancier();
+            if (circuit == CircuitFinancierSinistre.TRESORERIE_AGENCE
+                    && request.getModeReglement() == ModeReglementSinistre.COMPENSATION) {
+                throw new BadRequestException("Une compensation ne mouvemente pas la trésorerie de l'agence");
+            }
+            OperationTresorerie treasuryOperation = null;
+            if (circuit == CircuitFinancierSinistre.TRESORERIE_AGENCE
+                    && request.getModeReglement() != ModeReglementSinistre.COMPENSATION) {
+                if (request.getCompteTresorerieId() == null) {
+                    throw new BadRequestException("Sélectionnez le compte de trésorerie utilisé");
+                }
+                treasuryOperation = operationTresorerieService.createClaimMovement(
+                        agenceId,
+                        request.getCompteTresorerieId(),
+                        request.getType(),
+                        request.getModeReglement(),
+                        request.getMontant(),
+                        request.getDateOperation(),
+                        request.getReference(),
+                        context.sinistre().getNumeroSinistre(),
+                        counterparty.name()
+                );
+            } else if (request.getCompteTresorerieId() != null) {
+                throw new BadRequestException("Le compte de trésorerie est réservé aux flux passant par l'agence");
+            }
+            operationRepository.save(SinistreOperation.builder()
+                    .sinistre(context.sinistre())
+                    .saisiPar(context.acteur())
+                    .type(request.getType())
+                    .dateOperation(request.getDateOperation())
+                    .montant(request.getMontant())
+                    .reference(trimToNull(request.getReference()))
+                    .compagnieAssurance(context.sinistre().getCompagnieAssurance())
+                    .typeContrepartie(request.getTypeContrepartie())
+                    .contrepartieClient(counterparty.client())
+                    .contrepartiePartie(counterparty.partie())
+                    .contrepartieExpert(counterparty.expert())
+                    .contrepartieGarage(counterparty.garage())
+                    .contrepartieNomSnapshot(counterparty.name())
+                    .contrepartieNomLibre(counterparty.freeName())
+                    .justificationContrepartieLibre(counterparty.freeJustification())
+                    .modeReglement(request.getModeReglement())
+                    .circuitFinancier(circuit)
+                    .compteTresorerie(treasuryOperation == null ? null
+                            : treasuryOperation.getCompteSource() == null
+                            ? treasuryOperation.getCompteDestination()
+                            : treasuryOperation.getCompteSource())
+                    .operationTresorerie(treasuryOperation)
+                    .notes(trimToNull(request.getNotes()))
+                    .build());
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.OPERATION_FINANCIERE,
+                    "Opération " + request.getType() + " enregistrée pour "
+                            + request.getMontant() + " avec " + counterparty.name()
             );
-        } else if (request.getCompteTresorerieId() != null) {
-            throw new BadRequestException("Le compte de trésorerie est réservé aux flux passant par l'agence");
-        }
-        operationRepository.save(SinistreOperation.builder()
-                .sinistre(context.sinistre())
-                .saisiPar(context.acteur())
-                .type(request.getType())
-                .dateOperation(request.getDateOperation())
-                .montant(request.getMontant())
-                .reference(trimToNull(request.getReference()))
-                .compagnieAssurance(context.sinistre().getCompagnieAssurance())
-                .typeContrepartie(request.getTypeContrepartie())
-                .contrepartieClient(counterparty.client())
-                .contrepartiePartie(counterparty.partie())
-                .contrepartieExpert(counterparty.expert())
-                .contrepartieGarage(counterparty.garage())
-                .contrepartieNomSnapshot(counterparty.name())
-                .contrepartieNomLibre(counterparty.freeName())
-                .justificationContrepartieLibre(counterparty.freeJustification())
-                .modeReglement(request.getModeReglement())
-                .circuitFinancier(circuit)
-                .compteTresorerie(treasuryOperation == null ? null
-                        : treasuryOperation.getCompteSource() == null
-                        ? treasuryOperation.getCompteDestination()
-                        : treasuryOperation.getCompteSource())
-                .operationTresorerie(treasuryOperation)
-                .notes(trimToNull(request.getNotes()))
-                .build());
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.OPERATION_FINANCIERE,
-                "Opération " + request.getType() + " enregistrée pour "
-                        + request.getMontant() + " avec " + counterparty.name()
-        );
-        if (request.getType() == TypeOperationSinistre.REGLEMENT) {
-            synchronizeSettlementStatus(context);
-        }
-        return responseMapper.toDetail(context.sinistre());
+            if (request.getType() == TypeOperationSinistre.REGLEMENT) {
+                synchronizeSettlementStatus(context);
+            }
+            return responseMapper.toDetail(context.sinistre());
+        });
     }
 
     @Transactional
@@ -449,59 +481,69 @@ public class SinistreDossierService {
             String motif
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        assertEditable(context.sinistre());
-        SinistreOperation operation = operationRepository.findByIdAndSinistreId(operationId, sinistreId)
-                .orElseThrow(() -> new ResourceNotFoundException("SinistreOperation", operationId));
-        if (operation.getType() == TypeOperationSinistre.ANNULATION) {
-            throw new BadRequestException("Une annulation ne peut pas être annulée");
-        }
-        if (operationRepository.existsByOperationAnnuleeId(operationId)) {
-            throw new BadRequestException("Cette opération est déjà annulée");
-        }
-        if (operation.getOperationTresorerie() != null) {
-            AnnulerOperationTresorerieRequest treasuryCancellation = new AnnulerOperationTresorerieRequest();
-            treasuryCancellation.setDateOperation(LocalDate.now());
-            treasuryCancellation.setMotif(trimToNull(motif) == null
-                    ? "Annulation de l'opération du sinistre " + context.sinistre().getNumeroSinistre()
-                    : motif.trim());
-            operationTresorerieService.cancel(
-                    agenceId,
-                    operation.getOperationTresorerie().getId(),
-                    treasuryCancellation
+        return recordChange(context, ActivityAction.CANCELLED, "Operation financiere du sinistre annulee", "CLAIM_FINANCIAL_OPERATION_CANCELLATION",
+                ActivityRecordType.OPERATION_SINISTRE, operationId, () -> {
+            assertEditable(context.sinistre());
+            SinistreOperation operation = operationRepository.findByIdAndSinistreId(operationId, sinistreId)
+                    .orElseThrow(() -> new ResourceNotFoundException("SinistreOperation", operationId));
+            if (operation.getType() == TypeOperationSinistre.ANNULATION) {
+                throw new BadRequestException("Une annulation ne peut pas être annulée");
+            }
+            if (operationRepository.existsByOperationAnnuleeId(operationId)) {
+                throw new BadRequestException("Cette opération est déjà annulée");
+            }
+            if (operation.getOperationTresorerie() != null) {
+                AnnulerOperationTresorerieRequest treasuryCancellation = new AnnulerOperationTresorerieRequest();
+                treasuryCancellation.setDateOperation(LocalDate.now());
+                treasuryCancellation.setMotif(trimToNull(motif) == null
+                        ? "Annulation de l'opération du sinistre " + context.sinistre().getNumeroSinistre()
+                        : motif.trim());
+                operationTresorerieService.cancel(
+                        agenceId,
+                        operation.getOperationTresorerie().getId(),
+                        treasuryCancellation
+                );
+            }
+            operationRepository.save(SinistreOperation.builder()
+                    .sinistre(context.sinistre())
+                    .saisiPar(context.acteur())
+                    .operationAnnulee(operation)
+                    .type(TypeOperationSinistre.ANNULATION)
+                    .dateOperation(LocalDate.now())
+                    .montant(operation.getMontant())
+                    .reference(operation.getReference())
+                    .compagnieAssurance(operation.getCompagnieAssurance())
+                    .typeContrepartie(operation.getTypeContrepartie())
+                    .contrepartieClient(operation.getContrepartieClient())
+                    .contrepartiePartie(operation.getContrepartiePartie())
+                    .contrepartieExpert(operation.getContrepartieExpert())
+                    .contrepartieGarage(operation.getContrepartieGarage())
+                    .contrepartieNomSnapshot(operation.getContrepartieNomSnapshot())
+                    .contrepartieNomLibre(operation.getContrepartieNomLibre())
+                    .justificationContrepartieLibre(operation.getJustificationContrepartieLibre())
+                    .modeReglement(operation.getModeReglement())
+                    .circuitFinancier(operation.getCircuitFinancier())
+                    .compteTresorerie(operation.getCompteTresorerie())
+                    .notes(trimToNull(motif))
+                    .build());
+            evenementService.record(
+                    context.sinistre(),
+                    context.acteur(),
+                    TypeEvenementSinistre.OPERATION_FINANCIERE,
+                    "Opération financière annulée : " + operationId
             );
-        }
-        operationRepository.save(SinistreOperation.builder()
-                .sinistre(context.sinistre())
-                .saisiPar(context.acteur())
-                .operationAnnulee(operation)
-                .type(TypeOperationSinistre.ANNULATION)
-                .dateOperation(LocalDate.now())
-                .montant(operation.getMontant())
-                .reference(operation.getReference())
-                .compagnieAssurance(operation.getCompagnieAssurance())
-                .typeContrepartie(operation.getTypeContrepartie())
-                .contrepartieClient(operation.getContrepartieClient())
-                .contrepartiePartie(operation.getContrepartiePartie())
-                .contrepartieExpert(operation.getContrepartieExpert())
-                .contrepartieGarage(operation.getContrepartieGarage())
-                .contrepartieNomSnapshot(operation.getContrepartieNomSnapshot())
-                .contrepartieNomLibre(operation.getContrepartieNomLibre())
-                .justificationContrepartieLibre(operation.getJustificationContrepartieLibre())
-                .modeReglement(operation.getModeReglement())
-                .circuitFinancier(operation.getCircuitFinancier())
-                .compteTresorerie(operation.getCompteTresorerie())
-                .notes(trimToNull(motif))
-                .build());
-        evenementService.record(
-                context.sinistre(),
-                context.acteur(),
-                TypeEvenementSinistre.OPERATION_FINANCIERE,
-                "Opération financière annulée : " + operationId
-        );
-        if (operation.getType() == TypeOperationSinistre.REGLEMENT) {
-            synchronizeSettlementStatus(context);
-        }
-        return responseMapper.toDetail(context.sinistre());
+            if (operation.getType() == TypeOperationSinistre.REGLEMENT) {
+                synchronizeSettlementStatus(context);
+            }
+            return responseMapper.toDetail(context.sinistre());
+        });
+    }
+
+    private SinistreDetailResponse recordChange(Context context, ActivityAction action, String title, String origin,
+            ActivityRecordType subjectType, Long subjectId, java.util.function.Supplier<SinistreDetailResponse> work) {
+        var before = ClaimActivity.snapshot(responseMapper.toDetail(context.sinistre()));
+        return activityRecorder.perform(work, detail -> ClaimActivity.target(
+                ClaimActivity.command(context.sinistre(), before, detail, action, title, origin), before, detail, subjectType, subjectId));
     }
 
     private static final Set<StatutSinistre> SETTLEMENT_STATUSES = EnumSet.of(

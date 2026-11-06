@@ -1,5 +1,14 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.InvoiceActivity;
+import com.assurance.activity.PaymentActivity;
 import com.assurance.dto.request.AnnulerReglementClientRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentReglementRequest;
 import com.assurance.dto.request.CreerReglementClientRequest;
@@ -104,6 +113,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -148,6 +158,7 @@ public class ReglementClientService {
     private final ParametreApplicationService parametreApplicationService;
     private final StorageLayoutService storageLayoutService;
     private final EcartReglementClientRepository ecartRepository;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public ReglementClientPolicyResponse paymentPolicy(Long agenceId) {
@@ -168,6 +179,21 @@ public class ReglementClientService {
     @Transactional
     public ReglementClientPolicyResponse updatePaymentPolicy(Long agenceId, BigDecimal creditNonAffecteMaximum,
                                                              BigDecimal ecartReglementMaximum) {
+        var before = paymentPolicyValues(paymentPolicy(agenceId));
+        return businessActivityRecorder.perform(() -> updatePaymentPolicyRecord(agenceId, creditNonAffecteMaximum, ecartReglementMaximum),
+                result -> new ActivityCommand(agenceId, ActivityModule.COMPTABILITE_CLIENT, ActivityAction.UPDATED,
+                        "Parametres des reglements clients modifies", "CLIENT_PAYMENT_POLICY_UPDATE",
+                        new ActivityReference(ActivityRecordType.PARAMETRE, "CLIENT_PAYMENT_POLICY", "Parametres des reglements clients"),
+                        List.of(), ActivityValues.changes(before, paymentPolicyValues(result))));
+    }
+
+    private Map<String, String> paymentPolicyValues(ReglementClientPolicyResponse policy) {
+        return new ActivityValues().put("Credit non affecte maximal", policy.getCreditNonAffecteMaximum())
+                .put("Ecart de reglement maximal", policy.getEcartReglementMaximum()).snapshot();
+    }
+
+    private ReglementClientPolicyResponse updatePaymentPolicyRecord(Long agenceId, BigDecimal creditNonAffecteMaximum,
+            BigDecimal ecartReglementMaximum) {
         if (creditNonAffecteMaximum == null || creditNonAffecteMaximum.signum() < 0) {
             throw new BadRequestException("Le montant maximal restant à affecter doit être positif ou nul");
         }
@@ -423,6 +449,18 @@ public class ReglementClientService {
         ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         loadPaymentInstruments(payment, agenceId);
+        Map<String, String> before = PaymentActivity.snapshot(payment);
+        return businessActivityRecorder.perform(() -> createInvoiceFromPaymentRecord(agenceId, payment), result -> {
+            businessActivityRecorder.record(PaymentActivity.command(payment, before, ActivityAction.UPDATED,
+                    "Affectations transferees sur la facture", "PAYMENT_ALLOCATION_INVOICING", null));
+            return InvoiceActivity.command(documentClientService.findDocument(agenceId, result.getId()), Map.of(),
+                    ActivityAction.ISSUED, "Facture emise depuis un reglement", "CLIENT_INVOICE_FROM_PAYMENT",
+                    List.of(PaymentActivity.reference(payment)));
+        });
+    }
+
+    private DocumentClientResponse createInvoiceFromPaymentRecord(Long agenceId, ReglementClient payment) {
+        Long paymentId = payment.getId();
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Seul un règlement enregistré peut être facturé");
         }
@@ -600,7 +638,9 @@ public class ReglementClientService {
                     "Utilisez l'enregistrement de versement bancaire avec son justificatif"
             );
         }
-        return savePayment(agenceId, userId, request, null);
+        return businessActivityRecorder.perform(() -> savePayment(agenceId, userId, request, null), result ->
+                PaymentActivity.command(findPayment(agenceId, result.getId()), Map.of(), ActivityAction.CREATED,
+                        "Reglement client enregistre", "CLIENT_PAYMENT_CREATION", null));
     }
 
     @Transactional
@@ -612,7 +652,9 @@ public class ReglementClientService {
     ) {
         request.setMultiPayeur(true);
         validateReceipt(receipt, true);
-        return savePayment(agenceId, userId, request, receipt);
+        return businessActivityRecorder.perform(() -> savePayment(agenceId, userId, request, receipt), result ->
+                PaymentActivity.command(findPayment(agenceId, result.getId()), Map.of(), ActivityAction.CREATED,
+                        "Versement multi-clients enregistre", "MULTI_CLIENT_DEPOSIT_CREATION", null));
     }
 
     @Transactional(readOnly = true)
@@ -922,6 +964,15 @@ public class ReglementClientService {
                         agenceId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException("Instrument de règlement", instrumentId));
+        boolean confirmation = request.getStatut() == StatutInstrumentReglement.CONFIRME;
+        return instrumentActivity(instrument, confirmation ? ActivityAction.CONFIRMED : ActivityAction.REJECTED,
+                confirmation ? "Moyen de paiement encaisse" : "Moyen de paiement rejete",
+                confirmation ? "PAYMENT_INSTRUMENT_CONFIRMATION" : "PAYMENT_INSTRUMENT_REJECTION",
+                () -> changeInstrumentStatusRecord(agenceId, instrument, request));
+    }
+
+    private ReglementClientResponse changeInstrumentStatusRecord(Long agenceId, InstrumentReglementClient instrument,
+            ChangerStatutInstrumentReglementRequest request) {
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement doit être enregistré avant de traiter son moyen de paiement");
         }
@@ -974,6 +1025,14 @@ public class ReglementClientService {
         if (payment.getStatut() == StatutReglementClient.ANNULE) {
             return toResponse(payment);
         }
+        Map<String, String> before = PaymentActivity.snapshot(payment);
+        return businessActivityRecorder.perform(() -> cancelPaymentRecord(agenceId, payment, request), result ->
+                PaymentActivity.command(payment, before, ActivityAction.CANCELLED,
+                        "Reglement client annule", "CLIENT_PAYMENT_CANCELLATION", null));
+    }
+
+    private ReglementClientResponse cancelPaymentRecord(Long agenceId, ReglementClient payment,
+            AnnulerReglementClientRequest request) {
         if (payment.getInstruments().stream().anyMatch(instrument ->
                 instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE)) {
             throw new BadRequestException(
@@ -1033,6 +1092,14 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        Map<String, String> before = PaymentActivity.snapshot(replaced.getReglement());
+        return businessActivityRecorder.perform(() -> replaceInstrumentRecord(agenceId, replaced, request), result ->
+                PaymentActivity.command(replaced.getReglement(), before, ActivityAction.REPLACED,
+                        "Moyen de paiement remplace", "PAYMENT_INSTRUMENT_REPLACEMENT", PaymentActivity.reference(replaced)));
+    }
+
+    private ReglementClientResponse replaceInstrumentRecord(Long agenceId, InstrumentReglementClient replaced,
+            RemplacerInstrumentReglementRequest request) {
         if (Boolean.TRUE.equals(replaced.getReglement().getMultiPayeur())) {
             throw new BadRequestException(
                     "Annulez puis ressaisissez le versement multi-clients avec son nouveau bordereau"
@@ -1252,6 +1319,13 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        return instrumentActivity(instrument, ActivityAction.SAVED,
+                "Moyen de paiement prepare pour une nouvelle remise", "PAYMENT_INSTRUMENT_REPRESENTATION",
+                () -> representInstrumentRecord(agenceId, instrument, request));
+    }
+
+    private ReglementClientResponse representInstrumentRecord(Long agenceId, InstrumentReglementClient instrument,
+            RepresenterInstrumentReglementRequest request) {
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement doit être enregistré avant la représentation");
         }
@@ -1707,6 +1781,13 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        return instrumentActivity(instrument, ActivityAction.CONFIRMED,
+                "Moyen de paiement encaisse par rapprochement bancaire", "PAYMENT_CONFIRMATION_FROM_BANK_STATEMENT",
+                () -> confirmFromBankStatementRecord(agenceId, instrument, accountId, operationDate, bankStatementLine));
+    }
+
+    private MouvementTresorerie confirmFromBankStatementRecord(Long agenceId, InstrumentReglementClient instrument,
+            Long accountId, LocalDate operationDate, LigneReleveBancaire bankStatementLine) {
         MouvementTresorerie movement = confirmInstrument(
                 agenceId,
                 instrument,
@@ -1856,6 +1937,14 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        instrumentActivity(instrument, ActivityAction.REMITTED, "Moyen de paiement remis en banque", "PAYMENT_BANK_REMITTANCE", () -> {
+            markInstrumentRemittedRecord(agenceId, instrument, accountId, operationDate);
+            return instrument;
+        });
+    }
+
+    private void markInstrumentRemittedRecord(Long agenceId, InstrumentReglementClient instrument,
+            Long accountId, LocalDate operationDate) {
         if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE) {
             throw new BadRequestException("Seul un instrument en attente peut être remis en banque");
         }
@@ -1895,6 +1984,13 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        return instrumentActivity(instrument, ActivityAction.CONFIRMED,
+                "Moyen de paiement encaisse depuis un bordereau", "PAYMENT_CONFIRMATION_FROM_REMITTANCE",
+                () -> confirmFromRemittanceRecord(agenceId, instrument, accountId, operationDate));
+    }
+
+    private MouvementTresorerie confirmFromRemittanceRecord(Long agenceId, InstrumentReglementClient instrument,
+            Long accountId, LocalDate operationDate) {
         if (instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
             throw new BadRequestException("L'instrument doit être remis en banque avant encaissement");
         }
@@ -1932,6 +2028,14 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        instrumentActivity(instrument, ActivityAction.REJECTED, "Moyen de paiement rejete depuis un bordereau",
+                "PAYMENT_REJECTION_FROM_REMITTANCE", () -> {
+                    rejectFromRemittanceRecord(instrument, reason, operationDate);
+                    return instrument;
+                });
+    }
+
+    private void rejectFromRemittanceRecord(InstrumentReglementClient instrument, String reason, LocalDate operationDate) {
         if (instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE
                 && instrument.getStatut() != StatutInstrumentReglement.CONFIRME) {
             throw new BadRequestException("L'instrument n'est pas remis ou encaissé");
@@ -1948,6 +2052,13 @@ public class ReglementClientService {
         );
         rejetSuiviService.enregistrerRejet(instrument, rejectionLine, operationDate, reason);
         refreshAfterInstrumentTransition(instrument);
+    }
+
+    private <T> T instrumentActivity(InstrumentReglementClient instrument, ActivityAction action, String title,
+            String origin, Supplier<T> work) {
+        Map<String, String> before = PaymentActivity.instrumentSnapshot(instrument);
+        return businessActivityRecorder.perform(work, result ->
+                PaymentActivity.instrumentCommand(instrument, before, action, title, origin));
     }
 
     private LigneBordereauRemise updateRemittanceLine(

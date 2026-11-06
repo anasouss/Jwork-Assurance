@@ -617,6 +617,7 @@ export type GroupeClient = {
   membres: {
     membershipId: string;
     clientId: string;
+    clientCode?: string | null;
     clientNom: string;
     typeRelation: RelationGroupeClient;
     dateDebut?: string | null;
@@ -1623,11 +1624,14 @@ export type ContratSummary = {
   brancheAssuranceCode?: string | null;
   brancheAssuranceLibelle?: string | null;
   compagnieAssuranceId?: string;
+  compagnieAssuranceNom?: string | null;
   conventionId?: string | null;
+  conventionIntitule?: string | null;
   categorieClientId?: string | null;
   categorieClientCode?: string | null;
   categorieClientLibelle?: string | null;
   contratOrigineId?: string | null;
+  contratOrigineReference?: string | null;
   renouvele?: boolean;
   modeTermeRenouvellement?: "CABINET" | "COMPAGNIE" | null;
   renouvellementTermeCompagnieEligible?: boolean | null;
@@ -1638,6 +1642,7 @@ export type ContratSummary = {
   groupeUsageAttestationLibelle?: string | null;
   consommeAttestation?: boolean | null;
   grilleTarifaireId?: string | null;
+  grilleTarifaireLibelle?: string | null;
   dateEffet?: string;
   dateEcheance?: string;
   numeroAttestation?: string;
@@ -1669,6 +1674,7 @@ export type ContratSummary = {
   crmPartage?: boolean | null;
   crmPartageValeur?: string | null;
   libelleReleve?: string | null;
+  notes?: string | null;
   primeTotale?: number;
   clients?: { clientId: string; nomAffichage: string; role: string; principalPourRole: boolean; client?: ClientResponse }[];
   vehicules?: {

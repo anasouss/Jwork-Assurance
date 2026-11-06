@@ -1,5 +1,14 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ContractActivity;
+import com.assurance.activity.DocumentActivity;
 import com.assurance.dto.request.UpsertTypePieceJointeRequest;
 import com.assurance.dto.response.PieceJointeResponse;
 import com.assurance.dto.response.PiecesJointesContratResponse;
@@ -100,6 +109,7 @@ public class PieceJointeService {
     private final DocumentUsageRepository documentUsageRepository;
     private final ClientRepository clientRepository;
     private final VehiculeRepository vehiculeRepository;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public List<TypePieceJointeResponse> listTypes(Long agenceId, boolean includeInactive) {
@@ -122,6 +132,7 @@ public class PieceJointeService {
         if (type.getAgence() != null && !agenceId.equals(type.getAgence().getId())) {
             throw new ResourceNotFoundException("TypePieceJointe", id);
         }
+        var before = id == null ? null : DocumentActivity.type(type);
         BrancheAssurance branche = request.getBrancheAssuranceId() == null
                 ? null
                 : brancheAssuranceRepository.findById(request.getBrancheAssuranceId())
@@ -149,7 +160,13 @@ public class PieceJointeService {
         type.setActif(request.getActif() == null || Boolean.TRUE.equals(request.getActif()));
         type.setOrdreAffichage(request.getOrdreAffichage());
         validateNoDuplicateScope(agenceId, type);
-        return policyTypeResponse(agenceId, typePieceJointeRepository.save(type));
+        type = typePieceJointeRepository.save(type);
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.REFERENTIELS,
+                id == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                id == null ? "Type de document créé" : "Type de document modifié", "DOCUMENT_TYPE_SAVE",
+                ActivityReference.of(ActivityRecordType.TYPE_DOCUMENT, type.getId(), type.getLibelle()), List.of(),
+                ActivityValues.changes(before, DocumentActivity.type(type))));
+        return policyTypeResponse(agenceId, type);
     }
 
     @Transactional
@@ -162,8 +179,13 @@ public class PieceJointeService {
         if (type.getAgence() != null && !agenceId.equals(type.getAgence().getId())) {
             throw new ResourceNotFoundException("TypePieceJointe", id);
         }
+        var before = DocumentActivity.type(type);
         type.setActif(false);
         typePieceJointeRepository.save(type);
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.REFERENTIELS, ActivityAction.UPDATED,
+                "Type de document désactivé", "DOCUMENT_TYPE_DEACTIVATION",
+                ActivityReference.of(ActivityRecordType.TYPE_DOCUMENT, type.getId(), type.getLibelle()), List.of(),
+                ActivityValues.changes(before, DocumentActivity.type(type))));
     }
 
     @Transactional(readOnly = true)
@@ -309,6 +331,8 @@ public class PieceJointeService {
                 .cheminStockage(stored.storageKey())
                 .tailleOctets(stored.size())
                 .build());
+        businessActivityRecorder.record(DocumentActivity.command(piece, ActivityModule.PRODUCTION, ActivityAction.CREATED,
+                "Document ajouté au dossier", "CONTRACT_DOCUMENT_UPLOAD", null, DocumentActivity.snapshot(piece), null));
         return toPieceResponse(piece);
     }
 
@@ -391,7 +415,7 @@ public class PieceJointeService {
             throw new ResourceNotFoundException("PieceJointe", pieceId);
         }
         if (piece.getClient() != null) throw new BadRequestException("Gerez ce document depuis la fiche client");
-        deleteOrArchive(piece);
+        deleteOrArchive(piece, ActivityModule.PRODUCTION, "CONTRACT_DOCUMENT_REMOVAL");
     }
 
     @Transactional
@@ -399,6 +423,7 @@ public class PieceJointeService {
         NaturePieceJointe nature = resolveNature(agenceId, natureId, null, null);
         if (owner == null || expiry == null) throw new BadRequestException("Rattachement et validite obligatoires");
         DocumentPolicy policy = policy(agenceId, nature);
+        var before = DocumentActivity.policy(policy);
         source = source == null ? policy.getValiditySource() : source;
         if (expiry == DocumentExpiry.NONE) source = DocumentValiditySource.MANUAL;
         if ((source.name().startsWith("CLIENT_") && owner != DocumentOwner.CLIENT)
@@ -411,6 +436,10 @@ public class PieceJointeService {
         policy.setExpiry(expiry);
         policy.setValiditySource(source);
         documentPolicyRepository.save(policy);
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.REFERENTIELS, ActivityAction.UPDATED,
+                "Règles du document modifiées", "DOCUMENT_POLICY_UPDATE",
+                ActivityReference.of(ActivityRecordType.POLITIQUE_DOCUMENT, nature.getId(), nature.getLibelle()), List.of(),
+                ActivityValues.changes(before, DocumentActivity.policy(policy))));
     }
 
     @Transactional
@@ -423,6 +452,7 @@ public class PieceJointeService {
             throw new BadRequestException("Le titulaire de cette piece ne peut pas etre modifie");
         }
         if (piece.getTypePieceJointe() == null) throw new BadRequestException("Type de document manquant");
+        var before = DocumentActivity.snapshot(piece);
         DocumentPolicy policy = policy(agenceId, piece.getTypePieceJointe().getNaturePieceJointe());
         if (policy.getOwner() == DocumentOwner.CLIENT) {
             Client owner = contrat.getClients().stream().map(ContratClient::getClient)
@@ -440,7 +470,10 @@ public class PieceJointeService {
         piece.setDocumentOwner(policy.getOwner());
         piece.setAssignedBy(TenantContext.getCurrentUsername());
         piece.setAssignedAt(LocalDateTime.now());
-        return toPieceResponse(pieceJointeRepository.save(piece));
+        piece = pieceJointeRepository.save(piece);
+        businessActivityRecorder.record(DocumentActivity.command(piece, ActivityModule.PRODUCTION, ActivityAction.ASSIGNED,
+                "Titulaire du document renseigné", "CONTRACT_DOCUMENT_OWNER_ASSIGNMENT", before, DocumentActivity.snapshot(piece), null));
+        return toPieceResponse(piece);
     }
 
     private DocumentPolicy policy(Long agenceId, NaturePieceJointe nature) {
@@ -501,6 +534,7 @@ public class PieceJointeService {
         validateExpiry(policy, expiresOn);
         validateFiles(files);
         PieceJointe previous = previousId == null ? null : ownedClientPiece(agenceId, clientId, previousId);
+        var before = previous == null ? null : DocumentActivity.snapshot(previous);
         if (previous != null) {
             if (Boolean.TRUE.equals(previous.getArchived()) || pieceJointeRepository.existsByPreviousVersionId(previousId)) {
                 throw new BadRequestException("Cette version a deja ete archivee ou remplacee");
@@ -520,12 +554,17 @@ public class PieceJointeService {
                 .previousVersion(previous).changeReason(reason).createdBy(TenantContext.getCurrentUsername())
                 .nomFichier(stored.displayName()).cheminStockage(stored.storageKey())
                 .contentType(stored.contentType()).tailleOctets(stored.size()).build();
-        return toPieceResponse(pieceJointeRepository.save(piece));
+        piece = pieceJointeRepository.save(piece);
+        businessActivityRecorder.record(DocumentActivity.command(piece, ActivityModule.CRM,
+                previous == null ? ActivityAction.CREATED : ActivityAction.REPLACED,
+                previous == null ? "Document client ajouté" : "Document client remplacé", "CLIENT_DOCUMENT_UPLOAD",
+                before, DocumentActivity.snapshot(piece), null));
+        return toPieceResponse(piece);
     }
 
     @Transactional
     public void deleteClientDocument(Long agenceId, Long clientId, Long pieceId) {
-        deleteOrArchive(ownedClientPiece(agenceId, clientId, pieceId));
+        deleteOrArchive(ownedClientPiece(agenceId, clientId, pieceId), ActivityModule.CRM, "CLIENT_DOCUMENT_REMOVAL");
     }
 
     @Transactional(readOnly = true)
@@ -574,6 +613,11 @@ public class PieceJointeService {
             usage.setMouvement(mouvement);
             usage.setType(type);
             documentUsageRepository.save(usage);
+            businessActivityRecorder.record(DocumentActivity.command(piece, ActivityModule.PRODUCTION, ActivityAction.ASSIGNED,
+                    "Document rattaché au mouvement", "CONTRACT_DOCUMENT_REUSE", null,
+                    new ActivityValues().put("Dossier", ContractActivity.reference(contrat).label())
+                            .put("Mouvement", DocumentActivity.movement(mouvement).label()).snapshot(),
+                    List.of(ContractActivity.reference(contrat), DocumentActivity.movement(mouvement))));
         }
         return toPieceResponse(piece);
     }
@@ -602,12 +646,17 @@ public class PieceJointeService {
         }
         MouvementContrat mouvement = resolveMouvement(contrat, mouvementId);
         if (mouvement == null) throw new BadRequestException("Mouvement manquant");
-        pieceJointeRepository.lockOwned(agenceId, pieceId)
+        PieceJointe piece = pieceJointeRepository.lockOwned(agenceId, pieceId)
                 .orElseThrow(() -> new ResourceNotFoundException("PieceJointe", pieceId));
         List<DocumentUsage> usages = documentUsageRepository.findByContratAgenceIdAndContratIdAndMouvementId(agenceId, contratId, mouvement.getId())
                 .stream().filter(usage -> usage.getPiece().getId().equals(pieceId)).toList();
         if (usages.isEmpty()) throw new ResourceNotFoundException("DocumentUsage", pieceId);
         documentUsageRepository.deleteAll(usages);
+        businessActivityRecorder.record(DocumentActivity.command(piece, ActivityModule.PRODUCTION, ActivityAction.UNASSIGNED,
+                "Document détaché du mouvement", "CONTRACT_DOCUMENT_UNLINK",
+                new ActivityValues().put("Dossier", ContractActivity.reference(contrat).label())
+                        .put("Mouvement", DocumentActivity.movement(mouvement).label()).snapshot(), null,
+                List.of(ContractActivity.reference(contrat), DocumentActivity.movement(mouvement))));
     }
 
     private void validateExpiry(DocumentPolicy policy, LocalDate expiresOn) {
@@ -637,6 +686,7 @@ public class PieceJointeService {
                 .orElseThrow(() -> new ResourceNotFoundException("PieceJointe", pieceId));
         if (previous.getClient() != null) throw new BadRequestException("Remplacez ce document depuis la fiche client");
         if (previous.getTypePieceJointe() == null) throw new BadRequestException("Type de document manquant");
+        var before = DocumentActivity.snapshot(previous);
         if (Boolean.TRUE.equals(previous.getArchived()) || pieceJointeRepository.existsByPreviousVersionId(pieceId)) {
             throw new BadRequestException("Cette version est deja archivee ou remplacee");
         }
@@ -655,7 +705,10 @@ public class PieceJointeService {
                 .typePieceJointe(previous.getTypePieceJointe()).expiresOn(expiresOn).createdBy(TenantContext.getCurrentUsername())
                 .nomFichier(stored.displayName()).cheminStockage(stored.storageKey()).contentType(stored.contentType())
                 .tailleOctets(stored.size()).build();
-        return toPieceResponse(pieceJointeRepository.save(replacement));
+        replacement = pieceJointeRepository.save(replacement);
+        businessActivityRecorder.record(DocumentActivity.command(replacement, ActivityModule.PRODUCTION, ActivityAction.REPLACED,
+                "Document du dossier remplacé", "CONTRACT_DOCUMENT_REPLACEMENT", before, DocumentActivity.snapshot(replacement), null));
+        return toPieceResponse(replacement);
     }
 
     private void validateClientType(TypePieceJointe type, Client client) {
@@ -714,13 +767,21 @@ public class PieceJointeService {
                 && (piece.getContrat() == null || piece.getContrat().getStatut() == com.assurance.enums.StatutContrat.DRAFT);
     }
 
-    private void deleteOrArchive(PieceJointe piece) {
-        if (canDelete(piece)) {
+    private void deleteOrArchive(PieceJointe piece, ActivityModule module, String origin) {
+        var before = DocumentActivity.snapshot(piece);
+        boolean deleted = canDelete(piece);
+        if (deleted) {
             pieceJointeRepository.delete(piece);
             deleteAfterCommit(resolveStoredPath(piece));
         } else {
             archive(piece);
             pieceJointeRepository.save(piece);
+        }
+        var after = deleted ? null : DocumentActivity.snapshot(piece);
+        if (deleted || !com.assurance.activity.ActivityValues.changes(before, after).isEmpty()) {
+            businessActivityRecorder.record(DocumentActivity.command(piece, module,
+                    deleted ? ActivityAction.DELETED : ActivityAction.ARCHIVED,
+                    deleted ? "Document supprimé" : "Document archivé", origin, before, after, null));
         }
     }
 

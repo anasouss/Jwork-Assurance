@@ -1,6 +1,10 @@
 package com.assurance.service;
 
 import com.assurance.entity.Agence;
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.entity.QuittancePrimeSelection;
 import com.assurance.entity.ReglementClient;
 import com.assurance.enums.StatutReglementClient;
@@ -36,6 +40,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -47,8 +52,9 @@ class QuittancePrimeSelectionServiceTest {
     private final QuittancePrimeSelectionRepository receipts = mock(QuittancePrimeSelectionRepository.class);
     private final QuittancePrimePdfService renderer = mock(QuittancePrimePdfService.class);
     private final StorageLayoutService storage = mock(StorageLayoutService.class);
+    private final BusinessActivityRecorder activities = mock(BusinessActivityRecorder.class);
     private final QuittancePrimeSelectionService service = new QuittancePrimeSelectionService(
-            payments, receipts, renderer, storage, new ObjectMapper());
+            payments, receipts, renderer, storage, new ObjectMapper(), activities);
 
     @AfterEach
     void clearSynchronization() {
@@ -87,6 +93,13 @@ class QuittancePrimeSelectionServiceTest {
         assertThat(payment.getQuittancePrimeNumero()).isNull();
         verify(renderer).render(eq(payment), eq(first.reference()), any(), eq(Set.of("C:1", "C:2")));
         assertThat(issued).hasSize(2);
+        var events = org.mockito.ArgumentCaptor.forClass(ActivityCommand.class);
+        verify(activities, times(2)).record(events.capture());
+        assertThat(events.getAllValues()).allSatisfy(event -> {
+            assertThat(event.action()).isEqualTo(ActivityAction.ISSUED);
+            assertThat(event.references()).extracting(ref -> ref.type()).contains(ActivityRecordType.REGLEMENT_CLIENT);
+            assertThat(event.changes()).extracting(change -> change.label()).doesNotContain("Selection hash", "Chemin stockage", "Selection json");
+        });
     }
 
     @Test
@@ -97,6 +110,7 @@ class QuittancePrimeSelectionServiceTest {
         assertThatThrownBy(() -> service.issue(8L, 9L, List.of("C:1"))).isInstanceOf(ResourceNotFoundException.class);
         verify(receipts, never()).saveAndFlush(any());
         verify(renderer, never()).render(any(), anyString(), any(), anySet());
+        verify(activities, never()).record(any());
     }
 
     @Test

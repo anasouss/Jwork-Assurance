@@ -1,5 +1,7 @@
 package com.assurance.service;
 
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ActivityCommand;
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.entity.AjustementTarifUsage;
 import com.assurance.entity.LigneAjustementTarifUsage;
@@ -25,6 +27,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class TarifUsageAjustementServiceTest {
@@ -41,6 +45,9 @@ class TarifUsageAjustementServiceTest {
     @Mock
     private UtilisateurRepository utilisateurRepository;
 
+    @Mock
+    private BusinessActivityRecorder activityRecorder;
+
     @InjectMocks
     private TarifUsageAjustementService service;
 
@@ -48,7 +55,12 @@ class TarifUsageAjustementServiceTest {
     void consecutiveAdjustmentsAlwaysUseInitialPremium() {
         TarifUsage tarif = tariff("100.00");
         when(tarifUsageRepository.findAll()).thenReturn(List.of(tarif));
-        when(ajustementRepository.save(any(AjustementTarifUsage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var sequence = new java.util.concurrent.atomic.AtomicLong(20L);
+        when(ajustementRepository.save(any(AjustementTarifUsage.class))).thenAnswer(invocation -> {
+            AjustementTarifUsage saved = invocation.getArgument(0);
+            saved.setId(sequence.getAndIncrement());
+            return saved;
+        });
         ArgumentCaptor<List<LigneAjustementTarifUsage>> lines = lineCaptor();
 
         service.apply(adjustment("10"));
@@ -57,13 +69,27 @@ class TarifUsageAjustementServiceTest {
         assertThat(lines.getAllValues().get(0).get(0).getPrimeNetteAppliquee()).isEqualByComparingTo("110.00");
         assertThat(lines.getAllValues().get(1).get(0).getPrimeNetteAppliquee()).isEqualByComparingTo("120.00");
         assertThat(tarif.getPrimeNette()).isEqualByComparingTo("100.00");
+        ArgumentCaptor<ActivityCommand> events = ArgumentCaptor.forClass(ActivityCommand.class);
+        verify(activityRecorder, times(2)).recordGlobalReference(events.capture());
+        assertThat(events.getAllValues()).allSatisfy(event -> {
+            assertThat(event.agenceId()).isNull();
+            assertThat(event.changes()).anySatisfy(change -> {
+                assertThat(change.label()).isEqualTo("Debut d'application");
+                assertThat(change.afterValue()).isEqualTo("14/09/2026");
+            });
+            assertThat(event.changes()).noneMatch(change -> change.beforeValue() != null);
+        });
     }
 
     @Test
     void resetCreatesAHistoryLineAtInitialPremium() {
         TarifUsage tarif = tariff("1872.10");
         when(tarifUsageRepository.findAll()).thenReturn(List.of(tarif));
-        when(ajustementRepository.save(any(AjustementTarifUsage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ajustementRepository.save(any(AjustementTarifUsage.class))).thenAnswer(invocation -> {
+            AjustementTarifUsage saved = invocation.getArgument(0);
+            saved.setId(20L);
+            return saved;
+        });
         ArgumentCaptor<List<LigneAjustementTarifUsage>> lines = lineCaptor();
 
         BulkUpdateTarifUsageRequest request = new BulkUpdateTarifUsageRequest();

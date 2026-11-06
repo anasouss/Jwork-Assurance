@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.AssistanceActivity;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.dto.request.CreateAssistanceVoyageRequest;
 import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.request.QuoteAssistanceVoyageRequest;
@@ -83,6 +86,8 @@ public class AssistanceVoyageService {
     private final LigneTarificationAssistanceRepository ligneTarificationAssistanceRepository;
     private final AssistanceQuittanceService assistanceQuittanceService;
     private final ContractDirectModificationPolicy directModificationPolicy;
+    private final BusinessActivityRecorder activityRecorder;
+    private final AssistanceActivity assistanceActivity;
 
     @Transactional(readOnly = true)
     public AssistanceVoyageQuoteResponse quote(QuoteAssistanceVoyageRequest request) {
@@ -124,7 +129,9 @@ public class AssistanceVoyageService {
 
     @Transactional
     public AssistanceVoyageCreationResponse create(Long agenceId, CreateAssistanceVoyageRequest request) {
-        return createInternal(agenceId, request, null, null);
+        return activityRecorder.perform(() -> createInternal(agenceId, request, null, null), response ->
+                AssistanceActivity.command(null, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.CREATED, "Assistance voyage creee", "ASSISTANCE_TRAVEL_CREATE"));
     }
 
     @Transactional
@@ -134,6 +141,16 @@ public class AssistanceVoyageService {
             String section,
             SaveAssistanceVoyageDraftSectionRequest request
     ) {
+        var before = contratId == null ? null : assistanceActivity.capture(agenceId, contratId);
+        return activityRecorder.perform(() -> saveDraftSectionRecord(agenceId, contratId, section, request), response ->
+                AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
+                        before == null ? ActivityAction.CREATED : ActivityAction.SAVED,
+                        "Brouillon assistance voyage - " + ("souscripteur".equals(response.getSectionEnregistree()) ? "Souscripteur" : "Assures"),
+                        "ASSISTANCE_TRAVEL_DRAFT_SECTION"));
+    }
+
+    private AssistanceDraftResponse saveDraftSectionRecord(Long agenceId, Long contratId, String section,
+            SaveAssistanceVoyageDraftSectionRequest request) {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(request.getCompagnieAssistanceId())
                 .filter(item -> Boolean.TRUE.equals(item.getActif()))
                 .orElseThrow(() -> new BadRequestException("Compagnie d'assistance inactive ou introuvable"));
@@ -184,6 +201,14 @@ public class AssistanceVoyageService {
             Long contratId,
             CreateAssistanceVoyageRequest request
     ) {
+        var before = assistanceActivity.capture(agenceId, contratId);
+        return activityRecorder.perform(() -> finalizeDraftRecord(agenceId, contratId, request), response ->
+                AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.VALIDATED, "Assistance voyage validee", "ASSISTANCE_TRAVEL_FINALIZE"));
+    }
+
+    private AssistanceVoyageCreationResponse finalizeDraftRecord(Long agenceId, Long contratId,
+            CreateAssistanceVoyageRequest request) {
         Contrat draft = requireDraftContract(agenceId, contratId, "Assistance Voyage");
         requireDraftClient(draft, RoleClientContrat.SOUSCRIPTEUR, "souscripteur");
         requireDraftClient(draft, RoleClientContrat.BENEFICIAIRE, "personne assurée");
@@ -207,6 +232,13 @@ public class AssistanceVoyageService {
             Long contratOrigineId,
             CreateAssistanceVoyageRequest request
     ) {
+        return activityRecorder.perform(() -> renewRecord(agenceId, contratOrigineId, request), response ->
+                AssistanceActivity.command(null, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.RENEWED, "Assistance voyage renouvelee", "ASSISTANCE_TRAVEL_RENEW"));
+    }
+
+    private AssistanceVoyageCreationResponse renewRecord(Long agenceId, Long contratOrigineId,
+            CreateAssistanceVoyageRequest request) {
         Contrat source = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratOrigineId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratOrigineId));
         AssistanceContrat sourceAssistance = requireRenewableAssistance(source, "Assistance Voyage");
@@ -467,6 +499,13 @@ public class AssistanceVoyageService {
             Long contratId,
             CreateAssistanceVoyageRequest request
     ) {
+        var before = assistanceActivity.capture(agenceId, contratId);
+        return activityRecorder.perform(() -> updateRecord(agenceId, contratId, request), response ->
+                AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.UPDATED, "Assistance voyage modifiee", "ASSISTANCE_TRAVEL_UPDATE"));
+    }
+
+    private AssistanceVoyageCreationResponse updateRecord(Long agenceId, Long contratId, CreateAssistanceVoyageRequest request) {
         validateRequest(request);
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));

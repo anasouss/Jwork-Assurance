@@ -15,6 +15,8 @@ public interface VehiculeRepository extends JpaRepository<Vehicule, Long> {
 
     List<Vehicule> findByContratIdOrderByCreatedAtAsc(Long contratId);
 
+    List<Vehicule> findByContratIdAndContratAgenceIdOrderByCreatedAtAsc(Long contratId, Long agenceId);
+
     @Query("""
             select v
             from Vehicule v

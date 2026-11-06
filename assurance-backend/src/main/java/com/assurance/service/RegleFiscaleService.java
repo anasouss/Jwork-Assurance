@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.FiscalRuleActivity;
 import com.assurance.dto.request.UpsertRegleFiscaleRequest;
 import com.assurance.dto.response.RegleFiscaleResponse;
 import com.assurance.entity.RegleFiscale;
@@ -42,6 +45,7 @@ public class RegleFiscaleService {
     private final GarantieRepository garantieRepository;
     private final UsageRepository usageRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<RegleFiscaleResponse> list() {
@@ -58,12 +62,17 @@ public class RegleFiscaleService {
         RegleFiscale rule = new RegleFiscale();
         apply(rule, request);
         validateNoOverlap(rule);
-        return RegleFiscaleResponse.from(regleFiscaleRepository.save(rule));
+        RegleFiscale saved = regleFiscaleRepository.save(rule);
+        activityRecorder.recordGlobalReference(FiscalRuleActivity.command(saved, null, List.of(), ActivityAction.CREATED,
+                "Regle fiscale creee", "FISCAL_RULE_CREATE"));
+        return RegleFiscaleResponse.from(saved);
     }
 
     @Transactional
     public RegleFiscaleResponse update(Long id, UpsertRegleFiscaleRequest request) {
         RegleFiscale rule = get(id);
+        var before = FiscalRuleActivity.snapshot(rule);
+        var previousReferences = FiscalRuleActivity.references(rule);
         if (applicationRepository.existsByRegleFiscaleId(id) && changesCalculation(rule, request)) {
             throw new BadRequestException("Cette règle a déjà été appliquée. Clôturez sa période et créez une nouvelle version.");
         }
@@ -76,14 +85,21 @@ public class RegleFiscaleService {
         });
         apply(rule, request);
         validateNoOverlap(rule);
-        return RegleFiscaleResponse.from(regleFiscaleRepository.save(rule));
+        RegleFiscale saved = regleFiscaleRepository.save(rule);
+        activityRecorder.recordGlobalReference(FiscalRuleActivity.command(saved, before, previousReferences, ActivityAction.UPDATED,
+                "Regle fiscale modifiee", "FISCAL_RULE_UPDATE"));
+        return RegleFiscaleResponse.from(saved);
     }
 
     @Transactional
     public void deactivate(Long id) {
         RegleFiscale rule = get(id);
+        var before = FiscalRuleActivity.snapshot(rule);
+        var previousReferences = FiscalRuleActivity.references(rule);
         rule.setActif(false);
         regleFiscaleRepository.save(rule);
+        activityRecorder.recordGlobalReference(FiscalRuleActivity.command(rule, before, previousReferences, ActivityAction.UPDATED,
+                "Regle fiscale desactivee", "FISCAL_RULE_DEACTIVATE"));
     }
 
     private RegleFiscale get(Long id) {

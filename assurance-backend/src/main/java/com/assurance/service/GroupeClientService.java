@@ -1,5 +1,12 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClientActivity;
+import com.assurance.activity.ClientGroupActivity;
 import com.assurance.dto.request.AssignGroupeClientRequest;
 import com.assurance.dto.request.UpsertGroupeClientRequest;
 import com.assurance.dto.response.ClientResponse;
@@ -30,6 +37,7 @@ public class GroupeClientService {
     private final GroupeClientMembreRepository membreRepository;
     private final ClientRepository clientRepository;
     private final AgenceRepository agenceRepository;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public List<GroupeClientResponse> list(Long agenceId) {
@@ -55,6 +63,12 @@ public class GroupeClientService {
 
     @Transactional
     public GroupeClientResponse create(Long agenceId, UpsertGroupeClientRequest request) {
+        return businessActivityRecorder.perform(() -> createRecord(agenceId, request), result ->
+                ClientGroupActivity.command(agenceId, null, result, ActivityAction.CREATED,
+                        "Groupe client créé", "CLIENT_GROUP_CREATION"));
+    }
+
+    private GroupeClientResponse createRecord(Long agenceId, UpsertGroupeClientRequest request) {
         String code = normalizeRequired(request.getCode(), "Le code du groupe est obligatoire");
         if (groupeClientRepository.existsByAgenceIdAndCodeIgnoreCase(agenceId, code)) {
             throw new BadRequestException("Ce code de groupe est deja utilise");
@@ -77,6 +91,13 @@ public class GroupeClientService {
     @Transactional
     public GroupeClientResponse update(Long agenceId, Long groupeId, UpsertGroupeClientRequest request) {
         GroupeClient groupe = requireGroupe(agenceId, groupeId);
+        var before = toResponse(agenceId, groupe, true);
+        return businessActivityRecorder.perform(() -> updateRecord(agenceId, groupeId, groupe, request), result ->
+                ClientGroupActivity.command(agenceId, before, result, ActivityAction.UPDATED,
+                        "Groupe client modifié", "CLIENT_GROUP_UPDATE"));
+    }
+
+    private GroupeClientResponse updateRecord(Long agenceId, Long groupeId, GroupeClient groupe, UpsertGroupeClientRequest request) {
         String code = normalizeRequired(request.getCode(), "Le code du groupe est obligatoire");
         if (groupeClientRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, groupeId)) {
             throw new BadRequestException("Ce code de groupe est deja utilise");
@@ -108,6 +129,7 @@ public class GroupeClientService {
             throw new BadRequestException("Le groupe client est inactif");
         }
         LocalDate effectiveDate = dateDebut == null ? LocalDate.now() : dateDebut;
+        var before = membershipSnapshot(agenceId, clientId, groupeId, effectiveDate);
         RelationGroupeClient effectiveRelation = relation == null ? RelationGroupeClient.SOCIETE_LIEE : relation;
         if (effectiveRelation != RelationGroupeClient.TETE_GROUPE
                 && groupe.getClientTete() != null
@@ -150,6 +172,10 @@ public class GroupeClientService {
         membership.setPrincipal(principal);
         membership.setDateFin(null);
         membreRepository.save(membership);
+        var changes = ActivityValues.changes(before, membershipSnapshot(agenceId, clientId, groupeId, effectiveDate));
+        if (!changes.isEmpty()) businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM,
+                ActivityAction.ASSIGNED, "Rattachement au groupe enregistré", "CLIENT_GROUP_ASSIGNMENT",
+                ClientActivity.reference(client), List.of(ClientGroupActivity.reference(groupe)), changes));
         return toClientGroupView(membership);
     }
 
@@ -174,20 +200,47 @@ public class GroupeClientService {
             throw new ResourceNotFoundException("Rattachement groupe", membershipId);
         }
         assertMembershipCanEnd(membership);
+        var before = new ActivityValues();
+        ClientGroupActivity.addMembership(before, membership);
         membership.setDateFin(LocalDate.now());
         membership.setPrincipal(false);
         membreRepository.save(membership);
+        var after = new ActivityValues();
+        ClientGroupActivity.addMembership(after, membership);
+        var changes = ActivityValues.changes(before.snapshot(), after.snapshot());
+        if (!changes.isEmpty()) businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM,
+                ActivityAction.UNASSIGNED, "Rattachement au groupe terminé", "CLIENT_GROUP_MEMBERSHIP_END",
+                ClientActivity.reference(membership.getClient()), List.of(ClientGroupActivity.reference(membership.getGroupe())), changes));
     }
 
     @Transactional
     public void endActiveMemberships(Long agenceId, Long clientId) {
-        requireClient(agenceId, clientId);
+        Client client = requireClient(agenceId, clientId);
+        var before = new ActivityValues();
+        var after = new ActivityValues();
+        var references = new java.util.ArrayList<com.assurance.activity.ActivityReference>();
         for (GroupeClientMembre membership : membreRepository.findActiveByClient(agenceId, clientId, LocalDate.now())) {
             assertMembershipCanEnd(membership);
+            ClientGroupActivity.addMembership(before, membership);
+            references.add(ClientGroupActivity.reference(membership.getGroupe()));
             membership.setDateFin(LocalDate.now());
             membership.setPrincipal(false);
             membreRepository.save(membership);
+            ClientGroupActivity.addMembership(after, membership);
         }
+        var changes = ActivityValues.changes(before.snapshot(), after.snapshot());
+        if (!changes.isEmpty()) businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM,
+                ActivityAction.UNASSIGNED, "Client détaché de ses groupes", "CLIENT_GROUP_MEMBERSHIPS_END",
+                ClientActivity.reference(client), references, changes));
+    }
+
+    private java.util.Map<String, String> membershipSnapshot(Long agenceId, Long clientId, Long groupeId, LocalDate date) {
+        var values = new ActivityValues();
+        membreRepository.findActiveByClient(agenceId, clientId, date).forEach(member -> ClientGroupActivity.addMembership(values, member));
+        membreRepository.findActiveByGroupe(agenceId, groupeId, date).forEach(member -> ClientGroupActivity.addMembership(values, member));
+        var group = requireGroupe(agenceId, groupeId);
+        values.put("Tête de groupe", group.getClientTete() == null ? null : ClientActivity.reference(group.getClientTete()).label());
+        return values.snapshot();
     }
 
     @Transactional(readOnly = true)
@@ -305,6 +358,7 @@ public class GroupeClientService {
                 .map(item -> GroupeClientResponse.MembreView.builder()
                         .membershipId(item.getId())
                         .clientId(item.getClient().getId())
+                        .clientCode(item.getClient().getCodeClient())
                         .clientNom(item.getClient().getNomAffichage())
                         .typeRelation(item.getTypeRelation())
                         .dateDebut(item.getDateDebut())

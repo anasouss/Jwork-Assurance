@@ -1,5 +1,7 @@
 package com.assurance.service;
 
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ContractActivity;
 import com.assurance.dto.request.MouvementContratRequest;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.entity.Contrat;
@@ -64,6 +66,7 @@ public class MouvementContratService {
     private final QuittanceProductionService quittanceProductionService;
     private final QuittanceCalculService quittanceCalculService;
     private final ElementFacturableCibleService elementFacturableCibleService;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional
     public MouvementContrat creerAffaireNouvelle(
@@ -405,6 +408,12 @@ public class MouvementContratService {
     @Transactional
     public QuittanceResponse creerMouvement(Long agenceId, Long contratId, MouvementContratRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
+        StatutContrat previousStatus = contrat.getStatut();
+        return businessActivityRecorder.perform(() -> creerMouvementRecord(contrat, request),
+                result -> ContractActivity.genericMovementCommand(result.movement(), result.response(), previousStatus)).response();
+    }
+
+    private CreatedMovement creerMouvementRecord(Contrat contrat, MouvementContratRequest request) {
         TypeMouvementContrat typeMouvement = resolveTypeMouvement(request.getCodeTypeMouvement(), contrat.getTypeContrat());
         refuserCreationGeneriqueSiPayloadSpecialiseRequis(typeMouvement);
 
@@ -471,7 +480,10 @@ public class MouvementContratService {
                 : toResponse(quittance);
         response.setMouvementContratId(mouvement.getId());
         response.setNumeroMouvement(mouvement.getNumeroMouvement());
-        return response;
+        return new CreatedMovement(mouvement, response);
+    }
+
+    private record CreatedMovement(MouvementContrat movement, QuittanceResponse response) {
     }
 
     @Transactional(readOnly = true)

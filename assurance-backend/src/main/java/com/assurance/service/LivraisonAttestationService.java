@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.StockActivity;
 import com.assurance.dto.request.AddLotAttestationRequest;
 import com.assurance.dto.request.CreateLivraisonAttestationRequest;
 import com.assurance.dto.response.LivraisonAttestationResponse;
@@ -56,6 +59,7 @@ public class LivraisonAttestationService {
     private final AttestationStockRepository attestationStockRepository;
     private final MouvementStockAttestationRepository mouvementStockAttestationRepository;
     private final AttestationNumeroService attestationNumeroService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional
     public LivraisonAttestationResponse creer(Long agenceId, CreateLivraisonAttestationRequest request) {
@@ -115,7 +119,12 @@ public class LivraisonAttestationService {
             livraison.setValidee(true);
             livraison.setStatut(StatutLivraisonAttestation.VALIDEE);
         }
-        return toResponse(livraisonAttestationRepository.save(livraison));
+        livraison = livraisonAttestationRepository.save(livraison);
+        activityRecorder.record(StockActivity.deliveryCommand(livraison, Map.of(),
+                source == SourceLivraisonAttestation.RECEPTION_DIRECTE ? ActivityAction.VALIDATED : ActivityAction.CREATED,
+                source == SourceLivraisonAttestation.RECEPTION_DIRECTE ? "Reception directe d'attestations validee" : "Commande d'attestations creee",
+                "ATTESTATION_DELIVERY_CREATION"));
+        return toResponse(livraison);
     }
 
     @Transactional
@@ -126,6 +135,7 @@ public class LivraisonAttestationService {
     @Transactional
     public LivraisonAttestationResponse ajouterLots(Long agenceId, Long livraisonId, List<AddLotAttestationRequest> requests) {
         LivraisonAttestation livraison = findLivraison(agenceId, livraisonId);
+        var before = StockActivity.snapshot(livraison);
         if (Boolean.TRUE.equals(livraison.getValidee()) || livraison.getStatut() == StatutLivraisonAttestation.REFUSEE) {
             throw new BadRequestException("Livraison attestation verrouillee");
         }
@@ -151,12 +161,16 @@ public class LivraisonAttestationService {
             creerLot(livraison, ligne.usage(), ligne.groupe(), ligne.quantite(), lot.numeroDebut(), lot.numeroFin());
         }
         recalculer(livraison);
-        return toResponse(livraisonAttestationRepository.save(livraison));
+        livraison = livraisonAttestationRepository.save(livraison);
+        activityRecorder.record(StockActivity.deliveryCommand(livraison, before, ActivityAction.SAVED,
+                "Reception de lots d'attestations enregistree", "ATTESTATION_LOTS_RECEIPT"));
+        return toResponse(livraison);
     }
 
     @Transactional
     public LivraisonAttestationResponse valider(Long agenceId, Long livraisonId) {
         LivraisonAttestation livraison = findLivraison(agenceId, livraisonId);
+        var before = StockActivity.snapshot(livraison);
         recalculer(livraison);
         if (livraison.getQuantiteRecue() == null || livraison.getQuantiteRecue() <= 0) {
             throw new BadRequestException("Aucun lot recu pour cette livraison d'attestations");
@@ -166,7 +180,12 @@ public class LivraisonAttestationService {
         if (livraison.getDateReception() == null) {
             livraison.setDateReception(LocalDate.now());
         }
-        return toResponse(livraisonAttestationRepository.save(livraison));
+        livraison = livraisonAttestationRepository.save(livraison);
+        if (!com.assurance.activity.ActivityValues.changes(before, StockActivity.snapshot(livraison)).isEmpty()) {
+            activityRecorder.record(StockActivity.deliveryCommand(livraison, before, ActivityAction.VALIDATED,
+                    "Livraison d'attestations validee", "ATTESTATION_DELIVERY_VALIDATION"));
+        }
+        return toResponse(livraison);
     }
 
     @Transactional(readOnly = true)

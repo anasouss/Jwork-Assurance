@@ -1,5 +1,10 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.CompanyBordereauActivity;
 import com.assurance.dto.request.AnnulerBordereauCompagnieRequest;
 import com.assurance.dto.request.CreerBordereauCompagnieRequest;
 import com.assurance.dto.request.ModifierBordereauCompagnieRequest;
@@ -43,6 +48,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -66,6 +72,7 @@ public class BordereauCompagnieService {
     private final AgenceRepository agenceRepository;
     private final TiersCompagnieService tiersCompagnieService;
     private final UtilisateurRepository utilisateurRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<SourceBordereauCompagnieResponse> eligibleSources(
@@ -232,7 +239,7 @@ public class BordereauCompagnieService {
                 .build();
         replaceLines(bordereau, request.getAffectationIds());
         return toResponse(
-                bordereauRepository.saveAndFlush(bordereau),
+                saveActivity(bordereau, Map.of(), ActivityAction.CREATED, "Bordereau compagnie cree en brouillon", "COMPANY_BORDEREAU_CREATION"),
                 AllocationAmounts.empty(),
                 true
         );
@@ -247,6 +254,8 @@ public class BordereauCompagnieService {
         validatePeriod(request.getPeriodeDebut(), request.getPeriodeFin());
         BordereauCompagnie bordereau = lock(agenceId, id);
         requireDraft(bordereau);
+        var before = CompanyBordereauActivity.snapshot(bordereau);
+        var oldReferences = CompanyBordereauActivity.references(bordereau);
         releaseReservations(bordereau);
         bordereau.getLignes().clear();
         bordereauRepository.flush();
@@ -255,7 +264,7 @@ public class BordereauCompagnieService {
         bordereau.setNotes(trimToNull(request.getNotes()));
         replaceLines(bordereau, request.getAffectationIds());
         return toResponse(
-                bordereauRepository.saveAndFlush(bordereau),
+                saveActivity(bordereau, before, ActivityAction.UPDATED, "Bordereau compagnie modifie", "COMPANY_BORDEREAU_UPDATE", oldReferences),
                 AllocationAmounts.empty(),
                 true
         );
@@ -264,6 +273,7 @@ public class BordereauCompagnieService {
     @Transactional
     public BordereauCompagnieResponse validate(Long agenceId, Long id) {
         BordereauCompagnie bordereau = lock(agenceId, id);
+        var before = CompanyBordereauActivity.snapshot(bordereau);
         requireDraft(bordereau);
         if (bordereau.getLignes().isEmpty()) {
             throw new BadRequestException("Le bordereau doit contenir au moins une ligne");
@@ -273,7 +283,7 @@ public class BordereauCompagnieService {
         bordereau.setDateValidation(LocalDateTime.now());
         bordereau.setValidePar(currentUser());
         return toResponse(
-                bordereauRepository.saveAndFlush(bordereau),
+                saveActivity(bordereau, before, ActivityAction.VALIDATED, "Bordereau compagnie valide", "COMPANY_BORDEREAU_VALIDATION"),
                 AllocationAmounts.empty(),
                 true
         );
@@ -286,6 +296,7 @@ public class BordereauCompagnieService {
             TransmettreBordereauCompagnieRequest request
     ) {
         BordereauCompagnie bordereau = lock(agenceId, id);
+        var before = CompanyBordereauActivity.snapshot(bordereau);
         if (bordereau.getStatut() != StatutBordereauCompagnie.VALIDE) {
             throw new BadRequestException("Seul un bordereau validé peut être transmis");
         }
@@ -297,7 +308,7 @@ public class BordereauCompagnieService {
         bordereau.setCanalTransmission(request.getCanalTransmission().trim());
         bordereau.setReferenceTransmission(trimToNull(request.getReferenceTransmission()));
         return toResponse(
-                bordereauRepository.saveAndFlush(bordereau),
+                saveActivity(bordereau, before, ActivityAction.TRANSMITTED, "Bordereau compagnie transmis", "COMPANY_BORDEREAU_TRANSMISSION"),
                 loadAllocationAmounts(List.of(id)).getOrDefault(id, AllocationAmounts.empty()),
                 true
         );
@@ -310,6 +321,7 @@ public class BordereauCompagnieService {
             RapprocherBordereauCompagnieRequest request
     ) {
         BordereauCompagnie bordereau = lock(agenceId, id);
+        var before = CompanyBordereauActivity.snapshot(bordereau);
         if (bordereau.getStatut() != StatutBordereauCompagnie.TRANSMIS) {
             throw new BadRequestException("Le bordereau doit être transmis avant rapprochement");
         }
@@ -335,7 +347,7 @@ public class BordereauCompagnieService {
         bordereau.setDateAccuseReception(request.getDateAccuseReception());
         bordereau.setReferenceAccuseReception(trimToNull(request.getReferenceAccuseReception()));
         return toResponse(
-                bordereauRepository.saveAndFlush(bordereau),
+                saveActivity(bordereau, before, ActivityAction.RECONCILED, "Rapprochement compagnie enregistre", "COMPANY_BORDEREAU_RECONCILIATION"),
                 loadAllocationAmounts(List.of(id)).getOrDefault(id, AllocationAmounts.empty()),
                 true
         );
@@ -348,6 +360,7 @@ public class BordereauCompagnieService {
             AnnulerBordereauCompagnieRequest request
     ) {
         BordereauCompagnie bordereau = lock(agenceId, id);
+        var before = CompanyBordereauActivity.snapshot(bordereau);
         if (bordereau.getStatut() == StatutBordereauCompagnie.ANNULE) {
             throw new BadRequestException("Le bordereau est déjà annulé");
         }
@@ -362,7 +375,25 @@ public class BordereauCompagnieService {
         bordereau.setStatut(StatutBordereauCompagnie.ANNULE);
         bordereau.setDateAnnulation(LocalDateTime.now());
         bordereau.setMotifAnnulation(request.getMotif().trim());
-        return toResponse(bordereauRepository.saveAndFlush(bordereau), amounts, true);
+        return toResponse(saveActivity(bordereau, before, ActivityAction.CANCELLED,
+                "Bordereau compagnie annule", "COMPANY_BORDEREAU_CANCELLATION"), amounts, true);
+    }
+
+    private BordereauCompagnie saveActivity(BordereauCompagnie slip, Map<String, String> before,
+            ActivityAction action, String title, String origin) {
+        return saveActivity(slip, before, action, title, origin, List.of());
+    }
+
+    private BordereauCompagnie saveActivity(BordereauCompagnie slip, Map<String, String> before,
+            ActivityAction action, String title, String origin, List<ActivityReference> oldReferences) {
+        BordereauCompagnie saved = bordereauRepository.saveAndFlush(slip);
+        var command = CompanyBordereauActivity.command(saved, before, action, title, origin);
+        var references = new ArrayList<>(command.references());
+        references.addAll(oldReferences);
+        command = new ActivityCommand(command.agenceId(), command.module(), command.action(), command.title(), command.origin(),
+                command.subject(), references.stream().distinct().toList(), command.changes());
+        if (!command.changes().isEmpty()) activityRecorder.record(command);
+        return saved;
     }
 
     private void replaceLines(BordereauCompagnie bordereau, List<Long> requestedIds) {

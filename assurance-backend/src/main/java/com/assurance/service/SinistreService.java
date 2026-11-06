@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClaimActivity;
 import com.assurance.dto.request.CreateSinistreRequest;
 import com.assurance.dto.request.TransitionSinistreRequest;
 import com.assurance.dto.request.UpdateSinistreRequest;
@@ -61,6 +64,7 @@ public class SinistreService {
     private final SinistreReadinessService readinessService;
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<SinistreDoublonResponse> findPossibleDuplicates(
@@ -103,6 +107,13 @@ public class SinistreService {
             Long utilisateurId,
             CreateSinistreRequest request
     ) {
+        return activityRecorder.perform(() -> createRecord(agenceId, utilisateurId, request), detail ->
+                ClaimActivity.command(resolve(agenceId, detail.getId()), null, detail,
+                        detail.getStatut() == StatutSinistre.DECLARE ? ActivityAction.VALIDATED : ActivityAction.CREATED,
+                        detail.getStatut() == StatutSinistre.DECLARE ? "Sinistre cree et declare" : "Brouillon de sinistre cree", "CLAIM_CREATION"));
+    }
+
+    private SinistreDetailResponse createRecord(Long agenceId, Long utilisateurId, CreateSinistreRequest request) {
         validateDeclarationDates(request);
         Utilisateur acteur = resolveCurrentUser(agenceId, utilisateurId);
         SinistreCouvertureService.CouvertureResolue couverture = couvertureService.resolve(
@@ -200,6 +211,7 @@ public class SinistreService {
         if (!workflowService.isEditable(sinistre.getStatut())) {
             throw new BadRequestException("Le sinistre doit être rouvert avant modification");
         }
+        var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
         sinistre.setReferenceCompagnie(trimToNull(request.getReferenceCompagnie()));
         sinistre.setVille(resolveVille(request.getVilleId()));
         sinistre.setLieu(trimToNull(request.getLieu()));
@@ -226,7 +238,10 @@ public class SinistreService {
                 TypeEvenementSinistre.MODIFICATION,
                 "Informations générales du sinistre mises à jour"
         );
-        return responseMapper.toDetail(sinistre);
+        var detail = responseMapper.toDetail(sinistre);
+        activityRecorder.record(ClaimActivity.command(sinistre, before, detail, ActivityAction.UPDATED,
+                "Informations du sinistre modifiees", "CLAIM_GENERAL_INFORMATION"));
+        return detail;
     }
 
     @Transactional
@@ -246,6 +261,7 @@ public class SinistreService {
             throw new BadRequestException("Le motif est obligatoire pour ce changement de statut");
         }
         StatutSinistre ancien = sinistre.getStatut();
+        var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
         workflowService.transition(sinistre, request.getStatut());
         sinistreRepository.save(sinistre);
         String description = "Statut modifié de " + ancien + " vers " + request.getStatut();
@@ -260,7 +276,12 @@ public class SinistreService {
                 ancien,
                 request.getStatut()
         );
-        return responseMapper.toDetail(sinistre);
+        var detail = responseMapper.toDetail(sinistre);
+        var command = ClaimActivity.withReason(ClaimActivity.command(sinistre, before, detail,
+                ClaimActivity.transitionAction(sinistre.getStatut()), "Statut du sinistre : " + ClaimActivity.label(sinistre.getStatut()),
+                "CLAIM_STATUS_TRANSITION"), request.getMotif());
+        if (!command.changes().isEmpty()) activityRecorder.record(command);
+        return detail;
     }
 
     public Sinistre resolve(Long agenceId, Long id) {

@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.CompanyPaymentActivity;
 import com.assurance.dto.request.AnnulerBordereauCompagnieRequest;
 import com.assurance.dto.request.ChangerStatutInstrumentCompagnieRequest;
 import com.assurance.dto.request.CreerReglementCompagnieRequest;
@@ -62,12 +65,19 @@ public class ReglementCompagnieService {
     private final TiersCompagnieService tiersCompagnieService;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieService tresorerieService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional
     public ReglementCompagnieResponse create(
             Long agenceId,
             CreerReglementCompagnieRequest request
     ) {
+        return toResponse(activityRecorder.perform(() -> createRecord(agenceId, request), payment ->
+                CompanyPaymentActivity.command(payment, Map.of(), ActivityAction.CREATED,
+                        "Reglement compagnie enregistre", "COMPANY_PAYMENT_CREATION", null)));
+    }
+
+    private ReglementCompagnie createRecord(Long agenceId, CreerReglementCompagnieRequest request) {
         TiersCompagnie tiers = tiersCompagnieService.requireActive(request.getTiersCompagnieId());
         List<CreerReglementCompagnieRequest.Instrument> requestedInstruments = request.getInstruments();
         validateDuplicateAllocations(requestedInstruments);
@@ -143,7 +153,7 @@ public class ReglementCompagnieService {
         }
 
         payment = reglementRepository.saveAndFlush(payment);
-        return toResponse(payment);
+        return payment;
     }
 
     @Transactional(readOnly = true)
@@ -161,6 +171,16 @@ public class ReglementCompagnieService {
                 instrumentId,
                 agenceId
         ).orElseThrow(() -> new ResourceNotFoundException("Moyen de paiement compagnie", instrumentId));
+        var before = CompanyPaymentActivity.snapshot(instrument.getReglement());
+        return activityRecorder.perform(() -> changeInstrumentStatusRecord(agenceId, instrument, request), response ->
+                CompanyPaymentActivity.command(instrument.getReglement(), before,
+                        instrument.getStatut() == StatutInstrumentReglement.CONFIRME ? ActivityAction.CONFIRMED : ActivityAction.REJECTED,
+                        instrument.getStatut() == StatutInstrumentReglement.CONFIRME ? "Moyen de paiement compagnie confirme" : "Moyen de paiement compagnie rejete",
+                        "COMPANY_PAYMENT_INSTRUMENT_STATUS", instrument));
+    }
+
+    private ReglementCompagnieResponse changeInstrumentStatusRecord(Long agenceId, InstrumentReglementCompagnie instrument,
+            ChangerStatutInstrumentCompagnieRequest request) {
         if (instrument.getReglement().getStatut() == StatutReglementCompagnie.ANNULE) {
             throw new BadRequestException("Le règlement compagnie est annulé");
         }
@@ -189,6 +209,13 @@ public class ReglementCompagnieService {
         if (payment.getStatut() == StatutReglementCompagnie.ANNULE) {
             return toResponse(payment);
         }
+        var before = CompanyPaymentActivity.snapshot(payment);
+        return activityRecorder.perform(() -> cancelRecord(payment, request), response ->
+                CompanyPaymentActivity.command(payment, before, ActivityAction.CANCELLED,
+                        "Reglement compagnie annule", "COMPANY_PAYMENT_CANCELLATION", null));
+    }
+
+    private ReglementCompagnieResponse cancelRecord(ReglementCompagnie payment, AnnulerBordereauCompagnieRequest request) {
         LocalDate operationDate = LocalDate.now();
         for (InstrumentReglementCompagnie instrument : payment.getInstruments()) {
             if (instrument.getStatut() == StatutInstrumentReglement.CONFIRME

@@ -1,5 +1,13 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.StockActivity;
 import com.assurance.dto.request.CancelAttestationStockRequest;
 import com.assurance.dto.request.UpdateAttestationStockSettingsRequest;
 import com.assurance.dto.request.UpsertSeuilStockAttestationRequest;
@@ -65,6 +73,7 @@ public class AttestationStockService {
     private final UsageRepository usageRepository;
     private final ParametreApplicationService parametreApplicationService;
     private final AttestationNumeroService attestationNumeroService;
+    private final BusinessActivityRecorder activityRecorder;
 
     public boolean controleActif(Long agenceId) {
         return parametreApplicationService.getBoolean(agenceId, PARAM_CONTROLE_STOCK_ATTESTATION, true);
@@ -215,6 +224,7 @@ public class AttestationStockService {
 
     @Transactional
     public AttestationStockSettingsResponse updateSettings(Long agenceId, UpdateAttestationStockSettingsRequest request) {
+        var before = new ActivityValues().put("Controle du stock", controleActif(agenceId)).snapshot();
         boolean controleActif = Boolean.TRUE.equals(request.getControleStockActif());
         parametreApplicationService.setBoolean(
                 agenceId,
@@ -222,7 +232,13 @@ public class AttestationStockService {
                 controleActif,
                 "Active le controle du stock des attestations pendant la production"
         );
-        return settings(agenceId);
+        var response = settings(agenceId);
+        activityRecorder.record(new ActivityCommand(agenceId, ActivityModule.STOCK_ATTESTATIONS, ActivityAction.UPDATED,
+                "Controle du stock d'attestations modifie", "ATTESTATION_STOCK_CONTROL",
+                new ActivityReference(ActivityRecordType.PARAMETRE, PARAM_CONTROLE_STOCK_ATTESTATION, "Controle du stock d'attestations"),
+                List.of(), ActivityValues.changes(before,
+                        new ActivityValues().put("Controle du stock", response.getControleStockActif()).snapshot())));
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -315,6 +331,7 @@ public class AttestationStockService {
         if (attestation.getStatut() != StatutAttestationStock.DISPONIBLE) {
             throw new BadRequestException("Seule une attestation disponible peut etre annulee");
         }
+        var before = StockActivity.snapshot(attestation);
 
         String motif = request.getMotif().trim();
         attestation.setStatut(StatutAttestationStock.ANNULEE);
@@ -331,6 +348,8 @@ public class AttestationStockService {
                 motif
         );
         recalculerSeuil(attestation);
+        activityRecorder.record(StockActivity.command(attestation, before, List.of(), ActivityAction.CANCELLED,
+                "Attestation " + attestation.getNumero() + " annulee", "ATTESTATION_CANCELLATION"));
         return toItemResponse(attestation);
     }
 
@@ -363,14 +382,19 @@ public class AttestationStockService {
                         .groupeUsageAttestation(groupe)
                         .actif(true)
                         .build());
+        boolean created = seuil.getId() == null;
+        var before = created ? Map.<String, String>of() : StockActivity.snapshot(seuil);
         updateSeuilValues(seuil, request.getMinimumStock());
-        return toSeuilResponse(seuilStockAttestationRepository.save(seuil));
+        seuil = seuilStockAttestationRepository.save(seuil);
+        activityRecorder.record(StockActivity.thresholdCommand(seuil, before, created));
+        return toSeuilResponse(seuil);
     }
 
     @Transactional
     public SeuilStockAttestationResponse modifierSeuil(Long agenceId, Long id, UpsertSeuilStockAttestationRequest request) {
         SeuilStockAttestation seuil = seuilStockAttestationRepository.findByIdAndAgenceIdAndActifTrue(id, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("SeuilStockAttestation", id));
+        var before = StockActivity.snapshot(seuil);
         if (!seuil.getCompagnieAssurance().getId().equals(request.getCompagnieAssuranceId())
                 || !seuil.getGroupeUsageAttestation().getId().equals(request.getGroupeUsageAttestationId())) {
             CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
@@ -381,7 +405,9 @@ public class AttestationStockService {
             seuil.setGroupeUsageAttestation(groupe);
         }
         updateSeuilValues(seuil, request.getMinimumStock());
-        return toSeuilResponse(seuilStockAttestationRepository.save(seuil));
+        seuil = seuilStockAttestationRepository.save(seuil);
+        activityRecorder.record(StockActivity.thresholdCommand(seuil, before, false));
+        return toSeuilResponse(seuil);
     }
 
     @Transactional
@@ -394,6 +420,7 @@ public class AttestationStockService {
             throw new BadRequestException("Numéro d'attestation obligatoire pour ce mouvement");
         }
         AttestationStock attestation = trouverDisponiblePourUpdate(contrat, usage, numeroNormalise);
+        var before = StockActivity.snapshot(attestation);
         attestation.setStatut(StatutAttestationStock.UTILISEE);
         attestation.setDateUtilisation(LocalDateTime.now());
         attestation.setNumeroDossier(contrat.getNumeroDossier());
@@ -405,6 +432,8 @@ public class AttestationStockService {
         attestationStockRepository.save(attestation);
         enregistrerMouvement(attestation, TypeMouvementStockAttestation.UTILISATION, contrat, mouvement, null, numeroNormalise);
         recalculerSeuil(attestation);
+        activityRecorder.record(StockActivity.command(attestation, before, List.of(), ActivityAction.ASSIGNED,
+                "Attestation affectee au contrat", "ATTESTATION_CONTRACT_CONSUMPTION"));
     }
 
     @Transactional
@@ -430,6 +459,8 @@ public class AttestationStockService {
             if (contrat != null && attestation.getContrat() != null && !contrat.getId().equals(attestation.getContrat().getId())) {
                 continue;
             }
+            var before = StockActivity.snapshot(attestation);
+            var references = StockActivity.references(attestation);
             attestation.setStatut(StatutAttestationStock.DISPONIBLE);
             attestation.setDateUtilisation(null);
             attestation.setNumeroDossier(null);
@@ -441,6 +472,10 @@ public class AttestationStockService {
             attestationStockRepository.save(attestation);
             enregistrerMouvement(attestation, TypeMouvementStockAttestation.LIBERATION, contrat, mouvement, numeroNormalise, null);
             recalculerSeuil(attestation);
+            if (!ActivityValues.changes(before, StockActivity.snapshot(attestation)).isEmpty()) {
+                activityRecorder.record(StockActivity.command(attestation, before, references, ActivityAction.UNASSIGNED,
+                        "Attestation liberee du contrat", "ATTESTATION_CONTRACT_RELEASE"));
+            }
             return;
         }
     }
@@ -455,6 +490,8 @@ public class AttestationStockService {
             return;
         }
         String numeroAvant = attestation.getNumero();
+        var before = StockActivity.snapshot(attestation);
+        var references = StockActivity.references(attestation);
         attestation.setStatut(StatutAttestationStock.DISPONIBLE);
         attestation.setDateUtilisation(null);
         attestation.setNumeroDossier(null);
@@ -466,6 +503,8 @@ public class AttestationStockService {
         attestationStockRepository.save(attestation);
         enregistrerMouvement(attestation, TypeMouvementStockAttestation.LIBERATION, contrat, mouvement, numeroAvant, null);
         recalculerSeuil(attestation);
+        activityRecorder.record(StockActivity.command(attestation, before, references, ActivityAction.UNASSIGNED,
+                "Attestation liberee du contrat", "ATTESTATION_CONTRACT_RELEASE"));
     }
 
     public boolean doitConsommer(Contrat contrat, TypeMouvementContrat typeMouvement, Usage usage) {

@@ -1,5 +1,13 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.TreasuryActivity;
 import com.assurance.dto.request.UpsertAffectationsCompteTresorerieRequest;
 import com.assurance.dto.response.AffectationCompteTresorerieResponse;
 import com.assurance.dto.response.UtilisateurTresorerieResponse;
@@ -32,6 +40,7 @@ public class TresorerieAccessService {
     private final AffectationCompteTresorerieRepository affectationRepository;
     private final CompteTresorerieRepository compteRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<CompteTresorerie> visibleAccounts(Long agenceId, Long utilisateurId) {
@@ -129,6 +138,7 @@ public class TresorerieAccessService {
                         row -> row.getUtilisateur().getId(),
                         row -> row
                 ));
+        var before = TreasuryActivity.assignments(existing.values());
         existing.values().forEach(row -> row.setActif(false));
         for (Map.Entry<Long, UpsertAffectationsCompteTresorerieRequest.Ligne> entry : requested.entrySet()) {
             UpsertAffectationsCompteTresorerieRequest.Ligne input = entry.getValue();
@@ -144,6 +154,11 @@ public class TresorerieAccessService {
         }
         affectationRepository.saveAll(existing.values());
         ensureCashOwnerAccess(account);
+        activityRecorder.record(new ActivityCommand(agenceId, ActivityModule.TRESORERIE, ActivityAction.UPDATED,
+                "Acces au compte bancaire modifies", "TREASURY_ACCOUNT_ACCESS", TreasuryActivity.reference(account),
+                existing.values().stream().map(row -> ActivityReference.of(ActivityRecordType.UTILISATEUR,
+                        row.getUtilisateur().getId(), row.getUtilisateur().getFullName())).toList(),
+                ActivityValues.changes(before, TreasuryActivity.assignments(existing.values()))));
         return listAssignments(agenceId, compteId);
     }
 

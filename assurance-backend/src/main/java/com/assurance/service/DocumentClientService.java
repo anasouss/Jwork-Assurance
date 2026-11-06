@@ -1,5 +1,10 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityChange;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.InvoiceActivity;
 import com.assurance.dto.request.CreerDocumentClientRequest;
 import com.assurance.dto.request.CreerFactureDepuisReleveRequest;
 import com.assurance.dto.request.AnnulerDocumentClientRequest;
@@ -89,6 +94,7 @@ public class DocumentClientService {
     private final ConditionPaiementClientService conditionPaiementClientService;
     private final DocumentClientLineLabelService documentClientLineLabelService;
     private final EcartReglementClientRepository ecartRepository;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public PropositionEcheanceDocumentClientResponse proposeDueDate(
@@ -678,7 +684,9 @@ public class DocumentClientService {
         invoiceRequest.setElementFacturableIds(requestedIds);
         invoiceRequest.setDateEcheance(request.getDateEcheance());
         invoiceRequest.setNotes(request.getNotes());
-        return create(agenceId, invoiceRequest, false, false, null);
+        return businessActivityRecorder.perform(() -> create(agenceId, invoiceRequest, false, false, null), result ->
+                InvoiceActivity.command(findDocument(agenceId, result.getId()), Map.of(), ActivityAction.ISSUED,
+                        "Facture emise depuis un releve", "CLIENT_INVOICE_FROM_STATEMENT", List.of(InvoiceActivity.reference(statement))));
     }
 
     @Transactional
@@ -699,6 +707,17 @@ public class DocumentClientService {
             boolean useProposedDueDate,
             DocumentClient documentOrigine
     ) {
+        return businessActivityRecorder.perform(() -> createRecord(agenceId, request, allowActiveDirectPayments,
+                useProposedDueDate, documentOrigine), result -> {
+            DocumentClient document = findDocument(agenceId, result.getId());
+            return InvoiceActivity.command(document, Map.of(), ActivityAction.ISSUED,
+                    document.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture emise" : "Releve emis",
+                    allowActiveDirectPayments ? "CLIENT_INVOICE_FROM_DIRECT_PAYMENT" : "CLIENT_DOCUMENT_ISSUANCE", List.of());
+        });
+    }
+
+    private DocumentClientResponse createRecord(Long agenceId, CreerDocumentClientRequest request,
+            boolean allowActiveDirectPayments, boolean useProposedDueDate, DocumentClient documentOrigine) {
         List<Long> requestedIds = request.getElementFacturableIds().stream()
                 .filter(Objects::nonNull)
                 .distinct()
@@ -880,14 +899,23 @@ public class DocumentClientService {
         replacementRequest.setElementFacturableIds(request.getElementFacturableIds());
         replacementRequest.setDateEcheance(request.getDateEcheance());
         replacementRequest.setNotes(request.getNotes());
-
-        original.setStatut(StatutDocumentClient.REMPLACE);
-        original.setDateRemplacement(LocalDateTime.now());
-        original.setMotifRemplacement(request.getMotif().trim());
-        releaseConventionSchedules(original);
-        documentClientRepository.saveAndFlush(original);
-
-        return create(agenceId, replacementRequest, false, false, original);
+        Map<String, String> before = InvoiceActivity.snapshot(original);
+        return businessActivityRecorder.perform(() -> {
+            original.setStatut(StatutDocumentClient.REMPLACE);
+            original.setDateRemplacement(LocalDateTime.now());
+            original.setMotifRemplacement(request.getMotif().trim());
+            releaseConventionSchedules(original);
+            documentClientRepository.saveAndFlush(original);
+            return createRecord(agenceId, replacementRequest, false, false, original);
+        }, result -> {
+            ActivityCommand command = InvoiceActivity.command(findDocument(agenceId, result.getId()), before,
+                    ActivityAction.REPLACED, original.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture corrigee" : "Releve corrige",
+                    "CLIENT_DOCUMENT_REVISION", List.of(InvoiceActivity.reference(original)));
+            var changes = new ArrayList<>(command.changes());
+            changes.add(new ActivityChange("Motif de correction", null, request.getMotif().trim()));
+            return new ActivityCommand(command.agenceId(), command.module(), command.action(), command.title(),
+                    command.origin(), command.subject(), command.references(), changes);
+        });
     }
 
     @Transactional
@@ -902,11 +930,16 @@ public class DocumentClientService {
             throw new BadRequestException("Seul un document émis peut être annulé");
         }
         ensureNoActiveInvoicePayments(document);
+        Map<String, String> before = InvoiceActivity.snapshot(document);
         document.setStatut(StatutDocumentClient.ANNULE);
         document.setDateAnnulation(LocalDateTime.now());
         document.setMotifAnnulation(request.getMotif().trim());
         releaseConventionSchedules(document);
-        return toResponse(documentClientRepository.save(document), true);
+        DocumentClient saved = documentClientRepository.save(document);
+        businessActivityRecorder.record(InvoiceActivity.command(saved, before, ActivityAction.CANCELLED,
+                saved.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture annulee" : "Releve annule",
+                "CLIENT_DOCUMENT_CANCELLATION", List.of()));
+        return toResponse(saved, true);
     }
 
     @Transactional(readOnly = true)

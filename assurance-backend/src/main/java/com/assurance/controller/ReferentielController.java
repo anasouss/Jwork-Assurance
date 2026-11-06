@@ -1,5 +1,9 @@
 package com.assurance.controller;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.CompanyCatalogueActivity;
+import com.assurance.activity.GridCatalogueActivity;
+import com.assurance.activity.ReferenceCatalogueActivity;
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.request.UpsertCategorieClientRequest;
 import com.assurance.dto.request.UpsertCodePromoAssistanceRequest;
@@ -64,6 +68,7 @@ import com.assurance.service.RichTextSanitizer;
 import com.assurance.service.GrilleTarifaireCatalogueService;
 import com.assurance.service.TarifUsageAjustementService;
 import com.assurance.service.TiersCompagnieService;
+import com.assurance.service.CatalogueActivityService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
@@ -127,6 +132,7 @@ public class ReferentielController {
     private final GrilleTarifaireCatalogueService grilleTarifaireCatalogueService;
     private final TarifUsageAjustementService tarifUsageAjustementService;
     private final TiersCompagnieService tiersCompagnieService;
+    private final CatalogueActivityService catalogueActivity;
 
     @GetMapping("/branches-assurance")
     @Transactional(readOnly = true)
@@ -160,12 +166,19 @@ public class ReferentielController {
     @PostMapping("/usages")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createUsage(@Valid @RequestBody UpsertUsageRequest request) {
+        return catalogueActivity.perform(() -> createUsageRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createUsageRecord(UpsertUsageRequest request) {
         usageRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code usage deja utilise");
         });
         Usage usage = new Usage();
         applyUsageRequest(usage, request);
-        return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usageRepository.save(usage)), "Usage cree"));
+        usage = usageRepository.save(usage);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(usage),
+                ActivityAction.CREATED, "Usage cree", "USAGE_CREATE"));
+        return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usage), "Usage cree"));
     }
 
     @PutMapping("/usages/{id}")
@@ -174,15 +187,23 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertUsageRequest request
     ) {
+        return catalogueActivity.perform(() -> updateUsageRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateUsageRecord(Long id, UpsertUsageRequest request) {
         Usage usage = usageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", id));
+        var before = ReferenceCatalogueActivity.state(usage);
         usageRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
                     throw new BadRequestException("Code usage deja utilise");
                 });
         applyUsageRequest(usage, request);
-        return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usageRepository.save(usage)), "Usage modifie"));
+        usage = usageRepository.save(usage);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(usage),
+                ActivityAction.UPDATED, "Usage modifie", "USAGE_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toUsageResponse(usage), "Usage modifie"));
     }
 
     @PutMapping("/usages/taux-extension-remorque")
@@ -190,18 +211,28 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> updateUsageTauxExtensionRemorque(
             @Valid @RequestBody UpdateUsageTauxExtensionRemorqueRequest request
     ) {
+        return catalogueActivity.perform(() -> updateUsageTauxExtensionRemorqueRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<List<Map<String, Object>>>> updateUsageTauxExtensionRemorqueRecord(
+            UpdateUsageTauxExtensionRemorqueRequest request) {
         Set<Long> usageIds = new HashSet<>();
+        List<ReferenceCatalogueActivity.State> before = new java.util.ArrayList<>();
         List<Usage> usages = request.getLignes().stream().map(ligne -> {
             if (!usageIds.add(ligne.getUsageId())) {
                 throw new BadRequestException("Un usage ne peut etre renseigne qu'une seule fois");
             }
             Usage usage = usageRepository.findById(ligne.getUsageId())
                     .orElseThrow(() -> new ResourceNotFoundException("Usage", ligne.getUsageId()));
+            before.add(ReferenceCatalogueActivity.state(usage));
             usage.setTauxExtensionRemorque(ligne.getTaux());
             return usage;
         }).toList();
+        List<Usage> saved = usageRepository.saveAll(usages);
+        catalogueActivity.record(ReferenceCatalogueActivity.trailerRatesCommand(before,
+                saved.stream().map(ReferenceCatalogueActivity::state).toList()));
         return ResponseEntity.ok(ApiResponse.success(
-                usageRepository.saveAll(usages).stream().map(this::toUsageResponse).toList(),
+                saved.stream().map(this::toUsageResponse).toList(),
                 "Majorations RC remorque modifiees"
         ));
     }
@@ -215,6 +246,10 @@ public class ReferentielController {
 
     @PostMapping("/marques")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createMarque(@Valid @RequestBody UpsertReferenceRequest request) {
+        return catalogueActivity.perform(() -> createMarqueRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> createMarqueRecord(UpsertReferenceRequest request) {
         marqueRepository.findByLibelleIgnoreCase(request.getLibelle()).ifPresent(existing -> {
             throw new BadRequestException("Marque deja existante");
         });
@@ -222,6 +257,8 @@ public class ReferentielController {
                 .libelle(request.getLibelle())
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(marque),
+                ActivityAction.CREATED, "Marque creee", "VEHICLE_MAKE_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(toResponse(marque), "Marque creee"));
     }
 
@@ -230,8 +267,13 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertReferenceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateMarqueRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateMarqueRecord(Long id, UpsertReferenceRequest request) {
         Marque marque = marqueRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Marque", id));
+        var before = ReferenceCatalogueActivity.state(marque);
         marqueRepository.findByLibelleIgnoreCase(request.getLibelle())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
@@ -239,7 +281,10 @@ public class ReferentielController {
                 });
         marque.setLibelle(request.getLibelle());
         marque.setActif(request.getActif() == null ? true : request.getActif());
-        return ResponseEntity.ok(ApiResponse.success(toResponse(marqueRepository.save(marque)), "Marque modifiee"));
+        marque = marqueRepository.save(marque);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(marque),
+                ActivityAction.UPDATED, "Marque modifiee", "VEHICLE_MAKE_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toResponse(marque), "Marque modifiee"));
     }
 
     @GetMapping("/carrosseries")
@@ -251,6 +296,10 @@ public class ReferentielController {
 
     @PostMapping("/carrosseries")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarrosserie(@Valid @RequestBody UpsertReferenceRequest request) {
+        return catalogueActivity.perform(() -> createCarrosserieRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarrosserieRecord(UpsertReferenceRequest request) {
         carrosserieRepository.findByLibelleIgnoreCase(request.getLibelle()).ifPresent(existing -> {
             throw new BadRequestException("Carrosserie deja existante");
         });
@@ -258,6 +307,8 @@ public class ReferentielController {
                 .libelle(request.getLibelle())
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(carrosserie),
+                ActivityAction.CREATED, "Carrosserie creee", "VEHICLE_BODY_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(toResponse(carrosserie), "Carrosserie creee"));
     }
 
@@ -266,8 +317,13 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertReferenceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCarrosserieRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarrosserieRecord(Long id, UpsertReferenceRequest request) {
         Carrosserie carrosserie = carrosserieRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Carrosserie", id));
+        var before = ReferenceCatalogueActivity.state(carrosserie);
         carrosserieRepository.findByLibelleIgnoreCase(request.getLibelle())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
@@ -275,7 +331,10 @@ public class ReferentielController {
                 });
         carrosserie.setLibelle(request.getLibelle());
         carrosserie.setActif(request.getActif() == null ? true : request.getActif());
-        return ResponseEntity.ok(ApiResponse.success(toResponse(carrosserieRepository.save(carrosserie)), "Carrosserie modifiee"));
+        carrosserie = carrosserieRepository.save(carrosserie);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(carrosserie),
+                ActivityAction.UPDATED, "Carrosserie modifiee", "VEHICLE_BODY_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toResponse(carrosserie), "Carrosserie modifiee"));
     }
 
     @GetMapping("/carburants")
@@ -287,6 +346,10 @@ public class ReferentielController {
 
     @PostMapping("/carburants")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarburant(@Valid @RequestBody UpsertCodeReferenceRequest request) {
+        return catalogueActivity.perform(() -> createCarburantRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarburantRecord(UpsertCodeReferenceRequest request) {
         carburantRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code carburant deja utilise");
         });
@@ -295,6 +358,8 @@ public class ReferentielController {
                 .libelle(request.getLibelle())
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(carburant),
+                ActivityAction.CREATED, "Carburant cree", "VEHICLE_FUEL_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(toResponse(carburant), "Carburant cree"));
     }
 
@@ -303,8 +368,13 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCodeReferenceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCarburantRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarburantRecord(Long id, UpsertCodeReferenceRequest request) {
         Carburant carburant = carburantRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Carburant", id));
+        var before = ReferenceCatalogueActivity.state(carburant);
         carburantRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
@@ -313,7 +383,10 @@ public class ReferentielController {
         carburant.setCode(request.getCode());
         carburant.setLibelle(request.getLibelle());
         carburant.setActif(request.getActif() == null ? true : request.getActif());
-        return ResponseEntity.ok(ApiResponse.success(toResponse(carburantRepository.save(carburant)), "Carburant modifie"));
+        carburant = carburantRepository.save(carburant);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(carburant),
+                ActivityAction.UPDATED, "Carburant modifie", "VEHICLE_FUEL_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toResponse(carburant), "Carburant modifie"));
     }
 
     @GetMapping("/sous-classes")
@@ -325,6 +398,10 @@ public class ReferentielController {
 
     @PostMapping("/sous-classes")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createSousClasse(@Valid @RequestBody UpsertSousClasseRequest request) {
+        return catalogueActivity.perform(() -> createSousClasseRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> createSousClasseRecord(UpsertSousClasseRequest request) {
         sousClasseRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code sous-classe deja utilise");
         });
@@ -336,6 +413,8 @@ public class ReferentielController {
                 .assistanceAutorisee(Boolean.TRUE.equals(request.getAssistanceAutorisee()))
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(sousClasse),
+                ActivityAction.CREATED, "Sous-classe creee", "VEHICLE_SUBCLASS_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasse), "Sous-classe creee"));
     }
 
@@ -344,8 +423,13 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertSousClasseRequest request
     ) {
+        return catalogueActivity.perform(() -> updateSousClasseRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateSousClasseRecord(Long id, UpsertSousClasseRequest request) {
         SousClasse sousClasse = sousClasseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("SousClasse", id));
+        var before = ReferenceCatalogueActivity.state(sousClasse);
         sousClasseRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
@@ -357,7 +441,10 @@ public class ReferentielController {
         sousClasse.setConducteurPermisRequis(Boolean.TRUE.equals(request.getConducteurPermisRequis()));
         sousClasse.setAssistanceAutorisee(Boolean.TRUE.equals(request.getAssistanceAutorisee()));
         sousClasse.setActif(request.getActif() == null ? true : request.getActif());
-        return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasseRepository.save(sousClasse)), "Sous-classe modifiee"));
+        sousClasse = sousClasseRepository.save(sousClasse);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(sousClasse),
+                ActivityAction.UPDATED, "Sous-classe modifiee", "VEHICLE_SUBCLASS_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toResponse(sousClasse), "Sous-classe modifiee"));
     }
 
     @GetMapping("/compagnies-assurance")
@@ -380,6 +467,10 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssurance(
             @Valid @RequestBody UpsertCompagnieAssuranceRequest request
     ) {
+        return catalogueActivity.perform(() -> createCompagnieAssuranceRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssuranceRecord(UpsertCompagnieAssuranceRequest request) {
         validateCompagnieDossierPrefix(request.getPrefixeDossier(), null);
         CompagnieAssurance compagnie = new CompagnieAssurance();
         compagnie.setCode(nextCompagnieAssuranceCode(request.getNom()));
@@ -387,6 +478,8 @@ public class ReferentielController {
         compagnie = compagnieAssuranceRepository.save(compagnie);
         tiersCompagnieService.resolveAssurance(compagnie);
         String codeIntermediaire = saveCodeIntermediaire(compagnie, request.getCodeIntermediaire());
+        catalogueActivity.record(null, CompanyCatalogueActivity.state(compagnie), ActivityAction.CREATED,
+                "Compagnie d'assurance creee", "INSURANCE_COMPANY_CREATE");
         return ResponseEntity.ok(ApiResponse.success(
                 toCompagnieAssuranceResponse(compagnie, codeIntermediaire),
                 "Compagnie creee"
@@ -399,12 +492,19 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCompagnieAssuranceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCompagnieAssuranceRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssuranceRecord(Long id, UpsertCompagnieAssuranceRequest request) {
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", id));
+        var before = CompanyCatalogueActivity.state(compagnie);
         validateCompagnieDossierPrefix(request.getPrefixeDossier(), id);
         applyCompagnieAssuranceRequest(compagnie, request);
         compagnie = compagnieAssuranceRepository.save(compagnie);
         String codeIntermediaire = saveCodeIntermediaire(compagnie, request.getCodeIntermediaire());
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(compagnie), ActivityAction.UPDATED,
+                "Compagnie d'assurance modifiee", "INSURANCE_COMPANY_UPDATE");
         return ResponseEntity.ok(ApiResponse.success(
                 toCompagnieAssuranceResponse(compagnie, codeIntermediaire),
                 "Compagnie modifiee"
@@ -426,6 +526,10 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistance(
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> createCompagnieAssistanceRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistanceRecord(UpsertCompagnieAssistanceRequest request) {
         compagnieAssistanceRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code compagnie assistance deja utilise");
         });
@@ -433,6 +537,8 @@ public class ReferentielController {
         applyCompagnieAssistanceRequest(compagnie, request);
         compagnie = compagnieAssistanceRepository.save(compagnie);
         tiersCompagnieService.resolveAssistance(compagnie);
+        catalogueActivity.record(null, CompanyCatalogueActivity.state(compagnie), ActivityAction.CREATED,
+                "Compagnie d'assistance creee", "ASSISTANCE_COMPANY_CREATE");
         return ResponseEntity.ok(ApiResponse.success(
                 toCompagnieAssistanceResponse(compagnie),
                 "Compagnie d'assistance creee"
@@ -444,26 +550,41 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCompagnieAssistanceRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssistanceRecord(Long id, UpsertCompagnieAssistanceRequest request) {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", id));
+        var before = CompanyCatalogueActivity.state(compagnie);
         compagnieAssistanceRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
                     throw new BadRequestException("Code compagnie assistance deja utilise");
                 });
         applyCompagnieAssistanceRequest(compagnie, request);
+        compagnie = compagnieAssistanceRepository.save(compagnie);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(compagnie), ActivityAction.UPDATED,
+                "Compagnie d'assistance modifiee", "ASSISTANCE_COMPANY_UPDATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toCompagnieAssistanceResponse(compagnieAssistanceRepository.save(compagnie)),
+                toCompagnieAssistanceResponse(compagnie),
                 "Compagnie d'assistance modifiee"
         ));
     }
 
     @DeleteMapping("/compagnies-assistance/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteCompagnieAssistance(@PathVariable Long id) {
+        return catalogueActivity.perform(() -> deleteCompagnieAssistanceRecord(id));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> deleteCompagnieAssistanceRecord(Long id) {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", id));
+        var before = CompanyCatalogueActivity.state(compagnie);
         compagnie.setActif(false);
         compagnieAssistanceRepository.save(compagnie);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(compagnie), ActivityAction.UPDATED,
+                "Compagnie d'assistance desactivee", "ASSISTANCE_COMPANY_DEACTIVATE");
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Compagnie d'assistance desactivee"));
     }
 
@@ -494,10 +615,17 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> createProduitAssistance(
             @Valid @RequestBody UpsertProduitAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> createProduitAssistanceRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createProduitAssistanceRecord(UpsertProduitAssistanceRequest request) {
         ProduitAssistance produit = new ProduitAssistance();
         applyProduitAssistanceRequest(produit, request);
+        produit = produitAssistanceRepository.save(produit);
+        catalogueActivity.record(null, CompanyCatalogueActivity.state(produit), ActivityAction.CREATED,
+                "Produit d'assistance cree", "ASSISTANCE_PRODUCT_CREATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toProduitAssistanceResponse(produitAssistanceRepository.save(produit)),
+                toProduitAssistanceResponse(produit),
                 "Produit d'assistance cree"
         ));
     }
@@ -508,27 +636,46 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertProduitAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateProduitAssistanceRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateProduitAssistanceRecord(Long id, UpsertProduitAssistanceRequest request) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        var before = CompanyCatalogueActivity.state(produit);
         applyProduitAssistanceRequest(produit, request);
+        produit = produitAssistanceRepository.save(produit);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(produit), ActivityAction.UPDATED,
+                "Produit d'assistance modifie", "ASSISTANCE_PRODUCT_UPDATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toProduitAssistanceResponse(produitAssistanceRepository.save(produit)),
+                toProduitAssistanceResponse(produit),
                 "Produit d'assistance modifie"
         ));
     }
 
     @DeleteMapping("/produits-assistance/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteProduitAssistance(@PathVariable Long id) {
+        return catalogueActivity.perform(() -> deleteProduitAssistanceRecord(id));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> deleteProduitAssistanceRecord(Long id) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
+        var before = CompanyCatalogueActivity.state(produit);
         produit.setActif(false);
         produitAssistanceRepository.save(produit);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(produit), ActivityAction.UPDATED,
+                "Produit d'assistance desactive", "ASSISTANCE_PRODUCT_DEACTIVATE");
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Produit d'assistance desactive"));
     }
 
     @DeleteMapping("/produits-assistance/{id}/permanent")
     @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteProduitAssistancePermanently(@PathVariable Long id) {
+        return catalogueActivity.perform(() -> deleteProduitAssistancePermanentlyRecord(id));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> deleteProduitAssistancePermanentlyRecord(Long id) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
         if (assistanceContratRepository.existsByProduitOrTarifProduit(id)) {
@@ -536,7 +683,9 @@ public class ReferentielController {
                     "Ce produit est deja utilise par un contrat et ne peut pas etre supprime. Desactivez-le plutot."
             );
         }
+        var before = CompanyCatalogueActivity.productDeletion(produit);
         produitAssistanceRepository.delete(produit);
+        catalogueActivity.record(before, null, ActivityAction.DELETED, "Produit d'assistance supprime", "ASSISTANCE_PRODUCT_DELETE");
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Produit d'assistance supprime"));
     }
 
@@ -558,12 +707,19 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertTarifProduitAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> createTarifProduitAssistanceRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createTarifProduitAssistanceRecord(Long id, UpsertTarifProduitAssistanceRequest request) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
         TarifProduitAssistance tarif = new TarifProduitAssistance();
         applyTarifProduitAssistanceRequest(tarif, produit, request);
+        tarif = tarifProduitAssistanceRepository.save(tarif);
+        catalogueActivity.record(null, CompanyCatalogueActivity.state(tarif), ActivityAction.CREATED,
+                "Tarif d'assistance cree", "ASSISTANCE_RATE_CREATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toTarifProduitAssistanceResponse(tarifProduitAssistanceRepository.save(tarif)),
+                toTarifProduitAssistanceResponse(tarif),
                 "Tarif assistance cree"
         ));
     }
@@ -575,6 +731,11 @@ public class ReferentielController {
             @PathVariable Long tarifId,
             @Valid @RequestBody UpsertTarifProduitAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateTarifProduitAssistanceRecord(produitId, tarifId, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifProduitAssistanceRecord(Long produitId, Long tarifId,
+            UpsertTarifProduitAssistanceRequest request) {
         ProduitAssistance produit = produitAssistanceRepository.findById(produitId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", produitId));
         TarifProduitAssistance tarif = tarifProduitAssistanceRepository.findById(tarifId)
@@ -582,9 +743,13 @@ public class ReferentielController {
         if (tarif.getProduitAssistance() == null || !tarif.getProduitAssistance().getId().equals(produitId)) {
             throw new BadRequestException("Tarif incompatible avec le produit selectionne");
         }
+        var before = CompanyCatalogueActivity.state(tarif);
         applyTarifProduitAssistanceRequest(tarif, produit, request);
+        tarif = tarifProduitAssistanceRepository.save(tarif);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(tarif), ActivityAction.UPDATED,
+                "Tarif d'assistance modifie", "ASSISTANCE_RATE_UPDATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toTarifProduitAssistanceResponse(tarifProduitAssistanceRepository.save(tarif)),
+                toTarifProduitAssistanceResponse(tarif),
                 "Tarif assistance modifie"
         ));
     }
@@ -595,13 +760,20 @@ public class ReferentielController {
             @PathVariable Long produitId,
             @PathVariable Long tarifId
     ) {
+        return catalogueActivity.perform(() -> deleteTarifProduitAssistanceRecord(produitId, tarifId));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> deleteTarifProduitAssistanceRecord(Long produitId, Long tarifId) {
         TarifProduitAssistance tarif = tarifProduitAssistanceRepository.findById(tarifId)
                 .orElseThrow(() -> new ResourceNotFoundException("TarifProduitAssistance", tarifId));
         if (tarif.getProduitAssistance() == null || !tarif.getProduitAssistance().getId().equals(produitId)) {
             throw new BadRequestException("Tarif incompatible avec le produit selectionne");
         }
+        var before = CompanyCatalogueActivity.state(tarif);
         tarif.setActif(false);
         tarifProduitAssistanceRepository.save(tarif);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(tarif), ActivityAction.UPDATED,
+                "Tarif d'assistance desactive", "ASSISTANCE_RATE_DEACTIVATE");
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Tarif assistance supprime"));
     }
 
@@ -623,12 +795,19 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCodePromoAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> createCodePromoAssistanceRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createCodePromoAssistanceRecord(Long id, UpsertCodePromoAssistanceRequest request) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
         CodePromoAssistance promo = new CodePromoAssistance();
         applyCodePromoAssistanceRequest(promo, produit, request);
+        promo = codePromoAssistanceRepository.save(promo);
+        catalogueActivity.record(null, CompanyCatalogueActivity.state(promo), ActivityAction.CREATED,
+                "Promotion d'assistance creee", "ASSISTANCE_PROMOTION_CREATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toCodePromoAssistanceResponse(codePromoAssistanceRepository.save(promo)),
+                toCodePromoAssistanceResponse(promo),
                 "Code promo assistance cree"
         ));
     }
@@ -640,6 +819,11 @@ public class ReferentielController {
             @PathVariable Long promoId,
             @Valid @RequestBody UpsertCodePromoAssistanceRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCodePromoAssistanceRecord(produitId, promoId, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateCodePromoAssistanceRecord(Long produitId, Long promoId,
+            UpsertCodePromoAssistanceRequest request) {
         ProduitAssistance produit = produitAssistanceRepository.findById(produitId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", produitId));
         CodePromoAssistance promo = codePromoAssistanceRepository.findById(promoId)
@@ -647,9 +831,13 @@ public class ReferentielController {
         if (promo.getProduitAssistance() == null || !promo.getProduitAssistance().getId().equals(produitId)) {
             throw new BadRequestException("Code promo incompatible avec le produit selectionne");
         }
+        var before = CompanyCatalogueActivity.state(promo);
         applyCodePromoAssistanceRequest(promo, produit, request);
+        promo = codePromoAssistanceRepository.save(promo);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(promo), ActivityAction.UPDATED,
+                "Promotion d'assistance modifiee", "ASSISTANCE_PROMOTION_UPDATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toCodePromoAssistanceResponse(codePromoAssistanceRepository.save(promo)),
+                toCodePromoAssistanceResponse(promo),
                 "Code promo assistance modifie"
         ));
     }
@@ -660,13 +848,20 @@ public class ReferentielController {
             @PathVariable Long produitId,
             @PathVariable Long promoId
     ) {
+        return catalogueActivity.perform(() -> deleteCodePromoAssistanceRecord(produitId, promoId));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> deleteCodePromoAssistanceRecord(Long produitId, Long promoId) {
         CodePromoAssistance promo = codePromoAssistanceRepository.findById(promoId)
                 .orElseThrow(() -> new ResourceNotFoundException("CodePromoAssistance", promoId));
         if (promo.getProduitAssistance() == null || !promo.getProduitAssistance().getId().equals(produitId)) {
             throw new BadRequestException("Code promo incompatible avec le produit selectionne");
         }
+        var before = CompanyCatalogueActivity.state(promo);
         promo.setActif(false);
         codePromoAssistanceRepository.save(promo);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(promo), ActivityAction.UPDATED,
+                "Promotion d'assistance desactivee", "ASSISTANCE_PROMOTION_DEACTIVATE");
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Code promo assistance desactive"));
     }
 
@@ -675,9 +870,8 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> grillesTarifaires(
             @RequestParam(required = false) Long compagnieAssuranceId
     ) {
-        List<GrilleTarifaire> grilles = compagnieAssuranceId == null
-                ? grilleTarifaireRepository.findAllByOrderByCreatedAtDesc()
-                : grilleTarifaireRepository.findByCompagnieAssuranceIdAndActifTrueOrderByLibelleAsc(compagnieAssuranceId);
+        List<GrilleTarifaire> grilles = grilleTarifaireRepository.findAccessibleByCompany(TenantContext.getCurrentAgence(),
+                compagnieAssuranceId, compagnieAssuranceId == null ? Sort.by("createdAt").descending() : Sort.by("libelle"));
         return ResponseEntity.ok(ApiResponse.success(grilles.stream()
                 .filter(grille -> Boolean.TRUE.equals(grille.getActif()))
                 .map(grille -> ReferenceOptionResponse.builder()
@@ -731,9 +925,16 @@ public class ReferentielController {
 
     @PostMapping("/tarifs-usage")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createTarifUsage(@Valid @RequestBody UpsertTarifUsageRequest request) {
+        return catalogueActivity.perform(() -> createTarifUsageRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createTarifUsageRecord(UpsertTarifUsageRequest request) {
         TarifUsage tarif = new TarifUsage();
         applyTarifUsageRequest(tarif, request);
-        return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarifUsageRepository.save(tarif)), "Tarif usage cree"));
+        tarif = tarifUsageRepository.save(tarif);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(tarif),
+                ActivityAction.CREATED, "Tarif d'usage cree", "USAGE_RATE_CREATE"));
+        return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarif), "Tarif usage cree"));
     }
 
     @PutMapping("/tarifs-usage/{id}")
@@ -741,22 +942,37 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertTarifUsageRequest request
     ) {
+        return catalogueActivity.perform(() -> updateTarifUsageRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifUsageRecord(Long id, UpsertTarifUsageRequest request) {
         TarifUsage tarif = tarifUsageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TarifUsage", id));
+        var before = ReferenceCatalogueActivity.state(tarif);
         if (tarifUsageAjustementService.hasHistory(id)
                 && amountsDiffer(tarif.getPrimeNette(), request.getPrimeNette())) {
             throw new BadRequestException("Le tarif initial ne peut plus etre modifie apres un ajustement");
         }
         applyTarifUsageRequest(tarif, request);
-        return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarifUsageRepository.save(tarif)), "Tarif usage modifie"));
+        tarif = tarifUsageRepository.save(tarif);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(tarif),
+                ActivityAction.UPDATED, "Tarif d'usage modifie", "USAGE_RATE_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toTarifUsageResponse(tarif), "Tarif usage modifie"));
     }
 
     @DeleteMapping("/tarifs-usage/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteTarifUsage(@PathVariable Long id) {
+        return catalogueActivity.perform(() -> deleteTarifUsageRecord(id));
+    }
+
+    private ResponseEntity<ApiResponse<Void>> deleteTarifUsageRecord(Long id) {
         TarifUsage tarif = tarifUsageRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TarifUsage", id));
+        var before = ReferenceCatalogueActivity.state(tarif);
         tarif.setActif(false);
-        tarifUsageRepository.save(tarif);
+        tarif = tarifUsageRepository.save(tarif);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(tarif),
+                ActivityAction.UPDATED, "Tarif d'usage desactive", "USAGE_RATE_DEACTIVATE"));
         return ResponseEntity.ok(ApiResponse.success((Void) null, "Tarif usage supprime"));
     }
 
@@ -799,9 +1015,16 @@ public class ReferentielController {
     @PostMapping("/conventions")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createConvention(@Valid @RequestBody UpsertConventionRequest request) {
+        return catalogueActivity.perform(() -> createConventionRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createConventionRecord(UpsertConventionRequest request) {
         Convention convention = new Convention();
         applyConventionRequest(convention, request);
-        return ResponseEntity.ok(ApiResponse.success(toConventionResponse(conventionRepository.save(convention)), "Convention creee"));
+        convention = conventionRepository.save(convention);
+        catalogueActivity.record(null, CompanyCatalogueActivity.state(convention), ActivityAction.CREATED,
+                "Convention creee", "CONVENTION_CREATE");
+        return ResponseEntity.ok(ApiResponse.success(toConventionResponse(convention), "Convention creee"));
     }
 
     @PutMapping("/conventions/{id}")
@@ -810,17 +1033,29 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertConventionRequest request
     ) {
+        return catalogueActivity.perform(() -> updateConventionRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateConventionRecord(Long id, UpsertConventionRequest request) {
         Long agenceId = TenantContext.getCurrentAgence();
         Convention convention = conventionRepository.findByAgenceIdAndId(agenceId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Convention", id));
+        var before = CompanyCatalogueActivity.state(convention);
         applyConventionRequest(convention, request);
-        return ResponseEntity.ok(ApiResponse.success(toConventionResponse(conventionRepository.save(convention)), "Convention modifiee"));
+        convention = conventionRepository.save(convention);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(convention), ActivityAction.UPDATED,
+                "Convention modifiee", "CONVENTION_UPDATE");
+        return ResponseEntity.ok(ApiResponse.success(toConventionResponse(convention), "Convention modifiee"));
     }
 
     @PostMapping("/grilles-tarifaires")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createGrilleTarifaire(
             @Valid @RequestBody UpsertGrilleTarifaireRequest request
     ) {
+        return catalogueActivity.perform(() -> createGrilleTarifaireRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> createGrilleTarifaireRecord(UpsertGrilleTarifaireRequest request) {
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
         GrilleTarifaire grille = grilleTarifaireRepository.save(GrilleTarifaire.builder()
@@ -830,6 +1065,7 @@ public class ReferentielController {
                 .description(request.getDescription())
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
+        catalogueActivity.record(null, GridCatalogueActivity.state(grille), ActivityAction.CREATED, "Grille tarifaire creee", "GRID_CREATE");
         return ResponseEntity.ok(ApiResponse.success(toGrilleResponse(grille), "Grille tarifaire creee"));
     }
 
@@ -838,15 +1074,21 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertGrilleTarifaireRequest request
     ) {
-        GrilleTarifaire grille = grilleTarifaireRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", id));
+        return catalogueActivity.perform(() -> updateGrilleTarifaireRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateGrilleTarifaireRecord(Long id, UpsertGrilleTarifaireRequest request) {
+        GrilleTarifaire grille = accessibleGrid(id);
+        var before = GridCatalogueActivity.state(grille);
         CompagnieAssurance compagnie = compagnieAssuranceRepository.findById(request.getCompagnieAssuranceId())
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
         grille.setCompagnieAssurance(compagnie);
         grille.setLibelle(request.getLibelle());
         grille.setDescription(request.getDescription());
         grille.setActif(request.getActif() == null ? true : request.getActif());
-        return ResponseEntity.ok(ApiResponse.success(toGrilleResponse(grilleTarifaireRepository.save(grille)), "Grille tarifaire modifiee"));
+        grille = grilleTarifaireRepository.save(grille);
+        catalogueActivity.record(before, GridCatalogueActivity.state(grille), ActivityAction.UPDATED, "Grille tarifaire modifiee", "GRID_UPDATE");
+        return ResponseEntity.ok(ApiResponse.success(toGrilleResponse(grille), "Grille tarifaire modifiee"));
     }
 
     @GetMapping("/garanties")
@@ -887,12 +1129,19 @@ public class ReferentielController {
 
     @PostMapping("/groupes-exclusion-garanties")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeExclusionGarantie(@Valid @RequestBody UpsertGroupeExclusionGarantieRequest request) {
+        return catalogueActivity.perform(() -> createGroupeExclusionGarantieRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeExclusionGarantieRecord(UpsertGroupeExclusionGarantieRequest request) {
         groupeExclusionGarantieRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code groupe exclusion deja utilise");
         });
         GroupeExclusionGarantie groupe = new GroupeExclusionGarantie();
         applyGroupeExclusionGarantieRequest(groupe, request);
-        return ResponseEntity.ok(ApiResponse.success(toGroupeExclusionGarantieResponse(groupeExclusionGarantieRepository.save(groupe)), "Groupe exclusion cree"));
+        groupe = groupeExclusionGarantieRepository.save(groupe);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(groupe),
+                ActivityAction.CREATED, "Groupe d'exclusion cree", "GUARANTEE_EXCLUSION_GROUP_CREATE"));
+        return ResponseEntity.ok(ApiResponse.success(toGroupeExclusionGarantieResponse(groupe), "Groupe exclusion cree"));
     }
 
     @PutMapping("/groupes-exclusion-garanties/{id}")
@@ -900,20 +1149,32 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertGroupeExclusionGarantieRequest request
     ) {
+        return catalogueActivity.perform(() -> updateGroupeExclusionGarantieRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeExclusionGarantieRecord(Long id, UpsertGroupeExclusionGarantieRequest request) {
         GroupeExclusionGarantie groupe = groupeExclusionGarantieRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GroupeExclusionGarantie", id));
+        var before = ReferenceCatalogueActivity.state(groupe);
         groupeExclusionGarantieRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             if (!existing.getId().equals(id)) {
                 throw new BadRequestException("Code groupe exclusion deja utilise");
             }
         });
         applyGroupeExclusionGarantieRequest(groupe, request);
-        return ResponseEntity.ok(ApiResponse.success(toGroupeExclusionGarantieResponse(groupeExclusionGarantieRepository.save(groupe)), "Groupe exclusion modifie"));
+        groupe = groupeExclusionGarantieRepository.save(groupe);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(groupe),
+                ActivityAction.UPDATED, "Groupe d'exclusion modifie", "GUARANTEE_EXCLUSION_GROUP_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toGroupeExclusionGarantieResponse(groupe), "Groupe exclusion modifie"));
     }
 
     @PostMapping("/garanties")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGarantie(@Valid @RequestBody UpsertGarantieRequest request) {
+        return catalogueActivity.perform(() -> createGarantieRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createGarantieRecord(UpsertGarantieRequest request) {
         garantieRepository.findByCode(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code garantie deja utilise");
         });
@@ -921,6 +1182,9 @@ public class ReferentielController {
         applyGarantieRequest(garantie, request);
         garantieRepository.save(garantie);
         applyCompagnieProrataRequest(garantie, request.getCompagniesSansProrataIds());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null,
+                ReferenceCatalogueActivity.state(garantie, compagnieGarantieRepository.findByGarantieId(garantie.getId())),
+                ActivityAction.CREATED, "Garantie creee", "GUARANTEE_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantie), "Garantie creee"));
     }
 
@@ -930,8 +1194,13 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertGarantieRequest request
     ) {
+        return catalogueActivity.perform(() -> updateGarantieRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateGarantieRecord(Long id, UpsertGarantieRequest request) {
         Garantie garantie = garantieRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Garantie", id));
+        var before = ReferenceCatalogueActivity.state(garantie, compagnieGarantieRepository.findByGarantieId(garantie.getId()));
         garantieRepository.findByCode(request.getCode()).ifPresent(existing -> {
             if (!existing.getId().equals(id)) {
                 throw new BadRequestException("Code garantie deja utilise");
@@ -940,6 +1209,9 @@ public class ReferentielController {
         applyGarantieRequest(garantie, request);
         garantieRepository.save(garantie);
         applyCompagnieProrataRequest(garantie, request.getCompagniesSansProrataIds());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before,
+                ReferenceCatalogueActivity.state(garantie, compagnieGarantieRepository.findByGarantieId(garantie.getId())),
+                ActivityAction.UPDATED, "Garantie modifiee", "GUARANTEE_UPDATE"));
         return ResponseEntity.ok(ApiResponse.success(toGarantieResponse(garantie), "Garantie modifiee"));
     }
 
@@ -953,14 +1225,14 @@ public class ReferentielController {
         if (grilleId == null) {
             throw new BadRequestException("La grille tarifaire est obligatoire");
         }
-        return ResponseEntity.ok(ApiResponse.success(ligneGrilleTarifaireRepository.findByGrilleTarifaireIdAndActifTrue(grilleId).stream()
-                .filter(ligne -> usageId == null || ligne.getUsage() == null || ligne.getUsage().getId().equals(usageId))
-                .filter(ligne -> garantieId == null || ligne.getGarantie().getId().equals(garantieId))
+        accessibleGrid(grilleId);
+        return ResponseEntity.ok(ApiResponse.success(ligneGrilleTarifaireRepository.findAccessibleOptions(TenantContext.getCurrentAgence(), grilleId, usageId, garantieId).stream()
                 .map(this::toLigneResponse)
                 .toList()));
     }
 
     @GetMapping("/formules-garantie-personne")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> formulesGarantiePersonne(
             @RequestParam Long grilleId,
             @RequestParam(required = false) Long usageId,
@@ -969,17 +1241,14 @@ public class ReferentielController {
         if (grilleId == null) {
             throw new BadRequestException("La grille tarifaire est obligatoire");
         }
+        accessibleGrid(grilleId);
         Usage usageFilter = usageId == null ? null :
                 usageRepository.findById(usageId)
                         .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
         if (usageFilter != null && !usageAllowsGarantiesPersonne(usageFilter)) {
             return ResponseEntity.ok(ApiResponse.success(List.<Map<String, Object>>of()));
         }
-        return ResponseEntity.ok(ApiResponse.success(formuleGarantiePersonneRepository.findAll(Sort.by("ordreAffichage", "formule")).stream()
-                .filter(formule -> Boolean.TRUE.equals(formule.getActif()))
-                .filter(formule -> formule.getGrilleTarifaire() != null && formule.getGrilleTarifaire().getId().equals(grilleId))
-                .filter(formule -> usageId == null || formule.getUsage() == null || formule.getUsage().getId().equals(usageId))
-                .filter(formule -> garantieId == null || formule.getGarantie().getId().equals(garantieId))
+        return ResponseEntity.ok(ApiResponse.success(formuleGarantiePersonneRepository.findAccessibleOptions(TenantContext.getCurrentAgence(), grilleId, usageId, garantieId).stream()
                 .map(this::toFormulePersonneResponse)
                 .toList()));
     }
@@ -989,12 +1258,17 @@ public class ReferentielController {
             @PathVariable Long grilleId,
             @Valid @RequestBody UpsertLigneGrilleTarifaireRequest request
     ) {
-        GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
-                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", grilleId));
+        return catalogueActivity.perform(() -> createLigneGrilleTarifaireRecord(grilleId, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createLigneGrilleTarifaireRecord(Long grilleId, UpsertLigneGrilleTarifaireRequest request) {
+        GrilleTarifaire grille = accessibleGrid(grilleId);
         LigneGrilleTarifaire ligne = new LigneGrilleTarifaire();
         ligne.setGrilleTarifaire(grille);
         applyLigneRequest(ligne, request);
-        return ResponseEntity.ok(ApiResponse.success(toLigneResponse(ligneGrilleTarifaireRepository.save(ligne)), "Ligne de grille creee"));
+        ligne = ligneGrilleTarifaireRepository.save(ligne);
+        catalogueActivity.record(null, GridCatalogueActivity.state(ligne), ActivityAction.CREATED, "Ligne de grille creee", "GRID_LINE_CREATE");
+        return ResponseEntity.ok(ApiResponse.success(toLigneResponse(ligne), "Ligne de grille creee"));
     }
 
     @PutMapping("/lignes-grille-tarifaire/{id}")
@@ -1002,10 +1276,17 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertLigneGrilleTarifaireRequest request
     ) {
-        LigneGrilleTarifaire ligne = ligneGrilleTarifaireRepository.findById(id)
+        return catalogueActivity.perform(() -> updateLigneGrilleTarifaireRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateLigneGrilleTarifaireRecord(Long id, UpsertLigneGrilleTarifaireRequest request) {
+        LigneGrilleTarifaire ligne = ligneGrilleTarifaireRepository.findAccessibleById(TenantContext.getCurrentAgence(), id)
                 .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", id));
+        var before = GridCatalogueActivity.state(ligne);
         applyLigneRequest(ligne, request);
-        return ResponseEntity.ok(ApiResponse.success(toLigneResponse(ligneGrilleTarifaireRepository.save(ligne)), "Ligne de grille modifiee"));
+        ligne = ligneGrilleTarifaireRepository.save(ligne);
+        catalogueActivity.record(before, GridCatalogueActivity.state(ligne), ActivityAction.UPDATED, "Ligne de grille modifiee", "GRID_LINE_UPDATE");
+        return ResponseEntity.ok(ApiResponse.success(toLigneResponse(ligne), "Ligne de grille modifiee"));
     }
 
     @PostMapping("/grilles-tarifaires/{grilleId}/usages/{usageId}/configuration")
@@ -1015,10 +1296,15 @@ public class ReferentielController {
             @PathVariable Long usageId,
             @Valid @RequestBody UpsertGrilleUsageConfigurationRequest request
     ) {
-        GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
-                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", grilleId));
+        return catalogueActivity.perform(() -> replaceGrilleUsageConfigurationRecord(grilleId, usageId, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> replaceGrilleUsageConfigurationRecord(Long grilleId, Long usageId,
+            UpsertGrilleUsageConfigurationRequest request) {
+        GrilleTarifaire grille = accessibleGrid(grilleId);
         Usage usage = usageRepository.findById(usageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", usageId));
+        var before = gridUsageActivity(grille, usage);
 
         Set<Long> ligneIds = new HashSet<>();
         List<UpsertLigneGrilleTarifaireRequest> requestedLignes = request.getLignes() == null ? List.of() : request.getLignes();
@@ -1029,9 +1315,13 @@ public class ReferentielController {
             ligneRequest.setActif(true);
             LigneGrilleTarifaire ligne = ligneRequest.getId() == null
                     ? new LigneGrilleTarifaire()
-                    : ligneGrilleTarifaireRepository.findById(ligneRequest.getId()).orElseGet(LigneGrilleTarifaire::new);
+                    : ligneGrilleTarifaireRepository.findAccessibleById(TenantContext.getCurrentAgence(), ligneRequest.getId())
+                            .orElseThrow(() -> new ResourceNotFoundException("LigneGrilleTarifaire", ligneRequest.getId()));
             if (ligne.getGrilleTarifaire() != null && !ligne.getGrilleTarifaire().getId().equals(grille.getId())) {
                 throw new BadRequestException("La ligne n'appartient pas a cette grille tarifaire");
+            }
+            if (ligne.getUsage() != null && !ligne.getUsage().getId().equals(usageId)) {
+                throw new BadRequestException("La ligne n'appartient pas a cet usage");
             }
             ligne.setGrilleTarifaire(grille);
             applyLigneRequest(ligne, ligneRequest);
@@ -1051,9 +1341,13 @@ public class ReferentielController {
                 formuleRequest.setActif(true);
                 FormuleGarantiePersonne formule = formuleRequest.getId() == null
                         ? new FormuleGarantiePersonne()
-                        : formuleGarantiePersonneRepository.findById(formuleRequest.getId()).orElseGet(FormuleGarantiePersonne::new);
+                        : formuleGarantiePersonneRepository.findAccessibleById(TenantContext.getCurrentAgence(), formuleRequest.getId())
+                                .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", formuleRequest.getId()));
                 if (formule.getGrilleTarifaire() != null && !formule.getGrilleTarifaire().getId().equals(grille.getId())) {
                     throw new BadRequestException("La formule n'appartient pas a cette grille tarifaire");
+                }
+                if (formule.getUsage() != null && !formule.getUsage().getId().equals(usageId)) {
+                    throw new BadRequestException("La formule n'appartient pas a cet usage");
                 }
                 formule.setGrilleTarifaire(grille);
                 applyFormulePersonneRequest(formule, formuleRequest);
@@ -1074,6 +1368,7 @@ public class ReferentielController {
         data.put("formulesPersonne", formuleGarantiePersonneRepository.findByGrilleTarifaireIdAndUsageIdAndActifTrue(grilleId, usageId).stream()
                 .map(this::toFormulePersonneResponse)
                 .toList());
+        catalogueActivity.record(GridCatalogueActivity.configurationCommand(before, gridUsageActivity(grille, usage)));
         return ResponseEntity.ok(ApiResponse.success(data, "Configuration de l'usage enregistree"));
     }
 
@@ -1082,12 +1377,17 @@ public class ReferentielController {
             @PathVariable Long grilleId,
             @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
     ) {
-        GrilleTarifaire grille = grilleTarifaireRepository.findById(grilleId)
-                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", grilleId));
+        return catalogueActivity.perform(() -> createFormuleGarantiePersonneRecord(grilleId, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createFormuleGarantiePersonneRecord(Long grilleId, UpsertFormuleGarantiePersonneRequest request) {
+        GrilleTarifaire grille = accessibleGrid(grilleId);
         FormuleGarantiePersonne formule = new FormuleGarantiePersonne();
         formule.setGrilleTarifaire(grille);
         applyFormulePersonneRequest(formule, request);
-        return ResponseEntity.ok(ApiResponse.success(toFormulePersonneResponse(formuleGarantiePersonneRepository.save(formule)), "Formule garantie personne creee"));
+        formule = formuleGarantiePersonneRepository.save(formule);
+        catalogueActivity.record(null, GridCatalogueActivity.state(formule), ActivityAction.CREATED, "Formule personne creee", "GRID_FORMULA_CREATE");
+        return ResponseEntity.ok(ApiResponse.success(toFormulePersonneResponse(formule), "Formule garantie personne creee"));
     }
 
     @PutMapping("/formules-garantie-personne/{id}")
@@ -1095,10 +1395,29 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
     ) {
-        FormuleGarantiePersonne formule = formuleGarantiePersonneRepository.findById(id)
+        return catalogueActivity.perform(() -> updateFormuleGarantiePersonneRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateFormuleGarantiePersonneRecord(Long id, UpsertFormuleGarantiePersonneRequest request) {
+        FormuleGarantiePersonne formule = formuleGarantiePersonneRepository.findAccessibleById(TenantContext.getCurrentAgence(), id)
                 .orElseThrow(() -> new ResourceNotFoundException("FormuleGarantiePersonne", id));
+        var before = GridCatalogueActivity.state(formule);
         applyFormulePersonneRequest(formule, request);
-        return ResponseEntity.ok(ApiResponse.success(toFormulePersonneResponse(formuleGarantiePersonneRepository.save(formule)), "Formule garantie personne modifiee"));
+        formule = formuleGarantiePersonneRepository.save(formule);
+        catalogueActivity.record(before, GridCatalogueActivity.state(formule), ActivityAction.UPDATED, "Formule personne modifiee", "GRID_FORMULA_UPDATE");
+        return ResponseEntity.ok(ApiResponse.success(toFormulePersonneResponse(formule), "Formule garantie personne modifiee"));
+    }
+
+    private GrilleTarifaire accessibleGrid(Long id) {
+        return grilleTarifaireRepository.findAccessibleById(TenantContext.getCurrentAgence(), id)
+                .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", id));
+    }
+
+    private GridCatalogueActivity.Configuration gridUsageActivity(GrilleTarifaire grid, Usage usage) {
+        Long agencyId = TenantContext.getCurrentAgence();
+        return GridCatalogueActivity.configuration(grid, usage,
+                ligneGrilleTarifaireRepository.findAccessibleOptions(agencyId, grid.getId(), usage.getId(), null),
+                formuleGarantiePersonneRepository.findAccessibleOptions(agencyId, grid.getId(), usage.getId(), null));
     }
 
     @GetMapping("/villes")
@@ -1122,12 +1441,19 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCategorieClient(
             @Valid @RequestBody UpsertCategorieClientRequest request
     ) {
+        return catalogueActivity.perform(() -> createCategorieClientRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createCategorieClientRecord(UpsertCategorieClientRequest request) {
         categorieClientRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code categorie client deja utilise");
         });
         CategorieClient categorie = new CategorieClient();
         applyCategorieClientRequest(categorie, request);
-        return ResponseEntity.ok(ApiResponse.success(toCategorieClientResponse(categorieClientRepository.save(categorie)), "Categorie client creee"));
+        categorie = categorieClientRepository.save(categorie);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(categorie),
+                ActivityAction.CREATED, "Categorie client creee", "CLIENT_CATEGORY_CREATE"));
+        return ResponseEntity.ok(ApiResponse.success(toCategorieClientResponse(categorie), "Categorie client creee"));
     }
 
     @PutMapping("/categories-client/{id}")
@@ -1135,15 +1461,23 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCategorieClientRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCategorieClientRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateCategorieClientRecord(Long id, UpsertCategorieClientRequest request) {
         CategorieClient categorie = categorieClientRepository.findByIdWithUsages(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", id));
+        var before = ReferenceCatalogueActivity.state(categorie);
         categorieClientRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
                     throw new BadRequestException("Code categorie client deja utilise");
                 });
         applyCategorieClientRequest(categorie, request);
-        return ResponseEntity.ok(ApiResponse.success(toCategorieClientResponse(categorieClientRepository.save(categorie)), "Categorie client modifiee"));
+        categorie = categorieClientRepository.save(categorie);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(categorie),
+                ActivityAction.UPDATED, "Categorie client modifiee", "CLIENT_CATEGORY_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toCategorieClientResponse(categorie), "Categorie client modifiee"));
     }
 
     @GetMapping("/groupes-usage-attestation")
@@ -1166,13 +1500,20 @@ public class ReferentielController {
     @PostMapping("/groupes-usage-attestation")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeUsageAttestation(@Valid @RequestBody UpsertGroupeUsageAttestationRequest request) {
+        return catalogueActivity.perform(() -> createGroupeUsageAttestationRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeUsageAttestationRecord(UpsertGroupeUsageAttestationRequest request) {
         groupeUsageAttestationRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code groupe usage attestation deja utilise");
         });
         GroupeUsageAttestation groupe = new GroupeUsageAttestation();
         applyGroupeUsageAttestationRequest(groupe, request);
+        groupe = groupeUsageAttestationRepository.save(groupe);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(groupe),
+                ActivityAction.CREATED, "Groupe de stock d'attestations cree", "ATTESTATION_USAGE_GROUP_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(
-                toGroupeUsageAttestationResponse(groupeUsageAttestationRepository.save(groupe)),
+                toGroupeUsageAttestationResponse(groupe),
                 "Groupe usage attestation cree"
         ));
     }
@@ -1183,16 +1524,24 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertGroupeUsageAttestationRequest request
     ) {
+        return catalogueActivity.perform(() -> updateGroupeUsageAttestationRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeUsageAttestationRecord(Long id, UpsertGroupeUsageAttestationRequest request) {
         GroupeUsageAttestation groupe = groupeUsageAttestationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("GroupeUsageAttestation", id));
+        var before = ReferenceCatalogueActivity.state(groupe);
         groupeUsageAttestationRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
                     throw new BadRequestException("Code groupe usage attestation deja utilise");
                 });
         applyGroupeUsageAttestationRequest(groupe, request);
+        groupe = groupeUsageAttestationRepository.save(groupe);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(groupe),
+                ActivityAction.UPDATED, "Groupe de stock d'attestations modifie", "ATTESTATION_USAGE_GROUP_UPDATE"));
         return ResponseEntity.ok(ApiResponse.success(
-                toGroupeUsageAttestationResponse(groupeUsageAttestationRepository.save(groupe)),
+                toGroupeUsageAttestationResponse(groupe),
                 "Groupe usage attestation modifie"
         ));
     }
@@ -1209,6 +1558,10 @@ public class ReferentielController {
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCategorieTransport(
             @Valid @RequestBody UpsertCategorieTransportRequest request
     ) {
+        return catalogueActivity.perform(() -> createCategorieTransportRecord(request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCategorieTransportRecord(UpsertCategorieTransportRequest request) {
         categorieTransportRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
             throw new BadRequestException("Code categorie transport deja utilise");
         });
@@ -1218,6 +1571,8 @@ public class ReferentielController {
                 .description(request.getDescription())
                 .actif(request.getActif() == null ? true : request.getActif())
                 .build());
+        catalogueActivity.record(ReferenceCatalogueActivity.command(null, ReferenceCatalogueActivity.state(categorie),
+                ActivityAction.CREATED, "Categorie transport creee", "TRANSPORT_CATEGORY_CREATE"));
         return ResponseEntity.ok(ApiResponse.success(toResponse(categorie), "Categorie transport creee"));
     }
 
@@ -1226,8 +1581,13 @@ public class ReferentielController {
             @PathVariable Long id,
             @Valid @RequestBody UpsertCategorieTransportRequest request
     ) {
+        return catalogueActivity.perform(() -> updateCategorieTransportRecord(id, request));
+    }
+
+    private ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCategorieTransportRecord(Long id, UpsertCategorieTransportRequest request) {
         CategorieTransport categorie = categorieTransportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CategorieTransport", id));
+        var before = ReferenceCatalogueActivity.state(categorie);
         categorieTransportRepository.findByCodeIgnoreCase(request.getCode())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
@@ -1237,7 +1597,10 @@ public class ReferentielController {
         categorie.setLibelle(request.getLibelle());
         categorie.setDescription(request.getDescription());
         categorie.setActif(request.getActif() == null ? true : request.getActif());
-        return ResponseEntity.ok(ApiResponse.success(toResponse(categorieTransportRepository.save(categorie)), "Categorie transport modifiee"));
+        categorie = categorieTransportRepository.save(categorie);
+        catalogueActivity.record(ReferenceCatalogueActivity.command(before, ReferenceCatalogueActivity.state(categorie),
+                ActivityAction.UPDATED, "Categorie transport modifiee", "TRANSPORT_CATEGORY_UPDATE"));
+        return ResponseEntity.ok(ApiResponse.success(toResponse(categorie), "Categorie transport modifiee"));
     }
 
     private ReferenceOptionResponse toResponse(CategorieTransport categorie) {
@@ -1307,7 +1670,7 @@ public class ReferentielController {
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssurance", request.getCompagnieAssuranceId()));
         CategorieClient categorieClient = categorieClientRepository.findById(request.getCategorieClientId())
                 .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", request.getCategorieClientId()));
-        GrilleTarifaire grille = grilleTarifaireRepository.findById(request.getGrilleTarifaireId())
+        GrilleTarifaire grille = grilleTarifaireRepository.findAccessibleById(agenceId, request.getGrilleTarifaireId())
                 .orElseThrow(() -> new ResourceNotFoundException("GrilleTarifaire", request.getGrilleTarifaireId()));
         if (grille.getCompagnieAssurance() == null || !grille.getCompagnieAssurance().getId().equals(compagnie.getId())) {
             throw new BadRequestException("La grille tarifaire doit appartenir a la compagnie selectionnee");
@@ -1426,8 +1789,11 @@ public class ReferentielController {
         String codeIntermediaire = blankToNull(value);
         var existing = agenceCompagnieAssuranceRepository
                 .findByAgenceIdAndCompagnieAssuranceId(agenceId, compagnie.getId());
+        var before = existing.map(CompanyCatalogueActivity::state).orElse(null);
         if (codeIntermediaire == null) {
             existing.ifPresent(agenceCompagnieAssuranceRepository::delete);
+            if (before != null) catalogueActivity.record(before, null, ActivityAction.DELETED,
+                    "Code intermediaire retire", "AGENCY_COMPANY_INTERMEDIARY_REMOVE");
             return null;
         }
         AgenceCompagnieAssurance configuration = existing
@@ -1437,7 +1803,10 @@ public class ReferentielController {
                         .compagnieAssurance(compagnie)
                         .build());
         configuration.setCodeIntermediaire(codeIntermediaire);
-        agenceCompagnieAssuranceRepository.save(configuration);
+        configuration = agenceCompagnieAssuranceRepository.save(configuration);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(configuration),
+                before == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                "Code intermediaire enregistre", "AGENCY_COMPANY_INTERMEDIARY_SAVE");
         return codeIntermediaire;
     }
 

@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClaimActivity;
 import com.assurance.dto.response.SinistreDetailResponse;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreDocument;
@@ -57,6 +61,7 @@ public class SinistreDocumentService {
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
     private final StorageLayoutService storageLayoutService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional
     public SinistreDetailResponse upload(
@@ -75,55 +80,57 @@ public class SinistreDocumentService {
             MultipartFile file
     ) {
         Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
-        assertEditable(sinistre);
-        Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
-        validateFile(file);
-        validateMetadata(type, dateDocument, reference, montant, emetteur, missionExpertiseId);
-        SinistreGarantie garantie = sinistreGarantieId == null ? null : garantieRepository
-                .findByIdAndSinistreId(sinistreGarantieId, sinistreId)
-                .orElseThrow(() -> new BadRequestException("La garantie ne fait pas partie de ce sinistre"));
-        var mission = missionExpertiseId == null ? null : missionRepository
-                .findByIdAndSinistreId(missionExpertiseId, sinistreId)
-                .orElseThrow(() -> new BadRequestException("La mission ne fait pas partie de ce sinistre"));
-        var garage = garageId == null ? null : garageRepository.findByIdAndAgenceId(garageId, agenceId)
-                .orElseThrow(() -> new BadRequestException("Garage introuvable"));
-        if (garage == null && mission != null) {
-            garage = mission.getGarage();
-        }
-        if (garage != null && !missionRepository.existsBySinistreIdAndGarageId(sinistreId, garage.getId())) {
-            throw new BadRequestException("Le garage n'est lié à aucune mission de ce sinistre");
-        }
-        if (mission != null && garage != null
-                && (mission.getGarage() == null || !garage.getId().equals(mission.getGarage().getId()))) {
-            throw new BadRequestException("Le garage ne correspond pas à la mission sélectionnée");
-        }
-        StoredDocument stored = store(agenceId, sinistreId, file);
-        deleteOnRollback(stored.path());
-        documentRepository.save(SinistreDocument.builder()
-                .sinistre(sinistre)
-                .deposePar(acteur)
-                .type(type)
-                .statut(StatutDocumentSinistre.RECU)
-                .nomFichier(stored.fileName())
-                .contentType(stored.contentType())
-                .cheminStockage(stored.storageKey())
-                .tailleOctets(stored.size())
-                .dateDocument(dateDocument)
-                .reference(trimToNull(reference))
-                .montant(montant)
-                .emetteur(trimToNull(emetteur))
-                .sinistreGarantie(garantie)
-                .missionExpertise(mission)
-                .garage(garage)
-                .commentaire(trimToNull(commentaire))
-                .build());
-        evenementService.record(
-                sinistre,
-                acteur,
-                TypeEvenementSinistre.DOCUMENT,
-                "Document ajouté : " + stored.fileName()
-        );
-        return responseMapper.toDetail(sinistre);
+        return recordChange(sinistre, ActivityAction.CREATED, "Document ajoute au sinistre", "CLAIM_DOCUMENT_UPLOAD", null, () -> {
+            assertEditable(sinistre);
+            Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
+            validateFile(file);
+            validateMetadata(type, dateDocument, reference, montant, emetteur, missionExpertiseId);
+            SinistreGarantie garantie = sinistreGarantieId == null ? null : garantieRepository
+                    .findByIdAndSinistreId(sinistreGarantieId, sinistreId)
+                    .orElseThrow(() -> new BadRequestException("La garantie ne fait pas partie de ce sinistre"));
+            var mission = missionExpertiseId == null ? null : missionRepository
+                    .findByIdAndSinistreId(missionExpertiseId, sinistreId)
+                    .orElseThrow(() -> new BadRequestException("La mission ne fait pas partie de ce sinistre"));
+            var garage = garageId == null ? null : garageRepository.findByIdAndAgenceId(garageId, agenceId)
+                    .orElseThrow(() -> new BadRequestException("Garage introuvable"));
+            if (garage == null && mission != null) {
+                garage = mission.getGarage();
+            }
+            if (garage != null && !missionRepository.existsBySinistreIdAndGarageId(sinistreId, garage.getId())) {
+                throw new BadRequestException("Le garage n'est lié à aucune mission de ce sinistre");
+            }
+            if (mission != null && garage != null
+                    && (mission.getGarage() == null || !garage.getId().equals(mission.getGarage().getId()))) {
+                throw new BadRequestException("Le garage ne correspond pas à la mission sélectionnée");
+            }
+            StoredDocument stored = store(agenceId, sinistreId, file);
+            deleteOnRollback(stored.path());
+            documentRepository.save(SinistreDocument.builder()
+                    .sinistre(sinistre)
+                    .deposePar(acteur)
+                    .type(type)
+                    .statut(StatutDocumentSinistre.RECU)
+                    .nomFichier(stored.fileName())
+                    .contentType(stored.contentType())
+                    .cheminStockage(stored.storageKey())
+                    .tailleOctets(stored.size())
+                    .dateDocument(dateDocument)
+                    .reference(trimToNull(reference))
+                    .montant(montant)
+                    .emetteur(trimToNull(emetteur))
+                    .sinistreGarantie(garantie)
+                    .missionExpertise(mission)
+                    .garage(garage)
+                    .commentaire(trimToNull(commentaire))
+                    .build());
+            evenementService.record(
+                    sinistre,
+                    acteur,
+                    TypeEvenementSinistre.DOCUMENT,
+                    "Document ajouté : " + stored.fileName()
+            );
+            return responseMapper.toDetail(sinistre);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -156,22 +163,26 @@ public class SinistreDocumentService {
             throw new BadRequestException("Le contrôle doit valider ou rejeter le document");
         }
         Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
-        assertEditable(sinistre);
-        Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
-        SinistreDocument document = resolve(documentId, sinistreId);
-        document.setStatut(statut);
-        document.setValidePar(acteur);
-        document.setDateValidation(LocalDateTime.now());
-        document.setCommentaire(trimToNull(commentaire));
-        documentRepository.save(document);
-        evenementService.record(
-                sinistre,
-                acteur,
-                TypeEvenementSinistre.DOCUMENT,
-                "Document " + (statut == StatutDocumentSinistre.VALIDE ? "validé" : "rejeté")
-                        + " : " + document.getNomFichier()
-        );
-        return responseMapper.toDetail(sinistre);
+        return recordChange(sinistre, statut == StatutDocumentSinistre.VALIDE ? ActivityAction.VALIDATED : ActivityAction.REJECTED,
+                statut == StatutDocumentSinistre.VALIDE ? "Document du sinistre valide" : "Document du sinistre rejete",
+                "CLAIM_DOCUMENT_REVIEW", documentId, () -> {
+            assertEditable(sinistre);
+            Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
+            SinistreDocument document = resolve(documentId, sinistreId);
+            document.setStatut(statut);
+            document.setValidePar(acteur);
+            document.setDateValidation(LocalDateTime.now());
+            document.setCommentaire(trimToNull(commentaire));
+            documentRepository.save(document);
+            evenementService.record(
+                    sinistre,
+                    acteur,
+                    TypeEvenementSinistre.DOCUMENT,
+                    "Document " + (statut == StatutDocumentSinistre.VALIDE ? "validé" : "rejeté")
+                            + " : " + document.getNomFichier()
+            );
+            return responseMapper.toDetail(sinistre);
+        });
     }
 
     @Transactional
@@ -182,23 +193,32 @@ public class SinistreDocumentService {
             Long documentId
     ) {
         Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
-        assertEditable(sinistre);
-        Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
-        SinistreDocument document = resolve(documentId, sinistreId);
-        if (document.getStatut() == StatutDocumentSinistre.VALIDE) {
-            throw new BadRequestException("Un document validé ne peut pas être supprimé");
-        }
-        Path path = resolveStorageKey(document.getCheminStockage());
-        String fileName = document.getNomFichier();
-        documentRepository.delete(document);
-        deleteAfterCommit(path);
-        evenementService.record(
-                sinistre,
-                acteur,
-                TypeEvenementSinistre.DOCUMENT,
-                "Document supprimé : " + fileName
-        );
-        return responseMapper.toDetail(sinistre);
+        return recordChange(sinistre, ActivityAction.DELETED, "Document du sinistre supprime", "CLAIM_DOCUMENT_DELETION", documentId, () -> {
+            assertEditable(sinistre);
+            Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
+            SinistreDocument document = resolve(documentId, sinistreId);
+            if (document.getStatut() == StatutDocumentSinistre.VALIDE) {
+                throw new BadRequestException("Un document validé ne peut pas être supprimé");
+            }
+            Path path = resolveStorageKey(document.getCheminStockage());
+            String fileName = document.getNomFichier();
+            documentRepository.delete(document);
+            deleteAfterCommit(path);
+            evenementService.record(
+                    sinistre,
+                    acteur,
+                    TypeEvenementSinistre.DOCUMENT,
+                    "Document supprimé : " + fileName
+            );
+            return responseMapper.toDetail(sinistre);
+        });
+    }
+
+    private SinistreDetailResponse recordChange(Sinistre claim, ActivityAction action, String title, String origin, Long documentId,
+            java.util.function.Supplier<SinistreDetailResponse> work) {
+        var before = ClaimActivity.snapshot(responseMapper.toDetail(claim));
+        return activityRecorder.perform(work, detail -> ClaimActivity.target(ClaimActivity.command(claim, before, detail, action, title, origin),
+                before, detail, ActivityRecordType.DOCUMENT_SINISTRE, documentId));
     }
 
     private SinistreDocument resolve(Long documentId, Long sinistreId) {

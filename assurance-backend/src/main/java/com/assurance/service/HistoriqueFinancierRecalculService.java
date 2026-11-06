@@ -1,9 +1,19 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityChange;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ContractActivity;
 import com.assurance.dto.response.QuittanceResponse;
 import com.assurance.dto.response.RecalculHistoriqueFinancierResponse;
 import com.assurance.entity.Contrat;
 import com.assurance.entity.ContratGarantie;
+import com.assurance.entity.ElementFacturableCible;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.MouvementGarantie;
 import com.assurance.entity.MouvementRemorque;
@@ -22,6 +32,7 @@ import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import com.assurance.repository.ContratRepository;
+import com.assurance.repository.ElementFacturableCibleRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.MouvementGarantieRepository;
@@ -69,6 +80,8 @@ public class HistoriqueFinancierRecalculService {
     private final CalculGarantieService calculGarantieService;
     private final ElementFacturableCibleService elementFacturableCibleService;
     private final QuittanceProductionService quittanceProductionService;
+    private final BusinessActivityRecorder businessActivityRecorder;
+    private final ElementFacturableCibleRepository elementFacturableCibleRepository;
 
     @Transactional(readOnly = true)
     public RecalculHistoriqueFinancierResponse preview(Long contratId) {
@@ -91,6 +104,7 @@ public class HistoriqueFinancierRecalculService {
         if (!calculationErrors.isEmpty()) {
             throw new BadRequestException(String.join(" ", calculationErrors));
         }
+        var before = activitySnapshot(plans);
         for (CalculationPlan plan : plans) {
             MouvementContrat mouvement = plan.mouvement();
             QuittanceCalculService.Resultat calcul = plan.calcul();
@@ -113,6 +127,16 @@ public class HistoriqueFinancierRecalculService {
             );
         }
 
+        var after = activitySnapshot(plans);
+        var changes = new ArrayList<>(ActivityValues.changes(before.values(), after.values()));
+        if (!activityTargetIds(before).equals(activityTargetIds(after))) {
+            changes.add(new ActivityChange("Attribution des montants aux vehicules et remorques", null, "Actualisee"));
+        }
+        businessActivityRecorder.record(new ActivityCommand(contrat.getAgence().getId(), ActivityModule.PRODUCTION,
+                ActivityAction.RECALCULATED, "Historique financier recalcule", "CONTRACT_FINANCIAL_HISTORY_RECALCULATE",
+                ContractActivity.reference(contrat), java.util.stream.Stream.concat(before.references().stream(), after.references().stream()).distinct().toList(),
+                changes));
+
         log.warn(
                 "Historique financier recalcule: agenceId={}, contratId={}, utilisateurId={}, mouvements={}, ancienTotal={}, nouveauTotal={}",
                 TenantContext.getCurrentAgence(), contrat.getId(), TenantContext.getCurrentUser(), plans.size(),
@@ -128,6 +152,98 @@ public class HistoriqueFinancierRecalculService {
                 .nouveauTotal(preview.getNouveauTotal())
                 .ecartTotal(preview.getEcartTotal())
                 .build();
+    }
+
+    private ActivitySnapshot activitySnapshot(List<CalculationPlan> plans) {
+        ActivityValues values = new ActivityValues();
+        List<ActivityReference> references = new ArrayList<>(activityReferences(plans));
+        for (CalculationPlan plan : plans) {
+            var movement = plan.mouvement();
+            String prefix = "Mouvement " + movement.getNumeroMouvement() + " - " + movement.getTypeMouvement().getLibelle() + " - ";
+            appendActivityAmounts(values, prefix, movement.getPrimeNette(), movement.getTaxe(), movement.getTaxeParafiscale(),
+                    movement.getAccessoire(), movement.getCnpac(), movement.getPrimeTotale());
+            var receipt = plan.quittance();
+            String receiptPrefix = prefix + "Quittance - ";
+            values.put(receiptPrefix + "Reference", receipt.getNumeroQuittance()).put(receiptPrefix + "Type", receipt.getType())
+                    .put(receiptPrefix + "Date d'effet", receipt.getDateDebut()).put(receiptPrefix + "Date d'echeance", receipt.getDateFin());
+            appendActivityAmounts(values, receiptPrefix, receipt.getPrimeNette(), receipt.getTaxe(), receipt.getTaxeParafiscale(),
+                    receipt.getAccessoire(), receipt.getCnpac(), receipt.getPrimeTotale());
+            for (var line : receipt.getLignes()) {
+                String category = switch (line.getCategorie()) {
+                    case AUTOMOBILE -> "Automobile";
+                    case CORPOREL -> "Corporel";
+                    case EVCAT -> "EVCAT";
+                    case ASSISTANCE -> "Assistance";
+                    case TOTAL -> "Total";
+                };
+                appendActivityAmounts(values, receiptPrefix + category + " - ", line.getPrimeNette(), line.getTaxe(),
+                        line.getTaxeParafiscale(), line.getAccessoire(), line.getCnpac(), line.getPrimeTotale());
+            }
+            var element = receipt.getElementFacturable();
+            String elementPrefix = prefix + "Creance - ";
+            values.put(elementPrefix + "Libelle", element.getLibelle()).put(elementPrefix + "Libelle du releve", element.getLibelleReleve())
+                    .put(elementPrefix + "Date d'effet", element.getDateDebut()).put(elementPrefix + "Date d'echeance", element.getDateFin());
+            appendActivityAmounts(values, elementPrefix, element.getPrimeNette(), element.getTaxe(), element.getTaxeParafiscale(),
+                    element.getAccessoire(), element.getCnpac(), element.getPrimeTotale());
+            for (var target : elementFacturableCibleRepository.findByElementFacturableAgenceIdAndContratIdAndElementFacturableIdOrderByTargetIndexAscIdAsc(
+                    TenantContext.getCurrentAgence(), movement.getContrat().getId(), element.getId())) {
+                var reference = activityTargetReference(target);
+                if (reference != null) references.add(reference);
+                String targetLabel = reference == null ? "Cible non identifiee " + target.getTargetIndex() : reference.label();
+                String targetPrefix = prefix + targetLabel + " - ";
+                appendActivityAmounts(values, targetPrefix, target.getPrimeNette(), target.getTaxe(), target.getTaxeParafiscale(),
+                        target.getAccessoire(), target.getCnpac(), target.getPrimeTotale());
+                values.put(targetPrefix + "Prime automobile", target.getAutomobilePrimeNette())
+                        .put(targetPrefix + "Prime corporelle", target.getCorporelPrimeNette()).put(targetPrefix + "Prime EVCAT", target.getEvcatPrimeNette())
+                        .put(targetPrefix + "Prime hors EVCAT", target.getPrimeNetteHorsEvcat()).put(targetPrefix + "Actif", target.getActif());
+            }
+        }
+        return new ActivitySnapshot(values.snapshot(), references.stream().distinct().toList());
+    }
+
+    private void appendActivityAmounts(ActivityValues values, String prefix, BigDecimal net, BigDecimal tax,
+            BigDecimal parafiscalTax, BigDecimal accessory, BigDecimal cnpac, BigDecimal total) {
+        values.put(prefix + "Prime nette", net).put(prefix + "Taxes", tax).put(prefix + "TPF", parafiscalTax)
+                .put(prefix + "Accessoires", accessory).put(prefix + "CNPAC", cnpac).put(prefix + "Montant TTC", total);
+    }
+
+    private ActivityReference activityTargetReference(ElementFacturableCible target) {
+        if (target.getRemorque() != null) {
+            var trailer = target.getRemorque();
+            String label = trailer.getImmatriculation();
+            return ActivityReference.of(ActivityRecordType.REMORQUE, trailer.getId(),
+                    "Remorque " + (label == null || label.isBlank() ? "#" + trailer.getId() : label));
+        }
+        if (target.getVehicule() == null) return null;
+        var vehicle = target.getVehicule();
+        String label = vehicle.getImmatriculation();
+        return ActivityReference.of(ActivityRecordType.VEHICULE, vehicle.getId(),
+                "Vehicule " + (label == null || label.isBlank() ? "#" + vehicle.getId() : label));
+    }
+
+    private List<ActivityReference> activityReferences(List<CalculationPlan> plans) {
+        List<ActivityReference> references = new ArrayList<>();
+        for (CalculationPlan plan : plans) {
+            var movement = plan.mouvement();
+            references.add(ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT, movement.getId(),
+                    movement.getTypeMouvement().getLibelle() + " - " + movement.getNumeroMouvement()));
+            var receipt = plan.quittance();
+            String receiptLabel = receipt.getNumeroQuittance();
+            if (receiptLabel == null || receiptLabel.isBlank()) receiptLabel = "Quittance du mouvement " + movement.getNumeroMouvement();
+            references.add(ActivityReference.of(ActivityRecordType.QUITTANCE, receipt.getId(), receiptLabel));
+            references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE, receipt.getElementFacturable().getId(),
+                    movement.getTypeMouvement().getLibelle()));
+        }
+        return references.stream().distinct().toList();
+    }
+
+    private record ActivitySnapshot(Map<String, String> values, List<ActivityReference> references) {
+    }
+
+    private Set<String> activityTargetIds(ActivitySnapshot snapshot) {
+        return snapshot.references().stream()
+                .filter(reference -> reference.type() == ActivityRecordType.VEHICULE || reference.type() == ActivityRecordType.REMORQUE)
+                .map(reference -> reference.type() + ":" + reference.id()).collect(java.util.stream.Collectors.toSet());
     }
 
     private RecalculHistoriqueFinancierResponse buildPreview(

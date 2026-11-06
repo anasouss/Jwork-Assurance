@@ -1,6 +1,7 @@
 import type { ApiResponse, AuthResponse } from "@/lib/types";
 import { clearAuth, getAccessToken, getStoredAuth, saveAuth } from "@/lib/auth";
 import { deviceRequestHeaders } from "@/lib/device-info";
+import { activitySurfaceForPath } from "./activity-context";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8080";
@@ -128,6 +129,12 @@ async function authenticatedRequest(
   options: RequestInit,
   mapNetworkError?: NetworkErrorMapper
 ): Promise<Response> {
+  // Capture once: an authentication retry must keep the originating screen.
+  if (typeof window !== "undefined") {
+    const headers = new Headers(options.headers);
+    if (!headers.has("X-Activity-Surface")) headers.set("X-Activity-Surface", activitySurfaceForPath(window.location.pathname));
+    options = { ...options, headers };
+  }
   const requestToken = getAccessToken();
   let response = await executeRequest(path, options, requestToken, mapNetworkError);
   if (response.status !== 401) return response;

@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClientActivity;
 import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.response.ClientResponse;
 import com.assurance.entity.Agence;
@@ -36,9 +39,15 @@ public class ClientService {
     private final CategorieClientRepository categorieClientRepository;
     private final GroupeClientService groupeClientService;
     private final AcquisitionClientService acquisitionClientService;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional
     public ClientResponse create(Long agenceId, CreateClientRequest request) {
+        return toResponse(businessActivityRecorder.perform(() -> createClientRecord(agenceId, request), client ->
+                ClientActivity.command(client, null, ActivityAction.CREATED, "Client créé", "CRM_CLIENT_CREATION")));
+    }
+
+    private Client createClientRecord(Long agenceId, CreateClientRequest request) {
         bindAgence(request, agenceId);
         validateStandaloneClient(request);
         Client client = createEntity(agenceId, request);
@@ -52,7 +61,7 @@ public class ClientService {
                     LocalDate.now()
             );
         }
-        return toResponse(client);
+        return client;
     }
 
     private void validateStandaloneClient(CreateClientRequest request) {
@@ -92,6 +101,11 @@ public class ClientService {
 
     @Transactional
     public Client createEntity(Long agenceId, CreateClientRequest request) {
+        return businessActivityRecorder.perform(() -> createEntityRecord(agenceId, request), client ->
+                ClientActivity.command(client, null, ActivityAction.CREATED, "Client créé", "CLIENT_CREATION"));
+    }
+
+    private Client createEntityRecord(Long agenceId, CreateClientRequest request) {
         bindAgence(request, agenceId);
         if (request.getTypeClient() == null) {
             throw new BadRequestException("Le type client est obligatoire");
@@ -164,6 +178,13 @@ public class ClientService {
     public Client updateEntity(Long agenceId, Long clientId, CreateClientRequest request) {
         Client client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+        var before = ClientActivity.capture(client);
+        return businessActivityRecorder.perform(() -> updateEntityRecord(agenceId, client, request), result ->
+                ClientActivity.command(result, before, ActivityAction.UPDATED, "Fiche client modifiée", "CLIENT_UPDATE"));
+    }
+
+    private Client updateEntityRecord(Long agenceId, Client client, CreateClientRequest request) {
+        Long clientId = client.getId();
         assertIdentityAvailable(agenceId, clientId, request);
         applyRequest(client, request);
         client = clientRepository.save(client);

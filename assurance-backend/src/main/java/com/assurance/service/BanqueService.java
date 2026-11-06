@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BankReferenceActivity;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.dto.request.UpsertBanqueRequest;
 import com.assurance.dto.response.BanqueResponse;
 import com.assurance.entity.Agence;
@@ -46,6 +49,7 @@ public class BanqueService {
 
     private final BanqueRepository banqueRepository;
     private final AgenceRepository agenceRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional
     public List<BanqueResponse> list(Long agenceId, boolean includeInactive) {
@@ -72,12 +76,16 @@ public class BanqueService {
                 .actif(request.getActif() == null || request.getActif())
                 .ordre(safeOrder(request.getOrdre()))
                 .build();
-        return toResponse(banqueRepository.save(bank));
+        Banque saved = banqueRepository.save(bank);
+        activityRecorder.record(BankReferenceActivity.command(saved, null, ActivityAction.CREATED,
+                "Banque ajoutee au referentiel de l'agence", "BANK_REFERENCE_CREATE"));
+        return toResponse(saved);
     }
 
     @Transactional
     public BanqueResponse update(Long agenceId, Long bankId, UpsertBanqueRequest request) {
         Banque bank = get(agenceId, bankId);
+        var before = BankReferenceActivity.snapshot(bank);
         String code = normalizeCode(request.getCode());
         if (banqueRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, bankId)) {
             throw new BadRequestException("Une banque utilise déjà ce code");
@@ -87,7 +95,10 @@ public class BanqueService {
         bank.setAliases(normalizeAliases(request.getAliases()));
         bank.setActif(request.getActif() == null || request.getActif());
         bank.setOrdre(safeOrder(request.getOrdre()));
-        return toResponse(banqueRepository.save(bank));
+        Banque saved = banqueRepository.save(bank);
+        activityRecorder.record(BankReferenceActivity.command(saved, before, ActivityAction.UPDATED,
+                "Reference bancaire modifiee", "BANK_REFERENCE_UPDATE"));
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)

@@ -31,11 +31,14 @@ public class ContratResponse {
     private String brancheAssuranceCode;
     private String brancheAssuranceLibelle;
     private Long compagnieAssuranceId;
+    private String compagnieAssuranceNom;
     private Long conventionId;
+    private String conventionIntitule;
     private Long categorieClientId;
     private String categorieClientCode;
     private String categorieClientLibelle;
     private Long contratOrigineId;
+    private String contratOrigineReference;
     private Boolean renouvele;
     private ModeTermeRenouvellement modeTermeRenouvellement;
     private Boolean renouvellementTermeCompagnieEligible;
@@ -46,6 +49,7 @@ public class ContratResponse {
     private String groupeUsageAttestationLibelle;
     private Boolean consommeAttestation;
     private Long grilleTarifaireId;
+    private String grilleTarifaireLibelle;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
     private String numeroAttestation;
@@ -77,6 +81,7 @@ public class ContratResponse {
     private Boolean crmPartage;
     private String crmPartageValeur;
     private String libelleReleve;
+    private String notes;
     private List<ClientLink> clients;
     private List<VehiculeView> vehicules;
     private List<RemorqueView> remorques;

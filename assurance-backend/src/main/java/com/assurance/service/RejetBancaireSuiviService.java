@@ -1,5 +1,13 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.PaymentActivity;
 import com.assurance.dto.request.AjouterMouvementRejetRequest;
 import com.assurance.dto.response.SuiviRejetBancaireResponse;
 import com.assurance.entity.Client;
@@ -46,6 +54,7 @@ public class RejetBancaireSuiviService {
     private final MouvementRejetBancaireRepository mouvements;
     private final UtilisateurRepository utilisateurs;
     private final RejetBancaireRepository rejets;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     public StatutSuiviRejetBancaire statut(InstrumentReglementClient instrument) {
         if (contreValeurSoldee(instrument)) return StatutSuiviRejetBancaire.REGLE_CV;
@@ -228,6 +237,14 @@ public class RejetBancaireSuiviService {
             enregistrer(current, source, TypeMouvementRejetBancaire.REJET, date, motif.trim(), rejet);
             current = current.getInstrumentRemplace();
         }
+        List<ActivityReference> references = new ArrayList<>(List.of(PaymentActivity.reference(source), PaymentActivity.reference(source.getReglement())));
+        if (line != null) references.add(ActivityReference.of(ActivityRecordType.BORDEREAU_BANCAIRE,
+                line.getBordereau().getId(), line.getBordereau().getNumero()));
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.TRESORERIE, ActivityAction.CREATED,
+                "Rejet bancaire enregistre", "BANK_REJECTION_REGISTRATION",
+                ActivityReference.of(ActivityRecordType.REJET_BANCAIRE, rejet.getId(), rejet.getNumero()), references,
+                ActivityValues.changes(Map.of(), new ActivityValues().put("Rejet", rejet.getNumero())
+                        .put("Date du rejet", rejet.getDateRejet()).put("Motif", rejet.getMotif()).put("Montant", rejet.getMontant()).snapshot())));
     }
 
     @Transactional
@@ -247,7 +264,16 @@ public class RejetBancaireSuiviService {
         }
         instrument.setSuiviRejet(request.getStatut());
         instruments.save(instrument);
-        enregistrer(instrument, instrument, TypeMouvementRejetBancaire.SUIVI, request.getDateOperation(), request.getMotif().trim());
+        MouvementRejetBancaire event = enregistrer(instrument, instrument, TypeMouvementRejetBancaire.SUIVI,
+                request.getDateOperation(), request.getMotif().trim());
+        List<ActivityReference> references = new ArrayList<>(List.of(PaymentActivity.reference(instrument.getReglement())));
+        if (event.getRejet() != null) references.add(ActivityReference.of(ActivityRecordType.REJET_BANCAIRE,
+                event.getRejet().getId(), event.getRejet().getNumero()));
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.TRESORERIE, ActivityAction.SAVED,
+                "Suivi de rejet bancaire enregistre", "BANK_REJECTION_FOLLOW_UP", PaymentActivity.reference(instrument), references,
+                ActivityValues.changes(new ActivityValues().put("Statut de suivi", PaymentActivity.rejectionStatus(current.statutSuivi())).snapshot(),
+                        new ActivityValues().put("Statut de suivi", PaymentActivity.rejectionStatus(event.getStatutSuivi()))
+                                .put("Date de l'operation", event.getDateOperation()).put("Motif", event.getMotif()).snapshot())));
     }
 
     @Transactional
@@ -268,7 +294,7 @@ public class RejetBancaireSuiviService {
         }
     }
 
-    private void enregistrer(InstrumentReglementClient instrument, InstrumentReglementClient source,
+    private MouvementRejetBancaire enregistrer(InstrumentReglementClient instrument, InstrumentReglementClient source,
                              TypeMouvementRejetBancaire type, LocalDate date, String motif) {
         RejetBancaire dernierRejet = mouvements
                 .findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(instrument.getAgence().getId(), instrument.getId())
@@ -278,10 +304,10 @@ public class RejetBancaireSuiviService {
             dernierRejet = rejets.findByAgenceIdAndInstrumentIdOrderByIdAsc(instrument.getAgence().getId(), instrument.getId())
                     .stream().reduce((first, second) -> second).orElse(null);
         }
-        enregistrer(instrument, source, type, date, motif, dernierRejet);
+        return enregistrer(instrument, source, type, date, motif, dernierRejet);
     }
 
-    private void enregistrer(InstrumentReglementClient instrument, InstrumentReglementClient source,
+    private MouvementRejetBancaire enregistrer(InstrumentReglementClient instrument, InstrumentReglementClient source,
                              TypeMouvementRejetBancaire type, LocalDate date, String motif, RejetBancaire rejet) {
         MouvementRejetBancaire event = new MouvementRejetBancaire();
         event.setAgence(instrument.getAgence());
@@ -294,7 +320,7 @@ public class RejetBancaireSuiviService {
         event.setMotif(motif);
         event.setUtilisateurId(TenantContext.getCurrentUser());
         event.setUtilisateurNom(operatorName(instrument));
-        mouvements.save(event);
+        return mouvements.save(event);
     }
 
     private String operatorName(InstrumentReglementClient instrument) {

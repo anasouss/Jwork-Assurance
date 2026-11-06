@@ -59,6 +59,7 @@ class PieceJointeServiceTest {
     @Mock private com.assurance.repository.DocumentUsageRepository documentUsageRepository;
     @Mock private com.assurance.repository.ClientRepository clientRepository;
     @Mock private com.assurance.repository.VehiculeRepository vehiculeRepository;
+    @Mock private com.assurance.activity.BusinessActivityRecorder businessActivityRecorder;
 
     private PieceJointeService service;
 
@@ -74,7 +75,8 @@ class PieceJointeServiceTest {
                 pieceJointeRepository,
                 assistanceContratRepository,
                 brancheAssuranceRepository,
-                storageLayoutService, documentPolicyRepository, documentUsageRepository, clientRepository, vehiculeRepository
+                storageLayoutService, documentPolicyRepository, documentUsageRepository, clientRepository, vehiculeRepository,
+                businessActivityRecorder
         );
     }
 
@@ -263,7 +265,9 @@ class PieceJointeServiceTest {
     void usedClientDocumentIsArchivedWithoutDeletingItsFile() {
         var client = com.assurance.entity.Client.builder().build();
         client.setId(42L);
-        PieceJointe piece = PieceJointe.builder().client(client).cheminStockage("7/clients/42/cin.pdf").build();
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        PieceJointe piece = PieceJointe.builder().agence(agency).client(client).nomFichier("cin.pdf").cheminStockage("7/clients/42/cin.pdf").build();
         piece.setId(15L);
         when(pieceJointeRepository.lockOwned(7L, 15L)).thenReturn(Optional.of(piece));
         when(documentUsageRepository.existsByPieceId(15L)).thenReturn(true);
@@ -278,7 +282,9 @@ class PieceJointeServiceTest {
     void unusedUploadCanBePermanentlyRemoved(@TempDir Path folder) throws Exception {
         var client = com.assurance.entity.Client.builder().build();
         client.setId(42L);
-        PieceJointe piece = PieceJointe.builder().client(client).cheminStockage("7/clients/42/cin.pdf").build();
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        PieceJointe piece = PieceJointe.builder().agence(agency).client(client).nomFichier("cin.pdf").cheminStockage("7/clients/42/cin.pdf").build();
         piece.setId(15L);
         Path file = folder.resolve("cin.pdf");
         Files.writeString(file, "test");

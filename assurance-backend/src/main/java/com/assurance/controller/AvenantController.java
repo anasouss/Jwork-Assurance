@@ -1,6 +1,7 @@
 package com.assurance.controller;
 
 import com.assurance.dto.request.AvenantRequest;
+import com.assurance.dto.request.AvenantDraftContext;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AvenantContextResponse;
 import com.assurance.dto.response.AvenantDetailResponse;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -86,12 +88,13 @@ public class AvenantController {
     public ResponseEntity<ApiResponse<AvenantDraftResponse>> saveDraft(
             @PathVariable Long contratId,
             @PathVariable(required = false) String code,
-            @RequestBody AvenantRequest request
+            @RequestBody AvenantRequest request,
+            @Valid @ModelAttribute AvenantDraftContext context
     ) {
         String resolvedCode = code == null && request != null ? request.getCodeTypeMouvement() : code;
         return ResponseEntity.ok(ApiResponse.success(
                 avenantApplicationService.saveDraft(
-                        TenantContext.getCurrentAgence(), contratId, resolvedCode, request
+                        TenantContext.getCurrentAgence(), contratId, resolvedCode, request, context
                 ),
                 "Brouillon d'avenant enregistre"
         ));

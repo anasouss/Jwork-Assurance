@@ -348,6 +348,7 @@ export const router = createBrowserRouter([
           { path: "roles", lazy: lazyRoute(() => import("@/features/admin/pages/AdminRolesPage")) },
           { path: "roles/:roleId", lazy: lazyRoute(() => import("@/features/admin/pages/AdminRolesPage")) },
           { path: "audit", lazy: lazyRoute(() => import("@/features/admin/pages/AdminAuditPage")) },
+          { path: "activite", lazy: lazyRoute(() => import("@/features/admin/pages/AdminActivityPage")) },
           { path: "agence", lazy: lazyRoute(() => import("@/features/admin/pages/AdminAgenciesPage")) },
           { path: "agences", lazy: lazyRoute(() => import("@/features/admin/pages/AdminAgenciesPage")) },
           { path: "administrateurs-plateforme", lazy: lazyRoute(() => import("@/features/admin/pages/PlatformAdminsPage")) },

@@ -1,11 +1,16 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.CreerBordereauRemiseRequest;
+import com.assurance.dto.request.DeposerBordereauRemiseRequest;
+import com.assurance.activity.PaymentActivity;
+import com.assurance.activity.ActivityRecorderFixture;
+import com.assurance.activity.ActivityAction;
 import com.assurance.dto.response.BordereauRemiseResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.BordereauRemise;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.InstrumentReglementClient;
+import com.assurance.entity.LigneBordereauRemise;
 import com.assurance.entity.MouvementTresorerie;
 import com.assurance.entity.ReglementClient;
 import com.assurance.enums.ModeReglementClient;
@@ -43,6 +48,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
 
 class BordereauRemiseCreationTest {
     private static final Long AGENCY_ID = 7L;
@@ -55,10 +61,11 @@ class BordereauRemiseCreationTest {
     private final TresorerieService treasury = mock(TresorerieService.class);
     private final OperationTresorerieService transfers = mock(OperationTresorerieService.class);
     private final ReglementClientService payments = mock(ReglementClientService.class);
+    private final ActivityRecorderFixture activity = new ActivityRecorderFixture();
     private final BordereauRemiseService service = new BordereauRemiseService(
             slips, mock(LigneBordereauRemiseRepository.class), mock(LigneBordereauEspecesRepository.class),
             movements, operations, mock(SequenceBordereauRemiseRepository.class), instruments, agencies,
-            treasury, transfers, payments);
+            treasury, transfers, payments, activity.recorder);
     private final Agence agency = Agence.builder().nom("Cabinet test").build();
 
     @BeforeEach
@@ -101,6 +108,8 @@ class BordereauRemiseCreationTest {
         }
         verifyNoInteractions(transfers, payments, operations);
         verify(movements, never()).save(any());
+        verify(activity.events).save(org.mockito.ArgumentMatchers.argThat(event ->
+                event.getAction() == ActivityAction.CREATED && event.getTitle().contains("provisoire")));
     }
 
     @Test
@@ -109,6 +118,32 @@ class BordereauRemiseCreationTest {
         assertProvisional(service.createCashDeposit(AGENCY_ID, request(TypeBordereauRemise.VERSEMENT_ESPECES)));
         verifyNoInteractions(transfers, payments, operations);
         verify(movements, never()).save(any());
+    }
+
+    @Test
+    void depositingASlipGroupsItsInstrumentTransitionsIntoOneBusinessActivity() {
+        InstrumentReglementClient instrument = prepareInstrument(TypeBordereauRemise.CHEQUE);
+        var destination = treasury.findAccount(AGENCY_ID, 2L);
+        BordereauRemise slip = BordereauRemise.builder().agence(agency).numero("BRC-2026-000001")
+                .type(TypeBordereauRemise.CHEQUE).dateBordereau(DATE).compteDestination(destination)
+                .montantTotal(new BigDecimal("100.00")).build();
+        slip.setId(100L);
+        slip.getLignes().add(LigneBordereauRemise.builder().bordereau(slip).instrument(instrument)
+                .montant(instrument.getMontant()).statut(StatutLigneBordereauRemise.PREPAREE).build());
+        when(slips.findByIdAndAgenceIdForUpdate(100L, AGENCY_ID)).thenReturn(Optional.of(slip));
+        doAnswer(call -> {
+            var before = PaymentActivity.instrumentSnapshot(instrument);
+            instrument.setStatut(StatutInstrumentReglement.REMIS_EN_BANQUE);
+            activity.recorder.record(PaymentActivity.instrumentCommand(instrument, before, ActivityAction.REMITTED,
+                    "Moyen remis en banque", "PAYMENT_BANK_REMITTANCE"));
+            return null;
+        }).when(payments).markInstrumentRemitted(AGENCY_ID, instrument.getId(), 2L, DATE);
+        var request = new DeposerBordereauRemiseRequest();
+        request.setDateDepot(DATE);
+        request.setReferenceBancaire("BANK-1");
+        service.deposit(AGENCY_ID, slip.getId(), request);
+        verify(activity.events).save(org.mockito.ArgumentMatchers.argThat(event -> event.getAction() == ActivityAction.REMITTED
+                && event.getTitle().equals("Bordereau remis a la banque") && event.getReferencesJson().contains("REG-1")));
     }
 
     @Test
@@ -144,7 +179,7 @@ class BordereauRemiseCreationTest {
         ReglementClient payment = ReglementClient.builder().agence(agency).numero("REG-1")
                 .payeurNom("Client test").statut(StatutReglementClient.VALIDE).build();
         payment.setId(5L);
-        InstrumentReglementClient instrument = InstrumentReglementClient.builder().reglement(payment)
+        InstrumentReglementClient instrument = InstrumentReglementClient.builder().agence(agency).reglement(payment)
                 .mode(type == TypeBordereauRemise.CHEQUE ? ModeReglementClient.CHEQUE : ModeReglementClient.EFFET)
                 .statut(StatutInstrumentReglement.EN_ATTENTE).montant(new BigDecimal("100.00")).build();
         instrument.setId(10L);

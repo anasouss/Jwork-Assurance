@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClaimActivity;
 import com.assurance.dto.request.UpsertExpertSinistreRequest;
 import com.assurance.dto.request.UpsertGarageSinistreRequest;
 import com.assurance.dto.response.SinistreIntervenantResponse;
@@ -28,6 +31,7 @@ public class SinistreIntervenantService {
     private final VilleRepository villeRepository;
     private final ExpertSinistreRepository expertRepository;
     private final GarageSinistreRepository garageRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public List<SinistreIntervenantResponse> listExperts(Long agenceId, boolean includeInactive) {
@@ -54,6 +58,7 @@ public class SinistreIntervenantService {
                 ? ExpertSinistre.builder().agence(resolveAgency(agenceId)).build()
                 : expertRepository.findByIdAndAgenceId(id, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("ExpertSinistre", id));
+        var before = id == null ? java.util.Map.<String, String>of() : ClaimActivity.intervenantSnapshot(toResponse(expert));
         expert.setCode(code);
         expert.setNom(request.getNom().trim());
         expert.setTelephone(trimToNull(request.getTelephone()));
@@ -61,7 +66,10 @@ public class SinistreIntervenantService {
         expert.setAdresse(trimToNull(request.getAdresse()));
         expert.setVille(resolveVille(request.getVilleId()));
         expert.setActif(request.getActif() == null || request.getActif());
-        return toResponse(expertRepository.save(expert));
+        expert = expertRepository.save(expert);
+        var response = toResponse(expert);
+        activityRecorder.record(ClaimActivity.intervenantCommand(expert.getAgence().getId(), response, before, ActivityRecordType.EXPERT_SINISTRE, id == null));
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -89,6 +97,7 @@ public class SinistreIntervenantService {
                 ? GarageSinistre.builder().agence(resolveAgency(agenceId)).build()
                 : garageRepository.findByIdAndAgenceId(id, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("GarageSinistre", id));
+        var before = id == null ? java.util.Map.<String, String>of() : ClaimActivity.intervenantSnapshot(toResponse(garage));
         garage.setCode(code);
         garage.setRaisonSociale(request.getRaisonSociale().trim());
         garage.setTelephone(trimToNull(request.getTelephone()));
@@ -96,7 +105,10 @@ public class SinistreIntervenantService {
         garage.setAdresse(trimToNull(request.getAdresse()));
         garage.setVille(resolveVille(request.getVilleId()));
         garage.setActif(request.getActif() == null || request.getActif());
-        return toResponse(garageRepository.save(garage));
+        garage = garageRepository.save(garage);
+        var response = toResponse(garage);
+        activityRecorder.record(ClaimActivity.intervenantCommand(garage.getAgence().getId(), response, before, ActivityRecordType.GARAGE_SINISTRE, id == null));
+        return response;
     }
 
     private Agence resolveAgency(Long agenceId) {

@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.InvoiceActivity;
 import com.assurance.dto.request.CreerFactureConventionRequest;
 import com.assurance.dto.request.PropositionEcheanceFactureConventionRequest;
 import com.assurance.dto.response.DocumentClientResponse;
@@ -72,6 +75,7 @@ public class FacturationConventionService {
     private final AgenceRepository agenceRepository;
     private final DocumentClientService documentClientService;
     private final ConditionPaiementClientService conditionPaiementClientService;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public PropositionEcheanceDocumentClientResponse proposeDueDate(
@@ -188,6 +192,12 @@ public class FacturationConventionService {
             Long agenceId,
             CreerFactureConventionRequest request
     ) {
+        return businessActivityRecorder.perform(() -> createInvoiceRecord(agenceId, request), result ->
+                InvoiceActivity.command(documentClientService.findDocument(agenceId, result.getId()), Map.of(),
+                        ActivityAction.ISSUED, "Facture de convention emise", "CONVENTION_INVOICE_ISSUANCE", List.of()));
+    }
+
+    private DocumentClientResponse createInvoiceRecord(Long agenceId, CreerFactureConventionRequest request) {
         List<Long> ids = request.getEcheanceIds().stream().filter(Objects::nonNull).distinct().toList();
         List<EcheanceFacturationConvention> selected = echeanceRepository.findForUpdate(agenceId, ids);
         if (selected.size() != ids.size()) {

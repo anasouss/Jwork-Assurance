@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AssistanceContratRepository extends JpaRepository<AssistanceContrat, Long> {
+    List<AssistanceContrat> findByContratIdAndContratAgenceIdOrderByCreatedAtDesc(Long contratId, Long agenceId);
+
     @Query("""
             select count(a)
             from AssistanceContrat a

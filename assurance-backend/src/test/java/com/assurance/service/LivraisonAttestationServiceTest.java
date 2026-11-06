@@ -54,7 +54,8 @@ class LivraisonAttestationServiceTest {
                 lotAttestationRepository,
                 attestationStockRepository,
                 mouvementStockAttestationRepository,
-                attestationNumeroService
+                attestationNumeroService,
+                new com.assurance.activity.ActivityRecorderFixture().recorder
         );
     }
 

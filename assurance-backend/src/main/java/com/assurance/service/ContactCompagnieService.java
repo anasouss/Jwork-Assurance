@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.CompanyContactActivity;
 import com.assurance.dto.request.UpdateContactCompagnieStatusRequest;
 import com.assurance.dto.request.UpsertContactCompagnieRequest;
 import com.assurance.dto.response.ContactCompagnieResponse;
@@ -31,6 +34,7 @@ public class ContactCompagnieService {
     private final ContactCompagnieRepository contactRepository;
     private final CompagnieAssuranceRepository compagnieRepository;
     private final AgenceRepository agenceRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public PagedResponse<ContactCompagnieResponse> list(Long agenceId, String query, Long compagnieId,
@@ -91,8 +95,11 @@ public class ContactCompagnieService {
                 .actif(true)
                 .build();
         apply(contact, request);
-        ensureSinglePrincipal(contact);
-        return toResponse(contactRepository.save(contact));
+        var displaced = ensureSinglePrincipal(contact);
+        ContactCompagnie saved = contactRepository.save(contact);
+        activityRecorder.record(CompanyContactActivity.command(saved, null, displaced, ActivityAction.CREATED,
+                "Contact compagnie ajoute", "COMPANY_CONTACT_CREATE"));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -101,9 +108,13 @@ public class ContactCompagnieService {
         requireAgenceId(agenceId);
         validateContactMethod(request);
         ContactCompagnie contact = resolveContact(agenceId, compagnieId, contactId);
+        var before = CompanyContactActivity.snapshot(contact);
         apply(contact, request);
-        ensureSinglePrincipal(contact);
-        return toResponse(contactRepository.save(contact));
+        var displaced = ensureSinglePrincipal(contact);
+        ContactCompagnie saved = contactRepository.save(contact);
+        activityRecorder.record(CompanyContactActivity.command(saved, before, displaced, ActivityAction.UPDATED,
+                "Contact compagnie modifie", "COMPANY_CONTACT_UPDATE"));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -111,11 +122,16 @@ public class ContactCompagnieService {
                                                   UpdateContactCompagnieStatusRequest request) {
         requireAgenceId(agenceId);
         ContactCompagnie contact = resolveContact(agenceId, compagnieId, contactId);
+        var before = CompanyContactActivity.snapshot(contact);
         contact.setActif(request.getActif());
         if (!Boolean.TRUE.equals(request.getActif())) {
             contact.setPrincipal(false);
         }
-        return toResponse(contactRepository.save(contact));
+        ContactCompagnie saved = contactRepository.save(contact);
+        activityRecorder.record(CompanyContactActivity.command(saved, before, CompanyContactActivity.PrincipalChanges.none(),
+                ActivityAction.UPDATED, Boolean.TRUE.equals(saved.getActif()) ? "Contact compagnie reactive" : "Contact compagnie desactive",
+                "COMPANY_CONTACT_STATUS"));
+        return toResponse(saved);
     }
 
     private ContactCompagnie resolveContact(Long agenceId, Long compagnieId, Long contactId) {
@@ -168,14 +184,19 @@ public class ContactCompagnieService {
         contact.setNotes(optional(request.getNotes()));
     }
 
-    private void ensureSinglePrincipal(ContactCompagnie contact) {
-        if (!Boolean.TRUE.equals(contact.getPrincipal())) return;
+    private CompanyContactActivity.PrincipalChanges ensureSinglePrincipal(ContactCompagnie contact) {
+        if (!Boolean.TRUE.equals(contact.getPrincipal())) return CompanyContactActivity.PrincipalChanges.none();
         if (!Boolean.TRUE.equals(contact.getActif())) {
             throw new BadRequestException("Un contact inactif ne peut pas être défini comme principal.");
         }
+        // The bulk update clears the persistence context; keep immutable facts first.
+        var displaced = CompanyContactActivity.displacedPrincipals(contact,
+                contactRepository.findByAgenceIdAndCompagnieAssuranceIdAndServiceAndPrincipalTrue(
+                        contact.getAgence().getId(), contact.getCompagnieAssurance().getId(), contact.getService()));
         contactRepository.clearOtherPrincipalContacts(
                 contact.getAgence().getId(), contact.getCompagnieAssurance().getId(),
                 contact.getService(), contact.getId());
+        return displaced;
     }
 
     private ContactCompagnieResponse toResponse(ContactCompagnie contact) {

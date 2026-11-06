@@ -1,5 +1,14 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClientActivity;
+import com.assurance.activity.ClientGroupActivity;
 import com.assurance.dto.response.ConditionPaiementClientResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
@@ -52,6 +61,7 @@ public class ConditionPaiementClientService {
     private final ClientRepository clientRepository;
     private final GroupeClientRepository groupeClientRepository;
     private final StorageLayoutService storageLayoutService;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public List<ConditionPaiementClientResponse> list(Long agenceId, String payeurType, Long payeurId) {
@@ -103,6 +113,22 @@ public class ConditionPaiementClientService {
             condition.setTailleOctets(stored.size());
             condition = repository.save(condition);
         }
+        ActivityReference payerReference = payer.client() != null ? ClientActivity.reference(payer.client())
+                : ClientGroupActivity.reference(payer.group());
+        String justification = switch (condition.getTypeJustification()) {
+            case POLITIQUE_AGENCE -> "Politique de l'agence";
+            case ACCORD_CONTRACTUEL -> "Accord contractuel";
+            case DEROGATION_SECTORIELLE -> "Dérogation sectorielle";
+        };
+        var details = new ActivityValues().put("Délai de paiement (jours)", condition.getDelaiJours())
+                .put("Justification", justification).put("Date de début", condition.getDateDebut())
+                .put("Date de fin", condition.getDateFin()).put("Commentaire", condition.getCommentaire())
+                .put("Justificatif", condition.getNomFichier()).snapshot();
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM, ActivityAction.SAVED,
+                "Conditions de paiement enregistrées", "CLIENT_PAYMENT_CONDITION_SAVE",
+                ActivityReference.of(ActivityRecordType.CONDITION_PAIEMENT, condition.getId(),
+                        "Conditions de paiement - " + payerReference.label()),
+                List.of(payerReference), ActivityValues.changes(null, details)));
         return toResponse(condition);
     }
 

@@ -66,7 +66,8 @@ public class DataSeeder implements CommandLineRunner {
             "sinistre:manage",
             "sinistre:finance",
             "sinistre:referentiel",
-            "audit:view"
+            "audit:view",
+            "activity:view"
     );
 
     private final PermissionRepository permissionRepository;

@@ -1,6 +1,7 @@
 package com.assurance.service.avenant;
 
 import com.assurance.dto.request.AvenantRequest;
+import com.assurance.dto.request.AvenantDraftContext;
 import com.assurance.dto.response.AvenantContextResponse;
 import com.assurance.dto.response.AvenantDetailResponse;
 import com.assurance.dto.response.AvenantDraftResponse;
@@ -54,9 +55,15 @@ public class AvenantApplicationService {
 
     @Transactional
     public AvenantDraftResponse saveDraft(Long agenceId, Long contratId, String code, AvenantRequest request) {
+        return saveDraft(agenceId, contratId, code, request, new AvenantDraftContext());
+    }
+
+    @Transactional
+    public AvenantDraftResponse saveDraft(Long agenceId, Long contratId, String code, AvenantRequest request,
+            AvenantDraftContext context) {
         bindCode(code, request);
         avenantTypeCatalog.validateDraft(code, request);
-        return avenantDraftService.save(agenceId, contratId, request);
+        return avenantDraftService.save(agenceId, contratId, request, context);
     }
 
     @Transactional

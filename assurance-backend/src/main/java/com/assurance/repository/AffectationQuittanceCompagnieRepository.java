@@ -16,6 +16,9 @@ import java.util.List;
 public interface AffectationQuittanceCompagnieRepository extends JpaRepository<AffectationQuittanceCompagnie, Long> {
 
     @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
+    List<AffectationQuittanceCompagnie> findByAgenceIdAndQuittanceIdIn(Long agenceId, Collection<Long> quittanceIds);
+
+    @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
     List<AffectationQuittanceCompagnie> findByQuittanceIdOrderByDateEffetAscNumeroQuittanceCompagnieAsc(Long quittanceId);
 
     @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})

@@ -1,5 +1,14 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClientActivity;
+import com.assurance.activity.ClientGroupActivity;
 import com.assurance.entity.QuittancePrimeSelection;
 import com.assurance.entity.ReglementClient;
 import com.assurance.enums.StatutReglementClient;
@@ -32,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +52,7 @@ public class QuittancePrimeSelectionService {
     private final QuittancePrimePdfService renderer;
     private final StorageLayoutService storage;
     private final ObjectMapper mapper;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public Options options(Long agencyId, Long paymentId) {
@@ -124,6 +135,28 @@ public class QuittancePrimeSelectionService {
             receipt.setNumero(number);
             receipt.setCheminStockage(key);
             receipts.saveAndFlush(receipt);
+            var values = new ActivityValues().put("Quittance de prime", number)
+                    .put("Date d'emission", receipt.getDateEmission()).put("Payeur", payment.getPayeurNom());
+            List<ActivityReference> sources = new ArrayList<>();
+            int index = 0;
+            for (var policy : policies) {
+                if (selection != null && !selection.contains(policy.key())) continue;
+                String description = String.join(" / ", policy.descriptions());
+                String prefix = "Police " + (++index) + " - ";
+                values.put(prefix + "Description", description).put(prefix + "Montant", policy.montant());
+                ActivityRecordType sourceType = switch (policy.key().charAt(0)) {
+                    case 'C' -> ActivityRecordType.CONTRAT;
+                    case 'A' -> ActivityRecordType.ELEMENT_FACTURABLE;
+                    case 'D' -> ActivityRecordType.DOCUMENT_CLIENT;
+                    default -> throw new IllegalStateException("Source de quittance de prime inconnue");
+                };
+                sources.add(new ActivityReference(sourceType, policy.key().substring(2),
+                        description.isBlank() ? "Police du reglement" : description.length() > 500 ? description.substring(0, 497) + "..." : description));
+            }
+            businessActivityRecorder.record(receiptCommand(payment,
+                    ActivityReference.of(ActivityRecordType.QUITTANCE_PRIME, receipt.getId(), "Quittance de prime " + number),
+                    ActivityAction.ISSUED, "Quittance de prime emise", "PREMIUM_RECEIPT_ISSUANCE",
+                    Map.of(), values.snapshot(), sources));
             return new QuittancePrimeClientService.Receipt(number, pdf);
         } catch (IOException | RuntimeException error) {
             removeUncommitted(path);
@@ -152,12 +185,17 @@ public class QuittancePrimeSelectionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
         String number;
         Path path;
+        ActivityReference reference;
+        LocalDate emissionDate;
         if (receiptId == null) {
             if (payment.getQuittancePrimeNumero() == null && payment.getQuittancePrimeDateEmission() == null
                     && payment.getQuittancePrimeCheminStockage() == null) {
                 throw new ResourceNotFoundException("Archive de quittance de prime", paymentId);
             }
             number = payment.getQuittancePrimeNumero();
+            reference = new ActivityReference(ActivityRecordType.QUITTANCE_PRIME, "LEGACY:" + paymentId,
+                    "Quittance de prime " + (number == null ? "historique" : number));
+            emissionDate = payment.getQuittancePrimeDateEmission();
             path = archivePath(agencyId, paymentId, payment.getQuittancePrimeCheminStockage());
             payment.setQuittancePrimeNumero(null);
             payment.setQuittancePrimeDateEmission(null);
@@ -167,10 +205,16 @@ public class QuittancePrimeSelectionService {
             QuittancePrimeSelection receipt = receipts.findByIdAndAgenceIdAndReglementId(receiptId, agencyId, paymentId)
                     .orElseThrow(() -> new ResourceNotFoundException("Quittance de prime", receiptId));
             number = receipt.getNumero();
+            reference = ActivityReference.of(ActivityRecordType.QUITTANCE_PRIME, receipt.getId(), "Quittance de prime " + number);
+            emissionDate = receipt.getDateEmission();
             path = archivePath(agencyId, paymentId, receipt.getCheminStockage());
             receipts.delete(receipt);
             receipts.flush();
         }
+        businessActivityRecorder.record(receiptCommand(payment, reference, ActivityAction.DELETED,
+                "Archive de quittance de prime supprimee", "PREMIUM_RECEIPT_ARCHIVE_DELETION",
+                new ActivityValues().put("Quittance de prime", number).put("Date d'emission", emissionDate).snapshot(),
+                Map.of(), List.of()));
         Long userId = TenantContext.getCurrentUser();
         Runnable completeDeletion = () -> {
             deleteFile(path);
@@ -187,6 +231,18 @@ public class QuittancePrimeSelectionService {
         } else {
             completeDeletion.run();
         }
+    }
+
+    private ActivityCommand receiptCommand(ReglementClient payment, ActivityReference subject, ActivityAction action,
+            String title, String origin, Map<String, String> before, Map<String, String> after,
+            List<ActivityReference> sourceReferences) {
+        List<ActivityReference> references = new ArrayList<>(sourceReferences);
+        references.add(ActivityReference.of(ActivityRecordType.REGLEMENT_CLIENT, payment.getId(),
+                payment.getNumero() == null ? "Reglement client" : payment.getNumero()));
+        if (payment.getClientPayeur() != null) references.add(ClientActivity.reference(payment.getClientPayeur()));
+        if (payment.getGroupePayeur() != null) references.add(ClientGroupActivity.reference(payment.getGroupePayeur()));
+        return new ActivityCommand(payment.getAgence().getId(), ActivityModule.COMPTABILITE_CLIENT, action,
+                title, origin, subject, references, ActivityValues.changes(before, after));
     }
 
     private Path archivePath(Long agencyId, Long paymentId, String key) {

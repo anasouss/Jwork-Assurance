@@ -1,0 +1,14 @@
+package com.assurance.activity;
+
+public enum ActivityModule {
+    PRODUCTION,
+    CRM,
+    COMPTABILITE_CLIENT,
+    COMPTABILITE_COMPAGNIE,
+    TRESORERIE,
+    SINISTRES,
+    STOCK_ATTESTATIONS,
+    COMPAGNIES,
+    REFERENTIELS,
+    ADMINISTRATION
+}

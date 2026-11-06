@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.AssistanceActivity;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.dto.request.UpsertAssistanceContratRequest;
 import com.assurance.dto.response.AssistanceContratContextResponse;
 import com.assurance.dto.response.AssistanceContratResponse;
@@ -44,6 +48,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +76,7 @@ public class AssistanceContratService {
     private final TarifProduitAssistanceService tarifProduitAssistanceService;
     private final EcheanceService echeanceService;
     private final AssistanceQuittanceService assistanceQuittanceService;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional(readOnly = true)
     public AssistanceContratContextResponse getContext(Long agenceId, Long contratId, Long mouvementId, LocalDate dateSouscription) {
@@ -156,10 +162,16 @@ public class AssistanceContratService {
         AssistanceContrat assistance = assistanceContratRepository
                 .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contrat.getId(), vehicule.getId())
                 .orElse(null);
+        var before = assistance == null ? null : AssistanceActivity.snapshot(assistance);
+        var previousReferences = new ArrayList<>(assistance == null
+                ? List.<ActivityReference>of() : AssistanceActivity.references(assistance));
+        boolean replaced = false;
         if (assistance != null
                 && mouvement != null
                 && (assistance.getMouvementContrat() == null
                     || !mouvement.getId().equals(assistance.getMouvementContrat().getId()))) {
+            replaced = true;
+            previousReferences.add(AssistanceActivity.reference(assistance));
             assistance.setActif(false);
             if (assistance.getElementFacturable() != null) {
                 assistance.getElementFacturable().setActif(false);
@@ -225,6 +237,11 @@ public class AssistanceContratService {
         assistance.setElementFacturable(element);
         assistance = assistanceContratRepository.save(assistance);
         assistanceQuittanceService.synchroniser(assistance);
+
+        activityRecorder.record(AssistanceActivity.linked(assistance, before, previousReferences,
+                replaced ? ActivityAction.REPLACED : before == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                replaced ? "Assistance liee remplacee" : before == null ? "Assistance ajoutee au contrat" : "Assistance liee modifiee",
+                "CONTRACT_ASSISTANCE_SAVE"));
 
         return toResponse(assistance, pricing.trimestres(), pricing.prorata());
     }
@@ -356,6 +373,8 @@ public class AssistanceContratService {
         if (assistance.getContrat() == null || !assistance.getContrat().getId().equals(contrat.getId())) {
             throw new BadRequestException("L'assistance ne correspond pas au contrat");
         }
+        var before = AssistanceActivity.snapshot(assistance);
+        var previousReferences = AssistanceActivity.references(assistance);
         ElementFacturable element = assistance.getElementFacturable();
         if (element != null) {
             Quittance quittance = quittanceRepository
@@ -376,6 +395,8 @@ public class AssistanceContratService {
         assistanceContratRepository.save(assistance);
         contrat.setAssistance(assistanceContratRepository.countByContratIdAndActifTrue(contrat.getId()) > 0);
         contratRepository.save(contrat);
+        activityRecorder.record(AssistanceActivity.linked(assistance, before, previousReferences, ActivityAction.UPDATED,
+                "Assistance desactivee", "CONTRACT_ASSISTANCE_DEACTIVATE"));
     }
 
     private AssistanceContratResponse toResponse(AssistanceContrat assistance) {

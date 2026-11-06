@@ -26,6 +26,7 @@ public class GroupeClientResponse {
     public static class MembreView {
         private Long membershipId;
         private Long clientId;
+        private String clientCode;
         private String clientNom;
         private RelationGroupeClient typeRelation;
         private LocalDate dateDebut;

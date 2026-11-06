@@ -1,5 +1,12 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityRecorderFixture;
+import com.assurance.activity.AssistanceActivity;
+import com.assurance.activity.ActivityValues;
+import com.assurance.security.TenantContext;
+import com.assurance.entity.AssistanceContrat;
+import com.assurance.entity.LigneTarificationAssistance;
 import com.assurance.dto.request.QuoteAssistanceVoyageRequest;
 import com.assurance.dto.request.CreateAssistanceVoyageRequest;
 import com.assurance.dto.request.SaveAssistanceVoyageDraftSectionRequest;
@@ -30,11 +37,15 @@ import com.assurance.repository.MouvementContratRepository;
 import com.assurance.repository.LigneTarificationAssistanceRepository;
 import com.assurance.repository.ProduitAssistanceRepository;
 import com.assurance.repository.TypeMouvementContratRepository;
+import com.assurance.repository.VehiculeRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -68,9 +79,25 @@ class AssistanceVoyageServiceTest {
     @Mock private ElementFacturableRepository elementFacturableRepository;
     @Mock private LigneTarificationAssistanceRepository ligneTarificationAssistanceRepository;
     @Mock private ContractDirectModificationPolicy directModificationPolicy;
+    @Mock private VehiculeRepository vehiculeRepository;
 
     @InjectMocks
     private AssistanceVoyageService service;
+    private ActivityRecorderFixture activity;
+
+    @BeforeEach
+    void configureActivity() {
+        TenantContext.setCurrentAgence(7L);
+        activity = new ActivityRecorderFixture();
+        ReflectionTestUtils.setField(service, "activityRecorder", activity.recorder);
+        ReflectionTestUtils.setField(service, "assistanceActivity", new AssistanceActivity(contratRepository,
+                assistanceContratRepository, vehiculeRepository, ligneTarificationAssistanceRepository));
+    }
+
+    @AfterEach
+    void clearTenant() {
+        TenantContext.clear();
+    }
 
     @Test
     void quoteUsesSixMonthTariffAndAppliesConfiguredPromotion() {
@@ -123,7 +150,7 @@ class AssistanceVoyageServiceTest {
         agence.setId(7L);
         BrancheAssurance branche = BrancheAssurance.builder().code("ASSISTANCE").build();
         branche.setId(3L);
-        CompagnieAssistance compagnie = CompagnieAssistance.builder().actif(true).build();
+        CompagnieAssistance compagnie = CompagnieAssistance.builder().nom("Assistance Monde").actif(true).build();
         compagnie.setId(10L);
         ProduitAssistance produit = ProduitAssistance.builder()
                 .compagnieAssistance(compagnie)
@@ -156,11 +183,23 @@ class AssistanceVoyageServiceTest {
         when(produitAssistanceRepository.findById(20L)).thenReturn(Optional.of(produit));
         when(agenceRepository.findById(7L)).thenReturn(Optional.of(agence));
         when(brancheAssuranceRepository.findByCodeIgnoreCase("ASSISTANCE")).thenReturn(Optional.of(branche));
+        var savedContract = new java.util.concurrent.atomic.AtomicReference<Contrat>();
+        var savedAssistance = new java.util.concurrent.atomic.AtomicReference<AssistanceContrat>();
         when(contratRepository.save(any(Contrat.class))).thenAnswer(invocation -> {
             Contrat draft = invocation.getArgument(0);
             draft.setId(30L);
+            savedContract.set(draft);
             return draft;
         });
+        when(contratRepository.findByAgenceIdAndId(7L, 30L)).thenAnswer(call -> Optional.ofNullable(savedContract.get()));
+        when(assistanceContratRepository.save(any(AssistanceContrat.class))).thenAnswer(call -> {
+            AssistanceContrat saved = call.getArgument(0);
+            saved.setId(50L);
+            savedAssistance.set(saved);
+            return saved;
+        });
+        when(assistanceContratRepository.findByContratIdAndContratAgenceIdOrderByCreatedAtDesc(30L, 7L))
+                .thenAnswer(call -> List.of(savedAssistance.get()));
         when(assistanceContratRepository.findByContratIdAndActifTrueOrderByCreatedAtDesc(30L))
                 .thenReturn(List.of());
         when(clientRepository.findByAgenceIdAndId(7L, 40L)).thenReturn(Optional.of(subscriber));
@@ -177,7 +216,59 @@ class AssistanceVoyageServiceTest {
                         && draft.getAgence().getId().equals(7L)
         ));
         verify(elementFacturableRepository, never()).save(any());
-        verifyNoInteractions(mouvementContratRepository, ligneTarificationAssistanceRepository);
+        verifyNoInteractions(mouvementContratRepository);
+        verify(ligneTarificationAssistanceRepository, never()).save(any());
+        verify(ligneTarificationAssistanceRepository, never()).deleteByAssistanceContratId(any());
+        verify(activity.events).save(org.mockito.ArgumentMatchers.argThat(event -> event.getAction() == ActivityAction.CREATED
+                && event.getReferencesJson().contains("Sara Amrani") && event.getReferencesJson().contains("ASSISTANCE")
+                && !event.getChangesJson().contains("chemin")));
+    }
+
+    @Test
+    void linkedAssistanceSnapshotIgnoresDecimalScaleButKeepsBillingState() {
+        AssistanceContrat assistance = AssistanceContrat.builder().primeNette(new BigDecimal("120.0"))
+                .primeTotale(new BigDecimal("144.00")).actif(true).build();
+        var before = AssistanceActivity.snapshot(assistance);
+        assistance.setPrimeNette(new BigDecimal("120.00"));
+        assertThat(ActivityValues.changes(before, AssistanceActivity.snapshot(assistance))).isEmpty();
+
+        assistance.setActif(false);
+        assertThat(ActivityValues.changes(before, AssistanceActivity.snapshot(assistance)))
+                .anySatisfy(change -> assertThat(change.label()).isEqualTo("Actif"));
+    }
+
+    @Test
+    void recreatingTravelPricingRowsDoesNotLookLikeAnEdit() {
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        Contrat contract = Contrat.builder().agence(agency).numeroDossier("AST-26-000030").build();
+        contract.setId(30L);
+        AssistanceContrat assistance = AssistanceContrat.builder().contrat(contract).produit("Voyage Monde").build();
+        assistance.setId(50L);
+        Client insured = Client.builder().prenom("Sara").nom("Amrani").build();
+        insured.setId(40L);
+        TarifProduitAssistance tariff = TarifProduitAssistance.builder().dateDebut(LocalDate.of(2026, 1, 1))
+                .dureeMois(12).ageMin(18).ageMax(65).build();
+        LigneTarificationAssistance oldLine = LigneTarificationAssistance.builder().assistanceContrat(assistance)
+                .assure(insured).tarifProduitAssistance(tariff).age(36).primeNette(new BigDecimal("120.0"))
+                .primeTotale(new BigDecimal("144.00")).build();
+        oldLine.setId(1L);
+        LigneTarificationAssistance replacement = LigneTarificationAssistance.builder().assistanceContrat(assistance)
+                .assure(insured).tarifProduitAssistance(tariff).age(36).primeNette(new BigDecimal("120.00"))
+                .primeTotale(new BigDecimal("144.00")).build();
+        replacement.setId(2L);
+        when(contratRepository.findByAgenceIdAndId(7L, 30L)).thenReturn(Optional.of(contract));
+        when(assistanceContratRepository.findByContratIdAndContratAgenceIdOrderByCreatedAtDesc(30L, 7L)).thenReturn(List.of(assistance));
+        when(ligneTarificationAssistanceRepository.findByAssistanceContratContratIdAndAssistanceContratContratAgenceIdOrderByIdAsc(30L, 7L))
+                .thenReturn(List.of(oldLine), List.of(replacement));
+        AssistanceActivity snapshots = new AssistanceActivity(contratRepository, assistanceContratRepository,
+                vehiculeRepository, ligneTarificationAssistanceRepository);
+
+        var before = snapshots.capture(7L, 30L);
+        var after = snapshots.capture(7L, 30L);
+
+        assertThat(AssistanceActivity.command(before, after, ActivityAction.UPDATED,
+                "Assistance voyage modifiee", "ASSISTANCE_TRAVEL_UPDATE").changes()).isEmpty();
     }
 
     private QuoteAssistanceVoyageRequest request(int durationMonths) {

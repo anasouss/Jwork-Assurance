@@ -15,10 +15,14 @@ export const MODULE_PERMISSION_PREFIXES = {
   companies: ["referentiel", "grille-tarifaire", "contact-compagnie"],
   crm: ["client"],
   compta: ["quittance", "reglement-client", "tresorerie", "bordereau-compagnie", "reglement-compagnie"],
-  administration: ["user", "role", "agence", "audit", "config"],
+  administration: ["user", "role", "agence", "audit", "activity", "config"],
 } as const;
 
 const routePermissionRules: readonly RoutePermissionRule[] = [
+  {
+    matches: startsWith("/app/admin/activite"),
+    anyOf: ["activity:view"],
+  },
   {
     matches: startsWith("/app/sinistre/declarer"),
     anyOf: ["sinistre:create"],

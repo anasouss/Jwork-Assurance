@@ -1,6 +1,8 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.RemplacerInstrumentReglementRequest;
+import com.assurance.activity.ActivityRecorderFixture;
+import com.assurance.activity.ActivityAction;
 import com.assurance.entity.*;
 import com.assurance.enums.*;
 import com.assurance.exception.BadRequestException;
@@ -16,6 +18,7 @@ import com.assurance.dto.request.AjouterMouvementRejetRequest;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.dto.response.SuiviRejetBancaireResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -54,11 +57,18 @@ class ReglementClientReplacementTest {
     private RejetBancaireRepository rejets;
     @InjectMocks
     private ReglementClientService service;
+    private ActivityRecorderFixture activity;
+
+    @BeforeEach
+    void activityRecorder() {
+        activity = new ActivityRecorderFixture();
+        ReflectionTestUtils.setField(service, "businessActivityRecorder", activity.recorder);
+    }
 
     @Test
     void repeatedSameDayRejectionsKeepDistinctReferencesAndExactRemittanceLinks() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -95,6 +105,7 @@ class ReglementClientReplacementTest {
         assertThat(recorded).extracting(event -> event.getRejet().getNumero()).containsExactly("REJ26-0001", "REJ26-0002");
         assertThat(recorded).extracting(event -> event.getRejet().getLigneRemise()).containsExactly(firstLine, secondLine);
         verify(rejets, times(2)).incrementSequence(7L, 2026);
+        verify(activity.events, times(2)).save(argThat(event -> event.getSubjectType() == com.assurance.activity.ActivityRecordType.REJET_BANCAIRE));
         when(instrumentRepository.findByIdAndAgenceId(24L, 7L)).thenReturn(Optional.of(instrument));
         when(remittanceLineRepository.findHistoryByAgenceIdAndInstrumentId(7L, 24L)).thenReturn(List.of(firstLine, secondLine));
         when(events.findByAgenceIdAndInstrumentIdOrderByDateOperationAscIdAsc(7L, 24L)).thenReturn(recorded);
@@ -110,7 +121,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionDetailsCannotReadAnotherAgencyAndWrongSlipCannotAllocateReference() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets, activity.recorder);
         assertThatThrownBy(() -> followUp.detailRejet(8L, 1L)).isInstanceOf(ResourceNotFoundException.class);
         verify(rejets).findByIdAndAgenceId(1L, 8L);
         Agence agency = Agence.builder().build();
@@ -130,7 +141,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionOperatorUsesAgencyScopedNameSnapshotRatherThanLoginEmail() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -153,7 +164,7 @@ class ReglementClientReplacementTest {
     @Test
     void unavailableOperatorNameDoesNotFallBackToEmail() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -176,7 +187,7 @@ class ReglementClientReplacementTest {
     @Test
     void historyIncludesLegacyRemittancesAndMergesRecordedEventsWithoutInventingOperators() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -221,7 +232,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionClientCardOnlyExposesIdentifiersMatchingTheClientType() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets);
+                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets, activity.recorder);
         Client client = Client.builder().typeClient(TypeClient.PERSONNE_PHYSIQUE)
                 .cin("CIN-001").passport("PASS-001").rc("RC-001").ice("ICE-001").iff("IF-001").build();
         SuiviRejetBancaireResponse.Client physical = ReflectionTestUtils.invokeMethod(followUp, "ficheClient", client);
@@ -251,7 +262,7 @@ class ReglementClientReplacementTest {
     @Test
     void rejectionIsSettledOnlyAfterEveryCounterValueIsConfirmedIncludingReplacementChains() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets);
+                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -276,7 +287,7 @@ class ReglementClientReplacementTest {
     @Test
     void preparingAResubmissionDoesNotMeanItHasBeenPresentedToTheBank() {
         var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
-                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets);
+                mock(MouvementRejetBancaireRepository.class), utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -289,7 +300,7 @@ class ReglementClientReplacementTest {
     @Test
     void manualFollowUpCannotInventSettlementOrReadAnotherAgency() {
         var events = mock(MouvementRejetBancaireRepository.class);
-        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository, events, utilisateurs, rejets, activity.recorder);
         Agence agency = Agence.builder().build();
         agency.setId(7L);
         ReglementClient payment = ReglementClient.builder().agence(agency).statut(StatutReglementClient.VALIDE).build();
@@ -305,6 +316,35 @@ class ReglementClientReplacementTest {
         assertThatThrownBy(() -> followUp.ajouter(7L, 1L, request)).isInstanceOf(BadRequestException.class);
         assertThatThrownBy(() -> followUp.detail(8L, 1L)).isInstanceOf(ResourceNotFoundException.class);
         verify(events, never()).save(any());
+    }
+
+    @Test
+    void explicitFollowUpNoteCreatesOneReadableActivityWithoutAffectingCollection() {
+        var events = mock(MouvementRejetBancaireRepository.class);
+        var followUp = new RejetBancaireSuiviService(instrumentRepository, remittanceLineRepository,
+                events, utilisateurs, rejets, activity.recorder);
+        Agence agency = Agence.builder().build();
+        agency.setId(7L);
+        ReglementClient payment = ReglementClient.builder().agence(agency).numero("REG-26-00001")
+                .statut(StatutReglementClient.VALIDE).build();
+        payment.setId(5L);
+        var instrument = followUpInstrument(payment, 1L, "100.00", StatutInstrumentReglement.REJETE, null);
+        instrument.setDateRejet(LocalDate.now().minusDays(1));
+        when(instrumentRepository.findByIdAndAgenceIdForUpdate(1L, 7L)).thenReturn(Optional.of(instrument));
+        when(instrumentRepository.findByIdAndAgenceId(1L, 7L)).thenReturn(Optional.of(instrument));
+        when(events.save(any())).thenAnswer(call -> call.getArgument(0));
+        AjouterMouvementRejetRequest request = new AjouterMouvementRejetRequest();
+        request.setStatut(StatutSuiviRejetBancaire.CONTENTIEUX);
+        request.setDateOperation(LocalDate.now());
+        request.setMotif("Dossier transmis au contentieux");
+        followUp.ajouter(7L, instrument.getId(), request);
+
+        assertThat(instrument.getStatut()).isEqualTo(StatutInstrumentReglement.REJETE);
+        verify(activity.events).save(argThat(event -> event.getAction() == ActivityAction.SAVED
+                && event.getReferencesJson().contains("REG-26-00001")
+                && event.getChangesJson().contains("Dossier transmis au contentieux")
+                && !event.getChangesJson().contains("CONTENTIEUX")));
+        verifyNoInteractions(tresorerieService);
     }
 
     private InstrumentReglementClient followUpInstrument(ReglementClient payment, Long id, String amount,
@@ -395,6 +435,8 @@ class ReglementClientReplacementTest {
                 .containsExactly(new BigDecimal("40.00"), new BigDecimal("60.00"));
         assertThat(original.getReglement().getMontantTotal()).isEqualByComparingTo("100.00");
         verifyNoInteractions(tresorerieService);
+        verify(activity.events).save(argThat(event -> event.getAction() == ActivityAction.REPLACED
+                && event.getReferencesJson().contains("CH-NEW") && event.getReferencesJson().contains("EF-NEW")));
     }
 
     @Test
@@ -403,6 +445,7 @@ class ReglementClientReplacementTest {
         bank();
         save();
         var account = CompteTresorerie.builder().agence(original.getAgence()).typeCompte(TypeCompteTresorerie.CAISSE).build();
+        account.setId(3L);
         when(tresorerieService.findCurrentUserCashAccount(7L)).thenReturn(account);
         service.replaceInstrument(7L, 9L, request(row(ModeReglementClient.ESPECES, "25.00", null),
                 row(ModeReglementClient.CHEQUE, "75.00", "CH-NEW")));
@@ -423,6 +466,7 @@ class ReglementClientReplacementTest {
         assertThat(original.getStatut()).isEqualTo(StatutInstrumentReglement.REJETE);
         assertThat(original.getReglement().getInstruments()).containsExactly(original);
         verifyNoInteractions(reglementRepository, tresorerieService);
+        verifyNoInteractions(activity.events);
     }
 
     @Test

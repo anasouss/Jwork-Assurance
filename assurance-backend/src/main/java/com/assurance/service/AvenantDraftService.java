@@ -1,5 +1,9 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.AmendmentActivity;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.dto.request.AvenantDraftContext;
 import com.assurance.dto.request.AvenantRequest;
 import com.assurance.dto.response.AvenantDraftResponse;
 import com.assurance.dto.response.AvenantDraftSummaryResponse;
@@ -19,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Collection;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +33,8 @@ public class AvenantDraftService {
     private final ContratRepository contratRepository;
     private final MouvementContratService mouvementContratService;
     private final ObjectMapper objectMapper;
+    private final AmendmentActivity amendmentActivity;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
     public AvenantDraftResponse get(Long agenceId, Long contratId, String codeTypeMouvement) {
@@ -60,6 +67,11 @@ public class AvenantDraftService {
 
     @Transactional
     public AvenantDraftResponse save(Long agenceId, Long contratId, AvenantRequest request) {
+        return save(agenceId, contratId, request, new AvenantDraftContext());
+    }
+
+    @Transactional
+    public AvenantDraftResponse save(Long agenceId, Long contratId, AvenantRequest request, AvenantDraftContext context) {
         if (request == null) {
             throw new BadRequestException("Le brouillon d'avenant est obligatoire");
         }
@@ -80,6 +92,9 @@ public class AvenantDraftService {
         TypeMouvementContrat typeMouvement = mouvementContratService.resolveTypeMouvementPourContrat(code, contrat.getTypeContrat());
         request.setCodeTypeMouvement(typeMouvement.getCode());
         request.setDateEcheance(contrat.getDateEcheance());
+        context.validate(request,
+                (int) contrat.getVehicules().stream().filter(v -> !Boolean.FALSE.equals(v.getActif())).count(),
+                (int) contrat.getRemorques().stream().filter(r -> !Boolean.FALSE.equals(r.getActif())).count());
 
         AvenantDraft draft = avenantDraftRepository
                 .findByAgenceIdAndContratIdAndTypeMouvementCodeIgnoreCase(agenceId, contratId, code)
@@ -88,17 +103,30 @@ public class AvenantDraftService {
                         .contrat(contrat)
                         .typeMouvement(typeMouvement)
                         .build());
+        boolean created = draft.getId() == null;
+        Map<String, String> before = created ? Map.of() : amendmentActivity.snapshot(read(draft.getPayloadJson()), contrat);
         draft.setPayloadJson(write(request));
-        return toResponse(avenantDraftRepository.save(draft));
+        draft = avenantDraftRepository.save(draft);
+        businessActivityRecorder.record(amendmentActivity.draftCommand(draft, before,
+                amendmentActivity.snapshot(read(draft.getPayloadJson()), contrat),
+                created ? ActivityAction.CREATED : ActivityAction.SAVED, context.title(),
+                "AMENDMENT_DRAFT_" + context.getIntent().name(), request));
+        return toResponse(draft);
     }
 
     @Transactional
     public void delete(Long agenceId, Long contratId, String codeTypeMouvement) {
         requireCode(codeTypeMouvement);
-        requireContrat(agenceId, contratId);
+        Contrat contrat = requireContrat(agenceId, contratId);
         avenantDraftRepository
                 .findByAgenceIdAndContratIdAndTypeMouvementCodeIgnoreCase(agenceId, contratId, codeTypeMouvement)
-                .ifPresent(avenantDraftRepository::delete);
+                .ifPresent(draft -> {
+                    AvenantRequest request = read(draft.getPayloadJson());
+                    var command = amendmentActivity.draftCommand(draft, amendmentActivity.snapshot(request, contrat), Map.of(),
+                            ActivityAction.DELETED, "Brouillon d'avenant supprime", "AMENDMENT_DRAFT_DELETION", request);
+                    avenantDraftRepository.delete(draft);
+                    businessActivityRecorder.record(command);
+                });
     }
 
     private Contrat requireContrat(Long agenceId, Long contratId) {

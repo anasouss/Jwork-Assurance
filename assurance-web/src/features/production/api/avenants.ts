@@ -10,6 +10,10 @@ import type {
 
 import { unwrapApiResponse as unwrap } from "./response";
 
+export type AvenantDraftSaveContext =
+  | { intent: "SAVE_DRAFT" | "PREPARE_VALIDATION" }
+  | { intent: "SAVE_TARGET"; targetKind: "VEHICULE" | "REMORQUE"; targetIndex: number; section: "INFO" | "GARANTIES" };
+
 export const avenantApi = {
   async getAvenantContext(contratId: string) {
     return unwrap(await apiFetch<ApiResponse<AvenantContext>>(`/api/v1/contrats/${contratId}/avenants/context`));
@@ -27,10 +31,11 @@ export const avenantApi = {
     );
   },
 
-  async saveAvenantDraft(contratId: string, request: AvenantRequest) {
+  async saveAvenantDraft(contratId: string, request: AvenantRequest,
+    context: AvenantDraftSaveContext = { intent: "SAVE_DRAFT" }) {
     return unwrap(
       await apiFetch<ApiResponse<AvenantDraft>>(
-        `/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}/brouillon`,
+        `/api/v1/contrats/${contratId}/avenants/${encodeURIComponent(request.codeTypeMouvement)}/brouillon${buildQueryString(context)}`,
         { method: "PUT", body: JSON.stringify(request) }
       )
     );

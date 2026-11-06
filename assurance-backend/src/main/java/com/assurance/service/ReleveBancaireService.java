@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.BankStatementActivity;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.dto.request.ConfigurationImportReleveBancaireRequest;
 import com.assurance.dto.request.EnregistrerRapprochementsBancairesRequest;
 import com.assurance.dto.response.ImportReleveBancaireResponse;
@@ -86,6 +89,7 @@ public class ReleveBancaireService {
     private final StorageLayoutService storageLayoutService;
     private final ObjectMapper objectMapper;
     private final EntityManager entityManager;
+    private final BusinessActivityRecorder activityRecorder;
 
     public ImportReleveBancaireResponse preview(
             MultipartFile file,
@@ -189,6 +193,8 @@ public class ReleveBancaireService {
                 imported.getLignes().add(toEntity(imported, source));
             }
             imported = importRepository.saveAndFlush(imported);
+            activityRecorder.record(BankStatementActivity.command(imported, imported.getLignes(), Map.of(), ActivityAction.IMPORTED,
+                    "Releve bancaire importe", "BANK_STATEMENT_IMPORT"));
             return detail(agenceId, imported.getId());
         } catch (IOException error) {
             deleteQuietly(storedFile);
@@ -265,6 +271,7 @@ public class ReleveBancaireService {
             EnregistrerRapprochementsBancairesRequest request
     ) {
         ImportReleveBancaire imported = findEditableImport(agenceId, importId);
+        var before = BankStatementActivity.snapshot(imported, lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId));
         reconciliationRepository.deleteByLigneReleveImportReleveIdAndStatut(
                 importId,
                 StatutRapprochementBancaire.SELECTIONNE
@@ -362,11 +369,23 @@ public class ReleveBancaireService {
         reconciliationRepository.saveAll(reconciliations);
         entityManager.flush();
         entityManager.clear();
+        activityRecorder.record(BankStatementActivity.command(findImport(agenceId, importId),
+                lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId), before, ActivityAction.SAVED,
+                "Correspondances bancaires enregistrees", "BANK_RECONCILIATION_SELECTION"));
         return detail(agenceId, importId);
     }
 
     @Transactional
     public ImportReleveBancaireResponse validate(Long agenceId, Long importId) {
+        ImportReleveBancaire imported = findEditableImport(agenceId, importId);
+        var before = BankStatementActivity.snapshot(imported, lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId));
+        return activityRecorder.perform(() -> validateRecord(agenceId, importId), response ->
+                BankStatementActivity.command(findImport(agenceId, importId),
+                        lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId), before, ActivityAction.RECONCILED,
+                        "Rapprochement bancaire valide", "BANK_RECONCILIATION_VALIDATION"));
+    }
+
+    private ImportReleveBancaireResponse validateRecord(Long agenceId, Long importId) {
         ImportReleveBancaire imported = findEditableImport(agenceId, importId);
         List<RapprochementBancaire> selected = reconciliationRepository
                 .findByLigneReleveImportReleveIdAndStatutOrderByIdAsc(

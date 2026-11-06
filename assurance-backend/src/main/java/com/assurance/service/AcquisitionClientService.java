@@ -1,5 +1,14 @@
 package com.assurance.service;
 
+import com.assurance.activity.AcquisitionActivity;
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.ActivityCommand;
+import com.assurance.activity.ActivityModule;
+import com.assurance.activity.ActivityRecordType;
+import com.assurance.activity.ActivityReference;
+import com.assurance.activity.ActivityValues;
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.ClientActivity;
 import com.assurance.dto.request.AcquisitionClientRequest;
 import com.assurance.dto.request.UpsertOrigineCommercialeRequest;
 import com.assurance.dto.response.AcquisitionClientResponse;
@@ -44,6 +53,7 @@ public class AcquisitionClientService {
     private final AgenceRepository agenceRepository;
     private final ClientRepository clientRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional
     public AcquisitionOptionsResponse options(Long agenceId) {
@@ -78,7 +88,12 @@ public class AcquisitionClientService {
                 .actif(request.getActif() == null || request.getActif())
                 .ordre(safeOrder(request.getOrdre()))
                 .build();
-        return toOriginResponse(origineRepository.save(origin));
+        origin = origineRepository.save(origin);
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM, ActivityAction.CREATED,
+                "Origine commerciale créée", "COMMERCIAL_ORIGIN_CREATION",
+                ActivityReference.of(ActivityRecordType.ORIGINE_COMMERCIALE, origin.getId(), origin.getLibelle()),
+                List.of(), ActivityValues.changes(null, AcquisitionActivity.origin(origin))));
+        return toOriginResponse(origin);
     }
 
     @Transactional
@@ -88,6 +103,7 @@ public class AcquisitionClientService {
             UpsertOrigineCommercialeRequest request
     ) {
         OrigineCommerciale origin = getOrigin(agenceId, originId);
+        var before = AcquisitionActivity.origin(origin);
         String code = normalizeCode(request.getCode());
         if (origineRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, originId)) {
             throw new BadRequestException("Une origine commerciale utilise déjà ce code");
@@ -101,7 +117,12 @@ public class AcquisitionClientService {
         origin.setType(request.getType());
         origin.setActif(request.getActif() == null || request.getActif());
         origin.setOrdre(safeOrder(request.getOrdre()));
-        return toOriginResponse(origineRepository.save(origin));
+        origin = origineRepository.save(origin);
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM, ActivityAction.UPDATED,
+                "Origine commerciale modifiée", "COMMERCIAL_ORIGIN_UPDATE",
+                ActivityReference.of(ActivityRecordType.ORIGINE_COMMERCIALE, origin.getId(), origin.getLibelle()),
+                List.of(), ActivityValues.changes(before, AcquisitionActivity.origin(origin))));
+        return toOriginResponse(origin);
     }
 
     @Transactional
@@ -146,6 +167,8 @@ public class AcquisitionClientService {
                         .client(client)
                         .saisiPar(actor)
                         .build());
+        boolean created = acquisition.getId() == null;
+        var before = created ? null : toResponse(acquisition);
         acquisition.setOrigineCommerciale(origin);
         acquisition.setRecommandeParUtilisateur(employee);
         acquisition.setRecommandeParClient(referringClient);
@@ -154,7 +177,12 @@ public class AcquisitionClientService {
                 : request.getDateAcquisition());
         acquisition.setNotes(trimToNull(request.getNotes()));
         acquisition.setModifiePar(actor);
-        return toResponse(acquisitionRepository.save(acquisition));
+        AcquisitionClientResponse response = toResponse(acquisitionRepository.save(acquisition));
+        businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.CRM,
+                created ? ActivityAction.SAVED : ActivityAction.UPDATED,
+                created ? "Acquisition commerciale renseignée" : "Acquisition commerciale modifiée", "CLIENT_ACQUISITION_SAVE",
+                ClientActivity.reference(client), AcquisitionActivity.references(before, response), AcquisitionActivity.changes(before, response)));
+        return response;
     }
 
     @Transactional(readOnly = true)

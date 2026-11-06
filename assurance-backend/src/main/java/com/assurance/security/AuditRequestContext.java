@@ -1,12 +1,14 @@
 package com.assurance.security;
 
 import com.assurance.enums.AuditOperationCode;
+import com.assurance.activity.ActivitySurface;
 
 public final class AuditRequestContext {
 
     private static final ThreadLocal<String> REQUEST_ID = new ThreadLocal<>();
     private static final ThreadLocal<String> SOURCE = new ThreadLocal<>();
     private static final ThreadLocal<AuditOperationCode> OPERATION_CODE = new ThreadLocal<>();
+    private static final ThreadLocal<ActivitySurface> ACTIVITY_SURFACE = new ThreadLocal<>();
 
     private AuditRequestContext() {
     }
@@ -42,5 +44,17 @@ public final class AuditRequestContext {
         REQUEST_ID.remove();
         SOURCE.remove();
         OPERATION_CODE.remove();
+        ACTIVITY_SURFACE.remove();
+    }
+
+    public static void setActivitySurface(ActivitySurface surface) {
+        ACTIVITY_SURFACE.set(surface);
+    }
+
+    public static ActivitySurface getActivitySurface() {
+        ActivitySurface surface = ACTIVITY_SURFACE.get();
+        if (surface != null) return surface;
+        return "IMPORT".equals(getSource()) ? ActivitySurface.IMPORT
+                : "SYSTEM".equals(getSource()) ? ActivitySurface.SYSTEM : ActivitySurface.API;
     }
 }

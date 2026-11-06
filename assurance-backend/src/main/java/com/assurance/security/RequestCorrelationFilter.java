@@ -1,5 +1,6 @@
 package com.assurance.security;
 
+import com.assurance.activity.ActivitySurface;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +31,7 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String requestId = resolveRequestId(request.getHeader(REQUEST_ID_HEADER));
         AuditRequestContext.set(requestId, "API");
+        AuditRequestContext.setActivitySurface(ActivitySurface.browserHint(request.getHeader("X-Activity-Surface")));
         MDC.put("requestId", requestId);
         response.setHeader(REQUEST_ID_HEADER, requestId);
         try {

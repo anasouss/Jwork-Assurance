@@ -1,5 +1,7 @@
 package com.assurance.service;
 
+import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.activity.TariffAdjustmentActivity;
 import com.assurance.dto.request.BulkUpdateTarifUsageRequest;
 import com.assurance.dto.response.AjustementTarifUsageResponse;
 import com.assurance.dto.response.PageMetadata;
@@ -42,6 +44,7 @@ public class TarifUsageAjustementService {
     private final AjustementTarifUsageRepository ajustementRepository;
     private final LigneAjustementTarifUsageRepository ligneRepository;
     private final UtilisateurRepository utilisateurRepository;
+    private final BusinessActivityRecorder activityRecorder;
 
     @Transactional
     public AjustementTarifUsageResponse apply(BulkUpdateTarifUsageRequest request) {
@@ -65,6 +68,7 @@ public class TarifUsageAjustementService {
                 .map(tarif -> createLine(batch, tarif, request))
                 .toList();
         ligneRepository.saveAll(lines);
+        activityRecorder.recordGlobalReference(TariffAdjustmentActivity.command(batch, lines));
         return toResponse(batch, lines, null);
     }
 

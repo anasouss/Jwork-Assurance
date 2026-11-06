@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface ContactCompagnieRepository extends JpaRepository<ContactCompagnie, Long> {
 
@@ -42,6 +43,10 @@ public interface ContactCompagnieRepository extends JpaRepository<ContactCompagn
 
     @EntityGraph(attributePaths = "compagnieAssurance")
     Optional<ContactCompagnie> findByIdAndAgenceId(Long id, Long agenceId);
+
+    @EntityGraph(attributePaths = "compagnieAssurance")
+    List<ContactCompagnie> findByAgenceIdAndCompagnieAssuranceIdAndServiceAndPrincipalTrue(
+            Long agenceId, Long compagnieId, ServiceContactCompagnie service);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

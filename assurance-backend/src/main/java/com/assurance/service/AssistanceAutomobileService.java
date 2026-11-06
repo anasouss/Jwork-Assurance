@@ -1,5 +1,8 @@
 package com.assurance.service;
 
+import com.assurance.activity.ActivityAction;
+import com.assurance.activity.AssistanceActivity;
+import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.dto.request.CreateAssistanceAutomobileRequest;
 import com.assurance.dto.request.CreateClientRequest;
 import com.assurance.dto.request.QuoteAssistanceAutomobileRequest;
@@ -100,6 +103,8 @@ public class AssistanceAutomobileService {
     private final ElementFacturableRepository elementFacturableRepository;
     private final AssistanceQuittanceService assistanceQuittanceService;
     private final ContractDirectModificationPolicy directModificationPolicy;
+    private final BusinessActivityRecorder activityRecorder;
+    private final AssistanceActivity assistanceActivity;
 
     @Transactional(readOnly = true)
     public AssistanceAutomobileQuoteResponse quote(QuoteAssistanceAutomobileRequest request) {
@@ -118,7 +123,9 @@ public class AssistanceAutomobileService {
             Long agenceId,
             CreateAssistanceAutomobileRequest request
     ) {
-        return createInternal(agenceId, request, null, null);
+        return activityRecorder.perform(() -> createInternal(agenceId, request, null, null), response ->
+                AssistanceActivity.command(null, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.CREATED, "Assistance automobile creee", "ASSISTANCE_AUTO_CREATE"));
     }
 
     @Transactional
@@ -128,6 +135,16 @@ public class AssistanceAutomobileService {
             String section,
             SaveAssistanceAutomobileDraftSectionRequest request
     ) {
+        var before = contratId == null ? null : assistanceActivity.capture(agenceId, contratId);
+        return activityRecorder.perform(() -> saveDraftSectionRecord(agenceId, contratId, section, request), response ->
+                AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
+                        before == null ? ActivityAction.CREATED : ActivityAction.SAVED,
+                        "Brouillon assistance automobile - " + assistanceSectionLabel(response.getSectionEnregistree()),
+                        "ASSISTANCE_AUTO_DRAFT_SECTION"));
+    }
+
+    private AssistanceDraftResponse saveDraftSectionRecord(Long agenceId, Long contratId, String section,
+            SaveAssistanceAutomobileDraftSectionRequest request) {
         CompagnieAssistance compagnie = requireCompany(request.getCompagnieAssistanceId());
         Contrat draft = contratId == null
                 ? createDraftContract(agenceId)
@@ -184,6 +201,14 @@ public class AssistanceAutomobileService {
             Long contratId,
             CreateAssistanceAutomobileRequest request
     ) {
+        var before = assistanceActivity.capture(agenceId, contratId);
+        return activityRecorder.perform(() -> finalizeDraftRecord(agenceId, contratId, request), response ->
+                AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.VALIDATED, "Assistance automobile validee", "ASSISTANCE_AUTO_FINALIZE"));
+    }
+
+    private AssistanceAutomobileCreationResponse finalizeDraftRecord(Long agenceId, Long contratId,
+            CreateAssistanceAutomobileRequest request) {
         Contrat draft = requireDraftContract(agenceId, contratId);
         requireDraftClient(draft, RoleClientContrat.SOUSCRIPTEUR, "souscripteur");
         requireDraftClient(draft, RoleClientContrat.PROPRIETAIRE, "assuré");
@@ -213,6 +238,13 @@ public class AssistanceAutomobileService {
             Long contratOrigineId,
             CreateAssistanceAutomobileRequest request
     ) {
+        return activityRecorder.perform(() -> renewRecord(agenceId, contratOrigineId, request), response ->
+                AssistanceActivity.command(null, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.RENEWED, "Assistance automobile renouvelee", "ASSISTANCE_AUTO_RENEW"));
+    }
+
+    private AssistanceAutomobileCreationResponse renewRecord(Long agenceId, Long contratOrigineId,
+            CreateAssistanceAutomobileRequest request) {
         Contrat source = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratOrigineId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratOrigineId));
         AssistanceContrat sourceAssistance = requireRenewableAssistance(source);
@@ -301,6 +333,14 @@ public class AssistanceAutomobileService {
             Long contratId,
             CreateAssistanceAutomobileRequest request
     ) {
+        var before = assistanceActivity.capture(agenceId, contratId);
+        return activityRecorder.perform(() -> updateRecord(agenceId, contratId, request), response ->
+                AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
+                        ActivityAction.UPDATED, "Assistance automobile modifiee", "ASSISTANCE_AUTO_UPDATE"));
+    }
+
+    private AssistanceAutomobileCreationResponse updateRecord(Long agenceId, Long contratId,
+            CreateAssistanceAutomobileRequest request) {
         validateSubscriptionDate(request.getDateSouscription(), request.getDateEffet());
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
@@ -366,6 +406,15 @@ public class AssistanceAutomobileService {
         );
         saveBillableElement(contrat, mouvement, assistance, element, produit, pricing);
         return toCreationResponse(contrat, assistance, souscripteur, pricing);
+    }
+
+    private String assistanceSectionLabel(String section) {
+        return switch (section) {
+            case "souscripteur" -> "Souscripteur";
+            case "proprietaire" -> "Proprietaire";
+            case "vehicule" -> "Vehicule";
+            default -> throw new IllegalStateException("Section d'assistance enregistree inconnue");
+        };
     }
 
     private Pricing price(

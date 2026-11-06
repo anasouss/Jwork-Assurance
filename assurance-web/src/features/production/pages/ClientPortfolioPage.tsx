@@ -15,6 +15,7 @@ import { natureLabels, statusLabels } from "@/features/sinistre/format";
 import type { SinistreSummary } from "@/features/sinistre/types";
 import { useAuthStore } from "@/store/auth-store";
 import { ClientDocuments } from "@/features/crm/components/ClientDocuments";
+import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
 import { clientApi } from "../api/clients";
 import type { ClientCrm } from "../types";
 import { moneyAmount } from "../utils/format";
@@ -252,41 +253,56 @@ function PortfolioRow({ main, documents }: { main: ReactNode; documents: ReactNo
 }
 
 function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
+  const [showProfile, setShowProfile] = useState(false);
+  const canViewClient = useAuthStore(state => state.user?.permissions.includes("client:view") ?? false);
   const client = portfolio.client;
   const clientName = client.nomAffichage || client.raisonSociale || client.nom || "Client";
   const clientSummary = client.codeClient
     ? `${clientName} - ${client.codeClient}`
     : clientName;
   return (
-    <section className="overflow-hidden rounded-lg border border-border/70 bg-card">
+    <section className="self-start overflow-hidden rounded-lg border border-border/70 bg-card">
       <SectionHeader
         icon={<UserRound className="size-4" />}
         title="Informations client"
         description={clientSummary}
         tone="emerald"
+        action={canViewClient && <Button type="button" size="sm" variant="outline" onClick={() => setShowProfile(true)}><UserRound className="size-4" />Voir la fiche client</Button>}
       />
-      <div className="grid gap-px border-b bg-border md:grid-cols-2 xl:grid-cols-4">
+      <dl className="grid gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-2 xl:grid-cols-3">
         <InfoCell
-          className="md:col-span-2"
           label="Adresse"
           value={[client.adresse, client.ville].filter(Boolean).join(", ")}
         />
         <InfoCell
           label="Téléphone"
-          value={client.telephone || client.telephones?.find((item) => item.principal)?.numero}
+          value={client.telephones?.find((item) => item.principal)?.numero || client.telephone}
           icon={<Phone className="size-3.5" />}
         />
         <InfoCell label="E-mail" value={client.email} />
         {client.typeClient === "PERSONNE_PHYSIQUE" ? (
-          <InfoCell label="CIN" value={client.cin} />
+          <>
+            <InfoCell label="CIN" value={client.cin} />
+            {client.cinValidite && <InfoCell label="Validité CIN" value={formatDate(client.cinValidite)} />}
+          </>
         ) : (
           <>
             <InfoCell label="RC" value={client.rc} />
             <InfoCell label="ICE" value={client.ice} />
+            <InfoCell label="Identifiant fiscal (IF)" value={client.iff} />
           </>
         )}
         <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
-      </div>
+      </dl>
+      {client.typeClient === "PERSONNE_PHYSIQUE" && (client.numeroPermis || client.dateDelivrancePermis || client.dateValiditePermis) && <div className="border-t px-5 py-4">
+        <h3 className="mb-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200">Permis de conduire</h3>
+        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+          {client.numeroPermis && <InfoCell label="Numéro de permis" value={client.numeroPermis} />}
+          {client.dateDelivrancePermis && <InfoCell label="Date de délivrance" value={formatDate(client.dateDelivrancePermis)} />}
+          {client.dateValiditePermis && <InfoCell label="Date de validité" value={formatDate(client.dateValiditePermis)} />}
+        </dl>
+      </div>}
+      {showProfile && <ClientSummaryDialog clientId={client.id} onClose={() => setShowProfile(false)} />}
     </section>
   );
 }
@@ -771,11 +787,11 @@ function InfoCell({
   className?: string;
 }) {
   return (
-    <div className={`flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 bg-card px-5 py-4 text-sm ${className}`}>
-      <span className="font-medium uppercase text-muted-foreground">{label} :</span>
-      <span className="flex min-h-5 min-w-0 items-center gap-1.5 font-medium break-words">
-        {icon}{value || "-"}
-      </span>
+    <div className={`min-w-0 space-y-1 text-sm ${className}`}>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="flex min-h-5 min-w-0 items-start gap-1.5 break-words font-medium [&>svg]:mt-0.5 [&>svg]:shrink-0">
+        {icon}<span className="min-w-0 break-words">{value || "-"}</span>
+      </dd>
     </div>
   );
 }

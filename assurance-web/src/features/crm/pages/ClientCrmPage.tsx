@@ -41,8 +41,8 @@ import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
-import { ClientRecordDialog } from "@/features/crm/components/ClientRecordDialog";
 import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
+import { ClientProfileDetails } from "@/features/crm/components/ClientProfileDetails";
 import { clientRecordDraft } from "../client-record";
 import { CreateClientGroupDialog } from "@/features/crm/components/CreateClientGroupDialog";
 import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
@@ -592,6 +592,17 @@ function ClientDialog({
               <Field label="Prénom" required>
                 <Input value={draft.prenom ?? ""} onChange={(event) => update({ prenom: event.target.value })} />
               </Field>
+              {client && <>
+                <Field label="Date de naissance"><DatePicker date={draft.dateNaissance} onSelect={date => update({ dateNaissance: toDateOnly(date) })} /></Field>
+                <Field label="Nationalité"><Input value={draft.nationalite ?? ""} onChange={event => update({ nationalite: event.target.value })} /></Field>
+                <Field label="Passeport"><Input value={draft.passport ?? ""} onChange={event => update({ passport: event.target.value })} /></Field>
+                <Field label="Validité passeport"><DatePicker date={draft.passportValidite} onSelect={date => update({ passportValidite: toDateOnly(date) })} /></Field>
+                <Field label="Carte de résidence"><Input value={draft.carteResidence ?? ""} onChange={event => update({ carteResidence: event.target.value })} /></Field>
+                <h3 className="border-t pt-4 text-sm font-semibold text-blue-800 sm:col-span-2 lg:col-span-3 dark:text-blue-200">Permis de conduire</h3>
+                <Field label="Numéro de permis"><Input value={draft.numeroPermis ?? ""} onChange={event => update({ numeroPermis: event.target.value })} /></Field>
+                <Field label="Date de délivrance"><DatePicker date={draft.dateDelivrancePermis} onSelect={date => update({ dateDelivrancePermis: toDateOnly(date) })} /></Field>
+                <Field label="Validité du permis"><DatePicker date={draft.dateValiditePermis} onSelect={date => update({ dateValiditePermis: toDateOnly(date) })} /></Field>
+              </>}
             </>
           ) : (
             <>
@@ -610,8 +621,10 @@ function ClientDialog({
               <Field label="N° d'affiliation CNSS">
                 <Input value={draft.cnss ?? ""} onChange={(event) => update({ cnss: event.target.value })} />
               </Field>
+              {client && <Field label="Patente"><Input value={draft.patente ?? ""} onChange={event => update({ patente: event.target.value })} /></Field>}
             </>
           )}
+          {client && <h3 className="border-t pt-4 text-sm font-semibold text-blue-800 sm:col-span-2 lg:col-span-3 dark:text-blue-200">Coordonnées</h3>}
           <Field label="Ville" required>
             <AutocompleteSelect
               value={draft.villeId ?? ""}
@@ -733,7 +746,7 @@ function ClientDetail({
 
   return (
     <section className="min-w-0 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-blue-100 bg-blue-50/50 p-5 dark:border-blue-900 dark:bg-blue-950/20">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom}</h2>
@@ -745,49 +758,27 @@ function ClientDetail({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {onEdit && <Button type="button" variant="outline" onClick={() => onEdit(client)}><Pencil className="size-4" />Modifier</Button>}
+          {onEdit && <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => onEdit(client)}><Pencil className="size-4" />Modifier</Button>}
           <Button asChild type="button" variant="outline" className="border-emerald-200 text-emerald-950 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-950/30">
             <Link to={productionUrl}><FolderOpen className="size-4" />Portefeuille client</Link>
           </Button>
           <Button asChild type="button" variant="outline" className="border-amber-200 text-amber-950 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-100 dark:hover:bg-amber-950/30">
             <Link to={accountingUrl}><ReceiptText className="size-4" />Relevés et factures</Link>
           </Button>
-          {canManageClients ? (
-            <Button type="button" variant="outline" onClick={onAssignGroup} className="border-violet-200 text-violet-950 hover:bg-violet-50 dark:border-violet-900 dark:text-violet-100 dark:hover:bg-violet-950/30">
-              <Users className="size-4" />Gérer le groupe
-            </Button>
-          ) : null}
+          {canViewClaims && <Button asChild type="button" variant="outline"><Link to={claimsUrl}><ShieldCheck className="size-4 text-blue-700 dark:text-blue-300" />Sinistres</Link></Button>}
         </div>
       </div>
 
-      <div className="grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Code client" value={client.codeClient || "-"} tone="blue" />
-        <Metric label="Organisation" value={client.groupe?.libelle ?? "Indépendant"} tone="violet" />
-        <Metric label="Délai de paiement" value={`${activePaymentCondition?.delaiJours ?? 60} jours`} tone="amber" />
-        <Metric label="Contrats" value={String(detail.contrats.length)} tone="emerald" />
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+        <span>Contrats : <strong className="font-medium text-foreground">{detail.contrats.length}</strong></span>
+        {activePaymentCondition && <span>Condition de paiement active : <strong className="font-medium text-foreground">{activePaymentCondition.delaiJours} jours</strong></span>}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <PortfolioSection title="Informations client" icon={<Users className="size-4" />} tone="blue">
-            <dl className="grid gap-1 text-sm sm:grid-cols-2 sm:gap-x-6">
-              <Info label="Identifiant" value={client.rc || client.cin || client.ice} />
-              {client.typeClient === "PERSONNE_MORALE" ? <>
-                <Info label="ICE" value={client.ice} />
-                <Info label="IF" value={client.iff} />
-                <Info label="CNSS" value={client.cnss} />
-              </> : null}
-              <Info label="Adresse" value={[client.adresse, client.ville].filter(Boolean).join(", ")} />
-              <Info label="Téléphones" value={client.telephones?.length
-                ? client.telephones.map((telephone) => `${telephone.numero}${telephone.principal ? " (principal)" : ""}${telephone.whatsapp ? " · WhatsApp" : ""}`).join(" / ")
-                : client.telephone} />
-              <Info label="Email" value={client.email} />
-              <Info label="Organisation" value={client.groupe?.libelle ?? "Client indépendant"} />
-            </dl>
-        </PortfolioSection>
+      <ClientProfileDetails client={client} className="border-b py-4 lg:grid-cols-2" />
+      <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-2">
         <PortfolioSection
             title="Acquisition commerciale"
             icon={<Megaphone className="size-4" />}
-            tone="cyan"
             action={canManageClients ? (
               <Button
                 size="sm"
@@ -823,7 +814,6 @@ function ClientDetail({
         <PortfolioSection
             title="Organisation et groupe"
             icon={<Building2 className="size-4" />}
-            tone="violet"
             action={canManageClients ? <Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button> : undefined}
           >
             {detail.groupes.length ? detail.groupes.map((groupe) => (
@@ -841,7 +831,6 @@ function ClientDetail({
         <PortfolioSection
             title="Conditions de paiement"
             icon={<CalendarClock className="size-4" />}
-            tone="amber"
             action={canManageClients ? (
               <Button size="sm" variant="outline" onClick={() => setPaymentConditionOpen(true)}>
                 <Plus className="size-4" />
@@ -849,12 +838,14 @@ function ClientDetail({
               </Button>
             ) : undefined}
           >
-            <PaymentConditionHistory
+            {paymentConditionsQuery.isError ? <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive">
+              <p>Chargement des conditions impossible.</p><Button size="sm" variant="outline" onClick={() => void paymentConditionsQuery.refetch()}>Réessayer</Button>
+            </div> : <PaymentConditionHistory
               rows={paymentConditionsQuery.data ?? []}
               loading={paymentConditionsQuery.isLoading}
-            />
+            />}
         </PortfolioSection>
-        <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />} tone="emerald">
+        {groupMembers.length > 0 && <PortfolioSection title="Entités liées" icon={<Building2 className="size-4" />}>
             {groupMembers.length ? (
               <div className="divide-y">
                 {groupMembers.slice(0, 8).map((member) => (
@@ -866,18 +857,9 @@ function ClientDetail({
                 ))}
               </div>
             ) : <EmptyState text="Aucune autre entité liée." />}
-        </PortfolioSection>
-        <PortfolioSection title="Documents client" icon={<Paperclip className="size-4" />} tone="blue">
+        </PortfolioSection>}
+        <PortfolioSection title="Documents client" icon={<Paperclip className="size-4" />}>
           <ClientDocuments clientId={client.id} typeClient={client.typeClient} owner={client} />
-        </PortfolioSection>
-        <PortfolioSection title="Espaces liés" icon={<ArrowRight className="size-4" />} tone="amber">
-            <div className="grid gap-2">
-              <WorkspaceLink to={productionUrl} icon={<FolderOpen className="size-4" />} title="Portefeuille client" detail={`${detail.contrats.length} contrat(s) en production`} tone="emerald" />
-              <WorkspaceLink to={accountingUrl} icon={<ReceiptText className="size-4" />} title="Relevés et factures" detail="Espace comptable du payeur" tone="amber" />
-              {canViewClaims ? (
-                <WorkspaceLink to={claimsUrl} icon={<ShieldCheck className="size-4" />} title="Dossiers sinistre" detail="Déclarations et suivi des dossiers" tone="blue" />
-              ) : null}
-            </div>
         </PortfolioSection>
       </div>
 
@@ -921,7 +903,7 @@ function ClientDetail({
           });
         }}
       />
-      {linkedClient && <ClientRecordDialog clientId={linkedClient.id} name={linkedClient.name} onClose={() => setLinkedClient(undefined)} />}
+      {linkedClient && <ClientSummaryDialog clientId={linkedClient.id} onEdit={onEdit} onClose={() => setLinkedClient(undefined)} />}
     </section>
   );
 }
@@ -944,14 +926,7 @@ function PaymentConditionHistory({
 
   if (loading) return <Skeleton className="h-24 w-full" />;
   if (!rows.length) {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm">Délai appliqué : <strong>60 jours</strong></p>
-        <p className="text-xs text-muted-foreground">
-          Aucune condition particulière n’est enregistrée. Le délai par défaut sera proposé sur les factures.
-        </p>
-      </div>
-    );
+    return <p className="py-2 text-sm text-muted-foreground">Aucune condition particulière enregistrée.</p>;
   }
   return (
     <div className="divide-y rounded-md border">
@@ -1161,65 +1136,25 @@ function uniqueGroupMembers(groups: GroupeClient[], currentClientId: string) {
   return [...members.values()].sort((left, right) => left.clientNom.localeCompare(right.clientNom, "fr"));
 }
 
-type PortfolioTone = "blue" | "violet" | "emerald" | "amber" | "cyan";
-
-function PortfolioSection({ title, icon, action, children, tone = "blue" }: {
+function PortfolioSection({ title, icon, action, children }: {
   title: string;
   icon: ReactNode;
   action?: ReactNode;
   children: ReactNode;
-  tone?: PortfolioTone;
 }) {
-  const headerTone: Record<PortfolioTone, string> = {
-    blue: "border-blue-100 bg-blue-50/70 text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100",
-    violet: "border-violet-100 bg-violet-50/70 text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100",
-    emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100",
-    amber: "border-amber-100 bg-amber-50/70 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100",
-    cyan: "border-cyan-100 bg-cyan-50/70 text-cyan-950 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-100",
-  };
   return (
-    <section className="min-w-0 overflow-hidden rounded-md border">
-      <header className={`flex min-h-11 items-center justify-between gap-3 border-b px-4 py-2 ${headerTone[tone]}`}>
-        <h3 className="flex items-center gap-2 font-semibold">{icon}{title}</h3>
+    <section className="min-w-0 border-b pb-5">
+      <header className="flex min-h-9 flex-wrap items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-200">{icon}{title}</h3>
         {action}
       </header>
-      <div className="p-4">{children}</div>
+      <div className="pt-3">{children}</div>
     </section>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-md border border-dashed bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">{text}</div>;
-}
-
-function WorkspaceLink({ to, icon, title, detail, tone }: {
-  to: string;
-  icon: ReactNode;
-  title: string;
-  detail: string;
-  tone: "blue" | "emerald" | "amber";
-}) {
-  const styles = {
-    blue: {
-      link: "hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/30",
-      icon: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-    },
-    emerald: {
-      link: "hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30",
-      icon: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-    },
-    amber: {
-      link: "hover:border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30",
-      icon: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-    },
-  }[tone];
-  return (
-    <Link to={to} className={`flex min-w-0 items-center gap-3 rounded-md border p-3 transition-colors ${styles.link}`}>
-      <span className={`grid size-9 shrink-0 place-items-center rounded-md ${styles.icon}`}>{icon}</span>
-      <span className="min-w-0 flex-1"><strong className="block truncate text-sm">{title}</strong><span className="block truncate text-xs text-muted-foreground">{detail}</span></span>
-      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-    </Link>
-  );
+  return <p className="py-2 text-sm text-muted-foreground">{text}</p>;
 }
 
 function AssignmentDialog({
@@ -1305,51 +1240,11 @@ function AssignmentDialog({
   );
 }
 
-type MetricTone = "blue" | "violet" | "emerald" | "amber";
-
-function Metric({ label: metricLabel, value, alert, tone = "blue" }: {
-  label: string;
-  value: string;
-  alert?: boolean;
-  tone?: MetricTone;
-}) {
-  const styles: Record<MetricTone, { surface: string; label: string; value: string }> = {
-    blue: {
-      surface: "border-t-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20",
-      label: "text-blue-700 dark:text-blue-300",
-      value: "text-blue-950 dark:text-blue-100",
-    },
-    violet: {
-      surface: "border-t-2 border-violet-500 bg-violet-50/50 dark:bg-violet-950/20",
-      label: "text-violet-700 dark:text-violet-300",
-      value: "text-violet-950 dark:text-violet-100",
-    },
-    emerald: {
-      surface: "border-t-2 border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20",
-      label: "text-emerald-700 dark:text-emerald-300",
-      value: "text-emerald-950 dark:text-emerald-100",
-    },
-    amber: {
-      surface: "border-t-2 border-amber-500 bg-amber-50/50 dark:bg-amber-950/20",
-      label: "text-amber-700 dark:text-amber-300",
-      value: "text-amber-950 dark:text-amber-100",
-    },
-  };
-  const style = styles[tone];
-
-  return (
-    <div className={`p-4 ${style.surface}`}>
-      <div className={`text-xs font-medium uppercase ${style.label}`}>{metricLabel}</div>
-      <div className={`mt-1 text-lg font-semibold ${alert ? "text-red-600 dark:text-red-400" : style.value}`}>{value}</div>
-    </div>
-  );
-}
-
 function Info({ label: infoLabel, value }: { label: string; value?: string | null }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] gap-3 border-b py-2 last:border-0">
-      <dt className="text-muted-foreground">{infoLabel}</dt>
-      <dd className="font-medium">{value || "-"}</dd>
+    <div className="grid min-w-0 gap-1 py-2">
+      <dt className="text-xs text-muted-foreground">{infoLabel}</dt>
+      <dd className="break-words font-medium">{value || "-"}</dd>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, Building2, FolderOpen, Mail, MapPin, Pencil, Phone, ReceiptText, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowUpRight, Building2, FolderOpen, Pencil, ReceiptText, ShieldCheck, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import type { ClientResponse } from "@/features/production/types";
 import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
 import { useAuthStore } from "@/store/auth-store";
 import { ClientDocuments } from "./ClientDocuments";
+import { ClientProfileDetails } from "./ClientProfileDetails";
 
 export function ClientSummaryDialog({ clientId, onClose, onEdit }: {
   clientId: string;
@@ -59,30 +60,7 @@ export function ClientSummaryDialog({ clientId, onClose, onEdit }: {
                 {canOpen(accounting) && <Button asChild size="sm" variant="outline"><Link to={accounting}><ReceiptText className="size-4 text-orange-700 dark:text-orange-300" />Relevés et factures</Link></Button>}
                 {canOpen(claims) && <Button asChild size="sm" variant="outline"><Link to={claims}><ShieldCheck className="size-4 text-rose-700 dark:text-rose-300" />Sinistres</Link></Button>}
               </nav>
-              <section className="space-y-3">
-                <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">Identité et coordonnées</h3>
-                <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
-                  {client.typeClient === "PERSONNE_MORALE" ? <>
-                    <Info label="RC">{client.rc || "-"}</Info>
-                    {client.ice && <Info label="ICE">{client.ice}</Info>}
-                    {client.iff && <Info label="Identifiant fiscal">{client.iff}</Info>}
-                    {client.cnss && <Info label="CNSS">{client.cnss}</Info>}
-                  </> : <>
-                    <Info label="CIN">{client.cin || "-"}</Info>
-                    {client.passport && <Info label="Passeport">{client.passport}</Info>}
-                    {client.carteResidence && <Info label="Carte de résidence">{client.carteResidence}</Info>}
-                  </>}
-                  <Info label="Téléphones" icon={<Phone className="size-4" />}>
-                    {client.telephones?.length ? <ul className="space-y-1">{client.telephones.map((phone, index) => <li key={`${phone.numero}-${index}`}>
-                      <a className="text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" href={`tel:${phone.numero.replace(/\s/g, "")}`}>{phone.numero}</a>
-                      {phone.principal && <span className="ml-2 text-xs text-muted-foreground">Principal</span>}
-                      {phone.whatsapp && <span className="ml-2 text-xs text-emerald-700 dark:text-emerald-300">WhatsApp</span>}
-                    </li>)}</ul> : client.telephone ? <a className="text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" href={`tel:${client.telephone.replace(/\s/g, "")}`}>{client.telephone}</a> : "-"}
-                  </Info>
-                  {client.email && <Info label="E-mail" icon={<Mail className="size-4" />}><a className="break-all text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" href={`mailto:${client.email}`}>{client.email}</a></Info>}
-                  {(client.adresse || client.ville) && <div className="sm:col-span-2"><Info label="Adresse" icon={<MapPin className="size-4" />}>{[client.adresse, client.ville].filter(Boolean).join(", ")}</Info></div>}
-                </dl>
-              </section>
+              <ClientProfileDetails client={client} />
               <dl className="grid gap-4 border-y py-4 text-sm sm:grid-cols-2">
                 <Info label="Organisation">{detail.groupes.length ? <ul className="space-y-1">{detail.groupes.map(group => <li key={group.id}>
                   <span className="font-medium">{group.libelle}</span><span className="ml-2 text-xs text-muted-foreground">{group.code}</span>

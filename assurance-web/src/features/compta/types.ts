@@ -511,6 +511,7 @@ export type PaymentInstrument = {
   reglementId: string;
   clientPayeurId?: string | null;
   numeroReglement: string;
+  statutReglement?: ClientPaymentStatus | null;
   payeurNom: string;
   mode: ClientPaymentMode;
   statut: PaymentInstrumentStatus;

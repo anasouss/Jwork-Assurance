@@ -40,6 +40,9 @@ class ReglementClientServicePolicyTest {
     @InjectMocks
     private ReglementClientService service;
 
+    @Mock
+    private com.assurance.repository.InstrumentReglementClientRepository recordedInstrumentRepository;
+
     @Mock private com.assurance.repository.ContratRepository conventionContractRepository;
     @Mock private com.assurance.repository.EcheanceFacturationConventionRepository conventionScheduleRepository;
     @InjectMocks private FacturationConventionService conventionBilling;
@@ -47,6 +50,32 @@ class ReglementClientServicePolicyTest {
     @BeforeEach
     void activityRecorder() {
         ReflectionTestUtils.setField(service, "businessActivityRecorder", new ActivityRecorderFixture().recorder);
+    }
+
+    @Test
+    void recordedInstrumentSearchScopesEscapesAndBoundsTheRepositoryRequest() {
+        when(recordedInstrumentRepository.searchRecordedReferences(eq(7L), eq("%ref!_!%!!%"),
+                any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+        var result = service.searchRecordedInstruments(7L, " REF_%! ", null, null, null, null,
+                null, null, "montantTotal", "asc", -2, 500);
+        assertThat(result.getRows()).isEmpty();
+        var pageable = org.mockito.ArgumentCaptor.forClass(org.springframework.data.domain.Pageable.class);
+        verify(recordedInstrumentRepository).searchRecordedReferences(eq(7L), eq("%ref!_!%!!%"),
+                any(), any(), any(), any(), any(), any(), pageable.capture());
+        assertThat(pageable.getValue().getPageNumber()).isZero();
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(100);
+        assertThat(pageable.getValue().getSort().getOrderFor("montant").isAscending()).isTrue();
+    }
+
+    @Test
+    void recordedInstrumentSearchRejectsEmptyReferencesAndInvalidDates() {
+        assertThatThrownBy(() -> service.searchRecordedInstruments(7L, " ", null, null, null, null,
+                null, null, "numero", "desc", 0, 25)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.searchRecordedInstruments(7L, "123", java.time.LocalDate.of(2026, 2, 1),
+                java.time.LocalDate.of(2026, 1, 1), null, null, null, null, "numero", "desc", 0, 25))
+                .isInstanceOf(BadRequestException.class);
+        org.mockito.Mockito.verifyNoInteractions(recordedInstrumentRepository);
     }
 
     @Test

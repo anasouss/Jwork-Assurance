@@ -243,6 +243,26 @@ public class ReglementClientController {
         )));
     }
 
+    @GetMapping("/recherche-moyens")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> recordedInstruments(
+            @RequestParam String reference,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu,
+            @RequestParam(required = false) String payeurType,
+            @RequestParam(required = false) Long payeurId,
+            @RequestParam(required = false) ModeReglementClient mode,
+            @RequestParam(required = false) StatutInstrumentReglement statut,
+            @RequestParam(defaultValue = "dateReglement") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDirection,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchRecordedInstruments(
+                TenantContext.getCurrentAgence(), reference, dateDu, dateAu, payeurType, payeurId,
+                mode, statut, sortBy, sortDirection, page, size)));
+    }
+
     @GetMapping("/journal/utilisateurs")
     @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
     public ResponseEntity<ApiResponse<List<UtilisateurTresorerieResponse>>> journalUsers() {

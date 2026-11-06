@@ -26,6 +26,38 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             select instrument
             from InstrumentReglementClient instrument
             join instrument.reglement payment
+            where instrument.agence.id = :agenceId
+              and payment.agence.id = :agenceId
+              and lower(instrument.referenceInstrument) like :reference escape '!'
+              and (:dateDu is null or payment.dateReglement >= :dateDu)
+              and (:dateAu is null or payment.dateReglement <= :dateAu)
+              and (:mode is null or instrument.mode = :mode)
+              and (:statut is null or instrument.statut = :statut)
+              and (:payeurId is null
+                   or (:payeurType = 'CLIENT' and (payment.clientPayeur.id = :payeurId or exists (
+                       select a.id from AffectationReglementClient a
+                       where a.instrument = instrument and a.clientPayeur.id = :payeurId)))
+                   or (:payeurType = 'GROUPE' and (payment.groupePayeur.id = :payeurId or exists (
+                       select a.id from AffectationReglementClient a
+                       where a.instrument = instrument and a.groupePayeur.id = :payeurId))))
+            """)
+    Page<InstrumentReglementClient> searchRecordedReferences(
+            @Param("agenceId") Long agenceId,
+            @Param("reference") String reference,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu,
+            @Param("mode") ModeReglementClient mode,
+            @Param("statut") StatutInstrumentReglement statut,
+            @Param("payeurType") String payeurType,
+            @Param("payeurId") Long payeurId,
+            Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"reglement", "reglement.clientPayeur", "compteTresorerie", "banqueEmettriceReference"})
+    @Query("""
+            select instrument
+            from InstrumentReglementClient instrument
+            join instrument.reglement payment
             left join instrument.banqueEmettriceReference bank
             where instrument.agence.id = :agenceId
               and payment.statut = com.assurance.enums.StatutReglementClient.VALIDE

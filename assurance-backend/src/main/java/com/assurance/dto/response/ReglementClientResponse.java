@@ -79,6 +79,7 @@ public class ReglementClientResponse {
         private Long reglementId;
         private Long clientPayeurId;
         private String numeroReglement;
+        private StatutReglementClient statutReglement;
         private String payeurNom;
         private ModeReglementClient mode;
         private StatutInstrumentReglement statut;

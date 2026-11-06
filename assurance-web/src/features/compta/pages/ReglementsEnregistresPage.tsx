@@ -16,7 +16,7 @@ import {
   Search,
   XCircle,
 } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -57,6 +57,7 @@ import { comptaApi } from "../api";
 import { ClientPaymentsWorkspaceHeader } from "../components/ClientPaymentsWorkspaceHeader";
 import { PremiumReceiptDialog } from "../components/PremiumReceiptDialog";
 import { ClientPaymentDetailsDialog } from "../components/ClientPaymentDetailsDialog";
+import { PaymentInstrumentDetailsDialog } from "../components/PaymentInstrumentDetailsDialog";
 import {
   usePayerSearch,
   type PayerSelection,
@@ -155,6 +156,7 @@ export default function ReglementsEnregistresPage() {
   const [paymentToInvoice, setPaymentToInvoice] = useState<ClientPayment>();
   const [paymentToReceipt, setPaymentToReceipt] = useState<ClientPayment>();
   const [detailPaymentId, setDetailPaymentId] = useState<string>();
+  const [detailInstrument, setDetailInstrument] = useState<{ paymentId: string; instrumentId: string }>();
   const [openingPaymentId, setOpeningPaymentId] = useState<string>();
   const [expandedPayments, setExpandedPayments] = useState<Set<string>>(new Set());
   const [cancelReason, setCancelReason] = useState("");
@@ -165,6 +167,24 @@ export default function ReglementsEnregistresPage() {
     enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
+  const instrumentMatches = useQuery({
+    queryKey: ["compta", "client-payments", "reference-matches", appliedSearch, appliedDateFrom, appliedDateTo,
+      appliedPayerType, appliedPayerId, appliedPaymentMode, appliedInstrumentStatus, sortBy, sortDirection, page],
+    queryFn: () => comptaApi.recordedPaymentInstruments({
+      reference: appliedSearch,
+      dateDu: appliedDateFrom || undefined,
+      dateAu: appliedDateTo || undefined,
+      payeurType: appliedPayerType,
+      payeurId: appliedPayerId || undefined,
+      mode: appliedPaymentMode === "ALL" ? undefined : appliedPaymentMode,
+      statut: appliedInstrumentStatus === "ALL" ? undefined : appliedInstrumentStatus,
+      sortBy, sortDirection, page, size: PAGE_SIZE,
+    }),
+    enabled: hasAppliedFilters && Boolean(appliedSearch),
+  });
+  const showInstruments = Boolean(hasAppliedFilters && appliedSearch && instrumentMatches.data?.page.totalElements);
+  const checkingReferences = hasAppliedFilters && Boolean(appliedSearch) && instrumentMatches.isPending;
+  const referenceError = hasAppliedFilters && Boolean(appliedSearch) && instrumentMatches.isError;
   const payments = useQuery({
     queryKey: [
       "compta", "client-payments", appliedSearch, appliedDateFrom, appliedDateTo,
@@ -184,8 +204,11 @@ export default function ReglementsEnregistresPage() {
       page,
       size: PAGE_SIZE,
     }),
-    enabled: hasAppliedFilters,
+    enabled: hasAppliedFilters && (!appliedSearch || (instrumentMatches.isSuccess && !showInstruments)),
   });
+  const resultPage = showInstruments ? instrumentMatches.data?.page : payments.data?.page;
+  const loadingResults = checkingReferences || (!showInstruments && payments.isLoading);
+  const resultError = referenceError ? instrumentMatches.error : !showInstruments && payments.isError ? payments.error : null;
 
   useEffect(() => {
     if (!requestedPayerId) return;
@@ -494,6 +517,10 @@ export default function ReglementsEnregistresPage() {
       </section>
 
       <section className="overflow-hidden rounded-md border bg-card">
+        {resultError && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-b p-4 text-sm text-destructive">
+          <p>{resultError instanceof Error ? resultError.message : "Recherche impossible."}</p>
+          <Button variant="outline" onClick={() => void (referenceError ? instrumentMatches.refetch() : payments.refetch())}>Réessayer</Button>
+        </div>}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1240px] text-sm">
             <thead className="bg-orange-600 text-xs uppercase text-white">
@@ -505,15 +532,28 @@ export default function ReglementsEnregistresPage() {
                 <th className="px-4 py-3 text-left">Moyen</th>
                 <th className="px-4 py-3 text-left">Référence</th>
                 <th className="px-4 py-3 text-left">Date de valeur</th>
-                <th className="px-4 py-3 text-center">État de valeur</th>
-                <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Règlement</PaymentSortHeader>
+                <th className="px-4 py-3 text-center">État du moyen</th>
+                {showInstruments ? <th className="px-4 py-3 text-left">Banque</th>
+                  : <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Règlement</PaymentSortHeader>}
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {hasAppliedFilters && payments.isLoading ? (
+              {hasAppliedFilters && loadingResults ? (
                 <TableRowsSkeleton colSpan={10} rows={8} />
-              ) : hasAppliedFilters ? (payments.data?.rows ?? []).flatMap((payment) => {
+              ) : showInstruments ? instrumentMatches.data?.rows.map(instrument => <tr key={instrument.id} className="hover:bg-muted/30">
+                <td className="px-4 py-3"><Link className="font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" to={`/app/compta/reglements/${instrument.reglementId}`}>{instrument.numeroReglement}</Link>
+                  {instrument.statutReglement === "ANNULE" && <div className="mt-1"><PaymentStatusBadge value="ANNULE" /></div>}</td>
+                <td className="px-4 py-3">{formatDate(instrument.dateReglement)}</td>
+                <td className="max-w-64 px-4 py-3">{instrument.payeurNom}</td>
+                <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)}</td>
+                <td className="px-4 py-3"><Badge variant={MODE_BADGE_VARIANTS[instrument.mode]}>{MODE_LABELS[instrument.mode]}</Badge></td>
+                <td className="px-4 py-3"><button type="button" className="font-semibold text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => setDetailInstrument({ paymentId: instrument.reglementId, instrumentId: instrument.id })}>{instrument.referenceInstrument || "-"}</button></td>
+                <td className="px-4 py-3">{formatDate(instrument.mode === "CHEQUE" || instrument.mode === "EFFET" ? instrument.dateEcheance : instrument.dateInstrument)}</td>
+                <td className="px-4 py-3 text-center"><InstrumentStatusIndicator value={instrument.statut} /></td>
+                <td className="px-4 py-3">{instrument.banqueEmettrice || instrument.compteTresorerie || "-"}</td>
+                <td className="px-4 py-3 text-right"><Button type="button" variant="ghost" size="icon" title="Voir le moyen de règlement" aria-label={`Détails ${MODE_LABELS[instrument.mode]} ${instrument.referenceInstrument || ""}`} onClick={() => setDetailInstrument({ paymentId: instrument.reglementId, instrumentId: instrument.id })}><Eye className="size-4" /></Button></td>
+              </tr>) : hasAppliedFilters && !referenceError ? (payments.data?.rows ?? []).flatMap((payment) => {
                 const expanded = expandedPayments.has(payment.id);
                 return [
                 <tr key={payment.id} className="hover:bg-muted/30">
@@ -567,7 +607,7 @@ export default function ReglementsEnregistresPage() {
                 expanded ? (
                   <tr key={`${payment.id}-details`} className="bg-muted/20">
                     <td colSpan={10} className="px-10 py-3">
-                      <PaymentInstrumentDetails payment={payment} />
+                      <PaymentInstrumentDetails payment={payment} onDetail={instrumentId => setDetailInstrument({ paymentId: payment.id, instrumentId })} />
                     </td>
                   </tr>
                 ) : null,
@@ -579,7 +619,7 @@ export default function ReglementsEnregistresPage() {
                     Renseignez au moins un critère puis lancez la recherche.
                   </td>
                 </tr>
-              ) : !payments.isLoading && (payments.data?.rows.length ?? 0) === 0 ? (
+              ) : !loadingResults && !resultError && !showInstruments && (payments.data?.rows.length ?? 0) === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">
                     Aucun règlement ne correspond à la recherche.
@@ -589,12 +629,12 @@ export default function ReglementsEnregistresPage() {
             </tbody>
           </table>
         </div>
-        {hasAppliedFilters && payments.data && (
+        {hasAppliedFilters && !resultError && resultPage && (
           <ServerPagination
-            page={payments.data.page.number}
-            totalPages={payments.data.page.totalPages}
-            totalElements={payments.data.page.totalElements}
-            loading={payments.isFetching}
+            page={resultPage.number}
+            totalPages={resultPage.totalPages}
+            totalElements={resultPage.totalElements}
+            loading={instrumentMatches.isFetching || payments.isFetching}
             onPageChange={setPage}
           />
         )}
@@ -602,6 +642,7 @@ export default function ReglementsEnregistresPage() {
 
       {paymentToReceipt && <PremiumReceiptDialog key={paymentToReceipt.id} payment={paymentToReceipt} canIssue={canCreate} onClose={() => setPaymentToReceipt(undefined)} />}
       {detailPaymentId && <ClientPaymentDetailsDialog key={detailPaymentId} paymentId={detailPaymentId} onClose={() => setDetailPaymentId(undefined)} />}
+      {detailInstrument && <PaymentInstrumentDetailsDialog key={detailInstrument.instrumentId} {...detailInstrument} onClose={() => setDetailInstrument(undefined)} />}
 
       <Dialog
         open={Boolean(paymentToInvoice)}
@@ -804,7 +845,7 @@ function InstrumentStatusesSummary({ instruments }: { instruments: PaymentInstru
   );
 }
 
-function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
+function PaymentInstrumentDetails({ payment, onDetail }: { payment: ClientPayment; onDetail: (instrumentId: string) => void }) {
   return (
     <div className="overflow-hidden rounded-md border bg-card">
       <div className="border-b px-3 py-2 text-sm font-semibold">
@@ -825,7 +866,7 @@ function PaymentInstrumentDetails({ payment }: { payment: ClientPayment }) {
             {payment.instruments.map((instrument) => (
               <tr key={instrument.id}>
                 <td className="px-3 py-2">{MODE_LABELS[instrument.mode]}</td>
-                <td className="px-3 py-2 font-medium">{instrument.referenceInstrument || "-"}</td>
+                <td className="px-3 py-2"><button type="button" className="font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => onDetail(instrument.id)}>{instrument.referenceInstrument || "Voir le détail"}</button></td>
                 <td className="px-3 py-2">{formatDate(instrument.dateEcheance)}</td>
                 <td className="px-3 py-2 text-center"><InstrumentStatusIndicator value={instrument.statut} /></td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums">

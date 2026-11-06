@@ -604,6 +604,25 @@ export const comptaApi = {
     )));
   },
 
+  async recordedPaymentInstruments(params: {
+    reference: string;
+    dateDu?: string;
+    dateAu?: string;
+    payeurType?: "CLIENT" | "GROUPE";
+    payeurId?: string;
+    mode?: PaymentInstrument["mode"];
+    statut?: PaymentInstrument["statut"];
+    sortBy?: "dateReglement" | "numero" | "payeurNom" | "montantTotal" | "statut";
+    sortDirection?: "asc" | "desc";
+    page: number;
+    size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<PaymentInstrumentPage>>(
+      `/api/v1/compta/reglements-clients/recherche-moyens${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(normalizePaymentInstrument) };
+  },
+
   async clientPaymentJournalUsers() {
     return unwrap(await apiFetch<ApiResponse<TreasuryUser[]>>(
       "/api/v1/compta/reglements-clients/journal/utilisateurs"

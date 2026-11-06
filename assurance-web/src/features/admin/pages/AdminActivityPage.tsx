@@ -174,24 +174,28 @@ export default function AdminActivityPage() {
     {activities.isError ? <div role="alert" className="space-y-2 text-sm text-destructive">
       <p>{activities.error instanceof Error ? activities.error.message : "Chargement impossible."}</p>
       <Button type="button" variant="outline" onClick={() => activities.refetch()}>Réessayer</Button>
-    </div> : <div className="min-w-0 overflow-x-auto rounded-md border">
+    </div> : <div className="min-w-0 overflow-x-auto rounded-md border bg-card">
       <table className="w-full min-w-[960px] text-sm">
-        <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
-          {["Date", "Opérateur", "Module", "Activité", "Dossier / Référence", "Détails"].map(label => <th scope="col" key={label} className="px-3 py-3 font-semibold">{label}</th>)}
+        <thead className="bg-fuchsia-700 text-left text-white"><tr>
+          {["Date", "Opérateur", "Module", "Activité", "Dossier / Référence", "Détails"].map(label => <th scope="col" key={label} className="h-10 whitespace-nowrap px-3 py-2 font-semibold">{label}</th>)}
         </tr></thead>
         <tbody>{activities.isPending ? <TableRowsSkeleton rows={6} colSpan={6} /> : activities.data?.items.length
-          ? activities.data.items.map(event => <tr key={event.id} className="border-t align-top hover:bg-muted/40">
-            <td className="whitespace-nowrap px-3 py-3 tabular-nums">{dateTime(event.occurredAt)}</td>
-            <td className="px-3 py-3">{event.actorName}</td>
-            <td className="px-3 py-3 text-muted-foreground">{activityModules[event.module]}</td>
-            <td className="max-w-sm px-3 py-3"><p className="break-words font-medium">{event.title}</p>
-              <div className="mt-1.5"><ActionBadge action={event.action} /></div></td>
-            <td className="max-w-xs px-3 py-3"><p>{referenceLabel(event.subject, event)}</p>
-              {contextReferences(event).map(reference => <p key={`${reference.type}-${reference.id}`} className="mt-1 text-xs text-muted-foreground">
+          ? activities.data.items.map(event => <tr key={event.id} className="border-t align-middle hover:bg-muted/50">
+            <td className="whitespace-nowrap px-3 py-2 tabular-nums">{dateTime(event.occurredAt)}</td>
+            <td className="px-3 py-2">{event.actorName}</td>
+            <td className="px-3 py-2 text-muted-foreground">{activityModules[event.module]}</td>
+            <td className="px-3 py-2"><div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p className="min-w-0 break-words font-medium">{event.title}</p>
+              <div className="shrink-0"><ActionBadge action={event.action} /></div>
+            </div></td>
+            <td className="max-w-sm px-3 py-2"><p className="leading-5">{referenceLabel(event.subject, event)}</p>
+              <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs leading-4 text-muted-foreground">
+              {contextReferences(event).map(reference => <span key={`${reference.type}-${reference.id}`}>
                   {referenceLabel(reference, event)}
-                </p>)}
+                </span>)}
+              </div>
             </td>
-            <td className="px-3 py-3"><Button type="button" variant="ghost" size="icon" className="text-fuchsia-700 dark:text-fuchsia-300" title="Voir les détails" aria-label={`Détails : ${event.title}`} onClick={() => setSelection({ scope, event })}><Eye className="size-4" /></Button></td>
+            <td className="px-3 py-2"><Button type="button" variant="ghost" size="icon" className="size-8 text-fuchsia-700 dark:text-fuchsia-300" title="Voir les détails" aria-label={`Détails : ${event.title}`} onClick={() => setSelection({ scope, event })}><Eye className="size-4" /></Button></td>
           </tr>) : <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground">Aucune activité ne correspond aux filtres.</td></tr>}
         </tbody>
       </table>

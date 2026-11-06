@@ -444,6 +444,46 @@ public class ReglementClientService {
         return toResponse(payment).toBuilder().detail(paymentDetail(payment)).build();
     }
 
+    @Transactional(readOnly = true)
+    public InstrumentReglementPageResponse searchRecordedInstruments(
+            Long agenceId, String reference, LocalDate dateDu, LocalDate dateAu,
+            String payeurType, Long payeurId, ModeReglementClient mode,
+            StatutInstrumentReglement statut, String sortBy, String sortDirection, int page, int size
+    ) {
+        validateOptionalPayer(payeurType, payeurId);
+        String normalized = normalizeSearch(reference);
+        if (normalized == null) {
+            throw new BadRequestException("Renseignez une référence de moyen de règlement");
+        }
+        if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
+            throw new BadRequestException("La date de début doit précéder la date de fin");
+        }
+        String property = switch (sortBy == null ? "" : sortBy) {
+            case "numero" -> "reglement.numero";
+            case "payeurNom" -> "reglement.payeurNom";
+            case "montantTotal" -> "montant";
+            case "statut" -> "reglement.statut";
+            default -> "reglement.dateReglement";
+        };
+        String pattern = "%" + normalized.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        Page<InstrumentReglementClient> result = instrumentRepository.searchRecordedReferences(
+                agenceId, pattern, dateDu, dateAu, mode, statut, payeurType, payeurId,
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100),
+                        Sort.by("asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC, property)
+                                .and(Sort.by(Sort.Direction.DESC, "id")))
+        );
+        Map<Long, LigneBordereauRemise> remittances = remittanceLinesWithHistory(
+                result.getContent().stream().map(InstrumentReglementClient::getId).toList());
+        return InstrumentReglementPageResponse.builder()
+                .page(SourceDocumentClientPageResponse.PageInfo.builder()
+                        .number(result.getNumber()).size(result.getSize()).totalElements(result.getTotalElements())
+                        .totalPages(result.getTotalPages()).first(result.isFirst()).last(result.isLast()).build())
+                .rows(result.getContent().stream()
+                        .map(instrument -> toInstrumentRegisterResponse(instrument, remittances.get(instrument.getId())))
+                        .toList())
+                .build();
+    }
+
     @Transactional
     public DocumentClientResponse createInvoiceFromPayment(Long agenceId, Long paymentId) {
         ReglementClient payment = reglementRepository.findByIdAndAgenceIdForUpdate(paymentId, agenceId)
@@ -1578,6 +1618,7 @@ public class ReglementClientService {
                 .clientPayeurId(instrument.getReglement().getClientPayeur() == null
                         ? null : instrument.getReglement().getClientPayeur().getId())
                 .numeroReglement(instrument.getReglement().getNumero())
+                .statutReglement(instrument.getReglement().getStatut())
                 .payeurNom(instrument.getReglement().getPayeurNom())
                 .mode(instrument.getMode())
                 .statut(instrument.getStatut())
@@ -2999,11 +3040,13 @@ public class ReglementClientService {
                 .clientPayeurId(instrument.getReglement().getClientPayeur() == null
                         ? null : instrument.getReglement().getClientPayeur().getId())
                 .numeroReglement(instrument.getReglement().getNumero())
+                .statutReglement(instrument.getReglement().getStatut())
                 .payeurNom(instrument.getReglement().getPayeurNom())
                 .mode(instrument.getMode())
                 .statut(instrument.getStatut())
                 .montant(instrument.getMontant())
                 .dateInstrument(instrument.getDateInstrument())
+                .dateReglement(instrument.getReglement().getDateReglement())
                 .dateEcheance(instrument.getDateEcheance())
                 .dateStatut(instrument.getDateStatut())
                 .referenceInstrument(instrument.getReferenceInstrument())
@@ -3015,6 +3058,8 @@ public class ReglementClientService {
                         ? null : instrument.getBanqueEmettriceReference().getLibelle())
                 .reglementBureau(instrument.getReglementBureau())
                 .motifStatut(instrument.getMotifStatut())
+                .dateRejet(instrument.getDateRejet())
+                .motifRejet(instrument.getMotifRejet())
                 .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
                         ? null : instrument.getInstrumentRemplace().getId())
                 .modeInstrumentRemplace(instrument.getInstrumentRemplace() == null

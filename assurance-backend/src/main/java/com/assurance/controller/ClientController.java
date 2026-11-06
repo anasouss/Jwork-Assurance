@@ -150,6 +150,18 @@ public class ClientController {
         ));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PERM_client:manage')")
+    public ResponseEntity<ApiResponse<ClientResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateClientRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                clientService.update(TenantContext.getCurrentAgence(), id, request),
+                "Fiche client mise à jour"
+        ));
+    }
+
     @PutMapping("/{id}/groupe")
     @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
     public ResponseEntity<ApiResponse<ClientResponse.GroupeView>> assignGroup(

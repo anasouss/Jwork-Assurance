@@ -136,6 +136,13 @@ export const clientApi = {
     );
   },
 
+  async updateClient(clientId: string, request: ClientInput["client"]) {
+    return unwrap(await apiFetch<ApiResponse<ClientResponse>>(`/api/v1/clients/${clientId}`, {
+      method: "PUT",
+      body: JSON.stringify(request),
+    }));
+  },
+
   async listGroupesClients() {
     return unwrap(await apiFetch<ApiResponse<GroupeClient[]>>("/api/v1/groupes-clients"));
   },

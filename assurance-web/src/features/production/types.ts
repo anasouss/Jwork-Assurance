@@ -452,6 +452,7 @@ export type ClientInput = {
   retirerGroupesActifs?: boolean;
   client: {
     typeClient: TypeClient;
+    clientParentId?: string | null;
     genre?: GenreClient;
     prenom?: string;
     nom?: string;
@@ -460,10 +461,12 @@ export type ClientInput = {
     cinValidite?: string;
     passport?: string;
     passportValidite?: string;
+    carteResidence?: string;
     nationalite?: string;
     rc?: string;
     ice?: string;
     iff?: string;
+    patente?: string;
     cnss?: string;
     numeroPermis?: string;
     dateDelivrancePermis?: string;

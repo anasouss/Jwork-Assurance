@@ -183,6 +183,18 @@ public class ClientService {
                 ClientActivity.command(result, before, ActivityAction.UPDATED, "Fiche client modifiée", "CLIENT_UPDATE"));
     }
 
+    @Transactional
+    public ClientResponse update(Long agenceId, Long clientId, CreateClientRequest request) {
+        bindAgence(request, agenceId);
+        Client client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+        if (request.getTypeClient() != client.getTypeClient()) {
+            throw new BadRequestException("Le type d'un client existant ne peut pas être modifié depuis sa fiche");
+        }
+        validateStandaloneClient(request);
+        return toResponse(updateEntity(agenceId, clientId, request));
+    }
+
     private Client updateEntityRecord(Long agenceId, Client client, CreateClientRequest request) {
         Long clientId = client.getId();
         assertIdentityAvailable(agenceId, clientId, request);

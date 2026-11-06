@@ -17,7 +17,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { ClientDocuments } from "@/features/crm/components/ClientDocuments";
 import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
 import { clientApi } from "../api/clients";
-import type { ClientCrm } from "../types";
+import type { ClientCrm, ClientResponse } from "../types";
 import { moneyAmount } from "../utils/format";
 
 type PortfolioContract = ClientCrm["contrats"][number];
@@ -256,6 +256,9 @@ function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
   const [showProfile, setShowProfile] = useState(false);
   const canViewClient = useAuthStore(state => state.user?.permissions.includes("client:view") ?? false);
   const client = portfolio.client;
+  const phones: NonNullable<ClientResponse["telephones"]> = client.telephones?.length
+    ? client.telephones
+    : client.telephone ? [{ numero: client.telephone }] : [];
   const clientName = client.nomAffichage || client.raisonSociale || client.nom || "Client";
   const clientSummary = client.codeClient
     ? `${clientName} - ${client.codeClient}`
@@ -265,35 +268,49 @@ function ClientIdentity({ portfolio }: { portfolio: ClientCrm }) {
       <SectionHeader
         icon={<UserRound className="size-4" />}
         title="Informations client"
-        description={clientSummary}
+        description={<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span>{clientSummary}</span>
+          <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-foreground">{client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Personne physique"}</span>
+        </span>}
         tone="emerald"
         action={canViewClient && <Button type="button" size="sm" variant="outline" onClick={() => setShowProfile(true)}><UserRound className="size-4" />Voir la fiche client</Button>}
       />
-      <dl className="grid gap-x-6 gap-y-4 px-5 py-4 sm:grid-cols-2 xl:grid-cols-3">
-        <InfoCell
-          label="Adresse"
-          value={[client.adresse, client.ville].filter(Boolean).join(", ")}
-        />
-        <InfoCell
-          label="Téléphone"
-          value={client.telephones?.find((item) => item.principal)?.numero || client.telephone}
-          icon={<Phone className="size-3.5" />}
-        />
-        <InfoCell label="E-mail" value={client.email} />
-        {client.typeClient === "PERSONNE_PHYSIQUE" ? (
-          <>
-            <InfoCell label="CIN" value={client.cin} />
-            {client.cinValidite && <InfoCell label="Validité CIN" value={formatDate(client.cinValidite)} />}
-          </>
-        ) : (
-          <>
-            <InfoCell label="RC" value={client.rc} />
-            <InfoCell label="ICE" value={client.ice} />
-            <InfoCell label="Identifiant fiscal (IF)" value={client.iff} />
-          </>
-        )}
-        <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
-      </dl>
+      <div className="grid gap-5 px-5 py-4 lg:grid-cols-2 lg:gap-6">
+        <section className="min-w-0 space-y-3">
+          <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Identité</h3>
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            {client.typeClient === "PERSONNE_PHYSIQUE" ? (
+              <>
+                <InfoCell label="CIN" value={client.cin} />
+                {client.cinValidite && <InfoCell label="Validité CIN" value={formatDate(client.cinValidite)} />}
+                {client.dateNaissance && <InfoCell label="Date de naissance" value={formatDate(client.dateNaissance)} />}
+              </>
+            ) : (
+              <>
+                <InfoCell label="RC" value={client.rc} />
+                <InfoCell label="ICE" value={client.ice} />
+                <InfoCell label="Identifiant fiscal (IF)" value={client.iff} />
+              </>
+            )}
+            <InfoCell label="Groupe" value={client.groupe ? `${client.groupe.code} - ${client.groupe.libelle}` : undefined} />
+          </dl>
+        </section>
+        <section className="min-w-0 space-y-3 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+          <h3 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Coordonnées</h3>
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            <InfoCell className="sm:col-span-2" label="Adresse" value={[client.adresse, client.ville].filter(Boolean).join(", ")} />
+            <div className="min-w-0 space-y-1 text-sm">
+              <dt className="text-xs text-muted-foreground">Téléphones</dt>
+              <dd>{phones.length ? <ul className="space-y-1.5">{phones.map((phone, index) => <li key={`${phone.numero}-${index}`} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <a href={`tel:${phone.numero.replace(/\s/g, "")}`} className="inline-flex min-w-0 items-center gap-1.5 font-medium text-blue-700 underline-offset-4 hover:underline focus-visible:underline dark:text-blue-300"><Phone className="size-3.5 shrink-0" aria-hidden="true" /><span className="break-all">{phone.numero}</span></a>
+                {phone.principal && <span className="text-xs text-muted-foreground">Principal</span>}
+                {phone.whatsapp && <span className="text-xs text-emerald-700 dark:text-emerald-300">WhatsApp</span>}
+              </li>)}</ul> : "-"}</dd>
+            </div>
+            <InfoCell label="E-mail" value={client.email} />
+          </dl>
+        </section>
+      </div>
       {client.typeClient === "PERSONNE_PHYSIQUE" && (client.numeroPermis || client.dateDelivrancePermis || client.dateValiditePermis) && <div className="border-t px-5 py-4">
         <h3 className="mb-3 text-sm font-semibold text-emerald-800 dark:text-emerald-200">Permis de conduire</h3>
         <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -757,7 +774,7 @@ function DocumentEmpty({ text }: { text: string }) {
   return <p className="py-2 text-sm text-muted-foreground">{text}</p>;
 }
 
-function SectionHeader({ icon, title, description, tone, action }: { icon: ReactNode; title: string; description: string; tone: "emerald" | "cyan" | "red" | "amber"; action?: ReactNode }) {
+function SectionHeader({ icon, title, description, tone, action }: { icon: ReactNode; title: string; description: ReactNode; tone: "emerald" | "cyan" | "red" | "amber"; action?: ReactNode }) {
   const color = { emerald: "bg-emerald-700", cyan: "bg-cyan-700", red: "bg-red-700", amber: "bg-amber-600" }[tone];
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">

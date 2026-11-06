@@ -80,3 +80,61 @@ export function groupActivityChanges(changes: Change[]) {
       : group.changes.every(change => change.afterValue == null) ? "removed" as const : "compared" as const,
   }));
 }
+
+export type ActivityChangeGroup = ReturnType<typeof groupActivityChanges>[number];
+type ChangeSection = { title: string; kind: "fields" | "vehicle" | "person" | "guarantees" | "quittance"; groups: ActivityChangeGroup[] };
+
+const personFields = new Set(["Deces", "Décès", "Invalidite", "Invalidité", "Frais medicaux", "Frais médicaux", "Hospitalisation", "Frais funeraires", "Frais funéraires", "Chirurgie", "Personne assuree"]);
+const guaranteeFields = new Set(["Couverture", "Selection", "Mode de tarification", "Base assuree", "Capital", "Valeur assuree", "Valeur venale", "Valeur a neuf", "Valeur glace", "Prime", "Taux", "Franchise", "Franchise minimale", "Formule", "Accessoire", "Accessoires", ...personFields]);
+
+export function activityChangeSections(changes: Change[], module: BusinessActivity["module"]) {
+  const sections: ChangeSection[] = [];
+  const groups = groupActivityChanges(changes);
+  const target = (title: string) => title.slice(title.lastIndexOf(" (") + 2, -1);
+  const vehicleTargets = new Set(groups.filter(group => / \(.+\)$/.test(group.title)
+    && group.changes.some(change => change.label === "Base assuree"
+      && [change.beforeValue, change.afterValue].some(value => ["Valeur venale", "Valeur a neuf", "Valeur glace"].includes(value ?? ""))))
+    .map(group => target(group.title)));
+  for (const group of groups) {
+    let kind: ChangeSection["kind"] = "fields";
+    let title = group.title;
+    if (module === "PRODUCTION") {
+      if (group.title === "Quittance" || group.title.startsWith("Quittance - ")) {
+        kind = "quittance";
+        title = "Quittance";
+      } else if (/ \(.+\)$/.test(group.title) && group.changes.some(change => guaranteeFields.has(change.label))) {
+        const protection = group.changes.some(change => personFields.has(change.label)
+          || (change.label === "Mode de tarification" && [change.beforeValue, change.afterValue].includes("Protection")));
+        const vehicle = vehicleTargets.has(target(group.title));
+        kind = protection ? "person" : vehicle ? "vehicle" : "guarantees";
+        title = protection ? "Garanties des personnes" : vehicle ? "Garanties véhicule" : "Garanties";
+      }
+    }
+    const section = kind === "fields" ? undefined : sections.find(item => item.kind === kind);
+    if (section) section.groups.push(group);
+    else sections.push({ title, kind, groups: [group] });
+  }
+  if (module === "PRODUCTION") {
+    const rank = (section: ChangeSection) => section.kind === "quittance" ? 6
+      : section.kind === "vehicle" ? 2 : section.kind === "person" ? 3 : section.kind === "guarantees" ? 4
+        : section.title === "Informations générales" ? 0 : /^(V[eé]hicule|Remorque) \d+$/.test(section.title) ? 1 : 5;
+    sections.sort((first, second) => rank(first) - rank(second));
+    const quittance = sections.find(section => section.kind === "quittance");
+    const order = ["Quittance", "Quittance - Automobile", "Quittance - Corporel", "Quittance - EVCAT"];
+    quittance?.groups.sort((first, second) => {
+      const firstIndex = order.indexOf(first.title);
+      const secondIndex = order.indexOf(second.title);
+      return (firstIndex < 0 ? order.length : firstIndex) - (secondIndex < 0 ? order.length : secondIndex);
+    });
+  }
+  return sections;
+}
+
+export function guaranteeSummaryFields(group: ActivityChangeGroup, person: boolean) {
+  const columns = person
+    ? [["Deces", "Décès"], ["Invalidite", "Invalidité"], ["Frais medicaux", "Frais médicaux"], ["Prime"]]
+    : [["Valeur assuree", "Capital"], ["Franchise"], ["Franchise minimale"], ["Prime"]];
+  const summary = columns.map(labels => labels.map(label => group.changes.find(change => change.label === label)).find(Boolean));
+  const selected = new Set(summary.filter(change => change != null));
+  return { summary, additional: group.changes.filter(change => !selected.has(change)) };
+}

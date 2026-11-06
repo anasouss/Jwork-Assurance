@@ -15,7 +15,8 @@ import { adminApi } from "../api";
 import { activityActions, activityKeys, activityModules, getBusinessActivity, searchBusinessActivities,
   type ActivityFilters, type ActivityReference, type BusinessActivity } from "../business-activity";
 import { useAdminAccess } from "./admin-access";
-import { activityActionVariants, groupActivityChanges, groupActivityReferences } from "../business-activity-presentation";
+import { activityActionVariants, activityChangeSections, guaranteeSummaryFields, groupActivityReferences,
+  type ActivityChangeGroup } from "../business-activity-presentation";
 
 type Filters = { search: string; module: string; action: string; actor: string; from: string; to: string };
 const emptyFilters: Filters = { search: "", module: "ALL", action: "ALL", actor: "ALL", from: "", to: "" };
@@ -52,37 +53,88 @@ function ActionBadge({ action }: Pick<BusinessActivity, "action">) {
   </Badge>;
 }
 
-function ActivityChanges({ changes }: Pick<BusinessActivity, "changes">) {
-  const groups = groupActivityChanges(changes);
+function ActivityChanges({ changes, module }: Pick<BusinessActivity, "changes" | "module">) {
+  const sections = activityChangeSections(changes, module);
   return <section aria-label="Informations de l’opération" className="space-y-1">
     <h3 className="mb-3 text-sm font-semibold">Informations de l’opération</h3>
-    {groups.length === 0 && <p className="text-sm text-muted-foreground">Aucune information complémentaire enregistrée.</p>}
-    {groups.map((group, index) => <details key={group.title} open={index === 0 || groups.length <= 3} className="group border-t">
+    {sections.length === 0 && <p className="text-sm text-muted-foreground">Aucune information complémentaire enregistrée.</p>}
+    {sections.map((section, index) => {
+      const count = section.groups.reduce((total, group) => total + group.changes.length, 0);
+      return <details key={section.title} open={index === 0 || section.kind !== "fields" || sections.length <= 3} className="group/section border-t">
       <summary className="flex cursor-pointer list-none items-center gap-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
-        <span className="min-w-0 flex-1 break-words font-semibold">{group.title}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{group.changes.length} {group.changes.length === 1 ? "information" : "informations"}</span>
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open/section:rotate-180 motion-reduce:transition-none" />
+        <span className="min-w-0 flex-1 break-words font-semibold">{section.title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{count} {count === 1 ? "information" : "informations"}</span>
       </summary>
-      <div className="mb-4 overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[360px] table-fixed text-sm">
-          <thead className="bg-muted text-left"><tr>
-            <th scope="col" className="w-2/5 px-3 py-2 font-medium">Information</th>
-            {group.mode === "compared" ? <>
-              <th scope="col" className="px-3 py-2 font-medium">Avant</th>
-              <th scope="col" className="px-3 py-2 font-medium">Après</th>
-            </> : <th scope="col" className="px-3 py-2 font-medium">{group.mode === "removed" ? "Valeur précédente" : "Valeur enregistrée"}</th>}
-          </tr></thead>
-          <tbody>{group.changes.map((change, changeIndex) => <tr key={changeIndex} className="border-t align-top">
-            <th scope="row" className="break-words px-3 py-2.5 text-left font-medium">{change.label}</th>
-            {group.mode === "compared" ? <>
-              <td className="whitespace-pre-wrap break-words px-3 py-2.5 text-muted-foreground">{change.beforeValue ?? "-"}</td>
-              <td className="whitespace-pre-wrap break-words bg-emerald-50/60 px-3 py-2.5 dark:bg-emerald-950/20">{change.afterValue ?? "-"}</td>
-            </> : <td className="whitespace-pre-wrap break-words px-3 py-2.5">{(group.mode === "removed" ? change.beforeValue : change.afterValue) ?? "-"}</td>}
-          </tr>)}</tbody>
-        </table>
-      </div>
-    </details>)}
+      {section.kind === "vehicle" || section.kind === "person" || section.kind === "guarantees"
+        ? <GuaranteeChangesTable groups={section.groups} person={section.kind === "person"} />
+        : section.groups.map(group => <div key={group.title}>
+          {section.kind === "quittance" && <h4 className="mb-2 mt-3 text-sm font-medium">{group.title === "Quittance" ? "Total" : group.title.slice("Quittance - ".length)}</h4>}
+          <ChangeFieldsTable group={group} />
+        </div>)}
+    </details>;
+    })}
   </section>;
+}
+
+function ChangeFieldsTable({ group }: { group: ActivityChangeGroup }) {
+  return <div className="mb-4 overflow-x-auto rounded-md border">
+    <table className="w-full min-w-[360px] table-fixed text-sm">
+      <thead className="bg-muted text-left"><tr>
+        <th scope="col" className="w-2/5 px-3 py-2 font-medium">Information</th>
+        {group.mode === "compared" ? <>
+          <th scope="col" className="px-3 py-2 font-medium">Avant</th>
+          <th scope="col" className="px-3 py-2 font-medium">Après</th>
+        </> : <th scope="col" className="px-3 py-2 font-medium">{group.mode === "removed" ? "Valeur précédente" : "Valeur enregistrée"}</th>}
+      </tr></thead>
+      <tbody>{group.changes.map((change, changeIndex) => <tr key={changeIndex} className="border-t align-top">
+        <th scope="row" className="break-words px-3 py-2.5 text-left font-medium">{change.label}</th>
+        {group.mode === "compared" ? <>
+          <td className="whitespace-pre-wrap break-words px-3 py-2.5 text-muted-foreground">{change.beforeValue ?? "-"}</td>
+          <td className="whitespace-pre-wrap break-words bg-emerald-50/60 px-3 py-2.5 dark:bg-emerald-950/20">{change.afterValue ?? "-"}</td>
+        </> : <td className="whitespace-pre-wrap break-words px-3 py-2.5">{(group.mode === "removed" ? change.beforeValue : change.afterValue) ?? "-"}</td>}
+      </tr>)}</tbody>
+    </table>
+  </div>;
+}
+
+function GuaranteeChangeValue({ change }: { change?: BusinessActivity["changes"][number] }) {
+  if (!change) return <span className="text-muted-foreground">-</span>;
+  if (change.beforeValue == null) return <span>{change.afterValue ?? "-"}</span>;
+  if (change.afterValue == null) return <div><span className="text-xs text-red-700 dark:text-red-300">Retiré : </span>{change.beforeValue}</div>;
+  return <div className="space-y-1">
+    <div className="text-xs text-muted-foreground">Avant : {change.beforeValue}</div>
+    <div><span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Après : </span>{change.afterValue}</div>
+  </div>;
+}
+
+function GuaranteeChangesTable({ groups, person }: { groups: ActivityChangeGroup[]; person: boolean }) {
+  const headings = person ? ["Décès", "Invalidité", "Frais médicaux", "Prime"] : ["Valeur assurée / Capital", "Franchise (%)", "Minimum franchise", "Prime"];
+  return <div className="mb-4 overflow-x-auto rounded-md border">
+    <table className="w-full min-w-[700px] text-sm">
+      <thead className="bg-muted text-left"><tr>
+        <th scope="col" className="px-3 py-2 font-medium">Garantie / Cible</th>
+        {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
+        <th scope="col" className="px-3 py-2 font-medium">Détails</th>
+      </tr></thead>
+      <tbody>{groups.map(group => {
+        const { summary, additional } = guaranteeSummaryFields(group, person);
+        return <tr key={group.title} className="border-t align-top">
+          <th scope="row" className="max-w-56 break-words px-3 py-3 text-left font-medium">{group.title}</th>
+          {summary.map((change, index) => <td key={index} className="max-w-40 whitespace-pre-wrap break-words px-3 py-3 tabular-nums"><GuaranteeChangeValue change={change} /></td>)}
+          <td className="min-w-36 px-3 py-3">{additional.length > 0 ? <details className="group/guarantee">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300 [&::-webkit-details-marker]:hidden">
+              <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 group-open/guarantee:rotate-180" />{additional.length} {additional.length === 1 ? "détail" : "détails"}
+            </summary>
+            <dl className="mt-3 space-y-3">{additional.map((change, index) => <div key={index} className="max-w-64 break-words">
+              <dt className="mb-1 text-xs text-muted-foreground">{change.label}</dt>
+              <dd className="whitespace-pre-wrap"><GuaranteeChangeValue change={change} /></dd>
+            </div>)}</dl>
+          </details> : <span className="text-muted-foreground">-</span>}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+  </div>;
 }
 
 export default function AdminActivityPage() {
@@ -228,7 +280,7 @@ export default function AdminActivityPage() {
                 <dd className="space-y-1">{group.references.map(reference => <p key={reference.id}>{referenceLabel(reference, detail)}</p>)}</dd>
               </div>)}
           </dl>
-          <ActivityChanges changes={detail.changes} />
+          <ActivityChanges changes={detail.changes} module={detail.module} />
           {supportingReferences.length > 0 &&
             <details className="group border-t pt-4">
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

@@ -4,7 +4,7 @@ vi.mock("@/lib/api/base", () => ({ apiFetch: vi.fn(), buildQueryString: vi.fn() 
 
 import { apiFetch } from "@/lib/api/base";
 import { activityKeys, getBusinessActivity } from "./business-activity";
-import { groupActivityChanges, groupActivityReferences } from "./business-activity-presentation";
+import { activityChangeSections, guaranteeSummaryFields, groupActivityChanges, groupActivityReferences } from "./business-activity-presentation";
 
 describe("business activity queries", () => {
   it("separates agency and platform list/detail caches", () => {
@@ -21,6 +21,48 @@ describe("business activity queries", () => {
 });
 
 describe("business activity presentation", () => {
+  it("orders production details by workflow with every quittance category last", () => {
+    const changes = [
+      { label: "Quittance - EVCAT - Taxes", beforeValue: null, afterValue: "1,00" },
+      { label: "Responsabilite Civile (75959-B-1) - Capital", beforeValue: null, afterValue: "50 000 000,00" },
+      { label: "Quittance - Prime nette", beforeValue: "100,00", afterValue: "200,00" },
+      { label: "Protection Passagers (Contrat) - Deces", beforeValue: null, afterValue: "10 000,00" },
+      { label: "Vol (75959-B-1) - Base assuree", beforeValue: null, afterValue: "Valeur venale" },
+      { label: "Vehicule 1 - Immatriculation", beforeValue: null, afterValue: "75959-B-1" },
+      { label: "Quittance - Automobile - Taxes", beforeValue: null, afterValue: "10,00" },
+      { label: "Statut", beforeValue: "Brouillon", afterValue: "Actif" },
+    ];
+    const sections = activityChangeSections(changes, "PRODUCTION");
+    expect(sections.map(section => section.title)).toEqual([
+      "Informations générales", "Vehicule 1", "Garanties véhicule", "Garanties des personnes", "Quittance",
+    ]);
+    expect(sections[2].groups.map(group => group.title)).toEqual(["Responsabilite Civile (75959-B-1)", "Vol (75959-B-1)"]);
+    expect(sections.at(-1)?.groups.map(group => group.title)).toEqual(["Quittance", "Quittance - Automobile", "Quittance - EVCAT"]);
+    expect(sections.flatMap(section => section.groups.flatMap(group => group.changes))).toHaveLength(changes.length);
+  });
+
+  it("keeps both capital and insured value plus every extra guarantee field", () => {
+    const group = groupActivityChanges([
+      { label: "Vol (A) - Valeur assuree", beforeValue: "100", afterValue: "200" },
+      { label: "Vol (A) - Capital", beforeValue: "100", afterValue: "200" },
+      { label: "Vol (A) - Franchise", beforeValue: null, afterValue: "0,00" },
+      { label: "Vol (A) - Taux", beforeValue: "1", afterValue: "2" },
+    ])[0];
+    const fields = guaranteeSummaryFields(group, false);
+    expect(fields.summary[0]).toMatchObject({ label: "Valeur assuree", beforeValue: "100", afterValue: "200" });
+    expect(fields.summary[1]?.afterValue).toBe("0,00");
+    expect(fields.additional.map(change => change.label)).toEqual(["Capital", "Taux"]);
+    expect(fields.summary.filter(Boolean).length + fields.additional.length).toBe(group.changes.length);
+  });
+
+  it("does not guess a guarantee category from its name or regroup unrelated modules", () => {
+    const changes = [{ label: "Protection spéciale (Contrat) - Prime", beforeValue: "10", afterValue: "20" }];
+    expect(activityChangeSections(changes, "PRODUCTION")[0].kind).toBe("guarantees");
+    expect(activityChangeSections(changes, "SINISTRES")[0].kind).toBe("fields");
+    expect(guaranteeSummaryFields(groupActivityChanges(changes)[0], false).summary[3])
+      .toMatchObject({ beforeValue: "10", afterValue: "20" });
+  });
+
   it("groups guarantee fields without repeating their name on every row or losing zero values", () => {
     const groups = groupActivityChanges([
       { label: "Statut", beforeValue: null, afterValue: "Actif" },

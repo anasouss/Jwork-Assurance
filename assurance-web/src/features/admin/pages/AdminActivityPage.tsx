@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Eye, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, Eye, RotateCcw, Search } from "lucide-react";
 import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
@@ -15,9 +15,11 @@ import { adminApi } from "../api";
 import { activityActions, activityKeys, activityModules, getBusinessActivity, searchBusinessActivities,
   type ActivityFilters, type ActivityReference, type BusinessActivity } from "../business-activity";
 import { useAdminAccess } from "./admin-access";
+import { activityActionVariants, groupActivityChanges, groupActivityReferences } from "../business-activity-presentation";
 
 type Filters = { search: string; module: string; action: string; actor: string; from: string; to: string };
 const emptyFilters: Filters = { search: "", module: "ALL", action: "ALL", actor: "ALL", from: "", to: "" };
+const primaryReferenceTypes = new Set(["CONTRAT", "CLIENT", "GROUPE_CLIENT", "REGLEMENT_CLIENT", "SINISTRE"]);
 
 function recordPath(reference: ActivityReference) {
   const id = encodeURIComponent(reference.id);
@@ -40,8 +42,47 @@ function dateTime(value: string) {
 
 function contextReferences(event: BusinessActivity) {
   const priority = ["SINISTRE", "REGLEMENT_CLIENT", "REGLEMENT_COMPAGNIE", "CONTRAT", "CLIENT", "GROUPE_CLIENT", "BORDEREAU_BANCAIRE", "BORDEREAU_COMPAGNIE"];
-  return event.references.filter(reference => priority.includes(reference.type))
+  return groupActivityReferences(event).flatMap(group => group.references).filter(reference => priority.includes(reference.type))
     .sort((first, second) => priority.indexOf(first.type) - priority.indexOf(second.type)).slice(0, 2);
+}
+
+function ActionBadge({ action }: Pick<BusinessActivity, "action">) {
+  return <Badge variant={activityActionVariants[action]} className="rounded border-transparent shadow-none">
+    {activityActions[action]}
+  </Badge>;
+}
+
+function ActivityChanges({ changes }: Pick<BusinessActivity, "changes">) {
+  const groups = groupActivityChanges(changes);
+  return <section aria-label="Informations de l’opération" className="space-y-1">
+    <h3 className="mb-3 text-sm font-semibold">Informations de l’opération</h3>
+    {groups.length === 0 && <p className="text-sm text-muted-foreground">Aucune information complémentaire enregistrée.</p>}
+    {groups.map((group, index) => <details key={group.title} open={index === 0 || groups.length <= 3} className="group border-t">
+      <summary className="flex cursor-pointer list-none items-center gap-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+        <span className="min-w-0 flex-1 break-words font-semibold">{group.title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{group.changes.length} {group.changes.length === 1 ? "information" : "informations"}</span>
+      </summary>
+      <div className="mb-4 overflow-x-auto rounded-md border">
+        <table className="w-full min-w-[360px] table-fixed text-sm">
+          <thead className="bg-muted text-left"><tr>
+            <th scope="col" className="w-2/5 px-3 py-2 font-medium">Information</th>
+            {group.mode === "compared" ? <>
+              <th scope="col" className="px-3 py-2 font-medium">Avant</th>
+              <th scope="col" className="px-3 py-2 font-medium">Après</th>
+            </> : <th scope="col" className="px-3 py-2 font-medium">{group.mode === "removed" ? "Valeur précédente" : "Valeur enregistrée"}</th>}
+          </tr></thead>
+          <tbody>{group.changes.map((change, changeIndex) => <tr key={changeIndex} className="border-t align-top">
+            <th scope="row" className="break-words px-3 py-2.5 text-left font-medium">{change.label}</th>
+            {group.mode === "compared" ? <>
+              <td className="whitespace-pre-wrap break-words px-3 py-2.5 text-muted-foreground">{change.beforeValue ?? "-"}</td>
+              <td className="whitespace-pre-wrap break-words bg-emerald-50/60 px-3 py-2.5 dark:bg-emerald-950/20">{change.afterValue ?? "-"}</td>
+            </> : <td className="whitespace-pre-wrap break-words px-3 py-2.5">{(group.mode === "removed" ? change.beforeValue : change.afterValue) ?? "-"}</td>}
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </details>)}
+  </section>;
 }
 
 export default function AdminActivityPage() {
@@ -81,6 +122,9 @@ export default function AdminActivityPage() {
     enabled: access.canViewActivity && !!selected,
   });
   const detail = activityDetail.data;
+  const referenceGroups = detail ? groupActivityReferences(detail) : [];
+  const primaryReferences = referenceGroups.filter(group => primaryReferenceTypes.has(group.type));
+  const supportingReferences = referenceGroups.filter(group => !primaryReferenceTypes.has(group.type));
 
   if (!access.canViewActivity) return <Navigate to={access.defaultPath} replace />;
 
@@ -131,23 +175,23 @@ export default function AdminActivityPage() {
       <p>{activities.error instanceof Error ? activities.error.message : "Chargement impossible."}</p>
       <Button type="button" variant="outline" onClick={() => activities.refetch()}>Réessayer</Button>
     </div> : <div className="min-w-0 overflow-x-auto rounded-md border">
-      <table className="w-full min-w-[820px] text-sm">
-        <thead className="bg-muted text-left text-muted-foreground"><tr>
-          {["Date", "Opérateur", "Module", "Activité", "Dossier / Référence", "Détails"].map(label => <th key={label} className="px-3 py-3 font-medium">{label}</th>)}
+      <table className="w-full min-w-[960px] text-sm">
+        <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
+          {["Date", "Opérateur", "Module", "Activité", "Dossier / Référence", "Détails"].map(label => <th scope="col" key={label} className="px-3 py-3 font-semibold">{label}</th>)}
         </tr></thead>
         <tbody>{activities.isPending ? <TableRowsSkeleton rows={6} colSpan={6} /> : activities.data?.items.length
-          ? activities.data.items.map(event => <tr key={event.id} className="border-t align-top">
+          ? activities.data.items.map(event => <tr key={event.id} className="border-t align-top hover:bg-muted/40">
             <td className="whitespace-nowrap px-3 py-3 tabular-nums">{dateTime(event.occurredAt)}</td>
             <td className="px-3 py-3">{event.actorName}</td>
-            <td className="px-3 py-3">{activityModules[event.module]}</td>
+            <td className="px-3 py-3 text-muted-foreground">{activityModules[event.module]}</td>
             <td className="max-w-sm px-3 py-3"><p className="break-words font-medium">{event.title}</p>
-              <Badge variant="secondary" className="mt-1 rounded">{activityActions[event.action]}</Badge></td>
+              <div className="mt-1.5"><ActionBadge action={event.action} /></div></td>
             <td className="max-w-xs px-3 py-3"><p>{referenceLabel(event.subject, event)}</p>
               {contextReferences(event).map(reference => <p key={`${reference.type}-${reference.id}`} className="mt-1 text-xs text-muted-foreground">
                   {referenceLabel(reference, event)}
                 </p>)}
             </td>
-            <td className="px-3 py-3"><Button type="button" variant="ghost" size="icon" title="Voir les détails" aria-label={`Détails : ${event.title}`} onClick={() => setSelection({ scope, event })}><Eye className="size-4" /></Button></td>
+            <td className="px-3 py-3"><Button type="button" variant="ghost" size="icon" className="text-fuchsia-700 dark:text-fuchsia-300" title="Voir les détails" aria-label={`Détails : ${event.title}`} onClick={() => setSelection({ scope, event })}><Eye className="size-4" /></Button></td>
           </tr>) : <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground">Aucune activité ne correspond aux filtres.</td></tr>}
         </tbody>
       </table>
@@ -155,27 +199,49 @@ export default function AdminActivityPage() {
     <ServerPagination page={page} totalPages={activities.data?.page.totalPages ?? 1} totalElements={activities.data?.page.totalElements}
       loading={activities.isFetching} onPageChange={setPage} />
     <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelection(undefined); }}>
-      <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader><DialogTitle>{selected?.title}</DialogTitle></DialogHeader>
+      <DialogContent className="flex max-h-[90svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6 sm:pr-12">
+          <div className="mb-1 flex flex-wrap items-center gap-2">{selected && <ActionBadge action={selected.action} />}
+            <span className="text-xs font-medium text-muted-foreground">{selected && activityModules[selected.module]}</span>
+          </div>
+          <DialogTitle className="break-words text-xl leading-snug">{selected?.title}</DialogTitle>
+          <DialogDescription>{selected && `${dateTime(selected.occurredAt)} · ${selected.actorName}`}</DialogDescription>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
         {activityDetail.isPending && <p role="status" className="py-6 text-sm text-muted-foreground">Chargement des détails...</p>}
         {activityDetail.isError && <div role="alert" className="space-y-3 text-sm text-destructive">
           <p>{activityDetail.error instanceof Error ? activityDetail.error.message : "Chargement impossible."}</p>
           <Button type="button" variant="outline" onClick={() => activityDetail.refetch()}>Réessayer</Button>
         </div>}
-        {selected && detail && <div className="space-y-5">
-          <p className="text-sm text-muted-foreground">{dateTime(detail.occurredAt)} · {detail.actorName} · {activityModules[detail.module]}</p>
-          <p className="text-sm"><span className="text-muted-foreground">Depuis : </span>{detail.surfaceLabel}</p>
-          <div className="space-y-2 text-sm"><p className="font-medium">{referenceLabel(detail.subject, detail)}</p>
-            {detail.references.map(reference => <p key={`${reference.type}-${reference.id}`}>{referenceLabel(reference, detail)}</p>)}
-          </div>
-          {detail.changes.length > 0 && <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm"><thead className="bg-muted text-left"><tr>
-              <th className="px-3 py-2 font-medium">Information</th><th className="px-3 py-2 font-medium">Avant</th><th className="px-3 py-2 font-medium">Après</th>
-            </tr></thead><tbody>{detail.changes.map((change, index) => <tr key={`${change.label}-${index}`} className="border-t align-top">
-              <td className="px-3 py-2 font-medium">{change.label}</td><td className="whitespace-pre-wrap break-words px-3 py-2">{change.beforeValue ?? "-"}</td><td className="whitespace-pre-wrap break-words px-3 py-2">{change.afterValue ?? "-"}</td>
-            </tr>)}</tbody></table>
-          </div>}
+        {selected && detail && <div className="space-y-6">
+          <dl className="grid gap-4 border-b pb-5 text-sm sm:grid-cols-2">
+            <div className="min-w-0"><dt className="mb-1 text-xs text-muted-foreground">Dossier / Référence</dt>
+              <dd className="font-medium">{referenceLabel(detail.subject, detail)}</dd></div>
+            <div className="min-w-0"><dt className="mb-1 text-xs text-muted-foreground">Depuis la page</dt>
+              <dd className="break-words">{detail.surfaceLabel}</dd></div>
+            {primaryReferences.map(group =>
+              <div key={group.type} className="min-w-0"><dt className="mb-1 text-xs text-muted-foreground">{group.label}</dt>
+                <dd className="space-y-1">{group.references.map(reference => <p key={reference.id}>{referenceLabel(reference, detail)}</p>)}</dd>
+              </div>)}
+          </dl>
+          <ActivityChanges changes={detail.changes} />
+          {supportingReferences.length > 0 &&
+            <details className="group border-t pt-4">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" />Références associées
+              </summary>
+              <dl className="mt-4 grid gap-5 text-sm sm:grid-cols-2">
+                {supportingReferences.map(group =>
+                  <div key={group.type} className="min-w-0"><dt className="mb-2 font-medium text-muted-foreground">{group.label} <span className="text-xs">({group.references.length})</span></dt>
+                    <dd><ul className="space-y-1.5">{group.references.map(reference => <li key={reference.id}>{referenceLabel(reference, detail)}</li>)}</ul></dd>
+                  </div>)}
+              </dl>
+            </details>}
         </div>}
+        </div>
+        <div className="flex shrink-0 justify-end border-t px-5 py-3 sm:px-6">
+          <DialogClose asChild><Button type="button" variant="outline">Fermer</Button></DialogClose>
+        </div>
       </DialogContent>
     </Dialog>
   </div>;

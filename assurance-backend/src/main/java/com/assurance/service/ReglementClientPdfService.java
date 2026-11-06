@@ -63,14 +63,14 @@ import java.util.Set;
 @Slf4j
 public class ReglementClientPdfService {
 
-    private static final DeviceRgb INK = new DeviceRgb(17, 48, 78);
+    private static final DeviceRgb INK = new DeviceRgb(28, 28, 28);
     private static final DeviceRgb ACCENT = new DeviceRgb(17, 48, 78);
     private static final DeviceRgb TABLE_HEADER = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb FOOTER_ACCENT = new DeviceRgb(0, 147, 211);
     private static final DeviceRgb SOFT_ACCENT = new DeviceRgb(232, 244, 250);
     private static final DeviceRgb SOFT_BLUE = new DeviceRgb(248, 250, 252);
     private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
-    private static final DeviceRgb MUTED = new DeviceRgb(71, 85, 105);
+    private static final DeviceRgb MUTED = new DeviceRgb(82, 82, 82);
     private static final float PAGE_MARGIN = 24f;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -139,12 +139,12 @@ public class ReglementClientPdfService {
         Cell title = cell().setTextAlignment(TextAlignment.RIGHT)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE);
         title.add(new Paragraph("FICHE DE RÈGLEMENT CLIENT")
-                .setFont(bold).setFontSize(14).setFontColor(INK).setMargin(0));
+                .setFont(bold).setFontSize(14).setFontColor(ACCENT).setMargin(0));
         title.add(new Paragraph(payment.getNumero())
-                .setFont(bold).setFontSize(10.5f).setFontColor(TABLE_HEADER)
+                .setFont(bold).setFontSize(10.5f).setFontColor(INK)
                 .setMarginTop(5).setMarginBottom(0));
         title.add(new Paragraph(joinAvailable(city(payment.getAgence()), date(payment.getDateReglement())))
-                .setFont(bold).setFontSize(10.5f).setFontColor(TABLE_HEADER)
+                .setFont(bold).setFontSize(10.5f).setFontColor(INK)
                 .setMarginTop(3).setMarginBottom(0));
         header.addCell(title);
         document.add(header);
@@ -417,7 +417,7 @@ public class ReglementClientPdfService {
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {
-        return new Paragraph(text).setFont(bold).setFontSize(10).setFontColor(INK).setMarginBottom(7);
+        return new Paragraph(text).setFont(bold).setFontSize(10).setFontColor(ACCENT).setMarginBottom(7);
     }
 
     private Cell totalLabelCell(String label, int colspan, PdfFont bold) {

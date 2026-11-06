@@ -69,12 +69,12 @@ import java.util.stream.Stream;
 @Slf4j
 public class JournalReglementsPdfService {
 
-    private static final DeviceRgb INK = new DeviceRgb(17, 48, 78);
+    private static final DeviceRgb INK = new DeviceRgb(28, 28, 28);
     private static final DeviceRgb TABLE_HEADER = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb ACCENT = new DeviceRgb(0, 147, 211);
     private static final DeviceRgb SOFT_BLUE = new DeviceRgb(248, 250, 252);
     private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
-    private static final DeviceRgb MUTED = new DeviceRgb(71, 85, 105);
+    private static final DeviceRgb MUTED = new DeviceRgb(82, 82, 82);
     private static final float PAGE_MARGIN = 24f;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -460,7 +460,7 @@ public class JournalReglementsPdfService {
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {
-        return new Paragraph(text).setFont(bold).setFontSize(9.5f).setMarginBottom(6);
+        return new Paragraph(text).setFont(bold).setFontSize(9.5f).setFontColor(TABLE_HEADER).setMarginBottom(6);
     }
 
     private void addHeader(Table table, String text, PdfFont bold, TextAlignment alignment) {

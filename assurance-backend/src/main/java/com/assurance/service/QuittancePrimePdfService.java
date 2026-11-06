@@ -53,7 +53,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class QuittancePrimePdfService {
-    private static final DeviceRgb INK = new DeviceRgb(17, 48, 78);
+    private static final DeviceRgb INK = new DeviceRgb(28, 28, 28);
     private static final DeviceRgb HEADER = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
     private static final DeviceRgb PALE = new DeviceRgb(232, 244, 250);

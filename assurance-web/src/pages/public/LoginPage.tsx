@@ -69,32 +69,32 @@ export default function LoginPage() {
         </div>
         <section aria-labelledby="login-title" className="pointer-events-auto mx-auto min-w-0 w-full max-w-[400px] lg:w-[calc(100%-8rem)] lg:max-w-[460px] xl:w-[calc(100%-10rem)]">
           <div className="mb-9 space-y-3">
-            <h1 id="login-title" className="text-3xl font-semibold leading-tight">Connexion</h1>
-            <p className="text-sm leading-6 text-muted-foreground">Accédez à votre espace Skay Assurance.</p>
+            <h1 id="login-title" className="text-3xl font-semibold leading-tight lg:text-4xl">Connexion</h1>
+            <p className="text-sm leading-6 text-muted-foreground lg:text-base">Accédez à votre espace Skay Assurance.</p>
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit} aria-busy={busy}>
             <div className="space-y-2">
-              <label htmlFor="login-email" className="text-sm font-medium">Adresse e-mail</label>
+              <label htmlFor="login-email" className="text-sm font-medium lg:text-base">Adresse e-mail</label>
               <Input id="login-email" name="email" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
                 value={email} onChange={event => setEmail(event.target.value)} placeholder="vous@agence.ma"
                 disabled={busy} aria-describedby={error ? "login-error" : undefined}
-                className="h-12 rounded-md border-input bg-card px-3.5 text-foreground caret-primary md:text-base focus-visible:border-ring focus-visible:ring-ring/30 dark:border-input dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground"
+                className="h-12 rounded-md border-input bg-card px-3.5 text-foreground caret-primary md:text-base lg:h-[52px] focus-visible:border-ring focus-visible:ring-ring/30 dark:border-input dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground"
                 required />
             </div>
             <div className="space-y-2">
-              <label htmlFor="login-password" className="text-sm font-medium">Mot de passe</label>
+              <label htmlFor="login-password" className="text-sm font-medium lg:text-base">Mot de passe</label>
               <div className="relative">
                 <Input id="login-password" name="password" type={passwordVisible ? "text" : "password"} autoComplete="current-password"
                   value={password} onChange={event => setPassword(event.target.value)} disabled={busy}
                   aria-describedby={error ? "login-error" : undefined}
-                  className="h-12 rounded-md border-input bg-card pl-3.5 pr-12 text-foreground caret-primary md:text-base focus-visible:border-ring focus-visible:ring-ring/30 dark:border-input dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground"
+                  className="h-12 rounded-md border-input bg-card pl-3.5 pr-12 text-foreground caret-primary md:text-base lg:h-[52px] focus-visible:border-ring focus-visible:ring-ring/30 dark:border-input dark:bg-card dark:text-foreground dark:placeholder:text-muted-foreground"
                   required />
                 <Button type="button" variant="ghost" size="icon" disabled={busy}
                   aria-label={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   title={passwordVisible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
                   aria-pressed={passwordVisible} aria-controls="login-password"
-                  className="absolute right-0.5 top-0.5 size-11 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  className="absolute right-0.5 top-0.5 size-11 text-muted-foreground hover:bg-accent hover:text-accent-foreground lg:top-1"
                   onClick={() => setPasswordVisible(current => !current)}>
                   {passwordVisible ? <EyeOff aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
                 </Button>
@@ -105,7 +105,7 @@ export default function LoginPage() {
               <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 break-words">{error}</span>
             </div>}
             <Button type="submit" disabled={busy}
-              className="h-12 w-full justify-between rounded-md px-4 text-sm font-semibold focus-visible:ring-ring/30">
+              className="h-12 w-full justify-between rounded-md px-4 text-sm font-semibold focus-visible:ring-ring/30 lg:h-[52px] lg:text-base">
               <span>{!isHydrated ? "Vérification de la session..." : isLoading ? "Connexion..." : "Se connecter"}</span>
               {busy ? <Loader2 aria-hidden="true" className="size-4 animate-spin motion-reduce:animate-none" /> : <ArrowRight aria-hidden="true" className="size-4" />}
             </Button>

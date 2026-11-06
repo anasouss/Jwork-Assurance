@@ -58,14 +58,14 @@ import java.util.stream.Collectors;
 @Slf4j
 public class BordereauRemisePdfService {
 
-    private static final DeviceRgb INK = new DeviceRgb(17, 48, 78);
+    private static final DeviceRgb INK = new DeviceRgb(28, 28, 28);
     private static final DeviceRgb ACCENT = new DeviceRgb(17, 48, 78);
     private static final DeviceRgb TABLE_HEADER = new DeviceRgb(35, 78, 116);
     private static final DeviceRgb FOOTER_ACCENT = new DeviceRgb(0, 147, 211);
     private static final DeviceRgb SOFT_ACCENT = new DeviceRgb(232, 244, 250);
     private static final DeviceRgb SOFT_BLUE = new DeviceRgb(248, 250, 252);
     private static final DeviceRgb BORDER = new DeviceRgb(157, 171, 184);
-    private static final DeviceRgb MUTED = new DeviceRgb(71, 85, 105);
+    private static final DeviceRgb MUTED = new DeviceRgb(82, 82, 82);
     private static final float PAGE_MARGIN = 24f;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -121,13 +121,13 @@ public class BordereauRemisePdfService {
         title.add(new Paragraph(typeTitle(slip.getType()))
                 .setFont(bold)
                 .setFontSize(13)
-                .setFontColor(INK)
+                .setFontColor(ACCENT)
                 .setMargin(0));
         title.add(new Paragraph((slip.getType() == TypeBordereauRemise.VERSEMENT_ESPECES
                         ? "Réf. cabinet : " : "Réf. interne : ") + slip.getNumero())
                 .setFont(bold)
                 .setFontSize(10)
-                .setFontColor(ACCENT)
+                .setFontColor(INK)
                 .setMarginTop(5)
                 .setMarginBottom(0));
         if (slip.getReferenceBancaire() != null && !slip.getReferenceBancaire().isBlank()) {

@@ -175,7 +175,7 @@ public class ReleveClientPdfRenderer {
         document.add(new Paragraph(city(source.getAgence()) + " Le " + LONG_DATE_FORMAT.format(source.getDateEmission()))
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setFontSize(9f)
-                .setFontColor(BRAND_BLUE)
+                .setFontColor(ColorConstants.BLACK)
                 .setMarginTop(5)
                 .setMarginRight(0)
                 .setMarginBottom(4));
@@ -188,7 +188,7 @@ public class ReleveClientPdfRenderer {
                 .add(new Paragraph(value(source.getPayeurNom()))
                 .setFont(bold)
                 .setFontSize(9.5f)
-                .setFontColor(BRAND_BLUE)
+                .setFontColor(ColorConstants.BLACK)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMargin(0))
                 .setBorder(TABLE_BORDER)
@@ -648,7 +648,7 @@ public class ReleveClientPdfRenderer {
                 .setTextAlignment(TextAlignment.RIGHT)
                 .setBorder(TABLE_BORDER)
                 .setBackgroundColor(LIGHT_BLUE)
-                .setFontColor(BRAND_BLUE)
+                .setFontColor(ColorConstants.BLACK)
                 .setPadding(4));
     }
 
@@ -666,7 +666,7 @@ public class ReleveClientPdfRenderer {
         document.add(new Paragraph("Le montant total à régler s'élève à "
                 + amount(source.getTotalDocument()) + " Dhs")
                 .setFontSize(9.5f)
-                .setFontColor(BRAND_BLUE)
+                .setFontColor(ColorConstants.BLACK)
                 .setMarginLeft(0)
                 .setMarginTop(denseStatement ? 10 : 18)
                 .setMarginBottom(3));
@@ -711,7 +711,7 @@ public class ReleveClientPdfRenderer {
                 .add(new Paragraph(amount(source.getTotalDocument()))
                         .setFont(bold)
                         .setFontSize(8.5f)
-                        .setFontColor(BRAND_BLUE)
+                        .setFontColor(ColorConstants.BLACK)
                         .setTextAlignment(TextAlignment.CENTER)
                         .setMargin(0))
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
@@ -737,7 +737,7 @@ public class ReleveClientPdfRenderer {
         document.add(closing);
 
         Paragraph issuer = new Paragraph()
-                .setFontColor(BRAND_BLUE)
+                .setFontColor(ColorConstants.BLACK)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMargin(0)
                 .setMultipliedLeading(1.15f)
@@ -946,7 +946,7 @@ public class ReleveClientPdfRenderer {
         return new Paragraph(text)
                 .setFont(regular)
                 .setFontSize(6.9f)
-                .setFontColor(BRAND_BLUE)
+                .setFontColor(ColorConstants.DARK_GRAY)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMargin(0)
                 .setMultipliedLeading(1.05f);

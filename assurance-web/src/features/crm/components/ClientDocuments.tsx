@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Archive, Download, History, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -122,16 +124,22 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <strong className="font-medium">{piece.typePieceJointeLibelle ?? "Document"}</strong>
-            <span className={piece.status === "EXPIRED" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{documentStatus(piece)}</span>
+            <Badge variant={piece.status === "ARCHIVED" ? "gray" : piece.status === "EXPIRED" ? "red" : "success"} className="px-2 py-0 text-xs font-medium shadow-none">{documentStatus(piece)}</Badge>
           </div>
           <p className="mt-1 break-all text-muted-foreground">{piece.nomFichier}</p>
           {piece.expiresOn && <p className="mt-1 text-xs text-muted-foreground">Validité : {formatDocumentDate(piece.expiresOn)}</p>}
         </div>
         <div className="flex shrink-0 gap-1">
-          <Button type="button" size="icon" variant="ghost" title="Télécharger" aria-label={`Télécharger ${piece.nomFichier}`} onClick={() => download(piece)}><Download className="size-4" /></Button>
+          <Tooltip><TooltipTrigger asChild>
+            <Button type="button" size="icon" variant="ghost" aria-label={`Télécharger ${piece.nomFichier}`} onClick={() => download(piece)}><Download className="size-4" /></Button>
+          </TooltipTrigger><TooltipContent>Télécharger</TooltipContent></Tooltip>
           {canManage && !piece.archived && <>
-            <Button type="button" size="icon" variant="ghost" title="Remplacer" aria-label={`Remplacer ${piece.nomFichier}`} disabled={!types.data?.some(type => type.naturePieceJointeId === piece.naturePieceJointeId)} onClick={() => setUpload({ previous: piece })}><RefreshCw className="size-4" /></Button>
-            <Button type="button" size="icon" variant="ghost" title={piece.canDelete ? "Supprimer" : "Archiver"} aria-label={`${piece.canDelete ? "Supprimer" : "Archiver"} ${piece.nomFichier}`} onClick={() => setConfirm(piece)}>{piece.canDelete ? <Trash2 className="size-4 text-destructive" /> : <Archive className="size-4" />}</Button>
+            <Tooltip><TooltipTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" className="text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40 dark:hover:text-amber-200" aria-label={`Remplacer ${piece.nomFichier}`} disabled={!types.data?.some(type => type.naturePieceJointeId === piece.naturePieceJointeId)} onClick={() => setUpload({ previous: piece })}><RefreshCw className="size-4" /></Button>
+            </TooltipTrigger><TooltipContent>Remplacer</TooltipContent></Tooltip>
+            <Tooltip><TooltipTrigger asChild>
+              <Button type="button" size="icon" variant="ghost" className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200" aria-label={`${piece.canDelete ? "Supprimer" : "Archiver"} ${piece.nomFichier}`} onClick={() => setConfirm(piece)}>{piece.canDelete ? <Trash2 className="size-4" /> : <Archive className="size-4" />}</Button>
+            </TooltipTrigger><TooltipContent>{piece.canDelete ? "Supprimer" : "Archiver"}</TooltipContent></Tooltip>
           </>}
         </div>
       </div>
@@ -150,7 +158,7 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
   }
   return <section className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <h3 className="text-sm font-medium">Documents actuels</h3>
+      <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">Documents actuels</h3>
       {canManage && <Button type="button" size="sm" variant="outline" disabled={!types.data?.length} onClick={() => setUpload({})}><Plus className="size-4" />Ajouter un document</Button>}
     </div>
     {archivedDocuments.length > 0 && <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">

@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   ArrowRight,
   Building2,
   CalendarClock,
@@ -77,7 +78,6 @@ export default function ClientCrmPage() {
   const [collaborateurId, setCollaborateurId] = useState("TOUS");
   const [page, setPage] = useState(0);
   const selectedClientId = searchParams.get("clientId") ?? "";
-  const [clientPickerOpen, setClientPickerOpen] = useState(false);
   const [clientDialogOpen, setClientDialogOpen] = useState(false);
   const [previewClientId, setPreviewClientId] = useState<string>();
   const [clientToEdit, setClientToEdit] = useState<ClientResponse>();
@@ -106,7 +106,7 @@ export default function ClientCrmPage() {
       page,
       size: 25,
     }),
-    enabled: clientSearchReady && (!selectedClientId || clientPickerOpen),
+    enabled: clientSearchReady && !selectedClientId,
   });
   const detailQuery = useQuery({
     queryKey: ["crm-client", selectedClientId],
@@ -124,19 +124,21 @@ export default function ClientCrmPage() {
 
   const selectClient = (clientId: string) => {
     setPreviewClientId(clientId);
-    setClientPickerOpen(false);
   };
 
   return (
     <div className="min-w-0 space-y-4 p-4 md:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      {selectedClientId && <Button type="button" variant="ghost" className="w-fit gap-2 px-0 text-muted-foreground hover:bg-transparent hover:text-foreground" onClick={() => setSearchParams(current => {
+        const next = new URLSearchParams(current);
+        next.delete("clientId");
+        return next;
+      })}><ArrowLeft className="size-4" />Retour aux clients</Button>}
+      {!selectedClientId && <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">CRM</p>
-          <h1 className="text-2xl font-semibold">{selectedClientId ? "Fiche client" : "Clients"}</h1>
+          <h1 className="text-2xl font-semibold">Clients</h1>
           <p className="text-sm text-muted-foreground">
-            {selectedClientId
-              ? "Informations, organisation, acquisition et conditions de paiement."
-              : "Recherchez, consultez et créez les clients de l’agence."}
+            Recherchez, consultez et créez les clients de l’agence.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -146,12 +148,6 @@ export default function ClientCrmPage() {
               Nouveau groupe
             </Button>
           ) : null}
-          {selectedClientId ? (
-            <Button type="button" variant="outline" onClick={() => setClientPickerOpen(true)}>
-              <Search className="size-4" />
-              Changer de client
-            </Button>
-          ) : null}
           {canCreateClient ? (
             <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setClientDialogOpen(true)}>
               <Plus className="size-4" />
@@ -159,7 +155,7 @@ export default function ClientCrmPage() {
             </Button>
           ) : null}
         </div>
-      </header>
+      </header>}
 
       {!selectedClientId ? (
         <section className="mx-auto w-full max-w-5xl rounded-lg border bg-card">
@@ -205,35 +201,6 @@ export default function ClientCrmPage() {
           </div>
         </section>
       )}
-
-      <Dialog open={clientPickerOpen} onOpenChange={setClientPickerOpen}>
-        <DialogContent className="max-h-[88vh] gap-0 overflow-hidden p-0 sm:max-w-5xl">
-          <DialogHeader className="border-b px-5 py-4">
-            <DialogTitle>Changer de client</DialogTitle>
-            <DialogDescription>Recherchez par nom, identifiant ou groupe.</DialogDescription>
-          </DialogHeader>
-          <ClientPicker
-            query={query}
-            onQueryChange={(value) => { setQuery(value); setPage(0); }}
-            groupeId={groupeId}
-            onGroupChange={(value) => { setGroupeId(value); setPage(0); }}
-            groupes={groupesQuery.data ?? []}
-            origineId={origineId}
-            onOriginChange={(value) => { setOrigineId(value); setPage(0); }}
-            collaborateurId={collaborateurId}
-            onCollaboratorChange={(value) => { setCollaborateurId(value); setPage(0); }}
-            acquisitionOptions={acquisitionOptionsQuery.data}
-            clients={clientSearchReady && !clientsQuery.isError ? clientsQuery.data?.items ?? [] : []}
-            searchActive={hasClientSearch}
-            loading={hasClientSearch && (!clientSearchReady || clientsQuery.isLoading)}
-            error={clientSearchReady && clientsQuery.isError ? clientsQuery.error.message : undefined}
-            onRetry={() => void clientsQuery.refetch()}
-            page={clientSearchReady && !clientsQuery.isError ? clientsQuery.data?.page : undefined}
-            onPageChange={setPage}
-            onSelect={selectClient}
-          />
-        </DialogContent>
-      </Dialog>
 
       {previewClientId && <ClientSummaryDialog key={previewClientId} clientId={previewClientId}
         onClose={() => setPreviewClientId(undefined)} onEdit={canEditClient ? setClientToEdit : undefined} />}
@@ -746,18 +713,18 @@ function ClientDetail({
 
   return (
     <section className="min-w-0 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold">{client.nomAffichage || client.raisonSociale || client.nom}</h2>
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4 border-b pb-5">
+        <div className="min-w-0 flex-1 space-y-2">
+          <h1 className="break-words text-2xl font-semibold leading-tight">{client.nomAffichage || client.raisonSociale || client.nom}</h1>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <p className="break-words text-sm text-muted-foreground">
+              {[client.codeClient, client.rc ? `RC ${client.rc}` : client.cin ? `CIN ${client.cin}` : undefined, client.ice ? `ICE ${client.ice}` : undefined].filter(Boolean).join(" · ")}
+            </p>
             <Badge variant="outline">{client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Personne physique"}</Badge>
-            <Badge className={client.actif === false ? "bg-slate-500" : "bg-emerald-600"}>{client.actif === false ? "Inactif" : "Actif"}</Badge>
+            <Badge variant={client.actif === false ? "gray" : "success"}>{client.actif === false ? "Inactif" : "Actif"}</Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {[client.codeClient, client.rc || client.cin, client.ice].filter(Boolean).join(" · ")}
-          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 xl:w-auto">
           {onEdit && <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => onEdit(client)}><Pencil className="size-4" />Modifier</Button>}
           <Button asChild type="button" variant="outline" className="border-emerald-200 text-emerald-950 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-950/30">
             <Link to={productionUrl}><FolderOpen className="size-4" />Portefeuille client</Link>
@@ -767,7 +734,7 @@ function ClientDetail({
           </Button>
           {canViewClaims && <Button asChild type="button" variant="outline"><Link to={claimsUrl}><ShieldCheck className="size-4 text-blue-700 dark:text-blue-300" />Sinistres</Link></Button>}
         </div>
-      </div>
+      </header>
 
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
         <span>Contrats : <strong className="font-medium text-foreground">{detail.contrats.length}</strong></span>

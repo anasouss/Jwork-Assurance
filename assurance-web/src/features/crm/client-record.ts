@@ -14,7 +14,6 @@ export function clientProfileSections(client: ClientResponse) {
     ["Passeport", client.passport], ["Validité passeport", client.passportValidite && formatDocumentDate(client.passportValidite)],
     ["Carte de résidence", client.carteResidence],
   ];
-  identity.push(["Catégorie client", client.categorieClientLibelle ?? undefined]);
   const sections = [{ key: "identity", title: client.typeClient === "PERSONNE_MORALE" ? "Identification de l’entreprise" : "Identité", fields: identity }];
   if (client.typeClient === "PERSONNE_PHYSIQUE" && (client.numeroPermis || client.dateDelivrancePermis || client.dateValiditePermis)) {
     sections.push({ key: "licence", title: "Permis de conduire", fields: [

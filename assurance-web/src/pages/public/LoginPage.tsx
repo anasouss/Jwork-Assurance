@@ -51,23 +51,23 @@ export default function LoginPage() {
         </TopoBackground>
       </div>
 
-      <header className="pointer-events-none relative mx-auto flex w-full max-w-[1440px] items-center justify-between gap-6 px-6 pt-6 sm:px-10 lg:px-14 lg:pt-8">
+      <header className="pointer-events-none relative flex w-full items-center justify-between gap-6 px-6 pt-6 sm:px-10 lg:px-16 lg:pt-8 xl:px-20">
         <img src={skayLogo} alt="Skay Assurance" width={1200} height={666}
-          className="h-16 w-48 max-w-[70%] object-cover lg:h-20 lg:w-64 dark:brightness-0 dark:invert" />
+          className="h-16 w-48 max-w-[70%] object-cover lg:-ml-6 lg:h-24 lg:w-72 dark:brightness-0 dark:invert" />
         <ThemeToggle className="pointer-events-auto size-11 border border-border bg-background text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
       </header>
 
-      <main className="pointer-events-none relative mx-auto grid w-full max-w-[1440px] flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-24 lg:px-14 lg:py-16 xl:gap-40">
-        <div className="hidden min-w-0 max-w-md self-end space-y-6 pb-6 text-[#132a3b] lg:block dark:text-[#edf2f5]">
-          <p className="max-w-[420px] text-4xl font-semibold leading-[1.2]">
+      <main className="pointer-events-none relative grid w-full flex-1 items-center px-6 py-12 sm:px-10 lg:grid-cols-2 lg:px-0 lg:py-8">
+        <div className="hidden min-w-0 self-end space-y-6 text-[#132a3b] lg:block lg:px-16 xl:px-20 dark:text-[#edf2f5]">
+          <p className="max-w-[520px] text-[48px] font-semibold leading-[1.12]">
             <span className="block">Votre espace de</span>
             <span className="block text-[#805a19] dark:text-[#e1b86b]">gestion d’assurance.</span>
           </p>
-          <p className="max-w-[360px] text-pretty text-base leading-7 text-[#354f61] dark:text-[#becdd7]">
+          <p className="max-w-[400px] text-pretty text-lg leading-7 text-[#354f61] dark:text-[#becdd7]">
             Contrats, clients, sinistres et comptabilité réunis au même endroit.
           </p>
         </div>
-        <section aria-labelledby="login-title" className="pointer-events-auto mx-auto w-full max-w-[400px]">
+        <section aria-labelledby="login-title" className="pointer-events-auto mx-auto min-w-0 w-full max-w-[400px] lg:w-[calc(100%-8rem)] lg:max-w-[460px] xl:w-[calc(100%-10rem)]">
           <div className="mb-9 space-y-3">
             <h1 id="login-title" className="text-3xl font-semibold leading-tight">Connexion</h1>
             <p className="text-sm leading-6 text-muted-foreground">Accédez à votre espace Skay Assurance.</p>
@@ -117,8 +117,8 @@ export default function LoginPage() {
         </section>
       </main>
 
-      <footer className="relative mx-auto w-full max-w-[1440px] px-6 pb-6 sm:px-10 lg:px-14 lg:pb-8">
-        <DeveloperCredit className="text-center lg:text-right" />
+      <footer className="relative w-full px-6 pb-6 sm:px-10 lg:ml-auto lg:w-1/2 lg:px-16 lg:pb-8 xl:px-20">
+        <DeveloperCredit className="mx-auto w-full max-w-[460px] text-center lg:text-right" />
       </footer>
     </div>
   );

@@ -111,7 +111,23 @@ public final class PaymentActivity {
         }
         ActivityReference primary = subject == null ? reference(payment) : subject;
         return new ActivityCommand(payment.getAgence().getId(), ActivityModule.COMPTABILITE_CLIENT, action, title, origin,
-                primary, withoutSubject(references, primary), ActivityValues.changes(before, snapshot(payment)));
+                primary, withoutSubject(references, primary), allocationContext(payment, ActivityValues.changes(before, snapshot(payment))));
+    }
+
+    private static List<ActivityChange> allocationContext(ReglementClient payment, List<ActivityChange> changes) {
+        List<ActivityChange> result = new ArrayList<>(changes);
+        int index = 0;
+        for (var instrument : payment.getInstruments().stream()
+                .sorted(Comparator.comparing(InstrumentReglementClient::getId, Comparator.nullsLast(Comparator.naturalOrder()))).toList()) {
+            String prefix = "Moyen " + (++index) + " - Affectation ";
+            // Keep the instrument reference with allocation-only changes, where the
+            // unchanged instrument header would otherwise be absent from the event.
+            changes.stream().filter(change -> change.label().startsWith(prefix))
+                    .map(change -> change.label().substring(0, change.label().lastIndexOf(" - ")))
+                    .distinct().forEach(group -> result.add(new ActivityChange(
+                            group + " - Moyen de paiement", null, reference(instrument).label())));
+        }
+        return List.copyOf(result);
     }
 
     public static ActivityCommand instrumentCommand(InstrumentReglementClient instrument, Map<String, String> before,

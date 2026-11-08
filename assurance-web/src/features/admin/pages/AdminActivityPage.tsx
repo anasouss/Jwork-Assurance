@@ -15,7 +15,7 @@ import { adminApi } from "../api";
 import { activityActions, activityKeys, activityModules, getBusinessActivity, searchBusinessActivities,
   type ActivityFilters, type ActivityReference, type BusinessActivity } from "../business-activity";
 import { useAdminAccess } from "./admin-access";
-import { activityActionVariants, activityChangeSections, guaranteeSummaryFields, groupActivityReferences,
+import { accountingSummaryFields, activityActionVariants, activityChangeSections, guaranteeSummaryFields, groupActivityReferences,
   type ActivityChangeGroup } from "../business-activity-presentation";
 
 type Filters = { search: string; module: string; action: string; actor: string; from: string; to: string };
@@ -64,9 +64,13 @@ function ActivityChanges({ changes, module }: Pick<BusinessActivity, "changes" |
       <summary className="flex cursor-pointer list-none items-center gap-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open/section:rotate-180 motion-reduce:transition-none" />
         <span className="min-w-0 flex-1 break-words font-semibold">{section.title}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{count} {count === 1 ? "information" : "informations"}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{section.kind === "documentLines" || section.kind === "allocations"
+          ? `${section.groups.length} ${section.kind === "documentLines" ? (section.groups.length === 1 ? "ligne" : "lignes") : (section.groups.length === 1 ? "affectation" : "affectations")}`
+          : `${count} ${count === 1 ? "information" : "informations"}`}</span>
       </summary>
-      {section.kind === "vehicle" || section.kind === "person" || section.kind === "guarantees"
+      {section.kind === "documentLines" || section.kind === "allocations"
+        ? <AccountingChangesTable groups={section.groups} allocations={section.kind === "allocations"} />
+        : section.kind === "vehicle" || section.kind === "person" || section.kind === "guarantees"
         ? <GuaranteeChangesTable groups={section.groups} person={section.kind === "person"} />
         : section.groups.map(group => <div key={group.title}>
           {section.kind === "quittance" && <h4 className="mb-2 mt-3 text-sm font-medium">{group.title === "Quittance" ? "Total" : group.title.slice("Quittance - ".length)}</h4>}
@@ -75,6 +79,38 @@ function ActivityChanges({ changes, module }: Pick<BusinessActivity, "changes" |
     </details>;
     })}
   </section>;
+}
+
+function AccountingChangesTable({ groups, allocations }: { groups: ActivityChangeGroup[]; allocations: boolean }) {
+  const headings = allocations ? ["Moyen de paiement", "Écriture", "Document", "Montant", "Statut"] : ["Dossier", "Police", "Libellé", "Montant TTC"];
+  return <div className="mb-4 overflow-x-auto rounded-md border">
+    <table className="w-full min-w-[700px] text-sm">
+      <thead className="bg-muted text-left"><tr>
+        <th scope="col" className="px-3 py-2 font-medium">{allocations ? "Règlement / Affectation" : "Ligne"}</th>
+        {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
+        <th scope="col" className="px-3 py-2 font-medium">Détails</th>
+      </tr></thead>
+      <tbody>{groups.map(group => {
+        const { summary, additional } = accountingSummaryFields(group, allocations);
+        const allocation = allocations ? group.title.match(/^(?:(.*) - )?(Moyen(?: \d+)?) - (Affectation \d+)$/) : null;
+        return <tr key={group.title} className="border-t align-top">
+          <th scope="row" className="min-w-32 max-w-48 break-words px-3 py-2.5 text-left font-medium">{allocation ? <>
+            {allocation[1] && <div>{allocation[1]}</div>}<div className="text-xs text-muted-foreground">{allocation[3]}</div>
+          </> : group.title}</th>
+          {summary.map((change, index) => <td key={index} className="max-w-56 whitespace-pre-wrap break-words px-3 py-2.5 tabular-nums">{allocations && index === 0 && !change && allocation
+            ? <div>{allocation[2]}<div className="mt-1 text-xs text-muted-foreground">Référence non enregistrée</div></div>
+            : <GuaranteeChangeValue change={change} />}</td>)}
+          <td className="min-w-28 px-3 py-2.5">{additional.length > 0 ? <details>
+            <summary className="cursor-pointer text-xs font-medium text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300">Voir les détails</summary>
+            <dl className="mt-3 space-y-3">{additional.map((change, index) => <div key={index} className="max-w-64 break-words">
+              <dt className="mb-1 text-xs text-muted-foreground">{change.label}</dt>
+              <dd className="whitespace-pre-wrap"><GuaranteeChangeValue change={change} /></dd>
+            </div>)}</dl>
+          </details> : <span className="text-muted-foreground">-</span>}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+  </div>;
 }
 
 function ChangeFieldsTable({ group }: { group: ActivityChangeGroup }) {

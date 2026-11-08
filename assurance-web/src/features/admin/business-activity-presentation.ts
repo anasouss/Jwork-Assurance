@@ -82,7 +82,7 @@ export function groupActivityChanges(changes: Change[]) {
 }
 
 export type ActivityChangeGroup = ReturnType<typeof groupActivityChanges>[number];
-type ChangeSection = { title: string; kind: "fields" | "vehicle" | "person" | "guarantees" | "quittance"; groups: ActivityChangeGroup[] };
+type ChangeSection = { title: string; kind: "fields" | "vehicle" | "person" | "guarantees" | "quittance" | "documentLines" | "allocations"; groups: ActivityChangeGroup[] };
 
 const personFields = new Set(["Deces", "Décès", "Invalidite", "Invalidité", "Frais medicaux", "Frais médicaux", "Hospitalisation", "Frais funeraires", "Frais funéraires", "Chirurgie", "Personne assuree"]);
 const guaranteeFields = new Set(["Couverture", "Selection", "Mode de tarification", "Base assuree", "Capital", "Valeur assuree", "Valeur venale", "Valeur a neuf", "Valeur glace", "Prime", "Taux", "Franchise", "Franchise minimale", "Formule", "Accessoire", "Accessoires", ...personFields]);
@@ -98,6 +98,15 @@ export function activityChangeSections(changes: Change[], module: BusinessActivi
   for (const group of groups) {
     let kind: ChangeSection["kind"] = "fields";
     let title = group.title;
+    if (module === "COMPTABILITE_CLIENT") {
+      if (/^(?:.* - )?Ligne \d+$/.test(group.title)) {
+        kind = "documentLines";
+        title = "Lignes du document";
+      } else if (/(?:^| - )Moyen(?: \d+)? - Affectation \d+$/.test(group.title)) {
+        kind = "allocations";
+        title = "Affectations des règlements";
+      }
+    }
     if (module === "PRODUCTION") {
       if (group.title === "Quittance" || group.title.startsWith("Quittance - ")) {
         kind = "quittance";
@@ -114,6 +123,11 @@ export function activityChangeSections(changes: Change[], module: BusinessActivi
     if (section) section.groups.push(group);
     else sections.push({ title, kind, groups: [group] });
   }
+  if (module === "COMPTABILITE_CLIENT") {
+    const rank = (section: ChangeSection) => section.title === "Informations générales" ? 0
+      : section.kind === "documentLines" ? 1 : section.kind === "allocations" ? 2 : 3;
+    sections.sort((first, second) => rank(first) - rank(second));
+  }
   if (module === "PRODUCTION") {
     const rank = (section: ChangeSection) => section.kind === "quittance" ? 6
       : section.kind === "vehicle" ? 2 : section.kind === "person" ? 3 : section.kind === "guarantees" ? 4
@@ -128,6 +142,15 @@ export function activityChangeSections(changes: Change[], module: BusinessActivi
     });
   }
   return sections;
+}
+
+export function accountingSummaryFields(group: ActivityChangeGroup, allocations: boolean) {
+  const columns = allocations
+    ? ["Moyen de paiement", "Ecriture", "Document", "Montant", "Statut"]
+    : ["Dossier", "Police", "Libelle", "Montant TTC"];
+  const summary = columns.map(label => group.changes.find(change => change.label === label));
+  const selected = new Set(summary.filter(change => change != null));
+  return { summary, additional: group.changes.filter(change => !selected.has(change)) };
 }
 
 export function guaranteeSummaryFields(group: ActivityChangeGroup, person: boolean) {

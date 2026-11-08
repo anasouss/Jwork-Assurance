@@ -4,7 +4,7 @@ vi.mock("@/lib/api/base", () => ({ apiFetch: vi.fn(), buildQueryString: vi.fn() 
 
 import { apiFetch } from "@/lib/api/base";
 import { activityKeys, getBusinessActivity } from "./business-activity";
-import { activityChangeSections, guaranteeSummaryFields, groupActivityChanges, groupActivityReferences } from "./business-activity-presentation";
+import { accountingSummaryFields, activityChangeSections, guaranteeSummaryFields, groupActivityChanges, groupActivityReferences } from "./business-activity-presentation";
 
 describe("business activity queries", () => {
   it("separates agency and platform list/detail caches", () => {
@@ -21,6 +21,42 @@ describe("business activity queries", () => {
 });
 
 describe("business activity presentation", () => {
+  it("consolidates historical invoice lines and allocations without losing before/after values", () => {
+    const changes = [
+      { label: "REG-26-000005 - Moyen 2 - Affectation 1 - Statut", beforeValue: "En attente", afterValue: "Annulee" },
+      { label: "Ligne 1 - Dossier", beforeValue: null, afterValue: "MATU26-0021" },
+      { label: "Numero", beforeValue: null, afterValue: "FAC-26-000010" },
+      { label: "REG-26-000005 - Moyen 3 - Affectation 2 - Montant", beforeValue: null, afterValue: "0,00" },
+      { label: "Ligne 2 - Montant TTC", beforeValue: null, afterValue: "125,00" },
+      { label: "REG-26-000005 - Moyen 3 - Affectation 2 - Moyen de paiement", beforeValue: null, afterValue: "Cheque - 555444" },
+    ];
+    const sections = activityChangeSections(changes, "COMPTABILITE_CLIENT");
+    expect(sections.map(section => section.title)).toEqual(["Informations générales", "Lignes du document", "Affectations des règlements"]);
+    expect(sections[1].groups).toHaveLength(2);
+    expect(sections[2].groups).toHaveLength(2);
+    expect(sections.flatMap(section => section.groups.flatMap(group => group.changes))).toHaveLength(changes.length);
+    expect(accountingSummaryFields(sections[2].groups[0], true).summary[4])
+      .toMatchObject({ beforeValue: "En attente", afterValue: "Annulee" });
+    const summary = accountingSummaryFields(sections[2].groups[1], true).summary;
+    expect(summary[0]?.afterValue).toBe("Cheque - 555444");
+    expect(summary[3]?.afterValue).toBe("0,00");
+    expect(activityChangeSections(changes, "SINISTRES").every(section => section.kind === "fields")).toBe(true);
+  });
+
+  it("keeps extra invoice and allocation fields accessible without guessing missing cheque references", () => {
+    const group = groupActivityChanges([
+      { label: "Moyen 2 - Affectation 1 - Document", beforeValue: "FAC-1", afterValue: null },
+      { label: "Moyen 2 - Affectation 1 - Payeur", beforeValue: "Client", afterValue: null },
+    ])[0];
+    const fields = accountingSummaryFields(group, true);
+    expect(fields.summary[0]).toBeUndefined();
+    expect(fields.summary[2]?.beforeValue).toBe("FAC-1");
+    expect(fields.additional.map(change => change.label)).toEqual(["Payeur"]);
+    expect(accountingSummaryFields(groupActivityChanges([
+      { label: "Ligne 1 - Taxes", beforeValue: null, afterValue: "20,00" },
+    ])[0], false).additional[0].afterValue).toBe("20,00");
+  });
+
   it("orders production details by workflow with every quittance category last", () => {
     const changes = [
       { label: "Quittance - EVCAT - Taxes", beforeValue: null, afterValue: "1,00" },

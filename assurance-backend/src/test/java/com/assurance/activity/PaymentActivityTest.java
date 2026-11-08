@@ -20,6 +20,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PaymentActivityTest {
     @Test
+    void allocationOnlyChangesKeepTheChequeReferenceWithoutCreatingAnUnchangedEvent() {
+        ReglementClient payment = payment();
+        var before = PaymentActivity.snapshot(payment);
+        assertThat(PaymentActivity.command(payment, before, ActivityAction.UPDATED,
+                "Affectations", "PAYMENT_ALLOCATION_INVOICING", null).changes()).isEmpty();
+        payment.getInstruments().get(0).getAffectations().get(0).setStatut(StatutAffectationReglement.ANNULEE);
+        var command = PaymentActivity.command(payment, before, ActivityAction.UPDATED,
+                "Affectations", "PAYMENT_ALLOCATION_INVOICING", null);
+        assertThat(command.changes()).contains(
+                new ActivityChange("Moyen 1 - Affectation 1 - Statut", "En attente", "Annulee"),
+                new ActivityChange("Moyen 1 - Affectation 1 - Moyen de paiement", null, "Cheque - CH-1"));
+    }
+
+    @Test
     void paymentCreationDoesNotMisrepresentAPendingChequeAsCollected() {
         ReglementClient payment = payment();
         var command = PaymentActivity.command(payment, Map.of(), ActivityAction.CREATED,

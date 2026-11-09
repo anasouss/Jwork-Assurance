@@ -85,7 +85,7 @@ function AccountingChangesTable({ groups, allocations }: { groups: ActivityChang
   const headings = allocations ? ["Moyen de paiement", "Écriture", "Document", "Montant", "Statut"] : ["Dossier", "Police", "Libellé", "Montant TTC"];
   return <div className="mb-4 overflow-x-auto rounded-md border">
     <table className="w-full min-w-[700px] text-sm">
-      <thead className="bg-muted text-left"><tr>
+      <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
         <th scope="col" className="px-3 py-2 font-medium">{allocations ? "Règlement / Affectation" : "Ligne"}</th>
         {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
         <th scope="col" className="px-3 py-2 font-medium">Détails</th>
@@ -116,7 +116,7 @@ function AccountingChangesTable({ groups, allocations }: { groups: ActivityChang
 function ChangeFieldsTable({ group }: { group: ActivityChangeGroup }) {
   return <div className="mb-4 overflow-x-auto rounded-md border">
     <table className="w-full min-w-[360px] table-fixed text-sm">
-      <thead className="bg-muted text-left"><tr>
+      <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
         <th scope="col" className="w-2/5 px-3 py-2 font-medium">Information</th>
         {group.mode === "compared" ? <>
           <th scope="col" className="px-3 py-2 font-medium">Avant</th>
@@ -148,7 +148,7 @@ function GuaranteeChangesTable({ groups, person }: { groups: ActivityChangeGroup
   const headings = person ? ["Décès", "Invalidité", "Frais médicaux", "Prime"] : ["Valeur assurée / Capital", "Franchise (%)", "Minimum franchise", "Prime"];
   return <div className="mb-4 overflow-x-auto rounded-md border">
     <table className="w-full min-w-[700px] text-sm">
-      <thead className="bg-muted text-left"><tr>
+      <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
         <th scope="col" className="px-3 py-2 font-medium">Garantie / Cible</th>
         {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
         <th scope="col" className="px-3 py-2 font-medium">Détails</th>

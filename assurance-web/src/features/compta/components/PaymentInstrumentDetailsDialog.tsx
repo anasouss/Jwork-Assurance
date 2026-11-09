@@ -108,9 +108,14 @@ function InstrumentLifecycle({ payment, instrument, onSelect }: {
   const deposits = ownEvents.filter(event => event.type === "REMISE_EN_BANQUE");
   const firstDeposit = deposits[0];
   const firstReturnIndex = ownEvents.findIndex(event => event.type === "REJET");
-  const newDeposit = firstReturnIndex < 0 ? undefined
-    : ownEvents.slice(firstReturnIndex + 1).filter(event => event.type === "REMISE_EN_BANQUE").at(-1);
-  const lastReturn = ownEvents.filter(event => event.type === "REJET").at(-1);
+  const newDeposits = firstReturnIndex < 0 ? []
+    : ownEvents.slice(firstReturnIndex + 1).filter(event => event.type === "REMISE_EN_BANQUE");
+  const newDeposit = newDeposits.at(-1);
+  const returns = ownEvents.filter(event => event.type === "REJET");
+  const firstReturn = returns[0];
+  const lastReturn = returns.at(-1);
+  const returnAfterNewDeposit = Boolean(newDeposit && lastReturn
+    && ownEvents.indexOf(lastReturn) > ownEvents.indexOf(newDeposit));
   const lastCollection = ownEvents.filter(event => event.type === "ENCAISSEMENT").at(-1);
   const prepared = ownEvents.filter(event => event.type === "PREPARATION_REMISE").at(-1);
   const awaitingDeposit = Boolean(prepared && instrument.statut === "EN_ATTENTE");
@@ -124,7 +129,7 @@ function InstrumentLifecycle({ payment, instrument, onSelect }: {
   return <>
     <div className="space-y-5 p-4">
       <dl className="grid gap-4 text-sm sm:grid-cols-3">
-        {(collectionDate || instrument.statut === "CONFIRME") && <Field label={instrument.statut === "CONFIRME" ? "Date d’encaissement" : "Date d’encaissement antérieur"}>{formatTreasuryDate(collectionDate)}</Field>}
+        <Field label="Date du règlement">{formatTreasuryDate(payment.dateReglement)}</Field>
         {paper && <div className="sm:col-start-2"><Field label="Date de valeur">{formatTreasuryDate(instrument.dateEcheance)}</Field></div>}
         <div className={paper ? "sm:col-start-3" : undefined}><Field label={instrument.mode === "ESPECES" ? "Caisse" : "Banque"}>{instrument.banqueEmettrice || instrument.compteTresorerie || "-"}</Field></div>
       </dl>
@@ -133,16 +138,29 @@ function InstrumentLifecycle({ payment, instrument, onSelect }: {
         <Field label={remittance.data?.statut === "BROUILLON" && !firstDeposit ? "Bordereau bancaire préparé, non déposé" : "Bordereau bancaire"}>{firstDeposit
           ? slipLabel(firstDeposit.bordereauId, firstDeposit.numeroBordereau)
           : slipLabel(instrument.bordereauRemiseId, instrument.numeroBordereauRemise)}</Field>
+        {(collectionDate || instrument.statut === "CONFIRME") && <Field label={instrument.statut === "CONFIRME" ? "Date d’encaissement" : "Date d’encaissement antérieur"}>{formatTreasuryDate(collectionDate)}</Field>}
       </dl>}
+      {!paper && (collectionDate || instrument.statut === "CONFIRME") && <dl className="text-sm"><Field label={instrument.statut === "CONFIRME" ? "Date d’encaissement" : "Date d’encaissement antérieur"}>{formatTreasuryDate(collectionDate)}</Field></dl>}
     </div>
-    {hasRejection && <dl className="grid gap-4 p-4 text-sm sm:grid-cols-3">
-      <Field label="Date de retour">{formatTreasuryDate(lastReturn?.date || instrument.dateRejet)}</Field>
-      <div className="sm:col-span-2"><Field label="Motif de retour">{lastReturn?.motif || instrument.motifRejet || "-"}</Field></div>
-    </dl>}
+    {hasRejection && <div className="space-y-5 p-4">
+      <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        <Field label={returns.length > 1 ? "Date du premier retour" : "Date de retour"}>{formatTreasuryDate(firstReturn?.date || instrument.dateRejet)}</Field>
+        <div className="sm:col-span-2"><Field label={returns.length > 1 ? "Motif du premier retour" : "Motif de retour"}>{firstReturn ? firstReturn.motif || "-" : instrument.motifRejet || "-"}</Field></div>
+      </dl>
+      {returns.length > 1 && !returnAfterNewDeposit && <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        <Field label="Date du dernier retour">{formatTreasuryDate(lastReturn?.date)}</Field>
+        <div className="sm:col-span-2"><Field label="Motif du dernier retour">{lastReturn?.motif || "-"}</Field></div>
+      </dl>}
+    </div>}
     {(newDeposit || awaitingDeposit || instrument.statut === "REMPLACE" || children.length > 0 || instrument.instrumentRemplaceId) && <div className="space-y-5 p-4">
       {newDeposit && <dl className="grid gap-4 text-sm sm:grid-cols-3">
-        <Field label="Date de nouvelle remise">{formatTreasuryDate(newDeposit.date)}</Field>
-        <Field label="Nouveau bordereau bancaire">{slipLabel(newDeposit.bordereauId, newDeposit.numeroBordereau)}</Field>
+        <Field label={newDeposits.length > 1 ? "Date de la dernière nouvelle remise" : "Date de nouvelle remise"}>{formatTreasuryDate(newDeposit.date)}</Field>
+        <Field label={newDeposits.length > 1 ? "Dernier bordereau de nouvelle remise" : "Nouveau bordereau bancaire"}>{slipLabel(newDeposit.bordereauId, newDeposit.numeroBordereau)}</Field>
+      </dl>}
+      {returnAfterNewDeposit && <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        <Field label="Date du dernier retour">{formatTreasuryDate(lastReturn?.date)}</Field>
+        <Field label="Motif du dernier retour">{lastReturn?.motif || "-"}</Field>
+        {lastReturn?.bordereauId && <Field label="Bordereau du dernier retour">{slipLabel(lastReturn.bordereauId, lastReturn.numeroBordereau)}</Field>}
       </dl>}
       {prepared && awaitingDeposit && <dl className="text-sm"><Field label="Nouvelle remise préparée le, non encore déposée">{formatTreasuryDate(prepared.date)}</Field></dl>}
       {(instrument.statut === "REMPLACE" || children.length > 0) && <dl className="grid gap-4 text-sm sm:grid-cols-3">

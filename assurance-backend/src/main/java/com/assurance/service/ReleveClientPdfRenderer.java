@@ -330,7 +330,7 @@ public class ReleveClientPdfRenderer {
         if (showInsured) {
             addHeader(table, "L’assuré", tableHeader, fontSize, cellPadding);
         }
-        addHeader(table, "Police", tableHeader, fontSize, cellPadding);
+        addHeader(table, "Police / contrat", tableHeader, fontSize, cellPadding);
         addHeader(table, "Du", tableHeader, fontSize, cellPadding);
         addHeader(table, "Au", tableHeader, fontSize, cellPadding);
         addHeader(table, "Prime Nette", tableHeader, fontSize, cellPadding);
@@ -371,7 +371,7 @@ public class ReleveClientPdfRenderer {
         Table table = new Table(new float[]{14, 8, 8, 22, 9, 8, 8, 10})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setKeepTogether(false);
-        addHeader(table, "Police", tableHeader);
+        addHeader(table, "Police / contrat", tableHeader);
         addHeader(table, "Date effet", tableHeader);
         addHeader(table, "Date exp.", tableHeader);
         addHeader(table, "Nature", tableHeader);

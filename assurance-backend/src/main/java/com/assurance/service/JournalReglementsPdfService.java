@@ -232,7 +232,7 @@ public class JournalReglementsPdfService {
                 .setWidth(UnitValue.createPercentValue(100));
         addHeader(table, "N° RÈGLEMENT", bold, TextAlignment.LEFT);
         addHeader(table, "ASSURÉ", bold, TextAlignment.LEFT);
-        addHeader(table, "N° POLICE", bold, TextAlignment.LEFT);
+        addHeader(table, "N° POLICE / CONTRAT", bold, TextAlignment.LEFT);
         addHeader(table, "DATE RÈGLEMENT", bold, TextAlignment.CENTER);
         if (showUser) {
             addHeader(table, "UTILISATEUR", bold, TextAlignment.LEFT);
@@ -326,10 +326,7 @@ public class JournalReglementsPdfService {
         Map<Long, String> result = new HashMap<>();
         for (AssistanceContrat assistance : assistanceContratRepository
                 .findByElementFacturableIds(elementIds)) {
-            String number = firstNonBlank(
-                    assistance.getNumeroPoliceContrat(),
-                    assistance.getNumeroContratOuQuittance()
-            );
+            String number = BillableReferences.assistance(assistance);
             if (number != null) {
                 result.put(assistance.getElementFacturable().getId(), number);
             }
@@ -387,10 +384,7 @@ public class JournalReglementsPdfService {
         Stream<String> documentNumbers = instrument.getAffectations().stream()
                 .filter(allocation -> allocation.getDocumentClient() != null)
                 .flatMap(allocation -> allocation.getDocumentClient().getLignes().stream())
-                .map(line -> firstNonBlank(
-                        line.getNumeroPolice(),
-                        policyNumber(line.getElementFacturable(), assistancePolicyNumbers)
-                ));
+                .map(BillableReferences::documentLine);
         Set<String> numbers = Stream.concat(directNumbers, documentNumbers)
                 .filter(number -> number != null && !number.isBlank())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -401,14 +395,7 @@ public class JournalReglementsPdfService {
             ElementFacturable element,
             Map<Long, String> assistancePolicyNumbers
     ) {
-        String assistanceNumber = assistancePolicyNumbers.get(element.getId());
-        if (assistanceNumber != null) {
-            return assistanceNumber;
-        }
-        return firstNonBlank(
-                element.getContrat().getNumeroPolice(),
-                element.getContrat().getNumeroContrat()
-        );
+        return BillableReferences.element(element, assistancePolicyNumbers);
     }
 
     private Stream<ElementFacturable> billableElements(InstrumentReglementClient instrument) {

@@ -53,7 +53,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full min-w-[1040px] text-sm">
           <thead className="bg-emerald-600 text-xs uppercase text-white"><tr>
-            <th className="px-3 py-3 text-left">Police</th>
+            <th className="px-3 py-3 text-left">Police / contrat</th>
             <th className="px-3 py-3 text-left">Compagnie</th>
             <th className="px-3 py-3 text-left">Assuré</th>
             <th className="px-3 py-3 text-left">Du</th>
@@ -128,7 +128,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
     {history.length > 0 && <details className="border-t pt-4 text-sm">
       <summary className="cursor-pointer font-medium">Historique des affectations annulées</summary>
       <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[600px] text-sm">
-        <thead className="bg-muted text-xs"><tr><th className="px-3 py-2 text-left">Police</th><th className="px-3 py-2 text-left">Mouvement / document</th><th className="px-3 py-2 text-right">Montant</th><th className="px-3 py-2 text-left">Statut</th></tr></thead>
+        <thead className="bg-muted text-xs"><tr><th className="px-3 py-2 text-left">Police / contrat</th><th className="px-3 py-2 text-left">Mouvement / document</th><th className="px-3 py-2 text-right">Montant</th><th className="px-3 py-2 text-left">Statut</th></tr></thead>
         <tbody className="divide-y">{history.map(allocation => <tr key={allocation.key}><td className="px-3 py-2">{allocation.numeroPolice || "-"}</td><td className="px-3 py-2">{allocation.mouvement || allocation.referenceDocument || "-"}</td><td className="px-3 py-2 text-right tabular-nums">{amount(allocation.montant)}</td><td className="px-3 py-2"><Badge variant={ALLOCATION_VARIANTS[allocation.statut]}>{ALLOCATION_LABELS[allocation.statut]}</Badge></td></tr>)}</tbody>
       </table></div>
     </details>}

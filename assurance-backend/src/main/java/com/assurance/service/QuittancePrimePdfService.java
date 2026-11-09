@@ -502,11 +502,11 @@ public class QuittancePrimePdfService {
         }
 
         private String policyNumber(ElementFacturable element, AssistanceContrat assistance) {
-            String policy = assistance == null ? element.getContrat().getNumeroPolice()
-                    : first(assistance.getNumeroContratOuQuittance(), assistance.getNumeroPoliceContrat());
+            String policy = element.getNature() == com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                    ? BillableReferences.assistance(assistance) : element.getContrat().getNumeroPolice();
             if (document != null) {
                 var snapshot = lines().stream().filter(l -> l.getElementFacturable().getId().equals(element.getId())).findFirst().orElseThrow();
-                policy = first(snapshot.getNumeroPolice(), policy);
+                policy = BillableReferences.documentLine(snapshot);
             }
             return value(policy);
         }

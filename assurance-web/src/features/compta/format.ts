@@ -3,6 +3,16 @@ const ACCOUNTING_AMOUNT_FORMATTER = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 2,
 });
 
+export function clientDocumentReference(line: {
+  nature?: string | null;
+  numeroPolice?: string | null;
+  numeroQuittance?: string | null;
+}) {
+  return line.nature === "ASSISTANCE"
+    ? line.numeroQuittance?.trim() || "-"
+    : line.numeroPolice?.trim() || line.numeroQuittance?.trim() || "-";
+}
+
 export function formatAccountingAmount(value?: number | null) {
   return ACCOUNTING_AMOUNT_FORMATTER
     .format(value ?? 0)

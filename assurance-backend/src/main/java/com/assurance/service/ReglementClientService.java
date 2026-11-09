@@ -64,6 +64,7 @@ import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AffectationReglementClientRepository;
+import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.DocumentClientRepository;
@@ -146,6 +147,7 @@ public class ReglementClientService {
     private final AffectationReglementClientRepository allocationRepository;
     private final ReglementClientRepository reglementRepository;
     private final InstrumentReglementClientRepository instrumentRepository;
+    private final AssistanceContratRepository assistanceRepository;
     private final LigneDocumentClientRepository documentLineRepository;
     private final SequenceReglementClientRepository sequenceRepository;
     private final QuittanceRepository quittanceRepository;
@@ -1434,10 +1436,11 @@ public class ReglementClientService {
         Map<Long, LigneBordereauRemise> remittanceLines = activeRemittanceLines(
                 instruments.stream().map(InstrumentReglementClient::getId).toList()
         );
+        Map<Long, String> assistanceNumbers = assistanceNumbers(agenceId, instruments);
         return instruments.stream()
                 .map(instrument -> toInstrumentResponse(
                         instrument,
-                        remittanceLines.get(instrument.getId())
+                        remittanceLines.get(instrument.getId()), assistanceNumbers
                 ))
                 .toList();
     }
@@ -2698,7 +2701,7 @@ public class ReglementClientService {
                 .mouvementId(line.getElementFacturable().getMouvementContrat() == null
                         ? null : line.getElementFacturable().getMouvementContrat().getId())
                 .dossier(line.getNumeroDossier())
-                .police(line.getNumeroPolice())
+                .police(BillableReferences.documentLine(line))
                 .typeContrat(line.getElementFacturable().getContrat().getTypeContrat())
                 .mouvement(line.getMouvement())
                 .reference(document.getNumero())
@@ -2909,7 +2912,7 @@ public class ReglementClientService {
                                 amounts.getOrDefault(line.getElementFacturable().getId(), AllocationAmounts.empty())))
                         .reduce(ZERO, BigDecimal::add);
                 productions.add(ReglementClientResponse.Production.builder().key(key).documentClientId(global.getId())
-                        .numeroPolice(joinProductionLabels(global.getLignes().stream().map(LigneDocumentClient::getNumeroPolice).toList()))
+                        .numeroPolice(joinProductionLabels(global.getLignes().stream().map(BillableReferences::documentLine).toList()))
                         .compagnie(joinProductionLabels(global.getLignes().stream().map(LigneDocumentClient::getCompagnie).toList()))
                         .assure(joinProductionLabels(lines.stream().map(SourceDocumentClientResponse::getAssureNom).toList()))
                         .mouvement("Affectation globale au document").referenceDocument(global.getNumero())
@@ -2933,7 +2936,7 @@ public class ReglementClientService {
             BigDecimal total = money(snapshot == null ? source.getMontantTtc() : snapshot.getMontantTtc());
             productions.add(ReglementClientResponse.Production.builder().key(key).elementFacturableId(elementId)
                     .documentClientId(allocation.getDocumentClient() == null ? null : allocation.getDocumentClient().getId())
-                    .numeroPolice(snapshot == null ? source.getPolice() : snapshot.getNumeroPolice())
+                    .numeroPolice(snapshot == null ? source.getPolice() : BillableReferences.documentLine(snapshot))
                     .compagnie(snapshot == null ? source.getCompagnie() : snapshot.getCompagnie())
                     .assure(source.getAssureNom()).mouvement(snapshot == null ? source.getMouvement() : snapshot.getMouvement())
                     .referenceDocument(allocationDocumentReference(allocation))
@@ -2997,6 +3000,7 @@ public class ReglementClientService {
             ReglementClient payment,
             Map<Long, LigneBordereauRemise> remittanceLines
     ) {
+        Map<Long, String> assistanceNumbers = assistanceNumbers(payment.getAgence().getId(), payment.getInstruments());
         return ReglementClientResponse.builder()
                 .id(payment.getId())
                 .numero(payment.getNumero())
@@ -3024,7 +3028,7 @@ public class ReglementClientService {
                 .instruments(payment.getInstruments().stream()
                         .map(instrument -> toInstrumentResponse(
                                 instrument,
-                                remittanceLines.get(instrument.getId())
+                                remittanceLines.get(instrument.getId()), assistanceNumbers
                         ))
                         .toList())
                 .build();
@@ -3032,7 +3036,8 @@ public class ReglementClientService {
 
     private ReglementClientResponse.Instrument toInstrumentResponse(
             InstrumentReglementClient instrument,
-            LigneBordereauRemise remittanceLine
+            LigneBordereauRemise remittanceLine,
+            Map<Long, String> assistanceNumbers
     ) {
         return ReglementClientResponse.Instrument.builder()
                 .id(instrument.getId())
@@ -3089,8 +3094,8 @@ public class ReglementClientService {
                                                 ? null : allocation.getClientPayeur().getId()
                                         : allocation.getGroupePayeur().getId())
                                 .payeurNom(allocation.getPayeurNomSnapshot())
-                                .destination(allocationDestination(allocation))
-                                .numeroPolice(allocationPolicyNumber(allocation))
+                                .destination(allocationDestination(allocation, assistanceNumbers))
+                                .numeroPolice(BillableReferences.allocation(allocation, assistanceNumbers))
                                 .mouvement(allocation.getElementFacturable() == null
                                         ? "Affectation globale au document" : allocation.getElementFacturable().getLibelle())
                                 .referenceDocument(allocationDocumentReference(allocation))
@@ -3110,7 +3115,7 @@ public class ReglementClientService {
         return lines;
     }
 
-    private String allocationDestination(AffectationReglementClient allocation) {
+    private String allocationDestination(AffectationReglementClient allocation, Map<Long, String> assistanceNumbers) {
         DocumentClient document = allocation.getDocumentClient();
         ElementFacturable element = allocation.getElementFacturable();
         if (document != null) {
@@ -3118,31 +3123,16 @@ public class ReglementClientService {
                 case FACTURE -> "Facture ";
                 case RELEVE -> "Relevé ";
             };
-            return joinLabels(documentLabel + document.getNumero(), elementReference(element));
+            return joinLabels(documentLabel + document.getNumero(), allocation.getElementFacturable() == null
+                    ? null : joinLabels(element.getLibelle(), BillableReferences.allocation(allocation, assistanceNumbers)));
         }
-        return elementReference(element);
+        return elementReference(element, assistanceNumbers);
     }
 
-    private String allocationPolicyNumber(AffectationReglementClient allocation) {
-        if (allocation.getElementFacturable() != null) {
-            Contrat contract = allocation.getElementFacturable().getContrat();
-            return contract == null ? null : contract.getNumeroPolice();
-        }
-        if (allocation.getDocumentClient() == null) {
-            return null;
-        }
-        return allocation.getDocumentClient().getLignes().stream()
-                .map(line -> {
-                    if (line.getNumeroPolice() != null && !line.getNumeroPolice().isBlank()) {
-                        return line.getNumeroPolice().trim();
-                    }
-                    Contrat contract = line.getElementFacturable() == null
-                            ? null : line.getElementFacturable().getContrat();
-                    return contract == null ? null : contract.getNumeroPolice();
-                })
-                .filter(number -> number != null && !number.isBlank())
-                .distinct()
-                .collect(java.util.stream.Collectors.joining("\n"));
+    private Map<Long, String> assistanceNumbers(Long agenceId, Collection<InstrumentReglementClient> instruments) {
+        Set<Long> ids = BillableReferences.assistanceElementIds(instruments);
+        return ids.isEmpty() ? Map.of() : BillableReferences.assistanceNumbers(
+                assistanceRepository.findForPaymentHistory(agenceId, ids));
     }
 
     private String allocationDocumentReference(AffectationReglementClient allocation) {
@@ -3157,13 +3147,13 @@ public class ReglementClientService {
         return label + document.getNumero();
     }
 
-    private String elementReference(ElementFacturable element) {
+    private String elementReference(ElementFacturable element, Map<Long, String> assistanceNumbers) {
         if (element == null) {
             return "-";
         }
         Contrat contract = element.getContrat();
         String contractReference = contract == null ? null
-                : joinLabels(contract.getNumeroPolice(), contract.getNumeroDossier());
+                : joinLabels(BillableReferences.element(element, assistanceNumbers), contract.getNumeroDossier());
         return joinLabels(element.getLibelle(), contractReference);
     }
 

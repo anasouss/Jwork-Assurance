@@ -52,7 +52,7 @@ class ReglementClientPdfServiceTest {
         ReglementClientPdfService service = new ReglementClientPdfService(
                 paymentRepository,
                 instrumentRepository,
-                logoStorageService
+                logoStorageService, mock(com.assurance.repository.AssistanceContratRepository.class)
         );
         byte[] bytes = service.generate(1L, 50L);
         Path previewDir = Path.of("target", "pdf-previews");
@@ -101,7 +101,7 @@ class ReglementClientPdfServiceTest {
         when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L))
                 .thenReturn(payment.getInstruments());
         ReglementClientPdfService service = new ReglementClientPdfService(
-                paymentRepository, instrumentRepository, logoStorageService);
+                paymentRepository, instrumentRepository, logoStorageService, mock(com.assurance.repository.AssistanceContratRepository.class));
         try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
             String text = new PDFTextStripper().getText(pdf).replaceAll("\\s+", " ");
             assertThat(text).contains("11 moyens de paiement · 1 destination affectée", "DOCUMENT",
@@ -121,7 +121,7 @@ class ReglementClientPdfServiceTest {
         when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L))
                 .thenReturn(payment.getInstruments());
         ReglementClientPdfService service = new ReglementClientPdfService(
-                paymentRepository, instrumentRepository, logoStorageService);
+                paymentRepository, instrumentRepository, logoStorageService, mock(com.assurance.repository.AssistanceContratRepository.class));
         try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
             assertThat(new PDFTextStripper().getText(pdf)).contains("ÉCHÉANCE", "11/12/2030")
                     .doesNotContain("11/12/2031", "DATE CHÈQUE");
@@ -137,7 +137,7 @@ class ReglementClientPdfServiceTest {
         payment.getInstruments().forEach(instrument -> instrument.setStatut(StatutInstrumentReglement.CONFIRME));
         when(paymentRepository.findByIdAndAgenceId(50L, 1L)).thenReturn(Optional.of(payment));
         when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L)).thenReturn(payment.getInstruments());
-        ReglementClientPdfService service = new ReglementClientPdfService(paymentRepository, instrumentRepository, logoStorageService);
+        ReglementClientPdfService service = new ReglementClientPdfService(paymentRepository, instrumentRepository, logoStorageService, mock(com.assurance.repository.AssistanceContratRepository.class));
         try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
             String text = new PDFTextStripper().getText(pdf);
             String header = text.substring(0, text.indexOf("Mode de règlement"));
@@ -168,7 +168,7 @@ class ReglementClientPdfServiceTest {
         }
         when(paymentRepository.findByIdAndAgenceId(50L, 1L)).thenReturn(Optional.of(payment));
         when(instrumentRepository.findByReglementIdAndAgenceIdOrderByIdAsc(50L, 1L)).thenReturn(payment.getInstruments());
-        ReglementClientPdfService service = new ReglementClientPdfService(paymentRepository, instrumentRepository, logoStorageService);
+        ReglementClientPdfService service = new ReglementClientPdfService(paymentRepository, instrumentRepository, logoStorageService, mock(com.assurance.repository.AssistanceContratRepository.class));
         try (PDDocument pdf = PDDocument.load(service.generate(1L, 50L))) {
             String text = new PDFTextStripper().getText(pdf);
             assertThat(pdf.getNumberOfPages()).isGreaterThan(1);

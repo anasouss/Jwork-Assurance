@@ -72,7 +72,7 @@ export function PaymentInstrumentDetailsDialog({ paymentId, instrumentId, onClos
                   <h3 className="text-sm font-semibold">Affectations</h3>
                   <div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[600px] text-sm">
                     <thead className="bg-muted text-left"><tr>
-                      <th scope="col" className="px-3 py-2 font-medium">Client</th><th scope="col" className="px-3 py-2 font-medium">Police / Document</th>
+                      <th scope="col" className="px-3 py-2 font-medium">Client</th><th scope="col" className="px-3 py-2 font-medium">Police / Contrat / Document</th>
                       <th scope="col" className="px-3 py-2 text-right font-medium">Montant</th><th scope="col" className="px-3 py-2 font-medium">Statut</th>
                     </tr></thead>
                     <tbody className="divide-y">{instrument.affectations.map(allocation => <tr key={allocation.id} className="align-top">

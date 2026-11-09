@@ -849,7 +849,8 @@ public class DocumentClientService {
                     .dateOperation(element.getDateDebut())
                     .dateEcheance(element.getDateFin())
                     .numeroDossier(element.getContrat().getNumeroDossier())
-                    .numeroPolice(element.getContrat().getNumeroPolice())
+                    .numeroPolice(element.getNature() == NatureElementFacturable.ASSISTANCE
+                            ? BillableReferences.assistance(source.assistance()) : element.getContrat().getNumeroPolice())
                     .numeroQuittance(sourceReference(source))
                     .mouvement(sourceLabel(source))
                     .compagnie(sourceCompany(source))
@@ -1230,8 +1231,8 @@ public class DocumentClientService {
                 .mouvementId(element.getMouvementContrat() == null
                         ? null : element.getMouvementContrat().getId())
                 .dossier(contract.getNumeroDossier())
-                .police(source.assistance() == null ? contract.getNumeroPolice()
-                        : trimToNull(source.assistance().getNumeroContratOuQuittance()))
+                .police(source.element().getNature() == NatureElementFacturable.ASSISTANCE
+                        ? BillableReferences.assistance(source.assistance()) : contract.getNumeroPolice())
                 .typeContrat(contract.getTypeContrat())
                 .branche(sourceBranch(source))
                 .produit(sourceProduct(source))
@@ -1538,11 +1539,8 @@ public class DocumentClientService {
     }
 
     private String sourceReference(BillableSource source) {
-        if (source.assistance() != null) {
-            return firstNonBlank(
-                    source.assistance().getNumeroContratOuQuittance(),
-                    source.element().getReferenceSource()
-            );
+        if (source.element().getNature() == NatureElementFacturable.ASSISTANCE) {
+            return BillableReferences.assistance(source.assistance());
         }
         return source.quittance().getNumeroQuittance();
     }

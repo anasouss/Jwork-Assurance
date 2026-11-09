@@ -601,8 +601,7 @@ public class EcheanceProductionService {
                         "-"
                 ))
                 .numeroContrat(firstNonBlank(
-                        assistance.getNumeroContratOuQuittance(),
-                        assistance.getNumeroPoliceContrat(),
+                        BillableReferences.assistance(assistance),
                         "-"
                 ))
                 .typeAssistance(firstNonBlank(

@@ -3,11 +3,8 @@ package com.assurance.service;
 import com.assurance.entity.AffectationReglementClient;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
-import com.assurance.entity.Contrat;
 import com.assurance.entity.DocumentClient;
-import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.InstrumentReglementClient;
-import com.assurance.entity.LigneDocumentClient;
 import com.assurance.entity.ReglementClient;
 import com.assurance.enums.ModeReglementClient;
 import com.assurance.enums.StatutAffectationReglement;
@@ -17,6 +14,7 @@ import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
+import com.assurance.repository.AssistanceContratRepository;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
@@ -77,6 +75,7 @@ public class ReglementClientPdfService {
     private final ReglementClientRepository reglementRepository;
     private final InstrumentReglementClientRepository instrumentRepository;
     private final AgencyLogoStorageService agencyLogoStorageService;
+    private final AssistanceContratRepository assistanceRepository;
 
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long reglementId) {
@@ -225,7 +224,7 @@ public class ReglementClientPdfService {
                 : new float[]{1.35f, 2.4f, 1.3f, 0.55f, 0.85f, 1f};
         Table table = new Table(columns)
                 .setWidth(UnitValue.createPercentValue(100));
-        addHeader(table, "N° POLICE", bold, TextAlignment.LEFT);
+        addHeader(table, "N° POLICE / CONTRAT", bold, TextAlignment.LEFT);
         addHeader(table, "MOUVEMENT / PRESTATION", bold, TextAlignment.LEFT);
         if (showDocument) {
             addHeader(table, "DOCUMENT", bold, TextAlignment.LEFT);
@@ -261,6 +260,9 @@ public class ReglementClientPdfService {
 
     private Map<String, AllocationSummary> groupedAllocations(ReglementClient payment) {
         Map<String, AllocationSummary> grouped = new LinkedHashMap<>();
+        Set<Long> assistanceIds = BillableReferences.assistanceElementIds(payment.getInstruments());
+        Map<Long, String> assistanceNumbers = assistanceIds.isEmpty() ? Map.of() : BillableReferences.assistanceNumbers(
+                assistanceRepository.findForPaymentHistory(payment.getAgence().getId(), assistanceIds));
         for (InstrumentReglementClient instrument : payment.getInstruments().stream()
                 .sorted(Comparator.comparing(InstrumentReglementClient::getId))
                 .toList()) {
@@ -270,7 +272,7 @@ public class ReglementClientPdfService {
                 String key = allocationTargetKey(allocation) + ":" + allocation.getStatut()
                         + ":" + value(allocation.getPayeurNomSnapshot());
                 AllocationSummary summary = grouped.computeIfAbsent(key, ignored -> new AllocationSummary(
-                        allocationPolicyNumber(allocation),
+                        value(BillableReferences.allocation(allocation, assistanceNumbers)),
                         allocation.getElementFacturable() == null ? "Affectation globale au document"
                                 : value(allocation.getElementFacturable().getLibelle()),
                         allocationDocument(allocation),
@@ -391,29 +393,6 @@ public class ReglementClientPdfService {
             return documentLabel + value(clientDocument.getNumero());
         }
         return null;
-    }
-
-    private String allocationPolicyNumber(AffectationReglementClient allocation) {
-        if (allocation.getElementFacturable() != null) {
-            return policyNumber(allocation.getElementFacturable());
-        }
-        if (allocation.getDocumentClient() == null) {
-            return "-";
-        }
-        Set<String> numbers = new LinkedHashSet<>();
-        for (LigneDocumentClient line : allocation.getDocumentClient().getLignes()) {
-            String number = line.getNumeroPolice() == null || line.getNumeroPolice().isBlank()
-                    ? policyNumber(line.getElementFacturable()) : line.getNumeroPolice().trim();
-            if (!"-".equals(number)) {
-                numbers.add(number);
-            }
-        }
-        return numbers.isEmpty() ? "-" : String.join("\n", numbers);
-    }
-
-    private String policyNumber(ElementFacturable element) {
-        Contrat contract = element == null ? null : element.getContrat();
-        return contract == null ? "-" : value(contract.getNumeroPolice());
     }
 
     private Paragraph sectionTitle(String text, PdfFont bold) {

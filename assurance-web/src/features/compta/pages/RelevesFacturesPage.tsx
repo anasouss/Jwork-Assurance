@@ -70,6 +70,7 @@ import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { clientDocumentReference } from "../format";
 import { DocumentPdfOptionsDialog } from "../components/DocumentPdfOptionsDialog";
 import {
   usePayerSearch,
@@ -1369,9 +1370,7 @@ function DocumentDetailDialog(props: {
                       <td className="px-3 py-2">{formatDate(line.dateOperation)}</td>
                       <td className="px-3 py-2">
                         <div>
-                          {line.nature === "ASSISTANCE"
-                            ? line.numeroQuittance || "-"
-                            : line.numeroPolice || line.numeroQuittance || "-"}
+                          {clientDocumentReference(line)}
                         </div>
                         {line.nature !== "ASSISTANCE" && line.numeroQuittance && line.numeroQuittance !== line.numeroPolice ? (
                           <div className="text-xs text-muted-foreground">{line.numeroQuittance}</div>
@@ -1597,11 +1596,11 @@ function StatementInvoiceDialog(props: {
                               if (!lineId) return;
                               setSelected((current) => ({ ...current, [lineId]: checked === true }));
                             }}
-                            aria-label={`Sélectionner ${line.numeroPolice || line.numeroQuittance || line.mouvement}`}
+                            aria-label={`Sélectionner ${clientDocumentReference(line)}`}
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <div className="font-medium">{line.numeroPolice || line.numeroQuittance || "-"}</div>
+                          <div className="font-medium">{clientDocumentReference(line)}</div>
                           {line.nature === "ASSISTANCE" ? (
                             <div className="text-xs text-muted-foreground">Contrat d'assistance</div>
                           ) : null}
@@ -1843,8 +1842,8 @@ function RevisionDocumentDialog(props: {
                 {document.lignes.map((line) => {
                   const id = line.elementFacturableId;
                   return <tr key={line.id} className="border-t">
-                    <td className="px-3 py-3"><Checkbox checked={Boolean(id && selected[id])} disabled={!id} onCheckedChange={(checked) => id && setSelected((current) => ({ ...current, [id]: checked === true }))} aria-label={`Conserver ${line.numeroPolice || line.numeroQuittance || line.mouvement}`} /></td>
-                    <td className="px-3 py-3 font-medium">{line.numeroPolice || line.numeroQuittance || "-"}</td>
+                    <td className="px-3 py-3"><Checkbox checked={Boolean(id && selected[id])} disabled={!id} onCheckedChange={(checked) => id && setSelected((current) => ({ ...current, [id]: checked === true }))} aria-label={`Conserver ${clientDocumentReference(line)}`} /></td>
+                    <td className="px-3 py-3 font-medium">{clientDocumentReference(line)}</td>
                     <td className="px-3 py-3">{line.mouvement}</td>
                     <td className="px-3 py-3">{formatDate(line.dateOperation)}</td>
                     <MoneyCell value={line.montantTtc} strong />

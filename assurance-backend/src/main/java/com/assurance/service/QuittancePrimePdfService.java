@@ -191,7 +191,7 @@ public class QuittancePrimePdfService {
             add(detail, amount(premiumTotal), bold, true);
             document.add(detail);
             document.add(new Paragraph("Mode de règlement")
-                    .setFont(bold).setMarginTop(12).setMarginBottom(4));
+                    .setFont(bold).setFontColor(HEADER).setMarginTop(12).setMarginBottom(4));
             Set<String> selectedKeys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
             for (InstrumentReglementClient i : instruments) {
                 BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
@@ -372,6 +372,7 @@ public class QuittancePrimePdfService {
         Agence agency = payment.getAgence();
         header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .add(new Paragraph().add(new Text("QUITTANCE DE PRIME").setUnderline()).setFont(bold).setFontSize(17)
+                        .setFontColor(HEADER)
                         .setTextAlignment(TextAlignment.CENTER).setMargin(0)));
         header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0));
         document.add(header);
@@ -391,7 +392,7 @@ public class QuittancePrimePdfService {
         identity.addCell(details);
         Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
         if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
-            parties.add(new Paragraph("REPRÉSENTANT").setFont(bold).setFontSize(8).setMarginBottom(6));
+            parties.add(new Paragraph("REPRÉSENTANT").setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginBottom(6));
             addField(parties, "Nom", payment.getDeposantNom(), normal, bold);
             identity.addCell(parties);
             document.add(identity);
@@ -403,7 +404,7 @@ public class QuittancePrimePdfService {
             bySubscriber.computeIfAbsent(subscriber, ignored -> new ArrayList<>()).add(row);
         }
         parties.add(new Paragraph(bySubscriber.size() == 1 ? "SOUSCRIPTEUR" : "SOUSCRIPTEURS")
-                .setFont(bold).setFontSize(8).setMarginBottom(6));
+                .setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginBottom(6));
         bySubscriber.forEach((subscriber, sourceRows) -> {
             addField(parties, "Nom", subscriber == null ? null : subscriber.getNomAffichage(), normal, bold);
             addField(parties, "Adresse", subscriber == null ? null : subscriber.getAdresse(), normal, bold);

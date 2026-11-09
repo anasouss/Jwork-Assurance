@@ -223,6 +223,7 @@ public class ReleveClientPdfRenderer {
         if (isInvoice(source)) {
             Paragraph invoiceNumber = new Paragraph()
                     .setFontSize(10f)
+                    .setFontColor(BRAND_BLUE)
                     .setMargin(0);
             invoiceNumber.add(new com.itextpdf.layout.element.Text("Facture N° : ")
                     .setFont(regular)

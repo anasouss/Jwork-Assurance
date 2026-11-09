@@ -188,7 +188,7 @@ public class JournalReglementsPdfService {
         Cell title = cell().setTextAlignment(TextAlignment.RIGHT)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE);
         title.add(new Paragraph("ÉTAT D’ENCAISSEMENT JOURNALIER")
-                .setFont(bold).setFontSize(15).setMargin(0));
+                .setFont(bold).setFontSize(15).setFontColor(TABLE_HEADER).setMargin(0));
         title.add(new Paragraph("Date de l’état : " + date(dateDu))
                 .setFont(regular).setFontSize(9).setFontColor(MUTED)
                 .setMarginTop(5).setMarginBottom(0));
@@ -288,7 +288,7 @@ public class JournalReglementsPdfService {
         }
         Div summary = new Div().setMarginTop(12).setKeepTogether(true);
         summary.add(new Paragraph("Récapitulatif par mode de règlement")
-                .setFont(bold).setFontSize(8).setMarginTop(0).setMarginBottom(5));
+                .setFont(bold).setFontSize(8).setFontColor(TABLE_HEADER).setMarginTop(0).setMarginBottom(5));
         int columns = Math.min(3, totals.size() + 1);
         Table cards = new Table(UnitValue.createPercentArray(columns))
                 .setWidth(UnitValue.createPercentValue(100));

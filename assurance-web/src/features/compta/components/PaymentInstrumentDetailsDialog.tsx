@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, CheckCircle2, CircleAlert, History, Landmark, RefreshCcw } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import { formatTreasuryDate, paymentModeLabel } from "../pages/treasury-format";
 import type { ClientPayment, PaymentAllocationStatus, PaymentInstrumentStatus } from "../types";
-import { instrumentHistoryRows } from "../payment-instrument-history";
 
 const statusLabels: Record<PaymentInstrumentStatus, string> = {
   EN_ATTENTE: "En instance", REMIS_EN_BANQUE: "Remis en banque", CONFIRME: "Encaissé",
@@ -38,9 +37,13 @@ export function PaymentInstrumentDetailsDialog({ paymentId, instrumentId, onClos
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
       <DialogHeader className="shrink-0 border-b bg-orange-50/70 p-5 pr-12 text-left dark:bg-orange-950/20">
-        <DialogTitle className="break-words leading-snug">{instrument
-          ? `${paymentModeLabel(instrument.mode)}${instrument.referenceInstrument ? ` · ${instrument.referenceInstrument}` : ""}`
-          : "Détail du moyen de règlement"}</DialogTitle>
+        <DialogTitle className={instrument ? "sr-only" : "break-words leading-snug"}>Détail du moyen de règlement</DialogTitle>
+        {instrument && <dl className="grid gap-4 text-sm sm:grid-cols-3">
+          <Field label={instrument.mode === "CHEQUE" || instrument.mode === "EFFET" ? `${paymentModeLabel(instrument.mode)} N°` : "Référence"}>{instrument.referenceInstrument || "-"}</Field>
+          <Field label="Montant"><span className="text-lg font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)}</span> <span className="text-xs font-normal text-muted-foreground">MAD</span></Field>
+          <Field label="Statut"><div className="flex flex-wrap gap-2"><Badge variant={statusVariants[instrument.statut]}>{instrument.statut === "REJETE" && payment?.statut === "ANNULE" && !instrument.dateRejet ? "Annulé avec le règlement" : statusLabels[instrument.statut]}</Badge>
+            {payment?.statut === "ANNULE" && <Badge variant="red">Règlement annulé</Badge>}</div></Field>
+        </dl>}
         <DialogDescription className="break-words">{payment ? `${payment.numero} · ${payment.payeurNom}` : "Informations et affectations du moyen sélectionné."}</DialogDescription>
       </DialogHeader>
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -48,12 +51,9 @@ export function PaymentInstrumentDetailsDialog({ paymentId, instrumentId, onClos
           : query.isError ? <div role="alert" className="space-y-3 text-sm"><p>{query.error instanceof Error ? query.error.message : "Chargement impossible."}</p><Button variant="outline" onClick={() => void query.refetch()}>Réessayer</Button></div>
             : !instrument ? <p role="alert" className="text-sm text-muted-foreground">Ce moyen ne figure plus dans ce règlement. Relancez la recherche.</p>
               : <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-                  <p className="text-xl font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)} <span className="text-sm font-normal text-muted-foreground">MAD</span></p>
-                  <div className="flex flex-wrap gap-2"><Badge variant={statusVariants[instrument.statut]}>{instrument.statut === "REJETE" && payment?.statut === "ANNULE" && !instrument.dateRejet ? "Annulé avec le règlement" : statusLabels[instrument.statut]}</Badge>
-                    {payment?.statut === "ANNULE" && <Badge variant="red">Règlement annulé</Badge>}</div>
+                <div className="divide-y overflow-hidden rounded-md border">
+                  {payment && <InstrumentLifecycle key={instrument.id} payment={payment} instrument={instrument} onSelect={setSelectedInstrumentId} />}
                 </div>
-                {payment && <InstrumentLifecycle key={instrument.id} payment={payment} instrument={instrument} onSelect={setSelectedInstrumentId} />}
                 <section className="space-y-3 border-t pt-4">
                   <h3 className="text-sm font-semibold">Affectations</h3>
                   <div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[600px] text-sm">
@@ -103,9 +103,13 @@ function InstrumentLifecycle({ payment, instrument, onSelect }: {
     enabled: canViewTreasury && paper && Boolean(instrument.bordereauRemiseId),
     refetchOnMount: "always",
   });
-  const events = instrumentHistoryRows(history.data?.mouvements ?? [], instrument.id);
+  const events = history.data?.mouvements ?? [];
   const ownEvents = events.filter(event => !event.instrumentSourceId || event.instrumentSourceId === instrument.id);
   const deposits = ownEvents.filter(event => event.type === "REMISE_EN_BANQUE");
+  const firstDeposit = deposits[0];
+  const firstReturnIndex = ownEvents.findIndex(event => event.type === "REJET");
+  const newDeposit = firstReturnIndex < 0 ? undefined
+    : ownEvents.slice(firstReturnIndex + 1).filter(event => event.type === "REMISE_EN_BANQUE").at(-1);
   const lastReturn = ownEvents.filter(event => event.type === "REJET").at(-1);
   const lastCollection = ownEvents.filter(event => event.type === "ENCAISSEMENT").at(-1);
   const prepared = ownEvents.filter(event => event.type === "PREPARATION_REMISE").at(-1);
@@ -113,72 +117,49 @@ function InstrumentLifecycle({ payment, instrument, onSelect }: {
   const children = payment.instruments.filter(item => item.instrumentRemplaceId === instrument.id);
   const parent = payment.instruments.find(item => item.id === instrument.instrumentRemplaceId);
   const collectionDate = lastCollection?.date || (instrument.statut === "CONFIRME" ? instrument.dateStatut : undefined);
+  const replacement = ownEvents.filter(event => event.type === "REMPLACEMENT").at(-1);
   function slipLabel(id?: string | null, number?: string | null) {
     return id && canViewTreasury ? <Link className="text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" to={`/app/compta/tresorerie/bordereaux-remise/${id}`}>{number || "Voir le bordereau"}</Link> : number || "-";
   }
   return <>
-    <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-      <Field label={paper ? `${paymentModeLabel(instrument.mode)} n°` : "Référence"}>{instrument.referenceInstrument || "-"}</Field>
-      <Field label="Date du règlement">{formatTreasuryDate(payment.dateReglement)}</Field>
-      <Field label={paper ? "Date de réception" : "Date du moyen"}>{formatTreasuryDate(instrument.dateInstrument)}</Field>
-      {paper && <Field label="Date de valeur / échéance">{formatTreasuryDate(instrument.dateEcheance)}</Field>}
-      {(paper || instrument.banqueEmettrice) && <Field label="Banque émettrice">{instrument.banqueEmettrice || "-"}</Field>}
-      <Field label="Compte de trésorerie">{instrument.compteTresorerie || "-"}</Field>
-    </dl>
-    {paper && <section className="space-y-3 border-t pt-4">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-sky-800 dark:text-sky-200"><Landmark className="size-4" />Remises en banque</h3>
-      {deposits.length > 0 ? deposits.map(event => <div key={event.id} className="grid gap-3 text-sm sm:grid-cols-3">
-        <p className="font-medium">{event.title}</p>
-        <dl><Field label="Date de remise">{formatTreasuryDate(event.date)}</Field></dl>
-        <dl><Field label="Bordereau bancaire">{slipLabel(event.bordereauId, event.numeroBordereau)}</Field></dl>
-      </div>) : <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        <Field label={remittance.data?.statut === "BROUILLON" ? "Bordereau préparé, non déposé" : "Bordereau bancaire"}>{slipLabel(instrument.bordereauRemiseId, instrument.numeroBordereauRemise)}</Field>
-        <Field label="Date de remise">{formatTreasuryDate(remittance.data?.dateDepot)}</Field>
+    <div className="space-y-5 p-4">
+      <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        {(collectionDate || instrument.statut === "CONFIRME") && <Field label={instrument.statut === "CONFIRME" ? "Date d’encaissement" : "Date d’encaissement antérieur"}>{formatTreasuryDate(collectionDate)}</Field>}
+        {paper && <div className="sm:col-start-2"><Field label="Date de valeur">{formatTreasuryDate(instrument.dateEcheance)}</Field></div>}
+        <div className={paper ? "sm:col-start-3" : undefined}><Field label={instrument.mode === "ESPECES" ? "Caisse" : "Banque"}>{instrument.banqueEmettrice || instrument.compteTresorerie || "-"}</Field></div>
+      </dl>
+      {paper && <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        <Field label="Date de remise">{formatTreasuryDate(firstDeposit?.date || remittance.data?.dateDepot)}</Field>
+        <Field label={remittance.data?.statut === "BROUILLON" && !firstDeposit ? "Bordereau bancaire préparé, non déposé" : "Bordereau bancaire"}>{firstDeposit
+          ? slipLabel(firstDeposit.bordereauId, firstDeposit.numeroBordereau)
+          : slipLabel(instrument.bordereauRemiseId, instrument.numeroBordereauRemise)}</Field>
       </dl>}
-      {remittance.data && <dl className="text-sm"><Field label="Compte bancaire destinataire">{remittance.data.compteDestination}</Field></dl>}
-      {canViewTreasury && remittance.isFetching && <p role="status" className="text-xs text-muted-foreground">Chargement de la remise...</p>}
-      {remittance.isError && <p role="alert" className="text-xs text-destructive">Remise indisponible. <button type="button" className="underline" onClick={() => void remittance.refetch()}>Réessayer</button></p>}
-    </section>}
-    {(collectionDate || instrument.statut === "CONFIRME") && <section className="space-y-3 border-t pt-4">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200"><CheckCircle2 className="size-4" />{instrument.statut === "CONFIRME" ? "Encaissement confirmé" : "Encaissement antérieur"}</h3>
-      <dl className="text-sm"><Field label="Date d’encaissement">{formatTreasuryDate(collectionDate)}</Field></dl>
-    </section>}
-    {hasRejection && <section className="space-y-3 border-t pt-4">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-red-800 dark:text-red-200"><CircleAlert className="size-4" />Retour / rejet</h3>
-      <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        <Field label="Date de retour">{formatTreasuryDate(lastReturn?.date || instrument.dateRejet)}</Field>
-        <Field label="Motif de retour">{lastReturn?.motif || instrument.motifRejet || "-"}</Field>
-      </dl>
-    </section>}
-    {(instrument.statut === "REMPLACE" || children.length > 0 || instrument.instrumentRemplaceId || awaitingDeposit) && <section className="space-y-3 border-t pt-4">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200"><RefreshCcw className="size-4" />{instrument.statut === "REMPLACE" ? "Remplacement par contre-valeur" : instrument.instrumentRemplaceId ? "Origine de la contre-valeur" : "Nouvelle remise préparée"}</h3>
-      <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        {instrument.statut === "REMPLACE" && <><Field label="Date de remplacement">{formatTreasuryDate(instrument.dateStatut)}</Field><Field label="Motif du remplacement">{instrument.motifStatut || "-"}</Field></>}
-        {prepared && awaitingDeposit && <Field label="Date de préparation">{formatTreasuryDate(prepared.date)}</Field>}
-        {instrument.instrumentRemplaceId && <Field label="Remplace le moyen">{parent ? <button type="button" className="text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => onSelect(parent.id)}>{paymentModeLabel(parent.mode)} · {parent.referenceInstrument || "-"}</button> : instrument.referenceInstrumentRemplace || "-"}</Field>}
-      </dl>
+    </div>
+    {hasRejection && <dl className="grid gap-4 p-4 text-sm sm:grid-cols-3">
+      <Field label="Date de retour">{formatTreasuryDate(lastReturn?.date || instrument.dateRejet)}</Field>
+      <div className="sm:col-span-2"><Field label="Motif de retour">{lastReturn?.motif || instrument.motifRejet || "-"}</Field></div>
+    </dl>}
+    {(newDeposit || awaitingDeposit || instrument.statut === "REMPLACE" || children.length > 0 || instrument.instrumentRemplaceId) && <div className="space-y-5 p-4">
+      {newDeposit && <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        <Field label="Date de nouvelle remise">{formatTreasuryDate(newDeposit.date)}</Field>
+        <Field label="Nouveau bordereau bancaire">{slipLabel(newDeposit.bordereauId, newDeposit.numeroBordereau)}</Field>
+      </dl>}
+      {prepared && awaitingDeposit && <dl className="text-sm"><Field label="Nouvelle remise préparée le, non encore déposée">{formatTreasuryDate(prepared.date)}</Field></dl>}
+      {(instrument.statut === "REMPLACE" || children.length > 0) && <dl className="grid gap-4 text-sm sm:grid-cols-3">
+        <Field label="Date de C/V">{formatTreasuryDate(replacement?.date || (instrument.statut === "REMPLACE" ? instrument.dateStatut : undefined))}</Field>
+        <div className="sm:col-span-2"><Field label="Moyen de remplacement">{children.length ? <ul className="space-y-3">{children.map(child => <li key={child.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button type="button" className="inline-flex min-w-0 items-center gap-1.5 break-words text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => onSelect(child.id)}><ArrowUpRight className="size-3.5 shrink-0" />{paymentModeLabel(child.mode)} · {child.referenceInstrument || "Sans référence"}</button>
+          <span className="tabular-nums">{formatAccountingAmount(child.montant)}</span><Badge variant={statusVariants[child.statut]}>{statusLabels[child.statut]}</Badge>
+        </li>)}</ul> : "-"}</Field></div>
+      </dl>}
+      {instrument.instrumentRemplaceId && <dl className="text-sm"><Field label="Remplace le moyen">{parent ? <button type="button" className="text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => onSelect(parent.id)}>{paymentModeLabel(parent.mode)} · {parent.referenceInstrument || "-"}</button> : instrument.referenceInstrumentRemplace || "-"}</Field></dl>}
       {history.data?.statutSuivi === "REGLE_CV" && <Badge variant="success">Réglé par contre-valeur</Badge>}
-      {children.map(child => <div key={child.id} className="flex flex-wrap items-center justify-between gap-3 border-t py-2 text-sm">
-        <button type="button" className="inline-flex min-w-0 items-center gap-1.5 break-words font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => onSelect(child.id)}><ArrowUpRight className="size-3.5 shrink-0" />{paymentModeLabel(child.mode)} · {child.referenceInstrument || "Sans référence"}</button>
-        <div className="flex flex-wrap items-center gap-3"><span className="tabular-nums">{formatAccountingAmount(child.montant)}</span><Badge variant={statusVariants[child.statut]}>{statusLabels[child.statut]}</Badge></div>
-      </div>)}
-    </section>}
-    {canViewTreasury && paper && hasRejection && <section className="space-y-3 border-t pt-4">
-      <h3 className="flex items-center gap-2 text-sm font-semibold"><History className="size-4 text-sky-700 dark:text-sky-300" />Historique du moyen</h3>
-      {history.isPending ? <p role="status" className="text-sm text-muted-foreground">Chargement de l’historique...</p> : history.isError ? <p role="alert" className="text-sm text-destructive">Historique indisponible. <button type="button" className="underline" onClick={() => void history.refetch()}>Réessayer</button></p> : <ol className="divide-y">
-        {events.map(event => {
-          const source = payment.instruments.find(item => item.id === event.instrumentSourceId);
-          return <li key={event.id} className="space-y-1 py-3 text-sm">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1"><p className="font-medium">{event.title}</p><time dateTime={event.date} className="shrink-0 text-xs tabular-nums text-muted-foreground">{formatTreasuryDate(event.date)}</time></div>
-            {source && source.id !== instrument.id && <button type="button" className="text-xs text-sky-700 hover:underline dark:text-sky-300" onClick={() => onSelect(source.id)}>Sur la contre-valeur : {paymentModeLabel(source.mode)} · {source.referenceInstrument || "-"}</button>}
-            {event.numeroBordereau && <p>{slipLabel(event.bordereauId, event.numeroBordereau)}</p>}
-            {event.motif && event.motif !== event.title && <p className="whitespace-pre-wrap break-words text-muted-foreground">{event.motif}</p>}
-            {event.utilisateur && <p className="text-xs text-muted-foreground">{event.utilisateur}</p>}
-          </li>;
-        })}
-        {!events.length && <li className="py-2 text-sm text-muted-foreground">Aucun événement enregistré.</li>}
-      </ol>}
-    </section>}
+    </div>}
+    {((canViewTreasury && history.isFetching) || remittance.isFetching) && <p role="status" className="p-4 text-xs text-muted-foreground">Chargement des dates bancaires...</p>}
+    {(history.isError || remittance.isError) && <p role="alert" className="p-4 text-xs text-destructive">Certaines informations bancaires sont indisponibles. <button type="button" className="underline" onClick={() => {
+      if (history.isError) void history.refetch();
+      if (remittance.isError) void remittance.refetch();
+    }}>Réessayer</button></p>}
   </>;
 }
 

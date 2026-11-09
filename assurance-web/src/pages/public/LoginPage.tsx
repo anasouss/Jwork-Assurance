@@ -117,8 +117,8 @@ export default function LoginPage() {
         </section>
       </main>
 
-      <footer className="relative w-full px-6 pb-6 sm:px-10 lg:ml-auto lg:w-1/2 lg:px-16 lg:pb-8 xl:px-20">
-        <DeveloperCredit className="mx-auto w-full max-w-[460px] text-center lg:text-right [&_a]:text-[#805a19] [&_a:focus-visible]:underline dark:[&_a]:text-[#e1b86b]" />
+      <footer className="relative w-full px-6 pb-6 sm:px-10 lg:ml-auto lg:w-1/2 lg:pb-8 xl:px-12">
+        <DeveloperCredit className="mx-auto w-full max-w-[460px] text-center lg:max-w-none lg:text-right [&_a]:text-[#805a19] [&_a:focus-visible]:underline dark:[&_a]:text-[#e1b86b]" />
       </footer>
     </div>
   );

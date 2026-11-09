@@ -53,8 +53,8 @@ function ActionBadge({ action }: Pick<BusinessActivity, "action">) {
   </Badge>;
 }
 
-function ActivityChanges({ changes, module }: Pick<BusinessActivity, "changes" | "module">) {
-  const sections = activityChangeSections(changes, module);
+function ActivityChanges({ changes, module, subject }: Pick<BusinessActivity, "changes" | "module" | "subject">) {
+  const sections = activityChangeSections(changes, module, subject.type);
   return <section aria-label="Informations de l’opération" className="space-y-1">
     <h3 className="mb-3 text-sm font-semibold">Informations de l’opération</h3>
     {sections.length === 0 && <p className="text-sm text-muted-foreground">Aucune information complémentaire enregistrée.</p>}
@@ -64,11 +64,13 @@ function ActivityChanges({ changes, module }: Pick<BusinessActivity, "changes" |
       <summary className="flex cursor-pointer list-none items-center gap-3 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open/section:rotate-180 motion-reduce:transition-none" />
         <span className="min-w-0 flex-1 break-words font-semibold">{section.title}</span>
-        <span className="shrink-0 text-xs text-muted-foreground">{section.kind === "documentLines" || section.kind === "allocations"
-          ? `${section.groups.length} ${section.kind === "documentLines" ? (section.groups.length === 1 ? "ligne" : "lignes") : (section.groups.length === 1 ? "affectation" : "affectations")}`
+        <span className="shrink-0 text-xs text-muted-foreground">{section.kind === "documentLines" || section.kind === "allocations" || section.kind === "receiptLines"
+          ? `${section.groups.length} ${section.kind === "allocations" ? (section.groups.length === 1 ? "affectation" : "affectations") : (section.groups.length === 1 ? "ligne" : "lignes")}`
           : `${count} ${count === 1 ? "information" : "informations"}`}</span>
       </summary>
-      {section.kind === "documentLines" || section.kind === "allocations"
+      {section.kind === "receiptLines"
+        ? <ReceiptChangesTable groups={section.groups} />
+        : section.kind === "documentLines" || section.kind === "allocations"
         ? <AccountingChangesTable groups={section.groups} allocations={section.kind === "allocations"} />
         : section.kind === "vehicle" || section.kind === "person" || section.kind === "guarantees"
         ? <GuaranteeChangesTable groups={section.groups} person={section.kind === "person"} />
@@ -79,6 +81,42 @@ function ActivityChanges({ changes, module }: Pick<BusinessActivity, "changes" |
     </details>;
     })}
   </section>;
+}
+
+function ReceiptChangesTable({ groups }: { groups: ActivityChangeGroup[] }) {
+  return <div className="mb-4 overflow-x-auto rounded-md border">
+    <table className="w-full min-w-[600px] text-sm">
+      <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
+        {["Type", "N° police / contrat", "Compagnie", "Montant", "Détails"].map(heading =>
+          <th key={heading} scope="col" className={`px-3 py-2 font-medium ${heading === "Montant" ? "text-right" : ""}`}>{heading}</th>)}
+      </tr></thead>
+      <tbody>{groups.map(group => {
+        const field = (label: string) => group.changes.find(change => change.label === label);
+        // Older receipts stored the reference and company in one description; keep it intact.
+        const reference = field("Reference") ?? field("Description");
+        const type = field("Type");
+        const company = field("Compagnie");
+        const amount = field("Montant");
+        const summary = new Set([type, reference, company, amount]);
+        const additional = group.changes.filter(change => !summary.has(change));
+        return <tr key={group.title} className="border-t align-top">
+          <td className="px-3 py-2.5">{type?.beforeValue == null && type?.afterValue != null
+            ? <Badge variant={type.afterValue === "Assistance" ? "info" : "gray"} className="rounded border-transparent shadow-none">{type.afterValue}</Badge>
+            : <GuaranteeChangeValue change={type} />}</td>
+          <th scope="row" className="max-w-56 whitespace-pre-wrap break-words px-3 py-2.5 text-left font-medium"><GuaranteeChangeValue change={reference} /></th>
+          <td className="max-w-48 whitespace-pre-wrap break-words px-3 py-2.5"><GuaranteeChangeValue change={company} /></td>
+          <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium tabular-nums"><GuaranteeChangeValue change={amount} /></td>
+          <td className="min-w-28 px-3 py-2.5">{additional.length > 0 ? <details>
+            <summary className="cursor-pointer text-xs font-medium text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300">Voir les détails</summary>
+            <dl className="mt-3 space-y-3">{additional.map(change => <div key={change.label} className="max-w-56 break-words">
+              <dt className="mb-1 text-xs text-muted-foreground">{change.label}</dt>
+              <dd className="whitespace-pre-wrap"><GuaranteeChangeValue change={change} /></dd>
+            </div>)}</dl>
+          </details> : <span className="text-muted-foreground">-</span>}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+  </div>;
 }
 
 function AccountingChangesTable({ groups, allocations }: { groups: ActivityChangeGroup[]; allocations: boolean }) {
@@ -316,7 +354,7 @@ export default function AdminActivityPage() {
                 <dd className="space-y-1">{group.references.map(reference => <p key={reference.id}>{referenceLabel(reference, detail)}</p>)}</dd>
               </div>)}
           </dl>
-          <ActivityChanges changes={detail.changes} module={detail.module} />
+          <ActivityChanges changes={detail.changes} module={detail.module} subject={detail.subject} />
           {supportingReferences.length > 0 &&
             <details className="group border-t pt-4">
               <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">

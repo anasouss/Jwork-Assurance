@@ -142,8 +142,16 @@ public class QuittancePrimeSelectionService {
             for (var policy : policies) {
                 if (selection != null && !selection.contains(policy.key())) continue;
                 String description = String.join(" / ", policy.descriptions());
-                String prefix = "Police " + (++index) + " - ";
-                values.put(prefix + "Description", description).put(prefix + "Montant", policy.montant());
+                for (var movement : policy.mouvements()) {
+                    String prefix = "Prime " + (++index) + " - ";
+                    values.put(prefix + "Type", movement.assistance() ? "Assistance" : "Assurance")
+                            .put(prefix + "Reference", movement.numeroPolice())
+                            .put(prefix + "Compagnie", movement.compagnie())
+                            .put(prefix + "Montant", movement.montant())
+                            .put(prefix + "Mouvement / prestation", movement.libelle())
+                            .put(prefix + "Du", movement.dateDebut())
+                            .put(prefix + "Au", movement.dateFin());
+                }
                 ActivityRecordType sourceType = switch (policy.key().charAt(0)) {
                     case 'C' -> ActivityRecordType.CONTRAT;
                     case 'A' -> ActivityRecordType.ELEMENT_FACTURABLE;

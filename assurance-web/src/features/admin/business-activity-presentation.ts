@@ -82,12 +82,12 @@ export function groupActivityChanges(changes: Change[]) {
 }
 
 export type ActivityChangeGroup = ReturnType<typeof groupActivityChanges>[number];
-type ChangeSection = { title: string; kind: "fields" | "vehicle" | "person" | "guarantees" | "quittance" | "documentLines" | "allocations"; groups: ActivityChangeGroup[] };
+type ChangeSection = { title: string; kind: "fields" | "vehicle" | "person" | "guarantees" | "quittance" | "documentLines" | "allocations" | "receiptLines"; groups: ActivityChangeGroup[] };
 
 const personFields = new Set(["Deces", "Décès", "Invalidite", "Invalidité", "Frais medicaux", "Frais médicaux", "Hospitalisation", "Frais funeraires", "Frais funéraires", "Chirurgie", "Personne assuree"]);
 const guaranteeFields = new Set(["Couverture", "Selection", "Mode de tarification", "Base assuree", "Capital", "Valeur assuree", "Valeur venale", "Valeur a neuf", "Valeur glace", "Prime", "Taux", "Franchise", "Franchise minimale", "Formule", "Accessoire", "Accessoires", ...personFields]);
 
-export function activityChangeSections(changes: Change[], module: BusinessActivity["module"]) {
+export function activityChangeSections(changes: Change[], module: BusinessActivity["module"], subjectType?: string) {
   const sections: ChangeSection[] = [];
   const groups = groupActivityChanges(changes);
   const target = (title: string) => title.slice(title.lastIndexOf(" (") + 2, -1);
@@ -99,7 +99,10 @@ export function activityChangeSections(changes: Change[], module: BusinessActivi
     let kind: ChangeSection["kind"] = "fields";
     let title = group.title;
     if (module === "COMPTABILITE_CLIENT") {
-      if (/^(?:.* - )?Ligne \d+$/.test(group.title)) {
+      if (subjectType === "QUITTANCE_PRIME" && /^(Prime|Police) \d+$/.test(group.title)) {
+        kind = "receiptLines";
+        title = "Primes de la quittance";
+      } else if (/^(?:.* - )?Ligne \d+$/.test(group.title)) {
         kind = "documentLines";
         title = "Lignes du document";
       } else if (/(?:^| - )Moyen(?: \d+)? - Affectation \d+$/.test(group.title)) {
@@ -125,7 +128,7 @@ export function activityChangeSections(changes: Change[], module: BusinessActivi
   }
   if (module === "COMPTABILITE_CLIENT") {
     const rank = (section: ChangeSection) => section.title === "Informations générales" ? 0
-      : section.kind === "documentLines" ? 1 : section.kind === "allocations" ? 2 : 3;
+      : section.kind === "documentLines" || section.kind === "receiptLines" ? 1 : section.kind === "allocations" ? 2 : 3;
     sections.sort((first, second) => rank(first) - rank(second));
   }
   if (module === "PRODUCTION") {

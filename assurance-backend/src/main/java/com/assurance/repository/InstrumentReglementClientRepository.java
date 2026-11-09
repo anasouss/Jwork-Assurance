@@ -13,7 +13,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
@@ -159,18 +158,18 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             from InstrumentReglementClient instrument
             join instrument.reglement reglement
             where instrument.agence.id = :agenceId
-              and reglement.createdAt >= :saisiDu
-              and reglement.createdAt < :saisiAvant
+              and reglement.dateReglement >= :dateDu
+              and reglement.dateReglement <= :dateAu
               and instrument.statut <> com.assurance.enums.StatutInstrumentReglement.REMPLACE
               and (:utilisateurId is null or reglement.creePar.id = :utilisateurId)
               and instrument.mode in :modes
               and (:statutReglement is null or reglement.statut = :statutReglement)
-            order by reglement.createdAt asc, reglement.numero asc, instrument.id asc
+            order by reglement.dateReglement asc, reglement.numero asc, instrument.id asc
             """)
     List<InstrumentReglementClient> findForPaymentJournal(
             @Param("agenceId") Long agenceId,
-            @Param("saisiDu") LocalDateTime saisiDu,
-            @Param("saisiAvant") LocalDateTime saisiAvant,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu,
             @Param("utilisateurId") Long utilisateurId,
             @Param("modes") Collection<ModeReglementClient> modes,
             @Param("statutReglement") StatutReglementClient statutReglement

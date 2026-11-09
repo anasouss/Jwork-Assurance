@@ -92,7 +92,7 @@ class JournalReglementsPdfServiceTest {
 
     private void prepare(List<InstrumentReglementClient> rows) {
         when(agencies.findById(1L)).thenReturn(Optional.of(Agence.builder().nom("Agence test").build()));
-        when(instruments.findForPaymentJournal(eq(1L), eq(DAY.atStartOfDay()), eq(DAY.plusDays(1).atStartOfDay()),
+        when(instruments.findForPaymentJournal(eq(1L), eq(DAY), eq(DAY),
                 isNull(), anyList(), eq(StatutReglementClient.VALIDE))).thenReturn(rows);
     }
 

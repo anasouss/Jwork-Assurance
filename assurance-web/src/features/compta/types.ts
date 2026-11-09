@@ -715,6 +715,7 @@ export type PremiumReceiptOptions = {
       elementFacturableId: string;
       documentClientId?: string | null;
       libelle: string;
+      assistance?: boolean;
       clientNom?: string | null;
       numeroPolice?: string | null;
       compagnie?: string | null;

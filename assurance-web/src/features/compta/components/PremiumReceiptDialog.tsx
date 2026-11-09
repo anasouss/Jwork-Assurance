@@ -49,6 +49,10 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
     queryFn: () => comptaApi.premiumReceiptOptions(payment.id),
   });
   const policies = options.data?.policies ?? [];
+  const movements = policies.flatMap(policy => policy.mouvements);
+  const assistanceOnly = movements.length > 0 && movements.every(movement => movement.assistance === true);
+  const insuranceOnly = movements.length > 0 && movements.every(movement => movement.assistance === false);
+  const referenceHeading = assistanceOnly ? "N° contrat" : insuranceOnly ? "N° police" : "N° police / contrat";
   const hasExpandablePolicies = policies.some(policy => policy.mouvements.length > 1);
   const showControls = scope === "SPECIFIC" || hasExpandablePolicies;
   const eligiblePolicies = policies.filter(policy => policy.eligible);
@@ -133,7 +137,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
                       onCheckedChange={checked => setSelected(checked === true ? new Set(eligiblePolicies.map(p => p.key)) : new Set())} />}
                   </th>}
                   <th scope="col" className={`px-2 py-3 text-left ${showControls ? "" : "rounded-tl-md"}`}>Client</th>
-                  <th scope="col" className="px-2 py-3 text-left">N° police</th>
+                  <th scope="col" className="px-2 py-3 text-left">{referenceHeading}</th>
                   <th scope="col" className="px-2 py-3 text-left">Compagnie</th>
                   <th scope="col" className="px-2 py-3 text-left">Mouvement / prestation</th>
                   <th scope="col" className="px-2 py-3 text-left">Du / Au</th>

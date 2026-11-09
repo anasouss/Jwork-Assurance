@@ -10,6 +10,9 @@ public class UpsertCompagnieAssuranceRequest {
     @NotBlank
     private String nom;
 
+    @Size(max = 80, message = "Le nom abrege est limite a 80 caracteres")
+    private String nomAbrege;
+
     @Size(max = 80)
     private String codeIntermediaire;
 

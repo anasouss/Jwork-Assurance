@@ -27,6 +27,9 @@ public class CompagnieAssurance extends BaseEntity {
     @Column(nullable = false, length = 150)
     private String nom;
 
+    @Column(name = "nom_abrege", length = 80)
+    private String nomAbrege;
+
     @Column(length = 255)
     private String adresse;
 

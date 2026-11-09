@@ -1471,6 +1471,7 @@ export type TarifUsageAdjustmentPage = {
 
 export type UpsertCompagnieAssuranceRequest = {
   nom: string;
+  nomAbrege?: string;
   codeIntermediaire?: string;
   adresse?: string;
   ville?: string;

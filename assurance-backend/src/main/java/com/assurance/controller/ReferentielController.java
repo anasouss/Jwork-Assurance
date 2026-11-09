@@ -1750,6 +1750,7 @@ public class ReferentielController {
 
     private void applyCompagnieAssuranceRequest(CompagnieAssurance compagnie, UpsertCompagnieAssuranceRequest request) {
         compagnie.setNom(request.getNom().trim());
+        compagnie.setNomAbrege(blankToNull(request.getNomAbrege()));
         compagnie.setAdresse(blankToNull(request.getAdresse()));
         compagnie.setVille(blankToNull(request.getVille()));
         compagnie.setEmail(blankToNull(request.getEmail()));
@@ -1769,6 +1770,7 @@ public class ReferentielController {
     ) {
         return option(compagnie.getId(), compagnie.getCode(), compagnie.getNom())
                 .putValue("nom", compagnie.getNom())
+                .putValue("nomAbrege", compagnie.getNomAbrege())
                 .putValue("codeIntermediaire", codeIntermediaire)
                 .putValue("adresse", compagnie.getAdresse())
                 .putValue("ville", compagnie.getVille())

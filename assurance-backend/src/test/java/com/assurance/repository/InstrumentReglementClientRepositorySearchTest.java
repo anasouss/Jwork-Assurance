@@ -28,6 +28,26 @@ class InstrumentReglementClientRepositorySearchTest {
     private TestEntityManager em;
 
     @Test
+    void dailyJournalUsesPaymentDateRatherThanCreationOrChequeMaturity() {
+        LocalDate day = LocalDate.of(2001, 1, 2);
+        ReglementClient payment = payment("JOURNAL");
+        payment.setDateReglement(day);
+        InstrumentReglementClient match = instrument(payment, "DAILY", ModeReglementClient.CHEQUE, StatutInstrumentReglement.EN_ATTENTE);
+        match.setDateEcheance(day.plusMonths(3));
+        instrument(payment, "REPLACED", ModeReglementClient.CHEQUE, StatutInstrumentReglement.REMPLACE);
+        ReglementClient nextDay = em.persist(ReglementClient.builder().agence(payment.getAgence())
+                .creePar(payment.getCreePar()).numero("REG-NEXT").payeurNom("Payeur")
+                .dateReglement(day.plusDays(1)).montantTotal(BigDecimal.TEN).montantNonAffecte(BigDecimal.ZERO).build());
+        instrument(nextDay, "NEXT", ModeReglementClient.CHEQUE, StatutInstrumentReglement.EN_ATTENTE);
+        ReglementClient otherAgency = payment("OTHER-JOURNAL");
+        otherAgency.setDateReglement(day);
+        instrument(otherAgency, "OTHER", ModeReglementClient.CHEQUE, StatutInstrumentReglement.EN_ATTENTE);
+        em.flush();
+        assertThat(repository.findForPaymentJournal(payment.getAgence().getId(), day, day,
+                null, java.util.List.of(ModeReglementClient.CHEQUE), StatutReglementClient.VALIDE)).containsExactly(match);
+    }
+
+    @Test
     void returnsOnlyMatchingInstrumentsNotTheirSiblingsOrOtherAgencies() {
         ReglementClient payment = payment("FIRST");
         InstrumentReglementClient match = instrument(payment, "555444", ModeReglementClient.CHEQUE, StatutInstrumentReglement.CONFIRME);

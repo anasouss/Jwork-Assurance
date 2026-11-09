@@ -100,8 +100,8 @@ public class JournalReglementsPdfService {
         Utilisateur selectedUser = findSelectedUser(agenceId, utilisateurId);
         List<InstrumentReglementClient> instruments = instrumentRepository.findForPaymentJournal(
                 agenceId,
-                dateDu.atStartOfDay(),
-                dateAu.plusDays(1).atStartOfDay(),
+                dateDu,
+                dateAu,
                 utilisateurId,
                 mode == null ? List.of(ModeReglementClient.values()) : List.of(mode),
                 statutReglement

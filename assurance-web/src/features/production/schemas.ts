@@ -229,6 +229,7 @@ export const bulkTarifUsageSchema = z.object({
 
 export const compagnieAssuranceSchema = z.object({
   nom: z.string().min(2, "Nom obligatoire"),
+  nomAbrege: z.string().max(80, "Le nom abrégé est limité à 80 caractères").optional(),
   codeIntermediaire: z.string().max(80, "Le code intermédiaire est limité à 80 caractères").optional(),
   adresse: z.string().optional(),
   ville: z.string().optional(),

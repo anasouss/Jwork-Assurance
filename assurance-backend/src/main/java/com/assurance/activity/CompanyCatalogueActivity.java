@@ -25,6 +25,7 @@ public final class CompanyCatalogueActivity {
 
     public static State state(CompagnieAssurance company) {
         return new State(null, insuranceCompany(company), new ActivityValues().put("Code", company.getCode()).put("Nom", company.getNom())
+                .put("Nom abrege", company.getNomAbrege())
                 .put("Adresse", company.getAdresse()).put("Ville", company.getVille()).put("E-mail", company.getEmail())
                 .put("Telephone", company.getTelephone()).put("RC", company.getRc()).put("ICE", company.getIce())
                 .put("Prefixe attestation", company.getPrefixeAttestation()).put("Prefixe carte verte", company.getPrefixeCarteVerte())

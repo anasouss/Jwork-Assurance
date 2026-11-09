@@ -137,36 +137,48 @@ public class QuittancePrimePdfService {
                     row.selectionKey().equals(firstRow.selectionKey())
                             && Objects.equals(row.element.getDateDebut(), firstRow.element.getDateDebut())
                             && Objects.equals(row.element.getDateFin(), firstRow.element.getDateFin()));
-            writeHeader(document, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, normal, bold);
+            boolean showCompany = detailRows.stream()
+                    .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().count() > 1;
+            writeHeader(document, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, showCompany, normal, bold);
             if (sharedPolicyAndPeriod) {
                 document.add(new Paragraph().add(new Text("Période de garantie : ").setFont(bold))
                         .add("du " + date(firstRow.element.getDateDebut()) + " au " + date(firstRow.element.getDateFin()))
                         .setFontSize(8).setMarginTop(0).setMarginBottom(6).setKeepWithNext(true));
             }
             BigDecimal premiumTotal = detailRows.stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add);
-            Table detail = new Table(sharedPolicyAndPeriod
-                    ? new float[]{1.2f, 2, 1.1f, 1, 0.9f, 1.1f}
-                    : new float[]{1.1f, 1.8f, 1.2f, 0.9f, 0.9f, 1, 0.85f, 0.75f, 1}).useAllAvailableWidth();
+            List<Float> widths = new ArrayList<>(List.of(1.1f, 1.8f));
+            if (showCompany) widths.add(1.6f);
+            if (!sharedPolicyAndPeriod) widths.addAll(List.of(1.35f, 0.9f, 0.9f));
+            widths.addAll(List.of(1f, 0.85f, 0.75f, 1f));
+            float[] columnWidths = new float[widths.size()];
+            for (int index = 0; index < widths.size(); index++) columnWidths[index] = widths.get(index);
+            Table detail = new Table(columnWidths).useAllAvailableWidth();
             List<String> columns = new ArrayList<>(List.of("CATÉGORIE", "MOUVEMENT"));
-            if (!sharedPolicyAndPeriod) columns.addAll(List.of("N° POLICE", "DU", "AU"));
+            if (showCompany) columns.add("COMPAGNIE");
+            if (!sharedPolicyAndPeriod) columns.addAll(List.of(policyLabel(detailRows).toUpperCase(java.util.Locale.ROOT), "DU", "AU"));
             columns.addAll(List.of("PRIME NETTE", "TAXES", "ACC.", "TTC"));
-            for (String column : columns) {
+            for (int index = 0; index < columns.size(); index++) {
+                String column = columns.get(index);
+                TextAlignment alignment = index >= columns.size() - 4 ? TextAlignment.RIGHT
+                        : index < 2 || (showCompany && index == 2) ? TextAlignment.LEFT : TextAlignment.CENTER;
                 detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
+                        .setTextAlignment(alignment)
                         .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5)
                         .setBorder(new SolidBorder(BORDER, 0.5f)));
             }
             for (PrimeRow row : detailRows) {
                 add(detail, row.branchNames(assistance), normal, false);
                 add(detail, movementLabel(row, assistance), normal, false);
+                if (showCompany) add(detail, row.company(row.element, assistance.get(row.element.getId())), normal, false);
                 if (!sharedPolicyAndPeriod) {
                     String policyIdentity = row.policyNumbers(assistance);
                     if (multiPayer) {
                         Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);
                         policyIdentity += "\n" + value(subscriber == null ? null : subscriber.getNomAffichage());
                     }
-                    add(detail, policyIdentity, normal, false);
-                    add(detail, date(row.element.getDateDebut()), normal, false);
-                    add(detail, date(row.element.getDateFin()), normal, false);
+                    add(detail, policyIdentity, normal, TextAlignment.CENTER);
+                    add(detail, date(row.element.getDateDebut()), normal, TextAlignment.CENTER);
+                    add(detail, date(row.element.getDateFin()), normal, TextAlignment.CENTER);
                 }
                 add(detail, amount(row.net()), normal, true);
                 add(detail, amount(row.taxes()), normal, true);
@@ -232,7 +244,8 @@ public class QuittancePrimePdfService {
                 movementLabel(row, assistance), row.element.getDateDebut(), row.element.getDateFin(), row.total(), status,
                 subscriber == null ? null : subscriber.getNomAffichage(),
                 row.policyNumber(row.element, assistance.get(row.element.getId())),
-                row.company(row.element, assistance.get(row.element.getId())));
+                row.company(row.element, assistance.get(row.element.getId())),
+                row.element.getNature() == com.assurance.enums.NatureElementFacturable.ASSISTANCE);
     }
 
     private String movementLabel(PrimeRow row, Map<Long, AssistanceContrat> assistance) {
@@ -336,12 +349,20 @@ public class QuittancePrimePdfService {
 
     public record MovementOption(Long elementFacturableId, Long documentClientId, String libelle,
                                  LocalDate dateDebut, LocalDate dateFin, BigDecimal montant, String statut,
-                                 String clientNom, String numeroPolice, String compagnie) {
+                                 String clientNom, String numeroPolice, String compagnie, boolean assistance) {
+    }
+
+    private String policyLabel(List<PrimeRow> rows) {
+        boolean hasAssistance = rows.stream().flatMap(row -> row.elements().stream())
+                .anyMatch(element -> element.getNature() == com.assurance.enums.NatureElementFacturable.ASSISTANCE);
+        boolean hasInsurance = rows.stream().flatMap(row -> row.elements().stream())
+                .anyMatch(element -> element.getNature() != com.assurance.enums.NatureElementFacturable.ASSISTANCE);
+        return hasAssistance ? hasInsurance ? "N° police / contrat" : "N° contrat" : "N° police";
     }
 
     private void writeHeader(Document document, ReglementClient payment, String reference,
                              List<PrimeRow> rows, Map<Long, AssistanceContrat> assistance,
-                             boolean sharedPolicyAndPeriod, PdfFont normal, PdfFont bold) {
+                             boolean sharedPolicyAndPeriod, boolean showCompany, PdfFont normal, PdfFont bold) {
         Table header = new Table(new float[]{1, 3, 1}).useAllAvailableWidth().setKeepTogether(true).setMarginBottom(14);
         Cell brand = new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE);
         byte[] logo = logoStorage.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
@@ -358,12 +379,14 @@ public class QuittancePrimePdfService {
         Cell details = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
         addField(details, "N° quittance", reference, normal, bold);
         addField(details, "Intermédiaire", agency.getNom(), normal, bold);
-        String companies = String.join(" · ", rows.stream()
-                .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().toList());
-        addField(details, "Assureur(s)", companies, normal, bold);
+        if (!showCompany) {
+            String companies = String.join(" · ", rows.stream()
+                    .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().toList());
+            addField(details, "Assureur", companies, normal, bold);
+        }
         if (sharedPolicyAndPeriod) {
             PrimeRow row = rows.get(0);
-            addField(details, "N° police", row.policyNumbers(assistance), normal, bold);
+            addField(details, policyLabel(rows), row.policyNumbers(assistance), normal, bold);
         }
         identity.addCell(details);
         Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
@@ -387,7 +410,7 @@ public class QuittancePrimePdfService {
             addField(parties, "Ville", subscriber == null || subscriber.getVille() == null
                     ? null : subscriber.getVille().getNom(), normal, bold);
             if (bySubscriber.size() > 1) {
-                addField(parties, "Police(s)", String.join(" · ", sourceRows.stream()
+                addField(parties, policyLabel(sourceRows), String.join(" · ", sourceRows.stream()
                         .map(row -> row.policyNumbers(assistance)).distinct().toList()), normal, bold);
             }
             String insured = String.join(" · ", sourceRows.stream()
@@ -480,7 +503,7 @@ public class QuittancePrimePdfService {
 
         private String policyNumber(ElementFacturable element, AssistanceContrat assistance) {
             String policy = assistance == null ? element.getContrat().getNumeroPolice()
-                    : first(assistance.getNumeroPoliceContrat(), assistance.getNumeroContratOuQuittance());
+                    : first(assistance.getNumeroContratOuQuittance(), assistance.getNumeroPoliceContrat());
             if (document != null) {
                 var snapshot = lines().stream().filter(l -> l.getElementFacturable().getId().equals(element.getId())).findFirst().orElseThrow();
                 policy = first(snapshot.getNumeroPolice(), policy);
@@ -530,8 +553,13 @@ public class QuittancePrimePdfService {
     }
 
     private static void add(Table table, String text, PdfFont font, boolean right) {
+        add(table, text, font, right ? TextAlignment.RIGHT : TextAlignment.LEFT);
+    }
+
+    private static void add(Table table, String text, PdfFont font, TextAlignment alignment) {
         table.addCell(new Cell().add(new Paragraph(value(text)).setFont(font).setFontSize(7).setMargin(0))
-                .setTextAlignment(right ? TextAlignment.RIGHT : TextAlignment.LEFT).setPadding(5).setBorder(new SolidBorder(BORDER, 0.5f)));
+                .setTextAlignment(alignment).setVerticalAlignment(VerticalAlignment.MIDDLE)
+                .setPadding(5).setBorder(new SolidBorder(BORDER, 0.5f)));
     }
     private static BigDecimal sum(List<BigDecimal> values) {
         return values.stream().allMatch(Objects::isNull) ? null

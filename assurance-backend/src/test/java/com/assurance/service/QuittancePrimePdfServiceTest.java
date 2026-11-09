@@ -393,6 +393,21 @@ class QuittancePrimePdfServiceTest {
     }
 
     @Test
+    void assistanceOnlyReceiptUsesItsContractNumberInOptionsAndPdfHeader() throws Exception {
+        ReglementClient payment = payment(1);
+        ElementFacturable element = payment.getInstruments().get(0).getAffectations().get(0).getElementFacturable();
+        element.setNature(NatureElementFacturable.ASSISTANCE);
+        when(assistance.findByElementFacturableIds(anyCollection())).thenReturn(List.of(AssistanceContrat.builder()
+                .elementFacturable(element).numeroPoliceContrat("PARENT-POLICY")
+                .numeroContratOuQuittance("ASSIST-ONLY-001").build()));
+        assertThat(service.policies(payment).get(0).polices()).containsExactly("ASSIST-ONLY-001");
+        try (PDDocument pdf = PDDocument.load(service.render(payment, "2026000001", LocalDate.now()))) {
+            assertThat(new PDFTextStripper().getText(pdf)).contains("N° contrat", "ASSIST-ONLY-001")
+                    .doesNotContain("PARENT-POLICY", "POLICE-1");
+        }
+    }
+
+    @Test
     void assistanceRetainsItsOwnPolicyReferenceEvenOnTheSameContract() throws Exception {
         ReglementClient payment = payment(2);
         var allocations = payment.getInstruments().get(0).getAffectations();
@@ -401,7 +416,7 @@ class QuittancePrimePdfServiceTest {
         assisted.setNature(NatureElementFacturable.ASSISTANCE);
         assisted.setLibelle("Assistance");
         when(assistance.findByElementFacturableIds(anyCollection())).thenReturn(List.of(AssistanceContrat.builder()
-                .elementFacturable(assisted).numeroPoliceContrat("ASSIST-001")
+                .elementFacturable(assisted).numeroPoliceContrat("POLICE-1").numeroContratOuQuittance("ASSIST-001")
                 .compagnieAssistance(CompagnieAssistance.builder().nom("Assistance partner").build()).build()));
         try (PDDocument pdf = PDDocument.load(service.render(payment, "2026000001", LocalDate.now()))) {
             assertThat(new PDFTextStripper().getText(pdf)).contains("POLICE-1", "ASSIST-001", "Assistance partner");

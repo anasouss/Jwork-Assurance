@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Edit, Handshake, Plus, Search, Users } from "lucide-react";
+import { Building2, CircleHelp, Edit, Handshake, Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
@@ -16,6 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -64,6 +66,7 @@ export default function CompaniesPage() {
         compagnie.code,
         companyField(compagnie, "codeIntermediaire"),
         compagnie.libelle,
+        companyField(compagnie, "nomAbrege"),
         companyField(compagnie, "ville"),
         companyField(compagnie, "rc"),
         companyField(compagnie, "ice"),
@@ -200,7 +203,7 @@ export default function CompaniesPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="size-5 text-amber-600" />
@@ -220,6 +223,24 @@ export default function CompaniesPage() {
             <Field label="Nom" required>
               <Input value={payload.nom} onChange={(event) => update(setPayload, { nom: event.target.value })} />
             </Field>
+            <div className="grid gap-1.5 text-sm">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="company-short-name">Nom abrégé</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" className="size-5 text-muted-foreground" aria-label="À propos du nom abrégé">
+                      <CircleHelp className="size-3.5" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-72">
+                    Nom court pour les affichages compacts, par exemple SanlamAllianz. Facultatif : il ne remplace ni le nom complet ni le préfixe dossier.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input id="company-short-name" value={payload.nomAbrege ?? ""} maxLength={80}
+                className="border-slate-300 bg-slate-50/70 shadow-none dark:border-neutral-700 dark:bg-neutral-950/70"
+                onChange={(event) => update(setPayload, { nomAbrege: event.target.value })} />
+            </div>
             <Field label="Préfixe dossier">
               <Input
                 value={payload.prefixeDossier ?? ""}
@@ -296,6 +317,7 @@ function emptyCompany(): UpsertCompagnieAssuranceRequest {
 function companyPayload(compagnie: ReferenceOption): UpsertCompagnieAssuranceRequest {
   return {
     nom: companyField(compagnie, "nom") || compagnie.libelle,
+    nomAbrege: companyField(compagnie, "nomAbrege"),
     codeIntermediaire: companyField(compagnie, "codeIntermediaire"),
     adresse: companyField(compagnie, "adresse"),
     ville: companyField(compagnie, "ville"),

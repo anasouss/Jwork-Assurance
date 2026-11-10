@@ -18,6 +18,12 @@ export default function ContratPdfPage() {
     enabled: Boolean(contratId),
     queryFn: async () => {
       const contrat = await contractApi.getContrat(contratId, { mouvementId });
+      if (contrat.prospection) {
+        return contractApi.downloadDevisPdf(contratId);
+      }
+      if (contrat.brouillon) {
+        throw new Error("Ce dossier est encore en brouillon. Le PDF du contrat sera disponible après validation.");
+      }
       if (contrat.typeContrat === "FLOTTE") {
         return contractApi.downloadFlottePolicyPdf(contratId, mouvementId);
       }

@@ -289,7 +289,7 @@ public class ContratService {
     public ContratResponse createDraft(Long agenceId, CreateContratRequest request) {
         return businessActivityRecorder.perform(() -> createDraftRecord(agenceId, request), result ->
                 ContractActivity.command(null, result, ActivityAction.CREATED,
-                        "Brouillon de contrat créé", "CONTRACT_DRAFT_CREATION"));
+                        Boolean.TRUE.equals(result.getProspection()) ? "Brouillon de devis créé" : "Brouillon de contrat créé", "CONTRACT_DRAFT_CREATION"));
     }
 
     private ContratResponse createDraftRecord(Long agenceId, CreateContratRequest request) {
@@ -512,7 +512,9 @@ public class ContratService {
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> applyDraftTariffRecalculationRecord(contrat), result ->
                 ContractActivity.command(before, result, ActivityAction.RECALCULATED,
-                        "Tarifs du brouillon recalculés", "CONTRACT_TARIFF_RECALCULATION"));
+                        Boolean.TRUE.equals(result.getProspection()) ? "Tarifs du devis recalculés"
+                                : Boolean.TRUE.equals(result.getBrouillon()) ? "Tarifs du brouillon de contrat recalculés"
+                                : "Tarifs du contrat recalculés", "CONTRACT_TARIFF_RECALCULATION"));
     }
 
     private ContratResponse applyDraftTariffRecalculationRecord(Contrat contrat) {
@@ -678,7 +680,7 @@ public class ContratService {
         boolean correction = isCorrectionAffaireNouvelle(contrat);
         return businessActivityRecorder.perform(() -> finalizeDraftRecord(agenceId, contrat, request), result ->
                 ContractActivity.command(before, result,
-                        correction ? ActivityAction.UPDATED : ActivityAction.VALIDATED,
+                        correction ? ActivityAction.UPDATED : Boolean.TRUE.equals(result.getProspection()) ? ActivityAction.SAVED : ActivityAction.VALIDATED,
                         correction ? "Contrat modifié" : Boolean.TRUE.equals(result.getProspection()) ? "Devis enregistré" : "Contrat validé",
                         correction ? "CONTRACT_CORRECTION" : "CONTRACT_VALIDATION"));
     }

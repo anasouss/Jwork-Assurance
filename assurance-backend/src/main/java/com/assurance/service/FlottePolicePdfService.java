@@ -78,6 +78,9 @@ public class FlottePolicePdfService {
         if (contrat.getTypeContrat() != TypeContrat.FLOTTE) {
             throw new BadRequestException("Le document police flotte est réservé aux contrats flotte");
         }
+        if (Boolean.TRUE.equals(contrat.getProspection()) || Boolean.TRUE.equals(contrat.getBrouillon())) {
+            throw new BadRequestException("La police flotte est disponible uniquement après validation du contrat. Pour un devis, utilisez la proposition d'assurance.");
+        }
 
         ContratResponse.MouvementView mouvement = resolveMouvement(contrat, mouvementId);
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {

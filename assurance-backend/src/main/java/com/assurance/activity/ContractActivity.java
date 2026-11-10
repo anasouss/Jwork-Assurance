@@ -148,19 +148,33 @@ public final class ContractActivity {
     }
 
     public static ActivityReference reference(ContratResponse record) {
-        String label = record.getNumeroDossier();
-        if (label == null || label.isBlank()) label = record.getNumeroDevis();
-        if (label == null || label.isBlank()) label = record.getNumeroPolice();
-        if (label == null || label.isBlank()) label = "Contrat en preparation";
-        return ActivityReference.of(ActivityRecordType.CONTRAT, record.getId(), label);
+        return ActivityReference.of(ActivityRecordType.CONTRAT, record.getId(), dossierLabel(
+                record.getProspection(), record.getBrouillon(), record.getNumeroDossier(),
+                record.getNumeroDevis(), record.getNumeroPolice(), record.getNumeroContrat()));
     }
 
     public static ActivityReference reference(Contrat record) {
-        String label = record.getNumeroDossier();
-        if (label == null || label.isBlank()) label = record.getNumeroDevis();
-        if (label == null || label.isBlank()) label = record.getNumeroPolice();
-        if (label == null || label.isBlank()) label = "Contrat en preparation";
-        return ActivityReference.of(ActivityRecordType.CONTRAT, record.getId(), label);
+        return ActivityReference.of(ActivityRecordType.CONTRAT, record.getId(), dossierLabel(
+                record.getProspection(), record.getBrouillon(), record.getNumeroDossier(),
+                record.getNumeroDevis(), record.getNumeroPolice(), record.getNumeroContrat()));
+    }
+
+    private static String dossierLabel(Boolean prospection, Boolean brouillon, String dossier,
+            String devis, String police, String contrat) {
+        boolean draft = Boolean.TRUE.equals(brouillon);
+        if (Boolean.TRUE.equals(prospection)) {
+            String result = draft ? "Brouillon de devis" : "Devis";
+            if (devis != null && !devis.isBlank()) result += " " + devis;
+            if (dossier != null && !dossier.isBlank() && !dossier.equals(devis)) result += " - Dossier " + dossier;
+            return result;
+        }
+        if (draft) {
+            return "Brouillon de contrat" + (dossier == null || dossier.isBlank() ? "" : " - Dossier " + dossier);
+        }
+        if (dossier != null && !dossier.isBlank()) return "Dossier " + dossier;
+        if (police != null && !police.isBlank()) return "Police " + police;
+        if (contrat != null && !contrat.isBlank()) return "Contrat " + contrat;
+        return "Contrat sans reference";
     }
 
     public static ActivityCommand genericMovementCommand(MouvementContrat movement, QuittanceResponse response, StatutContrat previousStatus) {
@@ -283,6 +297,7 @@ public final class ContractActivity {
     public static Map<String, String> snapshot(ContratResponse contract) {
         if (contract == null) return Map.of();
         ActivityValues values = new ActivityValues()
+                .put("Nature du dossier", Boolean.TRUE.equals(contract.getProspection()) ? "Devis" : "Contrat")
                 .put("Dossier", contract.getNumeroDossier())
                 .put("Devis", contract.getNumeroDevis())
                 .put("Police", contract.getNumeroPolice())

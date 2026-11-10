@@ -71,6 +71,13 @@ export default function ContratShowPage() {
     return <ProductionFormSkeleton variant="contract" />;
   }
 
+  if (contratQuery.isError) {
+    return <div role="alert" className="space-y-3 py-8 text-sm">
+      <p>{contratQuery.error instanceof Error ? contratQuery.error.message : "Le dossier ne peut pas être chargé."}</p>
+      <Button variant="outline" onClick={() => void contratQuery.refetch()}>Réessayer</Button>
+    </div>;
+  }
+
   if (!contratQuery.data) {
     return <Card><CardContent className="p-8 text-center text-muted-foreground">Dossier introuvable.</CardContent></Card>;
   }
@@ -97,7 +104,9 @@ export default function ContratShowPage() {
     if (!previewWindow) return;
     setGeneratingPdf(true);
     try {
-      const blob = contrat.typeContrat === "FLOTTE"
+      const blob = contrat.prospection
+        ? await contractApi.downloadDevisPdf(contratId)
+        : contrat.typeContrat === "FLOTTE"
         ? await contractApi.downloadFlottePolicyPdf(contratId, mouvementId)
         : await generateContratPdfBlob({
             contrat,
@@ -125,11 +134,13 @@ export default function ContratShowPage() {
     <div className="grid min-w-0 gap-4">
       <div className="flex items-center justify-between gap-3 print:hidden">
         <Button asChild variant="ghost" size="sm" className="-ml-2">
-          <Link to="/app/production/contrats"><ArrowLeft className="size-4" />Retour liste</Link>
+          <Link to={contrat.prospection ? "/app/production/prospection" : "/app/production/contrats"}><ArrowLeft className="size-4" />Retour liste</Link>
         </Button>
         <div className="flex items-center gap-2">
-          <Badge className="bg-emerald-600">{statusLabel(selectedMouvement?.statut ?? contrat.statut)}</Badge>
-          <Button type="button" onClick={openPdf} disabled={generatingPdf}>
+          <Badge variant={contrat.brouillon ? "gray" : contrat.prospection ? "info" : contrat.statut === "CANCELLED" ? "red" : contrat.statut === "SUSPENDED" ? "warning" : contrat.statut === "ACTIVE" ? "success" : "gray"}>{contrat.prospection
+            ? contrat.brouillon ? "Brouillon de devis" : "Devis"
+            : contrat.brouillon ? "Brouillon de contrat" : statusLabel(selectedMouvement?.statut ?? contrat.statut)}</Badge>
+          <Button type="button" onClick={openPdf} disabled={generatingPdf || (contrat.brouillon === true && !contrat.prospection)}>
             <FileTextIcon className="size-4" />
             {generatingPdf ? "Génération..." : "Ouvrir PDF"}
           </Button>
@@ -149,20 +160,20 @@ export default function ContratShowPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-[9px] font-bold uppercase text-emerald-700">Fiche synthèse</p>
-              <h1 className="mt-0.5 text-lg font-bold">Dossier N° {dossier}</h1>
+              <h1 className="mt-0.5 text-lg font-bold">{contrat.prospection ? `Devis N° ${text(contrat.numeroDevis)}` : contrat.brouillon ? `Brouillon · Dossier ${dossier}` : `Dossier N° ${dossier}`}</h1>
               <p className="text-[10px] text-slate-600">
                 {productLabel(contrat)} · {travelAssistance ? "Assistance" : "Automobile"}
               </p>
             </div>
             <div className="text-right text-sm">
-              <p className="font-semibold">{text(contrat.numeroPolice)}</p>
-              <p className="text-slate-600">Police N°</p>
+              <p className="font-semibold">{contrat.prospection || contrat.brouillon ? dossier : text(contrat.numeroPolice)}</p>
+              <p className="text-slate-600">{contrat.prospection || contrat.brouillon ? "Dossier" : "Police N°"}</p>
             </div>
           </div>
         </header>
 
         <main className="mt-2 grid gap-2">
-          <Section title="Contrat" icon={<FileText className="size-4" />}>
+          <Section title={contrat.prospection ? "Devis" : "Contrat"} icon={<FileText className="size-4" />}>
             <InfoGrid
               items={[
                 ["Nature", selectedMouvement?.libelle ?? latestEvent(contrat)],
@@ -274,8 +285,8 @@ function FlottePolicySheet({
     <div className="w-full overflow-x-auto">
       <div className="mx-auto min-h-[210mm] w-[297mm] border bg-white p-[4mm] text-[11px] leading-tight text-slate-950 shadow-sm">
         <div className="mx-auto w-[470px] border border-slate-900 bg-slate-100 px-3 py-2 text-center text-slate-900">
-          <div className="text-lg font-bold uppercase tracking-wide">Police flotte automobile</div>
-          <div className="text-sm font-semibold">ACTE N {actNumber} : {text(actLabel)}</div>
+          <div className="text-lg font-bold uppercase tracking-wide">{contrat.prospection ? "Proposition d’assurance flotte automobile" : contrat.brouillon ? "Brouillon de contrat flotte automobile" : "Police flotte automobile"}</div>
+          {!contrat.prospection && !contrat.brouillon && <div className="text-sm font-semibold">ACTE N {actNumber} : {text(actLabel)}</div>}
         </div>
 
         <div className="mt-3 grid grid-cols-[1fr_360px] border border-slate-300">
@@ -297,7 +308,7 @@ function FlottePolicySheet({
             ) : null}
           </div>
           <div className="space-y-1 p-2 text-right">
-            <div className="font-bold text-blue-950">Police N {text(contrat.numeroPolice)}</div>
+            <div className="font-bold text-blue-950">{contrat.prospection ? `Devis N° ${text(contrat.numeroDevis)}` : contrat.brouillon ? `Dossier ${dossier}` : `Police N° ${text(contrat.numeroPolice)}`}</div>
             <div>Date d'effet {formatDate(mouvement?.dateEffet ?? contrat.dateEffet)} Date d'expiration {formatDate(mouvement?.dateEcheance ?? contrat.dateEcheance)}</div>
           </div>
         </div>

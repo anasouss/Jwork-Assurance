@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Eye, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, Eye, FileText, RotateCcw, Search } from "lucide-react";
 import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ const primaryReferenceTypes = new Set(["CONTRAT", "CLIENT", "GROUPE_CLIENT", "RE
 function recordPath(reference: ActivityReference) {
   const id = encodeURIComponent(reference.id);
   switch (reference.type) {
-    case "CONTRAT": return `/app/production/contrats/${id}/pdf`;
+    case "CONTRAT": return `/app/production/contrats/${id}`;
     case "REGLEMENT_CLIENT": return `/app/compta/reglements/${id}`;
     case "BORDEREAU_BANCAIRE": return `/app/compta/tresorerie/bordereaux-remise/${id}`;
     case "BORDEREAU_COMPAGNIE": return `/app/compta/bordereaux-compagnies/${id}`;
@@ -315,9 +315,16 @@ export default function AdminActivityPage() {
     const deletedSubject = event.action === "DELETED" && event.subject.type === reference.type && event.subject.id === reference.id;
     return path && sameAgency && !deletedSubject && requirement
       && satisfiesPermissionRequirement(access.user?.permissions ?? [], requirement)
-      ? <Link className="break-words text-sky-700 underline-offset-4 hover:underline dark:text-sky-400" to={path}
-          target={path.endsWith("/pdf") ? "_blank" : undefined}
-          rel={path.endsWith("/pdf") ? "noopener noreferrer" : undefined}>{reference.label}</Link>
+      && (reference.type !== "CONTRAT" || access.user?.permissions.includes("contrat:view"))
+      ? <span className="inline-flex max-w-full items-baseline gap-1.5">
+          <Link className="min-w-0 break-words text-sky-700 underline-offset-4 hover:underline dark:text-sky-400" to={path}>{reference.label}</Link>
+          {reference.type === "CONTRAT" && <Tooltip>
+            <TooltipTrigger asChild><Button asChild variant="ghost" size="icon" className="size-6 shrink-0 self-center text-sky-700 dark:text-sky-400">
+              <Link to={`${path}/pdf`} target="_blank" rel="noopener noreferrer" aria-label={`Ouvrir le PDF actuel : ${reference.label}`}><FileText className="size-3.5" /></Link>
+            </Button></TooltipTrigger>
+            <TooltipContent>Ouvrir le PDF actuel dans un nouvel onglet</TooltipContent>
+          </Tooltip>}
+        </span>
       : <span className="break-words">{reference.label}</span>;
   }
 

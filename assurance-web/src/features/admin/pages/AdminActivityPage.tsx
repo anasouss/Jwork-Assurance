@@ -74,13 +74,46 @@ function ActivityChanges({ changes, module, subject }: Pick<BusinessActivity, "c
         ? <AccountingChangesTable groups={section.groups} allocations={section.kind === "allocations"} />
         : section.kind === "vehicle" || section.kind === "person" || section.kind === "guarantees"
         ? <GuaranteeChangesTable groups={section.groups} person={section.kind === "person"} />
+        : section.kind === "quittance"
+        ? <QuittanceChangesTable groups={section.groups} />
         : section.groups.map(group => <div key={group.title}>
-          {section.kind === "quittance" && <h4 className="mb-2 mt-3 text-sm font-medium">{group.title === "Quittance" ? "Total" : group.title.slice("Quittance - ".length)}</h4>}
           <ChangeFieldsTable group={group} />
         </div>)}
     </details>;
     })}
   </section>;
+}
+
+function QuittanceChangesTable({ groups }: { groups: ActivityChangeGroup[] }) {
+  const columns = ["Prime nette", "Taxes", "TPF", "Accessoires", "CNPAC", "Montant TTC"];
+  const categories = groups.filter(group => group.title !== "Quittance");
+  const total = groups.find(group => group.title === "Quittance");
+  const additionalFields = (group: ActivityChangeGroup) => group.changes.filter(change => !columns.includes(change.label));
+  const hasDetails = groups.some(group => additionalFields(group).length > 0);
+  const renderRow = (group: ActivityChangeGroup, isTotal = false) => <tr key={group.title} className={`border-t align-top ${isTotal ? "bg-muted/50 font-semibold" : ""}`}>
+    <th scope="row" className="min-w-32 px-3 py-3 text-left font-semibold">{isTotal ? "Total" : group.title.slice("Quittance - ".length)}</th>
+    {columns.map(label => <td key={label} className={`whitespace-nowrap px-3 py-3 text-right tabular-nums ${label === "Montant TTC" ? "font-semibold" : ""}`}>
+      <GuaranteeChangeValue change={group.changes.find(change => change.label === label)} />
+    </td>)}
+    {hasDetails && <td className="min-w-32 px-3 py-3">{additionalFields(group).length > 0 ? <details>
+      <summary className="cursor-pointer text-xs font-medium text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300">Voir les détails</summary>
+      <dl className="mt-3 space-y-3">{additionalFields(group).map(change => <div key={change.label} className="max-w-56 break-words">
+        <dt className="mb-1 text-xs font-normal text-muted-foreground">{change.label}</dt>
+        <dd className="whitespace-pre-wrap font-normal"><GuaranteeChangeValue change={change} /></dd>
+      </div>)}</dl>
+    </details> : <span className="text-muted-foreground">-</span>}</td>}
+  </tr>;
+  return <div className="mb-4 overflow-x-auto rounded-md border">
+    <table className="w-full min-w-[960px] text-sm">
+      <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
+        <th scope="col" className="px-3 py-2 font-medium">Catégorie</th>
+        {columns.map(label => <th scope="col" key={label} className="px-3 py-2 text-right font-medium">{label}</th>)}
+        {hasDetails && <th scope="col" className="px-3 py-2 font-medium">Détails</th>}
+      </tr></thead>
+      <tbody>{categories.map(group => renderRow(group))}</tbody>
+      {total && <tfoot>{renderRow(total, true)}</tfoot>}
+    </table>
+  </div>;
 }
 
 function ReceiptChangesTable({ groups }: { groups: ActivityChangeGroup[] }) {
@@ -251,7 +284,7 @@ export default function AdminActivityPage() {
   const displayedActivity = detail ?? selected;
   const hasSummaryTable = displayedActivity && activityChangeSections(
     displayedActivity.changes, displayedActivity.module, displayedActivity.subject.type,
-  ).some(section => ["vehicle", "person", "guarantees", "documentLines", "allocations", "receiptLines"].includes(section.kind));
+  ).some(section => ["vehicle", "person", "guarantees", "quittance", "documentLines", "allocations", "receiptLines"].includes(section.kind));
   const referenceGroups = detail ? groupActivityReferences(detail) : [];
   const primaryReferences = referenceGroups.filter(group => primaryReferenceTypes.has(group.type));
   const supportingReferences = referenceGroups.filter(group => !primaryReferenceTypes.has(group.type));

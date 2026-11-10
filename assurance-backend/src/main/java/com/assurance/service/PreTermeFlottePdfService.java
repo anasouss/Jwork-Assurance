@@ -207,12 +207,6 @@ public class PreTermeFlottePdfService {
                         .setFontSize(10))
                 .setBorder(new SolidBorder(SOFT_BORDER, 0.9f))
                 .setPadding(6);
-        if (Boolean.TRUE.equals(draft.getReductionSaharienne())) {
-            insuredCell.add(new Paragraph()
-                    .add(new Text("Réduction saharienne : ").setBold().setFontColor(ACCENT))
-                    .add(value(draft.getJustificatifSahara(), "Oui"))
-                    .setFontSize(10));
-        }
         infoHeader.addCell(insuredCell);
         infoHeader.addCell(new Cell()
                 .add(new Paragraph(cityAndDate).setFontSize(10))

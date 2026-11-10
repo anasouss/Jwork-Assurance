@@ -184,9 +184,6 @@ export default function ContratShowPage() {
                 ["Date d'effet", formatDate(selectedMouvement?.dateEffet ?? contrat.dateEffet)],
                 ["Date d'échéance", formatDate(selectedMouvement?.dateEcheance ?? contrat.dateEcheance)],
                 ...(!travelAssistance ? [["Fractionnement", text(contrat.fractionnement)] as [string, ReactNode]] : []),
-                ...(contrat.reductionSaharienne
-                  ? [["Réduction saharienne", contrat.justificatifSahara ?? "Oui"] as [string, ReactNode]]
-                  : []),
                 ...(souscripteur?.groupe?.libelle
                   ? [["Groupe client", souscripteur.groupe.libelle] as [string, ReactNode]]
                   : []),
@@ -303,9 +300,6 @@ function FlottePolicySheet({
               <span className={subscriberPays ? "font-bold text-blue-950" : "ml-3 font-bold text-blue-950"}>Facturation : </span>
               {billingModeLabel(contrat.modeFacturation)}
             </div>
-            {contrat.reductionSaharienne ? (
-              <div><span className="font-bold text-blue-950">Réduction saharienne : </span>{contrat.justificatifSahara ?? "Oui"}</div>
-            ) : null}
           </div>
           <div className="space-y-1 p-2 text-right">
             <div className="font-bold text-blue-950">{contrat.prospection ? `Devis N° ${text(contrat.numeroDevis)}` : contrat.brouillon ? `Dossier ${dossier}` : `Police N° ${text(contrat.numeroPolice)}`}</div>
@@ -1175,9 +1169,6 @@ async function generateContratPdfBlob(params: {
       ["Date d'effet", formatDate(params.mouvement?.dateEffet ?? params.contrat.dateEffet)],
       ["Date d'échéance", formatDate(params.mouvement?.dateEcheance ?? params.contrat.dateEcheance)],
       ...(!travelAssistance ? [["Fractionnement", text(params.contrat.fractionnement)] as [string, string]] : []),
-      ...(params.contrat.reductionSaharienne
-        ? [["Réduction saharienne", params.contrat.justificatifSahara ?? "Oui"] as [string, string]]
-        : []),
       ...(params.souscripteur?.groupe?.libelle
         ? [["Groupe client", params.souscripteur.groupe.libelle] as [string, string]]
         : []),

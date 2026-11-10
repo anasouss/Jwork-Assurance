@@ -41,7 +41,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
     </div>
 
     <dl className="grid grid-cols-1 divide-y border-b sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-      <Summary label="Total réglé" value={amount(detail?.totalRegle)} />
+      <Summary label="Total affecté" value={amount(detail?.totalRegle)} />
       <Summary label="Total quittances" value={amount(detail?.totalQuittances)} />
       <Summary label="Solde restant" value={amount(detail?.solde)} />
     </dl>
@@ -57,7 +57,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
             <th className="px-3 py-3 text-left">Du</th>
             <th className="px-3 py-3 text-left">Au</th>
             <th className="px-3 py-3 text-right">Montant quittance</th>
-            <th className="px-3 py-3 text-right" title="Montant affecté par ce règlement">Montant réglé</th>
+            <th className="px-3 py-3 text-right" title="Montant affecté par ce règlement">Montant affecté</th>
             <th className="px-3 py-3 text-right">Solde</th>
           </tr></thead>
           <tbody className="divide-y">{detail?.productions.map(production => <tr key={production.key} className="hover:bg-muted/30">

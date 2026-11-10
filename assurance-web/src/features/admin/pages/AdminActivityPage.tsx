@@ -125,7 +125,7 @@ function AccountingChangesTable({ groups, allocations }: { groups: ActivityChang
     <table className="w-full min-w-[700px] text-sm">
       <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
         <th scope="col" className="px-3 py-2 font-medium">{allocations ? "Règlement / Affectation" : "Ligne"}</th>
-        {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
+        {headings.map((heading, index) => <th scope="col" key={heading} className={`px-3 py-2 font-medium ${index === 3 ? "text-right" : ""}`}>{heading}</th>)}
         <th scope="col" className="px-3 py-2 font-medium">Détails</th>
       </tr></thead>
       <tbody>{groups.map(group => {
@@ -135,7 +135,7 @@ function AccountingChangesTable({ groups, allocations }: { groups: ActivityChang
           <th scope="row" className="min-w-32 max-w-48 break-words px-3 py-2.5 text-left font-medium">{allocation ? <>
             {allocation[1] && <div>{allocation[1]}</div>}<div className="text-xs text-muted-foreground">{allocation[3]}</div>
           </> : group.title}</th>
-          {summary.map((change, index) => <td key={index} className="max-w-56 whitespace-pre-wrap break-words px-3 py-2.5 tabular-nums">{allocations && index === 0 && !change && allocation
+          {summary.map((change, index) => <td key={index} className={`px-3 py-2.5 tabular-nums ${index === 3 ? "whitespace-nowrap text-right" : "max-w-56 whitespace-pre-wrap break-words"}`}>{allocations && index === 0 && !change && allocation
             ? <div>{allocation[2]}<div className="mt-1 text-xs text-muted-foreground">Référence non enregistrée</div></div>
             : <GuaranteeChangeValue change={change} />}</td>)}
           <td className="min-w-28 px-3 py-2.5">{additional.length > 0 ? <details>
@@ -185,17 +185,17 @@ function GuaranteeChangeValue({ change }: { change?: BusinessActivity["changes"]
 function GuaranteeChangesTable({ groups, person }: { groups: ActivityChangeGroup[]; person: boolean }) {
   const headings = person ? ["Décès", "Invalidité", "Frais médicaux", "Prime"] : ["Valeur assurée / Capital", "Franchise (%)", "Minimum franchise", "Prime"];
   return <div className="mb-4 overflow-x-auto rounded-md border">
-    <table className="w-full min-w-[700px] text-sm">
+    <table className="w-full min-w-[860px] text-sm">
       <thead className="bg-fuchsia-50 text-left text-fuchsia-950 dark:bg-fuchsia-950/40 dark:text-fuchsia-100"><tr>
         <th scope="col" className="px-3 py-2 font-medium">Garantie / Cible</th>
-        {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
+        {headings.map(heading => <th scope="col" key={heading} className="px-3 py-2 text-right font-medium">{heading}</th>)}
         <th scope="col" className="px-3 py-2 font-medium">Détails</th>
       </tr></thead>
       <tbody>{groups.map(group => {
         const { summary, additional } = guaranteeSummaryFields(group, person);
         return <tr key={group.title} className="border-t align-top">
           <th scope="row" className="max-w-56 break-words px-3 py-3 text-left font-medium">{group.title}</th>
-          {summary.map((change, index) => <td key={index} className="max-w-40 whitespace-pre-wrap break-words px-3 py-3 tabular-nums"><GuaranteeChangeValue change={change} /></td>)}
+          {summary.map((change, index) => <td key={index} className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><GuaranteeChangeValue change={change} /></td>)}
           <td className="min-w-36 px-3 py-3">{additional.length > 0 ? <details className="group/guarantee">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300 [&::-webkit-details-marker]:hidden">
               <ChevronDown aria-hidden="true" className="size-3.5 shrink-0 group-open/guarantee:rotate-180" />{additional.length} {additional.length === 1 ? "détail" : "détails"}
@@ -248,6 +248,10 @@ export default function AdminActivityPage() {
     enabled: access.canViewActivity && !!selected,
   });
   const detail = activityDetail.data;
+  const displayedActivity = detail ?? selected;
+  const hasSummaryTable = displayedActivity && activityChangeSections(
+    displayedActivity.changes, displayedActivity.module, displayedActivity.subject.type,
+  ).some(section => ["vehicle", "person", "guarantees", "documentLines", "allocations", "receiptLines"].includes(section.kind));
   const referenceGroups = detail ? groupActivityReferences(detail) : [];
   const primaryReferences = referenceGroups.filter(group => primaryReferenceTypes.has(group.type));
   const supportingReferences = referenceGroups.filter(group => !primaryReferenceTypes.has(group.type));
@@ -261,7 +265,9 @@ export default function AdminActivityPage() {
     const deletedSubject = event.action === "DELETED" && event.subject.type === reference.type && event.subject.id === reference.id;
     return path && sameAgency && !deletedSubject && requirement
       && satisfiesPermissionRequirement(access.user?.permissions ?? [], requirement)
-      ? <Link className="break-words text-sky-700 underline-offset-4 hover:underline dark:text-sky-400" to={path}>{reference.label}</Link>
+      ? <Link className="break-words text-sky-700 underline-offset-4 hover:underline dark:text-sky-400" to={path}
+          target={path.endsWith("/pdf") ? "_blank" : undefined}
+          rel={path.endsWith("/pdf") ? "noopener noreferrer" : undefined}>{reference.label}</Link>
       : <span className="break-words">{reference.label}</span>;
   }
 
@@ -329,7 +335,8 @@ export default function AdminActivityPage() {
     <ServerPagination page={page} totalPages={activities.data?.page.totalPages ?? 1} totalElements={activities.data?.page.totalElements}
       loading={activities.isFetching} onPageChange={setPage} />
     <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelection(undefined); }}>
-      <DialogContent className="flex max-h-[90svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+      <DialogContent className={`flex max-h-[90svh] flex-col gap-0 overflow-hidden p-0 ${hasSummaryTable
+        ? "sm:max-w-[min(1200px,calc(100vw-2rem))]" : "sm:max-w-[min(896px,calc(100vw-2rem))]"}`}>
         <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 text-left sm:px-6 sm:pr-12">
           <div className="mb-1 flex flex-wrap items-center gap-2">{selected && <ActionBadge action={selected.action} />}
             <span className="text-xs font-medium text-muted-foreground">{selected && activityModules[selected.module]}</span>
@@ -337,7 +344,7 @@ export default function AdminActivityPage() {
           <DialogTitle className="break-words text-xl leading-snug">{selected?.title}</DialogTitle>
           <DialogDescription>{selected && `${dateTime(selected.occurredAt)} · ${selected.actorName}`}</DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
         {activityDetail.isPending && <p role="status" className="py-6 text-sm text-muted-foreground">Chargement des détails...</p>}
         {activityDetail.isError && <div role="alert" className="space-y-3 text-sm text-destructive">
           <p>{activityDetail.error instanceof Error ? activityDetail.error.message : "Chargement impossible."}</p>

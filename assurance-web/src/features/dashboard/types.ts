@@ -1,6 +1,21 @@
 export type DashboardData = {
   dateDu: string;
   dateAu: string;
+  dateReference: string;
+  comparaison: {
+    dateDu: string;
+    dateAu: string;
+    primeTotale: number;
+    primeNette: number;
+    variationTtcPourcent: number | null;
+    variationNettePourcent: number | null;
+  };
+  productionEvolution: {
+    date: string;
+    granularite: "DAY" | "MONTH";
+    primeNette: number;
+    primeTotale: number;
+  }[];
   kpis: DashboardKpis;
   workload: DashboardWorkload;
   productionMensuelle: DashboardMonthlyProduction[];
@@ -24,6 +39,8 @@ export type DashboardKpis = {
 };
 
 export type DashboardWorkload = {
+  echeancesDu: string;
+  echeancesAu: string;
   echeances30Jours: number;
   quittancesAAffecter: number;
   documentsAEmettre: number;

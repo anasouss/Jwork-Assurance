@@ -12,6 +12,9 @@ import java.util.List;
 public class DashboardResponse {
     private LocalDate dateDu;
     private LocalDate dateAu;
+    private LocalDate dateReference;
+    private Comparison comparaison;
+    private List<ProductionPoint> productionEvolution;
     private Kpis kpis;
     private Workload workload;
     private List<MonthlyProduction> productionMensuelle;
@@ -38,11 +41,33 @@ public class DashboardResponse {
     @Data
     @Builder
     public static class Workload {
+        private LocalDate echeancesDu;
+        private LocalDate echeancesAu;
         private Long echeances30Jours;
         private Long quittancesAAffecter;
         private Long documentsAEmettre;
         private Long alertesStock;
         private Boolean controleStockActif;
+    }
+
+    @Data
+    @Builder
+    public static class Comparison {
+        private LocalDate dateDu;
+        private LocalDate dateAu;
+        private BigDecimal primeTotale;
+        private BigDecimal primeNette;
+        private BigDecimal variationTtcPourcent;
+        private BigDecimal variationNettePourcent;
+    }
+
+    @Data
+    @Builder
+    public static class ProductionPoint {
+        private LocalDate date;
+        private String granularite;
+        private BigDecimal primeNette;
+        private BigDecimal primeTotale;
     }
 
     @Data

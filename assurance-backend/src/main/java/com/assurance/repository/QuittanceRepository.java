@@ -36,6 +36,8 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             where q.contrat.agence.id = :agenceId
               and q.globale = true
               and q.alternative = false
+              and (q.categorie is null or q.categorie <> 'ASSISTANCE')
+              and (q.elementFacturable is null or q.elementFacturable.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE)
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (q.elementFacturable is null or (q.elementFacturable.actif = true
@@ -102,6 +104,9 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             left join q.mouvementContrat m
             where q.globale = true
               and q.alternative = false
+              and (:excludeAssistance = false or (
+                   (q.categorie is null or q.categorie <> 'ASSISTANCE')
+                   and (q.elementFacturable is null or q.elementFacturable.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE)))
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (q.elementFacturable is null or (q.elementFacturable.actif = true
@@ -114,8 +119,13 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
     List<Object[]> sumDashboardProductionByMonth(
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
-            @Param("dateAu") LocalDate dateAu
+            @Param("dateAu") LocalDate dateAu,
+            @Param("excludeAssistance") boolean excludeAssistance
     );
+
+    default List<Object[]> sumDashboardProductionByMonth(Long agenceId, LocalDate dateDu, LocalDate dateAu) {
+        return sumDashboardProductionByMonth(agenceId, dateDu, dateAu, false);
+    }
 
     @Query("""
             select q.dateDebut,
@@ -126,6 +136,9 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
             left join q.mouvementContrat m
             where q.globale = true
               and q.alternative = false
+              and (:excludeAssistance = false or (
+                   (q.categorie is null or q.categorie <> 'ASSISTANCE')
+                   and (q.elementFacturable is null or q.elementFacturable.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE)))
               and q.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
               and (q.elementFacturable is null or (q.elementFacturable.actif = true
@@ -138,8 +151,13 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
     List<Object[]> sumDashboardProductionByDay(
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
-            @Param("dateAu") LocalDate dateAu
+            @Param("dateAu") LocalDate dateAu,
+            @Param("excludeAssistance") boolean excludeAssistance
     );
+
+    default List<Object[]> sumDashboardProductionByDay(Long agenceId, LocalDate dateDu, LocalDate dateAu) {
+        return sumDashboardProductionByDay(agenceId, dateDu, dateAu, false);
+    }
 
     @Query("""
             select count(q)

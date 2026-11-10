@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -9,6 +9,9 @@ import {
   RefreshCw,
   ReceiptText,
   ShieldCheck,
+  Plus,
+  Users,
+  WalletCards,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -37,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { formatMoney, moneyAmount } from "@/features/production/utils/format";
 import { dashboardApi } from "../api";
+import { DashboardCollectionSummary } from "../components/DashboardCollectionSummary";
 import type {
   DashboardBreakdown,
   DashboardData,
@@ -72,10 +76,12 @@ const presets: Array<{ value: DatePreset; label: string }> = [
 ];
 
 export default function AgencyDashboardPage() {
+  const queryClient = useQueryClient();
   const range = useDashboardDateRange("30d");
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const agenceId = useAuthStore((state) => state.user?.agenceId);
   const dashboard = useQuery({
-    queryKey: ["agency-dashboard", range.fromStr, range.toStr],
+    queryKey: ["agency-dashboard", agenceId, range.fromStr, range.toStr],
     queryFn: () => dashboardApi.get({ dateDu: range.fromStr, dateAu: range.toStr }),
     staleTime: 60_000,
   });
@@ -107,9 +113,9 @@ export default function AgencyDashboardPage() {
   }
 
   const data = dashboard.data;
-  const monthlyData = data.productionMensuelle.map((item) => ({
+  const monthlyData = data.productionEvolution.map((item) => ({
     ...item,
-    label: format(new Date(item.annee, item.mois - 1, 1), "MMM yy", { locale: fr }),
+    label: format(dateOnly(item.date), item.granularite === "DAY" ? "dd MMM" : "MMM yy", { locale: fr }),
   }));
   const hasProduction = monthlyData.some((item) => item.primeTotale !== 0 || item.primeNette !== 0);
 
@@ -120,7 +126,7 @@ export default function AgencyDashboardPage() {
           <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Pilotage de l'agence</p>
           <h1 className="mt-1 text-2xl font-semibold">Vue générale</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Production validée, portefeuille et tâches à traiter.
+            Production par date d’effet et priorités de l’agence.
           </p>
         </div>
         <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-[190px_190px_auto]">
@@ -167,18 +173,33 @@ export default function AgencyDashboardPage() {
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-2">
+        {permissions.includes("contrat:create") && <Button asChild size="sm"><Link to="/app/production/ajouter-dossier"><Plus className="size-4" />Nouveau dossier</Link></Button>}
+        {permissions.includes("client:view") && <Button asChild variant="outline" size="sm"><Link to="/app/crm"><Users className="size-4" />Rechercher un client</Link></Button>}
+        {(permissions.includes("reglement-client:create") || permissions.includes("reglement-client:manage")) && <Button asChild variant="outline" size="sm"><Link to="/app/compta/reglements/nouveau"><WalletCards className="size-4" />Enregistrer un règlement</Link></Button>}
+        <Button type="button" variant="ghost" size="icon" className="size-8" disabled={dashboard.isFetching}
+          title="Actualiser les indicateurs" aria-label="Actualiser les indicateurs" onClick={() => void queryClient.invalidateQueries({ queryKey: ["agency-dashboard"] })}><RefreshCw className="size-4" /></Button>
+      </div>
+
+      <WorkQueue data={data} permissions={permissions} />
+
+      <h2 className="text-sm font-semibold">Production du {formatDate(data.dateDu)} au {formatDate(data.dateAu)} · date d’effet</h2>
       <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-2 xl:grid-cols-4">
         <Metric
           label="Production TTC"
           value={formatMoney(data.kpis.primeTotale)}
-          detail={`${data.kpis.quittances.toLocaleString("fr-FR")} quittance(s) · ${data.kpis.assistancesProduites.toLocaleString("fr-FR")} assistance(s)`}
+          detail={`${data.kpis.quittances.toLocaleString("fr-FR")} quittance(s) d’assurance · ${data.kpis.assistancesProduites.toLocaleString("fr-FR")} assistance(s)`}
           accent="emerald"
+          comparison={data.comparaison.variationTtcPourcent}
+          previousPeriod={data.comparaison}
         />
         <Metric
           label="Prime nette"
           value={formatMoney(data.kpis.primeNette)}
           detail={`${formatMoney(data.kpis.taxes)} de taxes et TPF`}
           accent="blue"
+          comparison={data.comparaison.variationNettePourcent}
+          previousPeriod={data.comparaison}
         />
         <Metric
           label="Mouvements validés"
@@ -187,17 +208,19 @@ export default function AgencyDashboardPage() {
           accent="violet"
         />
         <Metric
-          label={`Portefeuille au ${formatDate(data.dateAu)}`}
-          value={`${data.kpis.contratsActifs.toLocaleString("fr-FR")} contrats`}
-          detail={`${data.kpis.assistancesActives.toLocaleString("fr-FR")} assistance(s) en vigueur · ${data.kpis.clientsActifs.toLocaleString("fr-FR")} clients actifs aujourd'hui · ${data.kpis.contratsBrouillon.toLocaleString("fr-FR")} brouillon(s)`}
+          label="Assistances produites"
+          value={data.kpis.assistancesProduites.toLocaleString("fr-FR")}
+          detail="Incluses dans les montants de production"
           accent="amber"
         />
       </section>
 
+      <DashboardCollectionSummary />
+
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.75fr)]">
         <DashboardPanel
           title="Évolution de la production"
-          description="Montants d'assurance et d'assistance validés sur la période."
+          description={`Assurance et assistance par date d’effet · ${monthlyData[0]?.granularite === "DAY" ? "par jour" : "par mois"}.`}
         >
           {hasProduction ? (
             <ChartContainer config={productionChartConfig} className="h-[310px] w-full aspect-auto">
@@ -249,17 +272,24 @@ export default function AgencyDashboardPage() {
 
         <DashboardPanel
           title="Portefeuille en vigueur"
-          description={`Contrats couvrant le ${formatDate(data.dateAu)}, par branche.`}
+          description={`Contrats actuellement actifs couvrant le ${formatDate(data.dateAu)}, par branche.`}
         >
           <PortfolioChart rows={data.portefeuilleParBranche} contractTypes={data.portefeuilleParType} />
+          <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">{data.kpis.assistancesActives.toLocaleString("fr-FR")} assistance(s) active(s) couvrant cette date</p>
         </DashboardPanel>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.65fr)]">
+      <section className="grid gap-5 xl:grid-cols-2">
         <DashboardPanel title="Production par catégorie" description="Montant TTC validé sur la période.">
           <CategoryChart rows={data.productionParCategorie} />
         </DashboardPanel>
-        <WorkQueue data={data} permissions={permissions} />
+        <section className="min-w-0 border-y px-1 py-4">
+          <h2 className="font-semibold">Situation au {formatDate(data.dateReference)}</h2>
+          <dl className="mt-4 divide-y">
+            <div className="flex items-center justify-between gap-4 py-3"><dt className="text-sm">Clients actifs</dt><dd className="font-semibold tabular-nums">{data.kpis.clientsActifs.toLocaleString("fr-FR")}</dd></div>
+            <div className="flex items-center justify-between gap-4 py-3"><dt className="text-sm">Dossiers en brouillon</dt><dd className="font-semibold tabular-nums">{data.kpis.contratsBrouillon.toLocaleString("fr-FR")}</dd></div>
+          </dl>
+        </section>
       </section>
 
       <RecentActivity
@@ -277,11 +307,15 @@ function Metric({
   value,
   detail,
   accent,
+  comparison,
+  previousPeriod,
 }: {
   label: string;
   value: string;
   detail: string;
   accent: "emerald" | "blue" | "violet" | "amber";
+  comparison?: number | null;
+  previousPeriod?: { dateDu: string; dateAu: string };
 }) {
   const accentClass = {
     emerald: "border-t-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/15",
@@ -298,8 +332,12 @@ function Metric({
   return (
     <div className={cn("min-w-0 border-t-2 p-5 sm:[&:not(:nth-child(odd))]:border-l xl:[&:not(:first-child)]:border-l", accentClass)}>
       <p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p>
-      <p className={cn("mt-2 truncate text-2xl font-semibold tabular-nums", valueClass)}>{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground" title={detail}>{detail}</p>
+      <p className={cn("mt-2 break-words text-2xl font-semibold tabular-nums", valueClass)}>{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+      {previousPeriod && <p className="mt-2 text-xs text-muted-foreground">
+        {comparison == null ? "Comparaison non calculable (base nulle)" : `${comparison > 0 ? "+" : ""}${comparison.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} %`}
+        <span className="mt-0.5 block">vs {formatDate(previousPeriod.dateDu)} – {formatDate(previousPeriod.dateAu)}</span>
+      </p>}
     </div>
   );
 }
@@ -396,7 +434,8 @@ function CategoryChart({ rows }: { rows: DashboardBreakdown[] }) {
   ) satisfies ChartConfig;
 
   return (
-    <ChartContainer config={config} className="h-[260px] w-full aspect-auto">
+    <div>
+    <ChartContainer config={config} className="h-[220px] w-full aspect-auto">
       <BarChart data={rows} layout="vertical" margin={{ left: 8, right: 14 }}>
         <CartesianGrid horizontal={false} />
         <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value) => compactMoney(Number(value))} />
@@ -412,64 +451,73 @@ function CategoryChart({ rows }: { rows: DashboardBreakdown[] }) {
         </Bar>
       </BarChart>
     </ChartContainer>
+    <dl className="mt-3 divide-y border-t">
+      {rows.map(row => <div key={row.code} className="flex items-center justify-between gap-3 py-2 text-sm">
+        <dt className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="size-2 shrink-0 rounded-sm" style={{ backgroundColor: categoryColors[row.code] ?? "#64748b" }} />{row.libelle}</dt>
+        <dd className="whitespace-nowrap font-medium tabular-nums">{formatMoney(row.montant)}</dd>
+      </div>)}
+    </dl>
+    </div>
   );
 }
 
 function WorkQueue({ data, permissions }: { data: DashboardData; permissions: string[] }) {
   const rows = [
     {
-      label: "Échéances dans les 30 jours",
+      label: "Dossiers à échéance · 30 jours",
       value: data.workload.echeances30Jours,
-      detail: "Contrats actifs arrivant à échéance",
+      detail: `Du ${formatDate(data.workload.echeancesDu)} au ${formatDate(data.workload.echeancesAu)}`,
       icon: CalendarClock,
-      href: "/app/production/echeances",
-      permission: "contrat:view",
+      href: `/app/production/echeances?dateDu=${data.workload.echeancesDu}&dateAu=${data.workload.echeancesAu}`,
+      permissions: ["contrat:view"],
       color: "text-blue-700 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-300",
     },
     {
-      label: "Quittances à affecter",
+      label: "Quittances sans affectation compagnie",
       value: data.workload.quittancesAAffecter,
-      detail: "Numéro de quittance compagnie manquant",
+      detail: "Aucune affectation compagnie enregistrée",
       icon: ReceiptText,
-      href: "/app/compta/quittances?avecQuittance=false",
-      permission: "quittance:view",
+      href: "/app/compta/quittances?nature=SANS_QUITTANCE",
+      permissions: ["quittance:view"],
       color: "text-orange-700 bg-orange-50 dark:bg-orange-950/30 dark:text-orange-300",
     },
     {
-      label: "Documents à émettre",
+      label: "Créances sans document",
       value: data.workload.documentsAEmettre,
-      detail: "Quittances sans relevé ou facture émis",
+      detail: "Solde restant, sans relevé ni facture émis",
       icon: FileClock,
-      href: "/app/compta/releves-factures",
-      permission: "quittance:view",
+      href: "/app/compta/releves-factures?tab=sources&sourceDocumentState=SANS_DOCUMENT",
+      permissions: ["quittance:view"],
       color: "text-violet-700 bg-violet-50 dark:bg-violet-950/30 dark:text-violet-300",
     },
     {
-      label: "Alertes de stock",
+      label: "Seuils de stock atteints",
       value: data.workload.alertesStock,
-      detail: data.workload.controleStockActif ? "Seuils de stock atteints" : "Contrôle de stock désactivé",
+      detail: data.workload.controleStockActif ? "Seuils atteints par compagnie / usage" : "Contrôle à la saisie désactivé",
       icon: ShieldCheck,
       href: "/app/production/attestations-stock",
-      permission: "contrat:view",
+      permissions: ["attestation-stock:view", "attestation-stock:manage"],
       color: "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-300",
     },
-  ].filter((row) => permissions.includes(row.permission));
+  ].filter((row) => row.permissions.some(permission => permissions.includes(permission)));
+
+  if (!rows.length) return null;
 
   return (
-    <section className="min-w-0 rounded-md border bg-card">
+    <section className="min-w-0 border-y bg-card">
       <div className="border-b px-5 py-4">
-        <h2 className="font-semibold">À traiter</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Files opérationnelles calculées sur les données actuelles.</p>
+        <h2 className="font-semibold">À traiter aujourd’hui</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Situation au {formatDate(data.dateReference)}</p>
       </div>
-      <div className="divide-y">
+      <div className="grid md:grid-cols-2">
         {rows.map((row) => (
-          <Link key={row.label} to={row.href} className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/40">
+          <Link key={row.label} to={row.href} className="flex items-center gap-4 border-b px-5 py-4 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
             <span className={cn("grid size-10 shrink-0 place-items-center rounded-md", row.color)}>
               <row.icon className="size-5" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">{row.label}</span>
-              <span className="block truncate text-xs text-muted-foreground">{row.detail}</span>
+              <span className="block text-xs text-muted-foreground">{row.detail}</span>
             </span>
             <span className="text-xl font-semibold tabular-nums">{row.value.toLocaleString("fr-FR")}</span>
             <ArrowRight className="size-4 text-muted-foreground" />
@@ -491,16 +539,17 @@ function RecentActivity({
   dateFrom: string;
   dateTo: string;
 }) {
+  if (!canView) return null;
   return (
     <section className="min-w-0 overflow-hidden rounded-md border bg-card">
       <div className="flex items-center justify-between gap-4 border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold">Activité récente</h2>
+          <h2 className="font-semibold">Derniers mouvements validés</h2>
           <p className="mt-1 text-xs text-muted-foreground">Derniers mouvements validés sur la période sélectionnée.</p>
         </div>
         {canView ? (
           <Button asChild variant="outline" size="sm">
-            <Link to={`/app/production/registre?typeDate=EFFET&dateDu=${dateFrom}&dateAu=${dateTo}`}>
+            <Link to={`/app/production/registre?typeDate=EFFET&statut=VALIDE&dateDu=${dateFrom}&dateAu=${dateTo}`}>
               Voir la liste
               <ArrowRight className="size-4" />
             </Link>
@@ -533,7 +582,7 @@ function RecentActivity({
                     <div className="font-medium">{row.mouvement}</div>
                     {row.detail ? <div className="text-xs text-muted-foreground">{row.detail}</div> : null}
                   </td>
-                  <td className="max-w-64 truncate px-4 py-3">{row.compagnie || "-"}</td>
+                  <td className="max-w-64 break-words px-4 py-3">{row.compagnie || "-"}</td>
                   <td className="whitespace-nowrap px-4 py-3">{formatDate(row.dateEffet)}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums">
                     {formatMoney(row.primeTotale)}

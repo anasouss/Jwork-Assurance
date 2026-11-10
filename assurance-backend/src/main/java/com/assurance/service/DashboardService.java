@@ -4,7 +4,6 @@ import com.assurance.dto.response.AttestationStockDashboardResponse;
 import com.assurance.dto.response.DashboardResponse;
 import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.MouvementContrat;
-import com.assurance.enums.StatutContrat;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ClientRepository;
@@ -19,8 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -44,6 +45,7 @@ public class DashboardService {
     private final QuittanceRepository quittanceRepository;
     private final LigneQuittanceRepository ligneQuittanceRepository;
     private final AttestationStockService attestationStockService;
+    private final DocumentClientService documentClientService;
 
     @Transactional(readOnly = true)
     public DashboardResponse get(Long agenceId, LocalDate dateDu, LocalDate dateAu) {
@@ -53,10 +55,16 @@ public class DashboardService {
                 elementFacturableRepository.sumDashboardAssistance(agenceId, dateDu, dateAu);
         AttestationStockDashboardResponse stock = attestationStockService.dashboard(agenceId);
         LocalDate today = LocalDate.now();
+        List<DashboardResponse.MonthlyProduction> monthly = monthlyProduction(agenceId, dateDu, dateAu);
 
         return DashboardResponse.builder()
                 .dateDu(dateDu)
                 .dateAu(dateAu)
+                .dateReference(today)
+                .comparaison(comparison(agenceId, dateDu, dateAu,
+                        valueOrZero(totals.getPrimeTotale()).add(valueOrZero(assistanceTotals.getPrimeTotale())),
+                        valueOrZero(totals.getPrimeNette()).add(valueOrZero(assistanceTotals.getPrimeNette()))))
+                .productionEvolution(productionTrend(agenceId, dateDu, dateAu, monthly))
                 .kpis(DashboardResponse.Kpis.builder()
                         .primeNette(valueOrZero(totals.getPrimeNette())
                                 .add(valueOrZero(assistanceTotals.getPrimeNette())))
@@ -76,17 +84,21 @@ public class DashboardService {
                         .clientsActifs(clientRepository.countByAgenceIdAndActifTrue(agenceId))
                         .build())
                 .workload(DashboardResponse.Workload.builder()
-                        .echeances30Jours(contratRepository
-                                .countByAgenceIdAndProspectionFalseAndBrouillonFalseAndStatutAndDateEcheanceBetween(
-                                        agenceId, StatutContrat.ACTIVE, today, today.plusDays(30)))
-                        .quittancesAAffecter(quittanceRepository.countDashboardUnassigned(agenceId))
-                        .documentsAEmettre(quittanceRepository.countDashboardDocumentsToIssue(agenceId))
-                        .alertesStock(stock.getStocksParCompagnieUsage().stream()
+                        .echeancesDu(today)
+                        .echeancesAu(today.plusDays(29))
+                        .echeances30Jours(contratRepository.findAutomobileEcheanceIds(
+                                agenceId, today, today.plusDays(29), null, null, null, PageRequest.of(0, 1)).getTotalElements())
+                        .quittancesAAffecter(quittanceRepository.searchForAffectation(
+                                agenceId, null, null, null, false, null, null, null, PageRequest.of(0, 1)).getTotalElements())
+                        .documentsAEmettre(documentClientService.searchSources(
+                                agenceId, null, null, null, null, null, null, "SANS_DOCUMENT",
+                                null, null, null, 0, 1).getPage().getTotalElements())
+                        .alertesStock(stock.getSeuils().stream()
                                 .filter(item -> Boolean.TRUE.equals(item.getStockFaible()))
                                 .count())
                         .controleStockActif(stock.getControleStockActif())
                         .build())
-                .productionMensuelle(monthlyProduction(agenceId, dateDu, dateAu))
+                .productionMensuelle(monthly)
                 .portefeuilleParType(portfolioByType(agenceId, dateAu))
                 .portefeuilleParBranche(portfolioByBranch(agenceId, dateAu))
                 .productionParCategorie(productionByCategory(
@@ -99,6 +111,54 @@ public class DashboardService {
                 .build();
     }
 
+    private DashboardResponse.Comparison comparison(Long agenceId, LocalDate from, LocalDate to,
+            BigDecimal currentTotal, BigDecimal currentNet) {
+        long days = ChronoUnit.DAYS.between(from, to) + 1;
+        LocalDate previousFrom = from.minusDays(days);
+        LocalDate previousTo = from.minusDays(1);
+        var insurance = quittanceRepository.sumDashboardProduction(agenceId, previousFrom, previousTo);
+        var assistance = elementFacturableRepository.sumDashboardAssistance(agenceId, previousFrom, previousTo);
+        BigDecimal previousTotal = valueOrZero(insurance.getPrimeTotale()).add(valueOrZero(assistance.getPrimeTotale()));
+        BigDecimal previousNet = valueOrZero(insurance.getPrimeNette()).add(valueOrZero(assistance.getPrimeNette()));
+        return DashboardResponse.Comparison.builder().dateDu(previousFrom).dateAu(previousTo)
+                .primeTotale(previousTotal).primeNette(previousNet)
+                .variationTtcPourcent(variation(currentTotal, previousTotal))
+                .variationNettePourcent(variation(currentNet, previousNet)).build();
+    }
+
+    private BigDecimal variation(BigDecimal current, BigDecimal previous) {
+        return previous.signum() == 0 ? null
+                : current.subtract(previous).multiply(BigDecimal.valueOf(100)).divide(previous.abs(), 2, RoundingMode.HALF_UP);
+    }
+
+    private List<DashboardResponse.ProductionPoint> productionTrend(Long agenceId, LocalDate from, LocalDate to,
+            List<DashboardResponse.MonthlyProduction> monthly) {
+        if (ChronoUnit.DAYS.between(from, to) >= 62) {
+            return monthly.stream().map(row -> DashboardResponse.ProductionPoint.builder()
+                    .date(LocalDate.of(row.getAnnee(), row.getMois(), 1)).granularite("MONTH")
+                    .primeNette(row.getPrimeNette()).primeTotale(row.getPrimeTotale()).build()).toList();
+        }
+        Map<LocalDate, BigDecimal> net = new LinkedHashMap<>();
+        Map<LocalDate, BigDecimal> total = new LinkedHashMap<>();
+        for (Object[] row : quittanceRepository.sumDashboardProductionByDay(agenceId, from, to, true)) {
+            LocalDate date = (LocalDate) row[0];
+            net.merge(date, decimal(row[1]), BigDecimal::add);
+            total.merge(date, decimal(row[2]), BigDecimal::add);
+        }
+        for (Object[] row : elementFacturableRepository.sumDashboardAssistanceByDay(agenceId, from, to)) {
+            LocalDate date = (LocalDate) row[0];
+            net.merge(date, decimal(row[1]), BigDecimal::add);
+            total.merge(date, decimal(row[2]), BigDecimal::add);
+        }
+        List<DashboardResponse.ProductionPoint> points = new ArrayList<>();
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            points.add(DashboardResponse.ProductionPoint.builder().date(date).granularite("DAY")
+                    .primeNette(net.getOrDefault(date, BigDecimal.ZERO))
+                    .primeTotale(total.getOrDefault(date, BigDecimal.ZERO)).build());
+        }
+        return points;
+    }
+
     private List<DashboardResponse.MonthlyProduction> monthlyProduction(
             Long agenceId,
             LocalDate dateDu,
@@ -107,7 +167,7 @@ public class DashboardService {
         Map<YearMonth, BigDecimal> netByMonth = new LinkedHashMap<>();
         Map<YearMonth, BigDecimal> totalByMonth = new LinkedHashMap<>();
         Map<YearMonth, Long> countByMonth = new LinkedHashMap<>();
-        for (Object[] row : quittanceRepository.sumDashboardProductionByMonth(agenceId, dateDu, dateAu)) {
+        for (Object[] row : quittanceRepository.sumDashboardProductionByMonth(agenceId, dateDu, dateAu, true)) {
             YearMonth month = YearMonth.of(integer(row[0]), integer(row[1]));
             netByMonth.merge(month, decimal(row[2]), BigDecimal::add);
             totalByMonth.merge(month, decimal(row[3]), BigDecimal::add);
@@ -260,7 +320,10 @@ public class DashboardService {
                 .contratId(movement.getContrat().getId())
                 .mouvementId(movement.getId())
                 .numeroDossier(movement.getContrat().getNumeroDossier())
-                .numeroPolice(movement.getContrat().getNumeroPolice())
+                .numeroPolice(assistanceOnly ? assistances.stream()
+                        .map(AssistanceContrat::getNumeroContratOuQuittance)
+                        .filter(reference -> reference != null && !reference.isBlank()).distinct()
+                        .collect(Collectors.joining(" · ")) : movement.getContrat().getNumeroPolice())
                 .typeContrat(movement.getContrat().getTypeContrat().name())
                 .branche(movement.getContrat().getBrancheAssurance() == null
                         ? null : movement.getContrat().getBrancheAssurance().getLibelle())

@@ -24,8 +24,6 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                    coalesce(sum(
                        coalesce(e.taxe, 0)
                        + coalesce(e.taxeParafiscale, 0)
-                       + coalesce(e.accessoire, 0)
-                       + coalesce(e.cnpac, 0)
                    ), 0) as taxes,
                    coalesce(sum(e.primeTotale), 0) as primeTotale,
                    count(e) as elementCount
@@ -65,6 +63,25 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
             order by year(e.dateDebut), month(e.dateDebut)
             """)
     List<Object[]> sumDashboardAssistanceByMonth(
+            @Param("agenceId") Long agenceId,
+            @Param("dateDu") LocalDate dateDu,
+            @Param("dateAu") LocalDate dateAu
+    );
+
+    @Query("""
+            select e.dateDebut, coalesce(sum(e.primeNette), 0), coalesce(sum(e.primeTotale), 0)
+            from ElementFacturable e
+            join e.mouvementContrat m
+            where e.agence.id = :agenceId
+              and e.nature = com.assurance.enums.NatureElementFacturable.ASSISTANCE
+              and e.actif = true
+              and e.statut <> com.assurance.enums.StatutElementFacturable.ANNULE
+              and e.contrat.prospection = false and e.contrat.brouillon = false
+              and m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+              and e.dateDebut between :dateDu and :dateAu
+            group by e.dateDebut order by e.dateDebut
+            """)
+    List<Object[]> sumDashboardAssistanceByDay(
             @Param("agenceId") Long agenceId,
             @Param("dateDu") LocalDate dateDu,
             @Param("dateAu") LocalDate dateAu

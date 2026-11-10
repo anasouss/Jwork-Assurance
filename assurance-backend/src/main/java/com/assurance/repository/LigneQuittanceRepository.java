@@ -15,11 +15,15 @@ public interface LigneQuittanceRepository extends JpaRepository<LigneQuittance, 
             left join l.quittance.mouvementContrat m
             where l.quittance.contrat.agence.id = :agenceId
               and l.globale = false
+              and l.categorie <> com.assurance.enums.CategorieQuittance.ASSISTANCE
               and l.quittance.globale = true
               and l.quittance.alternative = false
               and l.quittance.contrat.prospection = false
               and (m is null or m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE)
-              and (l.quittance.elementFacturable is null or l.quittance.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE)
+              and (l.quittance.elementFacturable is null or (
+                   l.quittance.elementFacturable.actif = true
+                   and l.quittance.elementFacturable.nature <> com.assurance.enums.NatureElementFacturable.ASSISTANCE
+                   and l.quittance.elementFacturable.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
               and l.quittance.dateDebut between :dateDu and :dateAu
             group by l.categorie
             order by l.categorie

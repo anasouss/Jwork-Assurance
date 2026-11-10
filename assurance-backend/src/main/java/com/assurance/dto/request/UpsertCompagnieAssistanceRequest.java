@@ -6,8 +6,12 @@ import lombok.Data;
 
 @Data
 public class UpsertCompagnieAssistanceRequest {
-    @NotBlank
+    // Accepted for older callers; internal codes are now generated and preserved server-side.
+    @Size(max = 80)
     private String code;
+
+    @Size(max = 80)
+    private String codeIntermediaire;
 
     @NotBlank
     private String nom;

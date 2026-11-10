@@ -39,6 +39,7 @@ import com.assurance.entity.Carrosserie;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.AgenceCompagnieAssurance;
+import com.assurance.entity.AgenceCompagnieAssistance;
 import com.assurance.entity.CompagnieGarantie;
 import com.assurance.entity.Convention;
 import com.assurance.entity.Agence;
@@ -73,6 +74,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -123,6 +125,7 @@ public class ReferentielController {
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
     private final ConventionRepository conventionRepository;
     private final CompagnieAssistanceRepository compagnieAssistanceRepository;
+    private final AgenceCompagnieAssistanceRepository agenceCompagnieAssistanceRepository;
     private final ProduitAssistanceRepository produitAssistanceRepository;
     private final TarifProduitAssistanceRepository tarifProduitAssistanceRepository;
     private final CodePromoAssistanceRepository codePromoAssistanceRepository;
@@ -512,16 +515,22 @@ public class ReferentielController {
     }
 
     @GetMapping("/compagnies-assistance")
+    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> compagniesAssistance(
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
+        Long agenceId = TenantContext.getCurrentAgence();
+        Map<Long, String> codesIntermediaires = new LinkedHashMap<>();
+        agenceCompagnieAssistanceRepository.findByAgenceId(agenceId).forEach(configuration ->
+                codesIntermediaires.put(configuration.getCompagnieAssistance().getId(), configuration.getCodeIntermediaire()));
         return ResponseEntity.ok(ApiResponse.success(compagnieAssistanceRepository.findAll(Sort.by("nom")).stream()
                 .filter(compagnie -> includeInactive || Boolean.TRUE.equals(compagnie.getActif()))
-                .map(this::toCompagnieAssistanceResponse)
+                .map(compagnie -> toCompagnieAssistanceResponse(compagnie, codesIntermediaires.get(compagnie.getId())))
                 .toList()));
     }
 
     @PostMapping("/compagnies-assistance")
+    @PreAuthorize("hasAuthority('PERM_referentiel:manage')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistance(
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
@@ -530,22 +539,22 @@ public class ReferentielController {
     }
 
     private ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistanceRecord(UpsertCompagnieAssistanceRequest request) {
-        compagnieAssistanceRepository.findByCodeIgnoreCase(request.getCode()).ifPresent(existing -> {
-            throw new BadRequestException("Code compagnie assistance deja utilise");
-        });
         CompagnieAssistance compagnie = new CompagnieAssistance();
+        compagnie.setCode(nextCompagnieAssistanceCode(request.getNom()));
         applyCompagnieAssistanceRequest(compagnie, request);
         compagnie = compagnieAssistanceRepository.save(compagnie);
         tiersCompagnieService.resolveAssistance(compagnie);
+        String codeIntermediaire = saveAssistanceCodeIntermediaire(compagnie, request.getCodeIntermediaire());
         catalogueActivity.record(null, CompanyCatalogueActivity.state(compagnie), ActivityAction.CREATED,
                 "Compagnie d'assistance creee", "ASSISTANCE_COMPANY_CREATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toCompagnieAssistanceResponse(compagnie),
+                toCompagnieAssistanceResponse(compagnie, codeIntermediaire),
                 "Compagnie d'assistance creee"
         ));
     }
 
     @PutMapping("/compagnies-assistance/{id}")
+    @PreAuthorize("hasAuthority('PERM_referentiel:manage')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssistance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
@@ -557,17 +566,13 @@ public class ReferentielController {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", id));
         var before = CompanyCatalogueActivity.state(compagnie);
-        compagnieAssistanceRepository.findByCodeIgnoreCase(request.getCode())
-                .filter(existing -> !existing.getId().equals(id))
-                .ifPresent(existing -> {
-                    throw new BadRequestException("Code compagnie assistance deja utilise");
-                });
         applyCompagnieAssistanceRequest(compagnie, request);
         compagnie = compagnieAssistanceRepository.save(compagnie);
+        String codeIntermediaire = saveAssistanceCodeIntermediaire(compagnie, request.getCodeIntermediaire());
         catalogueActivity.record(before, CompanyCatalogueActivity.state(compagnie), ActivityAction.UPDATED,
                 "Compagnie d'assistance modifiee", "ASSISTANCE_COMPANY_UPDATE");
         return ResponseEntity.ok(ApiResponse.success(
-                toCompagnieAssistanceResponse(compagnie),
+                toCompagnieAssistanceResponse(compagnie, codeIntermediaire),
                 "Compagnie d'assistance modifiee"
         ));
     }
@@ -1830,6 +1835,47 @@ public class ReferentielController {
         return candidate;
     }
 
+    private String saveAssistanceCodeIntermediaire(CompagnieAssistance compagnie, String value) {
+        Long agenceId = TenantContext.getCurrentAgence();
+        String codeIntermediaire = blankToNull(value);
+        var existing = agenceCompagnieAssistanceRepository
+                .findByAgenceIdAndCompagnieAssistanceId(agenceId, compagnie.getId());
+        var before = existing.map(CompanyCatalogueActivity::state).orElse(null);
+        if (codeIntermediaire == null) {
+            existing.ifPresent(agenceCompagnieAssistanceRepository::delete);
+            if (before != null) catalogueActivity.record(before, null, ActivityAction.DELETED,
+                    "Code intermediaire d'assistance retire", "AGENCY_ASSISTANCE_INTERMEDIARY_REMOVE");
+            return null;
+        }
+        AgenceCompagnieAssistance configuration = existing.orElseGet(() -> AgenceCompagnieAssistance.builder()
+                .agence(agenceRepository.findById(agenceId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId)))
+                .compagnieAssistance(compagnie)
+                .build());
+        configuration.setCodeIntermediaire(codeIntermediaire);
+        configuration = agenceCompagnieAssistanceRepository.save(configuration);
+        catalogueActivity.record(before, CompanyCatalogueActivity.state(configuration),
+                before == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
+                "Code intermediaire d'assistance enregistre", "AGENCY_ASSISTANCE_INTERMEDIARY_SAVE");
+        return codeIntermediaire;
+    }
+
+    private String nextCompagnieAssistanceCode(String name) {
+        String base = Normalizer.normalize(name == null ? "" : name.trim(), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        if (base.isBlank()) base = "ASSISTANCE";
+        base = base.substring(0, Math.min(base.length(), 70));
+        String candidate = base;
+        int suffix = 2;
+        while (compagnieAssistanceRepository.findByCodeIgnoreCase(candidate).isPresent()) {
+            candidate = base + "_" + suffix++;
+        }
+        return candidate;
+    }
+
     private void validateCompagnieDossierPrefix(String value, Long currentCompanyId) {
         String prefix = normalizeDossierPrefix(value);
         if (prefix == null) {
@@ -2340,7 +2386,6 @@ public class ReferentielController {
     }
 
     private void applyCompagnieAssistanceRequest(CompagnieAssistance compagnie, UpsertCompagnieAssistanceRequest request) {
-        compagnie.setCode(request.getCode().trim().toUpperCase());
         compagnie.setNom(request.getNom().trim());
         compagnie.setNomAbrege(blankToNull(request.getNomAbrege()));
         compagnie.setEmail(blankToNull(request.getEmail()));
@@ -2595,8 +2640,9 @@ public class ReferentielController {
                 .map();
     }
 
-    private Map<String, Object> toCompagnieAssistanceResponse(CompagnieAssistance compagnie) {
+    private Map<String, Object> toCompagnieAssistanceResponse(CompagnieAssistance compagnie, String codeIntermediaire) {
         return option(compagnie.getId(), compagnie.getCode(), compagnie.getNom())
+                .putValue("codeIntermediaire", codeIntermediaire)
                 .putValue("nom", compagnie.getNom())
                 .putValue("nomAbrege", compagnie.getNomAbrege())
                 .putValue("email", compagnie.getEmail())

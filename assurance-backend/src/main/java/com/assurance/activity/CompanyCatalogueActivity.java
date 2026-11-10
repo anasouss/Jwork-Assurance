@@ -1,6 +1,7 @@
 package com.assurance.activity;
 
 import com.assurance.entity.AgenceCompagnieAssurance;
+import com.assurance.entity.AgenceCompagnieAssistance;
 import com.assurance.entity.CodePromoAssistance;
 import com.assurance.entity.CompagnieAssistance;
 import com.assurance.entity.CompagnieAssurance;
@@ -44,6 +45,13 @@ public final class CompanyCatalogueActivity {
                 configuration.getId(), "Code intermediaire - " + configuration.getCompagnieAssurance().getNom()),
                 new ActivityValues().put("Code intermediaire", configuration.getCodeIntermediaire()).snapshot(),
                 List.of(insuranceCompany(configuration.getCompagnieAssurance())), null);
+    }
+
+    public static State state(AgenceCompagnieAssistance configuration) {
+        return new State(configuration.getAgence().getId(), ActivityReference.of(ActivityRecordType.AGENCE_COMPAGNIE_ASSISTANCE,
+                configuration.getId(), "Code intermediaire - " + configuration.getCompagnieAssistance().getNom()),
+                new ActivityValues().put("Code intermediaire", configuration.getCodeIntermediaire()).snapshot(),
+                List.of(assistanceCompany(configuration.getCompagnieAssistance())), null);
     }
 
     public static State state(ProduitAssistance product) {

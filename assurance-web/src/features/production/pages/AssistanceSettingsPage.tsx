@@ -21,16 +21,18 @@ import { SortableTableHead, type TableSortDirection } from "@/components/ui/sort
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { compareTableValues, nextTableSort } from "@/lib/table-sort";
+import { useAuthStore } from "@/store/auth-store";
 import { assistanceProductApi } from "../api/assistance-products";
 import { referenceApi } from "../api/references";
 import { Field } from "../components/Field";
 import type { ReferenceOption, UpsertCompagnieAssistanceRequest } from "../types";
 
-type AssistanceCompanySortColumn = "code" | "company" | "phone" | "email" | "active";
+type AssistanceCompanySortColumn = "intermediaryCode" | "company" | "phone" | "email" | "active";
 
 export default function AssistanceSettingsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const agenceId = useAuthStore(state => state.user?.agenceId);
   const [companySearch, setCompanySearch] = useState("");
   const [sort, setSort] = useState<{ column: AssistanceCompanySortColumn; direction: TableSortDirection }>({ column: "company", direction: "asc" });
   const [editingCompany, setEditingCompany] = useState<ReferenceOption | null>(null);
@@ -38,7 +40,7 @@ export default function AssistanceSettingsPage() {
   const [companyPayload, setCompanyPayload] = useState<UpsertCompagnieAssistanceRequest>(emptyCompany());
 
   const companies = useQuery({
-    queryKey: ["referentiel", "compagnies-assistance", "settings"],
+    queryKey: ["referentiel", "compagnies-assistance", "settings", agenceId],
     queryFn: () => referenceApi.list("compagnies-assistance", { includeInactive: "true" }),
     staleTime: 60_000,
   });
@@ -52,7 +54,7 @@ export default function AssistanceSettingsPage() {
     const term = companySearch.trim().toLowerCase();
     const result = (companies.data ?? []).filter((company) => {
       if (!term) return true;
-      return [company.code, company.libelle, refString(company, "nomAbrege"), refString(company, "email"), refString(company, "telephone")]
+      return [refString(company, "codeIntermediaire"), company.libelle, refString(company, "nomAbrege"), refString(company, "email"), refString(company, "telephone")]
         .some((value) => String(value ?? "").toLowerCase().includes(term));
     });
     return result.sort((left, right) => compareTableValues(
@@ -119,7 +121,7 @@ export default function AssistanceSettingsPage() {
           <Table>
             <TableHeader className="bg-amber-600 text-white [&_th]:text-white">
               <TableRow className="hover:bg-amber-600">
-                <SortableTableHead column="code" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code</SortableTableHead>
+                <SortableTableHead column="intermediaryCode" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Code intermédiaire</SortableTableHead>
                 <SortableTableHead column="company" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Compagnie</SortableTableHead>
                 <SortableTableHead column="phone" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Téléphone</SortableTableHead>
                 <SortableTableHead column="email" activeColumn={sort.column} direction={sort.direction} onSort={(column) => setSort((current) => nextTableSort(current, column))}>Email</SortableTableHead>
@@ -131,7 +133,7 @@ export default function AssistanceSettingsPage() {
               {companies.isLoading ? <TableRowsSkeleton rows={6} colSpan={6} /> : null}
               {filteredCompanies.map((company) => (
                 <TableRow key={company.id}>
-                  <TableCell className="font-medium">{company.code}</TableCell>
+                  <TableCell className="font-medium">{refString(company, "codeIntermediaire") || "-"}</TableCell>
                   <TableCell>
                     <div>{company.libelle}</div>
                     {refString(company, "nomAbrege") && <div className="mt-0.5 text-xs text-muted-foreground">Nom abrégé : {refString(company, "nomAbrege")}</div>}
@@ -186,8 +188,9 @@ export default function AssistanceSettingsPage() {
             <DialogDescription>Ces compagnies alimentent le choix assistance dans les contrats.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Code" required>
-              <Input value={companyPayload.code} onChange={(event) => setCompanyPayload((current) => ({ ...current, code: event.target.value }))} />
+            <Field label="Code intermédiaire">
+              <Input value={companyPayload.codeIntermediaire ?? ""} maxLength={80}
+                onChange={(event) => setCompanyPayload((current) => ({ ...current, codeIntermediaire: event.target.value }))} />
             </Field>
             <Field label="Nom" required>
               <Input value={companyPayload.nom} onChange={(event) => setCompanyPayload((current) => ({ ...current, nom: event.target.value }))} />
@@ -233,12 +236,12 @@ export default function AssistanceSettingsPage() {
 }
 
 function emptyCompany(): UpsertCompagnieAssistanceRequest {
-  return { code: "", nom: "", actif: true };
+  return { nom: "", actif: true };
 }
 
 function companyToPayload(company: ReferenceOption): UpsertCompagnieAssistanceRequest {
   return {
-    code: company.code ?? "",
+    codeIntermediaire: refString(company, "codeIntermediaire"),
     nom: refString(company, "nom") || company.libelle,
     nomAbrege: refString(company, "nomAbrege"),
     email: refString(company, "email"),
@@ -254,18 +257,22 @@ function submitCompany(
 ) {
   const value = {
     ...payload,
-    code: payload.code.trim(),
+    codeIntermediaire: cleanOptional(payload.codeIntermediaire),
     nom: payload.nom.trim(),
     nomAbrege: cleanOptional(payload.nomAbrege),
     email: cleanOptional(payload.email),
     telephone: cleanOptional(payload.telephone),
   };
-  if (!value.code || !value.nom) {
-    toast.error("Code et nom sont obligatoires.");
+  if (!value.nom) {
+    toast.error("Le nom est obligatoire.");
     return;
   }
   if ((value.nomAbrege?.length ?? 0) > 80) {
     toast.error("Le nom abrégé est limité à 80 caractères.");
+    return;
+  }
+  if ((value.codeIntermediaire?.length ?? 0) > 80) {
+    toast.error("Le code intermédiaire est limité à 80 caractères.");
     return;
   }
   mutate({ id: editing?.id, value });
@@ -278,7 +285,7 @@ function refString(item: ReferenceOption | Record<string, unknown>, key: string)
 
 function assistanceCompanySortValue(company: ReferenceOption, column: AssistanceCompanySortColumn) {
   switch (column) {
-    case "code": return company.code;
+    case "intermediaryCode": return refString(company, "codeIntermediaire");
     case "company": return company.libelle;
     case "phone": return refString(company, "telephone");
     case "email": return refString(company, "email");

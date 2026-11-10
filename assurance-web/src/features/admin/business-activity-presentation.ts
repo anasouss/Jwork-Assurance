@@ -35,6 +35,7 @@ const referenceLabels: Record<string, string> = {
   INTERVENANT_SINISTRE: "Intervenants", ATTESTATION: "Attestations", LIVRAISON_ATTESTATIONS: "Livraisons d’attestations",
   LOT_ATTESTATIONS: "Lots d’attestations", SEUIL_STOCK_ATTESTATION: "Seuils de stock",
   COMPAGNIE: "Compagnies", AGENCE_COMPAGNIE_ASSURANCE: "Agences compagnies",
+  AGENCE_COMPAGNIE_ASSISTANCE: "Agences compagnies d’assistance",
   CODE_PROMO_ASSISTANCE: "Codes promotionnels", CONTACT_COMPAGNIE: "Contacts compagnies",
   BANQUE: "Banques", REGLE_FISCALE: "Règles fiscales", TARIF_USAGE: "Tarifs par usage",
   AJUSTEMENT_TARIF_USAGE: "Ajustements tarifaires", USAGE: "Usages", CONFIGURATION_USAGES: "Configurations des usages",

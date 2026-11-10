@@ -754,6 +754,7 @@ export type ClientPayment = {
   dateValidation?: string | null;
   instruments: PaymentInstrument[];
   detail?: {
+    totalRegle: number;
     totalEncaisse: number;
     totalEnAttente: number;
     totalQuittances: number;
@@ -770,6 +771,7 @@ export type ClientPayment = {
       dateDebut?: string | null;
       dateFin?: string | null;
       montantQuittance: number;
+      montantRegle: number;
       montantEncaisse: number;
       montantEnAttente: number;
       solde: number;

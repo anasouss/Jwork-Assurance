@@ -41,9 +41,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
     </div>
 
     <dl className="grid grid-cols-1 divide-y border-b sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-      <Summary label="Total encaissé" value={amount(detail?.totalEncaisse)}>
-        {detail && detail.totalEnAttente > 0 && <p className="mt-1 text-xs text-blue-700 dark:text-blue-300">En attente : {amount(detail.totalEnAttente)}</p>}
-      </Summary>
+      <Summary label="Total réglé" value={amount(detail?.totalRegle)} />
       <Summary label="Total quittances" value={amount(detail?.totalQuittances)} />
       <Summary label="Solde restant" value={amount(detail?.solde)} />
     </dl>
@@ -59,7 +57,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
             <th className="px-3 py-3 text-left">Du</th>
             <th className="px-3 py-3 text-left">Au</th>
             <th className="px-3 py-3 text-right">Montant quittance</th>
-            <th className="px-3 py-3 text-right" title="Montant confirmé affecté par ce règlement">Montant encaissé</th>
+            <th className="px-3 py-3 text-right" title="Montant affecté par ce règlement">Montant réglé</th>
             <th className="px-3 py-3 text-right">Solde</th>
           </tr></thead>
           <tbody className="divide-y">{detail?.productions.map(production => <tr key={production.key} className="hover:bg-muted/30">
@@ -72,9 +70,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
             <td className="whitespace-nowrap px-3 py-3">{formatTreasuryDate(production.dateDebut)}</td>
             <td className="whitespace-nowrap px-3 py-3">{formatTreasuryDate(production.dateFin)}</td>
             <td className="px-3 py-3 text-right tabular-nums">{amount(production.montantQuittance)}</td>
-            <td className="px-3 py-3 text-right tabular-nums"><div className="font-semibold">{amount(production.montantEncaisse)}</div>
-              {production.montantEnAttente > 0 && <div className="mt-1 text-xs text-blue-700 dark:text-blue-300">En attente : {amount(production.montantEnAttente)}</div>}
-            </td>
+            <td className="px-3 py-3 text-right font-semibold tabular-nums">{amount(production.montantRegle)}</td>
             <td className="px-3 py-3 text-right font-semibold tabular-nums">{amount(production.solde)}</td>
           </tr>)}
             {!detail?.productions.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">{detail ? "Aucune production affectée." : "Détail des productions indisponible."}</td></tr>}

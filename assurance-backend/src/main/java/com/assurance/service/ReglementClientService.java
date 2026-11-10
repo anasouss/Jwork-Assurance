@@ -2921,6 +2921,7 @@ public class ReglementClientService {
                         .dateFin(global.getLignes().stream().map(LigneDocumentClient::getDateEcheance).filter(Objects::nonNull)
                                 .max(LocalDate::compareTo).orElse(null))
                         .montantQuittance(money(global.getTotalDocument())).montantEncaisse(current.confirmed())
+                        .montantRegle(current.confirmed().add(current.pending()))
                         .montantEnAttente(current.pending()).solde(balance).build());
                 return;
             }
@@ -2943,6 +2944,7 @@ public class ReglementClientService {
                     .dateDebut(snapshot == null ? source.getDateEffet() : snapshot.getDateOperation())
                     .dateFin(snapshot == null ? source.getDateEcheance() : snapshot.getDateEcheance())
                     .montantQuittance(total).montantEncaisse(current.confirmed()).montantEnAttente(current.pending())
+                    .montantRegle(current.confirmed().add(current.pending()))
                     .solde(remainingAfterAllocations(total, amounts.getOrDefault(elementId, AllocationAmounts.empty()))).build());
         });
         BigDecimal collected = ZERO;
@@ -2958,6 +2960,7 @@ public class ReglementClientService {
             }
         }
         return ReglementClientResponse.Detail.builder().totalEncaisse(collected).totalEnAttente(pending)
+                .totalRegle(collected.add(pending))
                 .totalQuittances(productions.stream().map(ReglementClientResponse.Production::getMontantQuittance)
                         .reduce(ZERO, BigDecimal::add))
                 .solde(productions.stream().map(ReglementClientResponse.Production::getSolde).reduce(ZERO, BigDecimal::add))

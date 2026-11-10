@@ -46,6 +46,7 @@ public class ReglementClientResponse {
     @Getter
     @Builder
     public static class Detail {
+        private BigDecimal totalRegle;
         private BigDecimal totalEncaisse;
         private BigDecimal totalEnAttente;
         private BigDecimal totalQuittances;
@@ -67,6 +68,7 @@ public class ReglementClientResponse {
         private LocalDate dateDebut;
         private LocalDate dateFin;
         private BigDecimal montantQuittance;
+        private BigDecimal montantRegle;
         private BigDecimal montantEncaisse;
         private BigDecimal montantEnAttente;
         private BigDecimal solde;

@@ -9,6 +9,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
 import { toDateOnly } from "@/features/production/date";
 import { adminApi } from "../api";
@@ -227,7 +228,7 @@ function GuaranteeChangesTable({ groups, person }: { groups: ActivityChangeGroup
       <tbody>{groups.map(group => {
         const { summary, additional } = guaranteeSummaryFields(group, person);
         return <tr key={group.title} className="border-t align-top">
-          <th scope="row" className="max-w-56 break-words px-3 py-3 text-left font-medium">{group.title}</th>
+          <th scope="row" className="max-w-56 break-words px-3 py-3 text-left font-medium"><GuaranteeRowLabel group={group} /></th>
           {summary.map((change, index) => <td key={index} className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><GuaranteeChangeValue change={change} /></td>)}
           <td className="min-w-36 px-3 py-3">{additional.length > 0 ? <details className="group/guarantee">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-sky-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-300 [&::-webkit-details-marker]:hidden">
@@ -242,6 +243,22 @@ function GuaranteeChangesTable({ groups, person }: { groups: ActivityChangeGroup
       })}</tbody>
     </table>
   </div>;
+}
+
+function GuaranteeRowLabel({ group }: { group: ActivityChangeGroup }) {
+  const coverage = group.changes.find(change => change.label === "Couverture");
+  const code = (coverage?.afterValue ?? coverage?.beforeValue)?.trim();
+  const separator = group.title.lastIndexOf(" (");
+  if (!code || separator < 0 || !group.title.endsWith(")")) return <>{group.title}</>;
+  const name = group.title.slice(0, separator);
+  if (code === name) return <>{group.title}</>;
+  const target = group.title.slice(separator + 2, -1);
+  return <Tooltip>
+    <TooltipTrigger asChild>
+      <span tabIndex={0} className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">{code} · {target}</span>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-72 break-words">{group.title}</TooltipContent>
+  </Tooltip>;
 }
 
 export default function AdminActivityPage() {

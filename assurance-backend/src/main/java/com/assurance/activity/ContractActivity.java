@@ -35,7 +35,9 @@ public final class ContractActivity {
     }
 
     public static List<ActivityChange> changes(ContratResponse before, ContratResponse after) {
-        List<ActivityChange> changes = new ArrayList<>(ActivityValues.changes(snapshot(before), snapshot(after)));
+        var oldValues = snapshot(before);
+        var newValues = snapshot(after);
+        List<ActivityChange> changes = new ArrayList<>(ActivityValues.changes(oldValues, newValues));
         if (before != null && after != null) {
             var oldRelationships = relationships(before);
             var newRelationships = relationships(after);
@@ -46,6 +48,22 @@ public final class ContractActivity {
                         && changes.stream().noneMatch(change -> change.label().equals(label))) {
                     changes.add(new ActivityChange(label, null, "Selection actualisee"));
                 }
+            }
+        }
+        // Keep the saved guarantee code available even when only its price changed.
+        var coverageLabels = new LinkedHashSet<String>();
+        for (var change : changes) {
+            int separator = change.label().lastIndexOf(" - ");
+            if (separator < 0) continue;
+            String coverageLabel = change.label().substring(0, separator) + " - Couverture";
+            if (newValues.containsKey(coverageLabel) || oldValues.containsKey(coverageLabel)) {
+                coverageLabels.add(coverageLabel);
+            }
+        }
+        for (String coverageLabel : coverageLabels) {
+            if (changes.stream().noneMatch(change -> change.label().equals(coverageLabel))) {
+                String code = newValues.getOrDefault(coverageLabel, oldValues.get(coverageLabel));
+                if (code != null) changes.add(new ActivityChange(coverageLabel, null, code));
             }
         }
         return List.copyOf(changes);

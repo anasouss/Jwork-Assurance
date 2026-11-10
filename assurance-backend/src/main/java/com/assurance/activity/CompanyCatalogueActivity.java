@@ -35,6 +35,7 @@ public final class CompanyCatalogueActivity {
 
     public static State state(CompagnieAssistance company) {
         return new State(null, assistanceCompany(company), new ActivityValues().put("Code", company.getCode()).put("Nom", company.getNom())
+                .put("Nom abrege", company.getNomAbrege())
                 .put("E-mail", company.getEmail()).put("Telephone", company.getTelephone()).put("Actif", company.getActif()).snapshot(), List.of(), null);
     }
 

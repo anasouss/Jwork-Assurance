@@ -29,6 +29,7 @@ export type ReferenceOption = {
 export type UpsertCompagnieAssistanceRequest = {
   code: string;
   nom: string;
+  nomAbrege?: string;
   email?: string;
   telephone?: string;
   actif?: boolean;

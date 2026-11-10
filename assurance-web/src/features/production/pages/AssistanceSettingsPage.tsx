@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ambulance, Edit, Package, Plus, Search, Trash2 } from "lucide-react";
+import { Ambulance, CircleHelp, Edit, Package, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
@@ -16,8 +16,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { compareTableValues, nextTableSort } from "@/lib/table-sort";
 import { assistanceProductApi } from "../api/assistance-products";
 import { referenceApi } from "../api/references";
@@ -50,7 +52,7 @@ export default function AssistanceSettingsPage() {
     const term = companySearch.trim().toLowerCase();
     const result = (companies.data ?? []).filter((company) => {
       if (!term) return true;
-      return [company.code, company.libelle, refString(company, "email"), refString(company, "telephone")]
+      return [company.code, company.libelle, refString(company, "nomAbrege"), refString(company, "email"), refString(company, "telephone")]
         .some((value) => String(value ?? "").toLowerCase().includes(term));
     });
     return result.sort((left, right) => compareTableValues(
@@ -130,7 +132,10 @@ export default function AssistanceSettingsPage() {
               {filteredCompanies.map((company) => (
                 <TableRow key={company.id}>
                   <TableCell className="font-medium">{company.code}</TableCell>
-                  <TableCell>{company.libelle}</TableCell>
+                  <TableCell>
+                    <div>{company.libelle}</div>
+                    {refString(company, "nomAbrege") && <div className="mt-0.5 text-xs text-muted-foreground">Nom abrégé : {refString(company, "nomAbrege")}</div>}
+                  </TableCell>
                   <TableCell>{refString(company, "telephone") || "-"}</TableCell>
                   <TableCell>{refString(company, "email") || "-"}</TableCell>
                   <TableCell>{company.actif === false ? "Non" : "Oui"}</TableCell>
@@ -172,7 +177,7 @@ export default function AssistanceSettingsPage() {
       </section>
 
       <Dialog open={companyDialogOpen} onOpenChange={(open) => { setCompanyDialogOpen(open); if (!open) setEditingCompany(null); }}>
-        <DialogContent>
+        <DialogContent className="max-h-[90svh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Ambulance className="size-5 text-amber-600" />
@@ -187,6 +192,23 @@ export default function AssistanceSettingsPage() {
             <Field label="Nom" required>
               <Input value={companyPayload.nom} onChange={(event) => setCompanyPayload((current) => ({ ...current, nom: event.target.value }))} />
             </Field>
+            <div className="grid gap-1.5 text-sm sm:col-span-2">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="assistance-company-short-name">Nom abrégé</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" className="size-5 text-muted-foreground" aria-label="À propos du nom abrégé">
+                      <CircleHelp className="size-3.5" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-72">
+                    Nom court pour les affichages compacts, par exemple Wafa IMA. Facultatif : il ne remplace ni le nom complet ni le code de la compagnie.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input id="assistance-company-short-name" value={companyPayload.nomAbrege ?? ""} maxLength={80}
+                onChange={(event) => setCompanyPayload((current) => ({ ...current, nomAbrege: event.target.value }))} />
+            </div>
             <Field label="Téléphone">
               <Input value={companyPayload.telephone ?? ""} onChange={(event) => setCompanyPayload((current) => ({ ...current, telephone: event.target.value }))} />
             </Field>
@@ -218,6 +240,7 @@ function companyToPayload(company: ReferenceOption): UpsertCompagnieAssistanceRe
   return {
     code: company.code ?? "",
     nom: refString(company, "nom") || company.libelle,
+    nomAbrege: refString(company, "nomAbrege"),
     email: refString(company, "email"),
     telephone: refString(company, "telephone"),
     actif: company.actif !== false,
@@ -233,11 +256,16 @@ function submitCompany(
     ...payload,
     code: payload.code.trim(),
     nom: payload.nom.trim(),
+    nomAbrege: cleanOptional(payload.nomAbrege),
     email: cleanOptional(payload.email),
     telephone: cleanOptional(payload.telephone),
   };
   if (!value.code || !value.nom) {
     toast.error("Code et nom sont obligatoires.");
+    return;
+  }
+  if ((value.nomAbrege?.length ?? 0) > 80) {
+    toast.error("Le nom abrégé est limité à 80 caractères.");
     return;
   }
   mutate({ id: editing?.id, value });

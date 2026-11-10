@@ -2342,6 +2342,7 @@ public class ReferentielController {
     private void applyCompagnieAssistanceRequest(CompagnieAssistance compagnie, UpsertCompagnieAssistanceRequest request) {
         compagnie.setCode(request.getCode().trim().toUpperCase());
         compagnie.setNom(request.getNom().trim());
+        compagnie.setNomAbrege(blankToNull(request.getNomAbrege()));
         compagnie.setEmail(blankToNull(request.getEmail()));
         compagnie.setTelephone(blankToNull(request.getTelephone()));
         compagnie.setActif(request.getActif() == null ? true : request.getActif());
@@ -2597,6 +2598,7 @@ public class ReferentielController {
     private Map<String, Object> toCompagnieAssistanceResponse(CompagnieAssistance compagnie) {
         return option(compagnie.getId(), compagnie.getCode(), compagnie.getNom())
                 .putValue("nom", compagnie.getNom())
+                .putValue("nomAbrege", compagnie.getNomAbrege())
                 .putValue("email", compagnie.getEmail())
                 .putValue("telephone", compagnie.getTelephone())
                 .putValue("actif", compagnie.getActif())

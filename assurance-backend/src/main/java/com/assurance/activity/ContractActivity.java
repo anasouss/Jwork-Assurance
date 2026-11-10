@@ -35,8 +35,11 @@ public final class ContractActivity {
     }
 
     public static List<ActivityChange> changes(ContratResponse before, ContratResponse after) {
-        var oldValues = snapshot(before);
-        var newValues = snapshot(after);
+        Map<String, String> guaranteeLabels = new LinkedHashMap<>();
+        collectGuaranteeLabels(before, guaranteeLabels);
+        collectGuaranteeLabels(after, guaranteeLabels);
+        var oldValues = snapshot(before, guaranteeLabels);
+        var newValues = snapshot(after, guaranteeLabels);
         List<ActivityChange> changes = new ArrayList<>(ActivityValues.changes(oldValues, newValues));
         if (before != null && after != null) {
             var oldRelationships = relationships(before);
@@ -66,7 +69,81 @@ public final class ContractActivity {
                 if (code != null) changes.add(new ActivityChange(coverageLabel, null, code));
             }
         }
-        return List.copyOf(changes);
+        return changes.stream().filter(change -> !change.label().endsWith(" - Carburant")
+                || change.beforeValue() == null || change.afterValue() == null
+                || !change.beforeValue().trim().equalsIgnoreCase(change.afterValue().trim())).toList();
+    }
+
+    public static ActivityCommand targetSaveCommand(ContratResponse before, ContratResponse after,
+            int index, boolean trailer) {
+        boolean created = index >= (trailer ? items(before.getRemorques()).size() : items(before.getVehicules()).size());
+        boolean firstSave = !created && (trailer
+                ? !hasText(items(before.getRemorques()).get(index).getImmatriculation())
+                        && items(before.getRemorques()).get(index).getMarqueId() == null
+                : !hasText(items(before.getVehicules()).get(index).getImmatriculation())
+                        && items(before.getVehicules()).get(index).getMarqueId() == null);
+        var changes = changes(before, after);
+        String prefix = (trailer ? "Remorque " : "Vehicule ") + (index + 1) + " - ";
+        boolean targetChanged = changes.stream().anyMatch(change -> change.label().startsWith(prefix));
+        ActivityAction action = created ? ActivityAction.CREATED : firstSave && targetChanged ? ActivityAction.SAVED
+                : targetChanged ? ActivityAction.UPDATED : ActivityAction.RECALCULATED;
+        String title = created ? (trailer ? "Remorque ajoutée au dossier" : "Véhicule ajouté au dossier")
+                : firstSave && targetChanged ? (trailer ? "Informations remorque enregistrées" : "Informations véhicule enregistrées")
+                : targetChanged ? (trailer ? "Informations remorque modifiées" : "Informations véhicule modifiées")
+                : "Tarifs du dossier recalculés";
+        return command(before, after, action, title, trailer ? "CONTRACT_TRAILER_SAVE" : "CONTRACT_VEHICLE_SAVE");
+    }
+
+    public static ActivityCommand draftSaveCommand(ContratResponse before, ContratResponse after,
+            String title, String operation) {
+        ActivityCommand command = command(before, after, ActivityAction.SAVED, title,
+                operation == null ? "CONTRACT_DRAFT_SAVE" : operation);
+        // A full draft PUT can also persist edits outside the section that triggered it.
+        boolean outsideSection = command.changes().stream().anyMatch(change -> switch (operation == null ? "" : operation) {
+            case "CONTRACT_SUBSCRIBER_SAVED" -> !change.label().equals("Souscripteur");
+            case "CONTRACT_OWNER_SAVED" -> !change.label().equals("Proprietaire");
+            case "CONTRACT_TARIFF_GRID_SELECTED" -> !change.label().equals("Grille tarifaire");
+            case "CONTRACT_VEHICLE_SAVED" -> !change.label().startsWith("Vehicule ")
+                    && !change.label().startsWith("Quittance - ");
+            case "CONTRACT_GUARANTEES_SAVED" -> !change.label().contains(") - ")
+                    && !change.label().startsWith("Quittance - ")
+                    && !change.label().equals("Affectation et parametrage des garanties");
+            case "CONTRACT_DETAILS_SAVED" -> change.label().contains(") - ")
+                    || change.label().equals("Affectation et parametrage des garanties")
+                    || change.label().startsWith("Assistance ")
+                    || change.label().equals("Souscripteur") || change.label().equals("Proprietaire");
+            default -> false;
+        });
+        return outsideSection ? new ActivityCommand(command.agenceId(), command.module(), command.action(),
+                "Dossier enregistré", command.origin(), command.subject(), command.references(), command.changes()) : command;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String guaranteeKey(ContratResponse contract, ContratResponse.GarantieView guarantee) {
+        return guarantee.getGarantieId() + ":" + targetKey(contract, guarantee.getVehiculeId(), guarantee.getRemorqueId())
+                + ":" + guarantee.getClientId();
+    }
+
+    private static void collectGuaranteeLabels(ContratResponse contract, Map<String, String> labels) {
+        if (contract == null) return;
+        for (var guarantee : items(contract.getGaranties())) {
+            String target = guarantee.getVehiculeId() != null
+                    ? items(contract.getVehicules()).stream().filter(vehicle -> Objects.equals(vehicle.getVehiculeId(), guarantee.getVehiculeId()))
+                            .map(vehicle -> label(vehicle.getImmatriculation(), "Vehicule " + (items(contract.getVehicules()).indexOf(vehicle) + 1)))
+                            .findFirst().orElse("Vehicule")
+                    : guarantee.getRemorqueId() != null
+                    ? items(contract.getRemorques()).stream().filter(trailer -> Objects.equals(trailer.getRemorqueId(), guarantee.getRemorqueId()))
+                            .map(trailer -> label(trailer.getImmatriculation(), "Remorque " + (items(contract.getRemorques()).indexOf(trailer) + 1)))
+                            .findFirst().orElse("Remorque")
+                    : guarantee.getClientId() != null
+                    ? items(contract.getClients()).stream().filter(client -> Objects.equals(client.getClientId(), guarantee.getClientId()))
+                            .map(client -> label(client.getNomAffichage(), "Personne assuree")).findFirst().orElse("Personne assuree")
+                    : "Contrat";
+            labels.put(guaranteeKey(contract, guarantee), label(guarantee.getLibelle(), "Garantie") + " (" + target + ") - ");
+        }
     }
 
     private static List<ActivityReference> distinctReferences(List<ActivityReference> references) {
@@ -295,6 +372,12 @@ public final class ContractActivity {
     }
 
     public static Map<String, String> snapshot(ContratResponse contract) {
+        Map<String, String> labels = new LinkedHashMap<>();
+        collectGuaranteeLabels(contract, labels);
+        return snapshot(contract, labels);
+    }
+
+    private static Map<String, String> snapshot(ContratResponse contract, Map<String, String> guaranteeLabels) {
         if (contract == null) return Map.of();
         ActivityValues values = new ActivityValues()
                 .put("Nature du dossier", Boolean.TRUE.equals(contract.getProspection()) ? "Devis" : "Contrat")
@@ -404,17 +487,7 @@ public final class ContractActivity {
                     .put(prefix + "Valeur assuree", trailer.getValeurAssuree());
         }
         for (var guarantee : items(contract.getGaranties())) {
-            String target = guarantee.getVehiculeId() != null
-                    ? items(contract.getVehicules()).stream().filter(vehicle -> Objects.equals(vehicle.getVehiculeId(), guarantee.getVehiculeId()))
-                            .map(vehicle -> label(vehicle.getImmatriculation(), "Vehicule")).findFirst().orElse("Vehicule")
-                    : guarantee.getRemorqueId() != null
-                    ? items(contract.getRemorques()).stream().filter(trailer -> Objects.equals(trailer.getRemorqueId(), guarantee.getRemorqueId()))
-                            .map(trailer -> label(trailer.getImmatriculation(), "Remorque")).findFirst().orElse("Remorque")
-                    : guarantee.getClientId() != null
-                    ? items(contract.getClients()).stream().filter(client -> Objects.equals(client.getClientId(), guarantee.getClientId()))
-                            .map(client -> label(client.getNomAffichage(), "Personne assuree")).findFirst().orElse("Personne assuree")
-                    : "Contrat";
-            String prefix = label(guarantee.getLibelle(), "Garantie") + " (" + target + ") - ";
+            String prefix = guaranteeLabels.get(guaranteeKey(contract, guarantee));
             values.put(prefix + "Couverture", label(guarantee.getCode(), guarantee.getLibelle()))
                     .put(prefix + "Mode de tarification", AmendmentActivity.guaranteeMode(guarantee.getModeSelectionne()))
                     .put(prefix + "Base assuree", AmendmentActivity.valueSource(guarantee.getSourceValeurSelectionnee()))

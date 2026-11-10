@@ -326,6 +326,16 @@ public class QuittanceCalculService {
             List<Ligne> lignes,
             List<RegleFiscaleQuittanceEngine.Application> applications
     ) {
+        // Persisted category amounts and their TTC must reconcile at currency precision.
+        lignes = lignes.stream().map(ligne -> {
+            BigDecimal nette = scale(ligne.primeNette());
+            BigDecimal taxes = scale(ligne.taxe());
+            BigDecimal tpf = scale(ligne.taxeParafiscale());
+            BigDecimal accessoires = scale(ligne.accessoire());
+            BigDecimal cnpacLigne = scale(ligne.cnpac());
+            return new Ligne(ligne.categorie(), ligne.ordre(), ligne.globale(), nette, taxes, tpf,
+                    accessoires, cnpacLigne, total(nette, taxes, tpf, accessoires, cnpacLigne));
+        }).toList();
         BigDecimal primeNette = lignes.stream().map(Ligne::primeNette).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal taxe = lignes.stream().map(Ligne::taxe).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal taxeParafiscale = lignes.stream().map(Ligne::taxeParafiscale).reduce(BigDecimal.ZERO, BigDecimal::add);

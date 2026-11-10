@@ -104,6 +104,7 @@ public class CreateContratRequest {
 
     @Data
     public static class VehiculeInput {
+        private Long vehiculeId;
         @NotNull
         private TypeVehiculeContrat typeVehicule;
         private Long usageId;
@@ -144,6 +145,7 @@ public class CreateContratRequest {
 
     @Data
     public static class RemorqueInput {
+        private Long remorqueId;
         private Long usageId;
         private Long marqueId;
         private String marqueLibelle;

@@ -332,8 +332,7 @@ public class ContratService {
             default -> "Dossier enregistré";
         };
         return businessActivityRecorder.perform(() -> updateDraftRecord(agenceId, contrat, request), result ->
-                ContractActivity.command(before, result, ActivityAction.SAVED, title,
-                        operation == null ? "CONTRACT_DRAFT_SAVE" : operation));
+                ContractActivity.draftSaveCommand(before, result, title, operation));
     }
 
     private ContratResponse updateDraftRecord(Long agenceId, Contrat contrat, CreateContratRequest request) {
@@ -350,14 +349,12 @@ public class ContratService {
     public ContratResponse saveDraftVehicule(Long agenceId, Long contratId, int index, CreateContratRequest.VehiculeInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
         ContratResponse before = toResponse(contrat);
-        boolean created = index >= (before.getVehicules() == null ? 0 : before.getVehicules().size());
         return businessActivityRecorder.perform(() -> {
             enforceRenewalPeriod(contrat, input);
             saveVehiculeTarget(contrat, index, input);
             rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
             return toResponse(contrat);
-        }, result -> ContractActivity.command(before, result, created ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                created ? "Véhicule ajouté au dossier" : "Informations véhicule modifiées", "CONTRACT_VEHICLE_SAVE"));
+        }, result -> ContractActivity.targetSaveCommand(before, result, index, false));
     }
 
     private ContratResponse saveVehiculeTarget(Contrat contrat, int index, CreateContratRequest.VehiculeInput input) {
@@ -371,6 +368,9 @@ public class ContratService {
         }
         boolean created = index >= existing.size();
         Vehicule vehicule = created ? new Vehicule() : existing.get(index);
+        if (input.getVehiculeId() != null && !input.getVehiculeId().equals(vehicule.getId())) {
+            throw new BadRequestException("Le vehicule ne correspond pas a la cible enregistree");
+        }
         vehicule.setContrat(contrat);
         applyVehiculeInput(contrat, vehicule, input);
         vehicule.setActif(true);
@@ -452,14 +452,12 @@ public class ContratService {
     public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
         ContratResponse before = toResponse(contrat);
-        boolean created = index >= (before.getRemorques() == null ? 0 : before.getRemorques().size());
         return businessActivityRecorder.perform(() -> {
             enforceRenewalPeriod(contrat, input);
             saveRemorqueTarget(contrat, index, input);
             rafraichirCorrectionAffaireNouvelleSiNecessaire(contrat, null);
             return toResponse(contrat);
-        }, result -> ContractActivity.command(before, result, created ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                created ? "Remorque ajoutée au dossier" : "Informations remorque modifiées", "CONTRACT_TRAILER_SAVE"));
+        }, result -> ContractActivity.targetSaveCommand(before, result, index, true));
     }
 
     private ContratResponse saveRemorqueTarget(Contrat contrat, int index, CreateContratRequest.RemorqueInput input) {
@@ -473,6 +471,9 @@ public class ContratService {
         }
         boolean created = index >= existing.size();
         Remorque remorque = created ? new Remorque() : existing.get(index);
+        if (input.getRemorqueId() != null && !input.getRemorqueId().equals(remorque.getId())) {
+            throw new BadRequestException("La remorque ne correspond pas a la cible enregistree");
+        }
         remorque.setContrat(contrat);
         applyRemorqueInput(contrat, remorque, input);
         remorque.setActif(true);
@@ -1359,6 +1360,8 @@ public class ContratService {
             existingClients.put(clientDraftKey(link.getRole(), Boolean.TRUE.equals(link.getPrincipalPourRole())), link.getClient());
         }
         List<DraftAssistanceSnapshot> assistanceSnapshots = snapshotDraftAssistances(contrat, false);
+        List<Vehicule> existingVehicles = vehiculeRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
+        List<Remorque> existingTrailers = remorqueRepository.findByContratIdOrderByCreatedAtAsc(contrat.getId());
         clearDraftChildren(contrat);
 
         saveClientLinks(contrat, request.getClients(), request.getAgenceId(), existingClients, finalMode);
@@ -1367,8 +1370,8 @@ public class ContratService {
         validateUsageForClientCategory(contrat, contrat.getUsage());
         applyContractBilling(contrat, request, finalMode);
 
-        Usage usageContrat = contrat.getUsage();
         List<Vehicule> vehiculesCrees = new ArrayList<>();
+        int vehicleIndex = 0;
         for (CreateContratRequest.VehiculeInput input : request.getVehicules() == null ? List.<CreateContratRequest.VehiculeInput>of() : request.getVehicules()) {
             validateConditionalVehicleInput(input);
             if (input.getTypeVehicule() == null) {
@@ -1377,75 +1380,36 @@ public class ContratService {
                 }
                 continue;
             }
-            Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
-            validateUsageForClientCategory(contrat, usage);
-            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
-            Carrosserie carrosserie = resolveCarrosserie(input.getCarrosserieId(), input.getCarrosserieLibelle(), true);
-            CategorieTransport categorieTransport = resolveCategorieTransport(input.getCategorieTransportId());
-            validateCategorieTransport(usage, categorieTransport);
-            Vehicule vehicule = vehiculeRepository.save(Vehicule.builder()
-                    .contrat(contrat)
-                    .typeVehicule(input.getTypeVehicule())
-                    .usage(usage)
-                    .marque(marque)
-                    .carrosserie(carrosserie)
-                    .categorieTransport(categorieTransport)
-                    .immatriculation(input.getImmatriculation())
-                    .immatriculationProvisoire(input.getImmatriculationProvisoire())
-                    .carburant(input.getCarburant())
-                    .puissanceFiscale(input.getPuissanceFiscale())
-                    .cylindree(input.getCylindree())
-                    .nombrePlaces(input.getNombrePlaces())
-                    .sousClasse(input.getSousClasse())
-                    .ptc(input.getPtc())
-                    .datePremiereCirculation(input.getDatePremiereCirculation())
-                    .dateExpirationCarteGrise(input.getDateExpirationCarteGrise())
-                    .dateEffet(contrat.getDateEffet())
-                    .dateEcheance(contrat.getDateEcheance())
-                    .crm(input.getCrm())
-                    .numeroAttestation(input.getNumeroAttestation())
-                    .remorque(input.getRemorque() == null ? false : input.getRemorque())
-                    .numeroRemorque(Boolean.TRUE.equals(input.getRemorque()) ? blankToNull(input.getNumeroRemorque()) : null)
-                    .marqueRemorque(Boolean.TRUE.equals(input.getRemorque())
-                            ? resolveMarque(input.getMarqueRemorqueId(), input.getMarqueRemorqueLibelle(), true)
-                            : null)
-                    .coefficientProrata(input.getCoefficientProrata())
-                    .valeurVenale(input.getValeurVenale())
-                    .valeurNeuf(input.getValeurNeuf())
-                    .valeurGlace(input.getValeurGlace())
-                    .organismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()))
-                    .nomOrganismeCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? blankToNull(input.getNomOrganismeCredit()) : null)
-                    .montantCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getMontantCredit() : null)
-                    .dateFinCredit(Boolean.TRUE.equals(input.getOrganismeCredit()) ? input.getDateFinCredit() : null)
-                    .build());
+            Vehicule vehicule = input.getVehiculeId() != null
+                    ? existingVehicles.stream().filter(item -> input.getVehiculeId().equals(item.getId())).findFirst()
+                            .orElseThrow(() -> new BadRequestException("Le vehicule ne fait pas partie de ce dossier"))
+                    : vehicleIndex < existingVehicles.size() ? existingVehicles.get(vehicleIndex) : new Vehicule();
+            vehicleIndex++;
+            if (vehiculesCrees.contains(vehicule)) throw new BadRequestException("Vehicule duplique dans le dossier");
+            vehicule.setContrat(contrat);
+            applyVehiculeInput(contrat, vehicule, input);
+            vehiculeRepository.save(vehicule);
             vehiculesCrees.add(vehicule);
-            contrat.getVehicules().add(vehicule);
+            if (!contrat.getVehicules().contains(vehicule)) contrat.getVehicules().add(vehicule);
         }
 
         List<Remorque> remorquesCreees = new ArrayList<>();
+        int trailerIndex = 0;
         for (CreateContratRequest.RemorqueInput input : request.getRemorques() == null ? List.<CreateContratRequest.RemorqueInput>of() : request.getRemorques()) {
-            Usage usage = input.getUsageId() == null ? usageContrat : usageRepository.findById(input.getUsageId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
-            validateUsageForClientCategory(contrat, usage);
-            Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), true);
-            Remorque remorque = remorqueRepository.save(Remorque.builder()
-                    .contrat(contrat)
-                    .usage(usage)
-                    .marque(marque)
-                    .immatriculation(input.getImmatriculation())
-                    .ptc(input.getPtc())
-                    .dateMiseEnCirculation(input.getDateMiseEnCirculation())
-                    .dateEffet(contrat.getDateEffet())
-                    .dateEcheance(contrat.getDateEcheance())
-                    .crm(input.getCrm())
-                    .numeroAttestation(input.getNumeroAttestation())
-                    .coefficientProrata(input.getCoefficientProrata())
-                    .valeurAssuree(input.getValeurAssuree())
-                    .build());
+            Remorque remorque = input.getRemorqueId() != null
+                    ? existingTrailers.stream().filter(item -> input.getRemorqueId().equals(item.getId())).findFirst()
+                            .orElseThrow(() -> new BadRequestException("La remorque ne fait pas partie de ce dossier"))
+                    : trailerIndex < existingTrailers.size() ? existingTrailers.get(trailerIndex) : new Remorque();
+            trailerIndex++;
+            if (remorquesCreees.contains(remorque)) throw new BadRequestException("Remorque dupliquee dans le dossier");
+            remorque.setContrat(contrat);
+            applyRemorqueInput(contrat, remorque, input, true);
+            remorqueRepository.save(remorque);
             remorquesCreees.add(remorque);
-            contrat.getRemorques().add(remorque);
+            if (!contrat.getRemorques().contains(remorque)) contrat.getRemorques().add(remorque);
         }
+        contrat.getVehicules().removeIf(vehicle -> !vehiculesCrees.contains(vehicle));
+        contrat.getRemorques().removeIf(trailer -> !remorquesCreees.contains(trailer));
 
         List<ContratGarantie> garantiesCreees = finalMode
                 ? replaceFinalGaranties(contrat, request, vehiculesCrees, remorquesCreees)
@@ -1548,16 +1512,10 @@ public class ContratService {
         }
         contratGarantieRepository.deleteByContratId(contrat.getId());
         contratClientRepository.deleteByContratId(contrat.getId());
-        remorqueRepository.deleteByContratId(contrat.getId());
-        vehiculeRepository.deleteByContratId(contrat.getId());
         contratGarantieRepository.flush();
         contratClientRepository.flush();
-        remorqueRepository.flush();
-        vehiculeRepository.flush();
         contrat.getGaranties().clear();
         contrat.getClients().clear();
-        contrat.getRemorques().clear();
-        contrat.getVehicules().clear();
         contrat.getAssistances().clear();
         contrat.getElementsFacturables().removeAll(assistanceElements);
     }
@@ -1977,10 +1935,15 @@ public class ContratService {
     }
 
     private void applyRemorqueInput(Contrat contrat, Remorque remorque, CreateContratRequest.RemorqueInput input) {
+        applyRemorqueInput(contrat, remorque, input, false);
+    }
+
+    private void applyRemorqueInput(Contrat contrat, Remorque remorque, CreateContratRequest.RemorqueInput input,
+            boolean allowMarqueCreation) {
         Usage usage = input.getUsageId() == null ? contrat.getUsage() : usageRepository.findById(input.getUsageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usage", input.getUsageId()));
         validateUsageForClientCategory(contrat, usage);
-        Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), false);
+        Marque marque = resolveMarque(input.getMarqueId(), input.getMarqueLibelle(), allowMarqueCreation);
         remorque.setUsage(usage);
         remorque.setMarque(marque);
         remorque.setImmatriculation(input.getImmatriculation());

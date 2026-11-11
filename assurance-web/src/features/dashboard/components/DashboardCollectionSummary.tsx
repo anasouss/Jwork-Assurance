@@ -6,8 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { comptaApi } from "@/features/compta/api";
 import { formatMoney } from "@/features/production/utils/format";
 import { useAuthStore } from "@/store/auth-store";
+import { formatTreasuryDate } from "@/features/compta/pages/treasury-format";
 
-export function DashboardCollectionSummary() {
+export function DashboardCollectionSummary({ dateReference }: { dateReference: string }) {
   const user = useAuthStore(state => state.user);
   const canReadBalances = user?.permissions.includes("quittance:view") ?? false;
   const canReadTreasury = user?.permissions.includes("tresorerie:view") ?? false;
@@ -48,17 +49,18 @@ export function DashboardCollectionSummary() {
       href: "/app/compta/tresorerie/impayes-clients", query: rejections,
     }] : []),
   ];
-  return <section aria-label="Encaissements actuels" className="border-y py-4">
-    <h2 className="mb-3 text-sm font-semibold">Encaissements · situation actuelle</h2>
-    <div className="grid gap-4 md:grid-cols-3">
+  return <section aria-labelledby="collection-summary-title" className="min-w-0">
+    <h2 id="collection-summary-title" className="text-base font-semibold">Encaissements actuels</h2>
+    <p className="mt-1 text-xs text-muted-foreground">Situation au {formatTreasuryDate(dateReference)}</p>
+    <div className="mt-4 divide-y">
       {indicators.map(indicator => <div key={indicator.label} className="min-w-0">
-        <Link to={indicator.href} className="group flex items-start justify-between gap-3 rounded-sm py-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link to={indicator.href} className="group grid grid-cols-[minmax(0,1fr)_16px] items-center gap-x-3 gap-y-2 rounded-sm py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto_16px]">
           <div className="min-w-0">
             <p className="text-sm font-medium group-hover:underline">{indicator.label}</p>
-            <div className="mt-1 break-words text-xl font-semibold tabular-nums">{indicator.query.isPending ? <Skeleton className="h-7 w-24" /> : indicator.query.isError ? "-" : indicator.value}</div>
-            <p className="mt-1 text-xs text-muted-foreground">{indicator.detail}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">{indicator.detail}</p>
           </div>
-          <ArrowRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-muted-foreground" />
+          <div className="col-start-1 row-start-2 break-words text-lg font-semibold tabular-nums sm:col-start-2 sm:row-start-1 sm:text-right">{indicator.query.isPending ? <Skeleton className="h-6 w-20" /> : indicator.query.isError ? "-" : indicator.value}</div>
+          <ArrowRight aria-hidden="true" className="col-start-2 row-start-1 size-4 shrink-0 text-muted-foreground sm:col-start-3" />
         </Link>
         {indicator.query.isError && <div role="alert" className="mt-1 flex items-center gap-2 text-xs text-destructive">
           Indicateur indisponible

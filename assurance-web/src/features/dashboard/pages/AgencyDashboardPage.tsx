@@ -71,15 +71,14 @@ export default function AgencyDashboardPage() {
       </header>
 
       <ProductionKpis data={data} isFetching={dashboard.isFetching} />
-      <DashboardWorkQueue data={data} permissions={permissions} />
-
-      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.8fr)_minmax(300px,1fr)]" aria-label="Analyse de la production sur la période">
-        <ProductionTrendChart rows={data.productionEvolution} dateFrom={data.dateDu} dateTo={data.dateAu} />
+      <section className="grid items-start gap-5 xl:grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))]" aria-label="Travail à traiter, encaissements et répartition">
+        <DashboardWorkQueue data={data} permissions={permissions} />
+        <DashboardCollectionSummary dateReference={data.dateReference} />
         <ProductionCategoryBreakdown rows={data.productionParCategorie} />
       </section>
 
-      <section className="grid items-start gap-5 xl:grid-cols-2" aria-label="Encaissements et portefeuille">
-        <DashboardCollectionSummary dateReference={data.dateReference} />
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]" aria-label="Évolution de la production et portefeuille">
+        <ProductionTrendChart rows={data.productionEvolution} dateFrom={data.dateDu} dateTo={data.dateAu} />
         <DashboardPortfolio rows={data.portefeuilleParBranche} contractTypes={data.portefeuilleParType}
           total={data.kpis.contratsActifs} activeAssistances={data.kpis.assistancesActives} date={data.dateAu} />
       </section>

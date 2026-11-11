@@ -12,10 +12,10 @@ const categoryColors: Record<string, string> = {
 
 export function ProductionCategoryBreakdown({ rows }: { rows: DashboardBreakdown[] }) {
   return (
-    <section className="min-w-0 border-y border-sky-200 bg-sky-50/30 dark:border-sky-900/60 dark:bg-sky-950/15">
-      <div className="border-b border-sky-200/70 bg-sky-50 px-4 py-3 dark:border-sky-900/50 dark:bg-sky-950/30">
-        <h2 className="text-base font-semibold text-sky-950 dark:text-sky-100">Répartition par catégorie</h2>
-        <p className="mt-1 text-xs text-sky-800/80 dark:text-sky-200/80">Production TTC sur la même période · MAD</p>
+    <section className="min-w-0 border-y bg-card">
+      <div className="border-b bg-foreground/[0.04] px-4 py-3">
+        <h2 className="text-base font-semibold">Répartition par catégorie</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Production TTC sur la même période · MAD</p>
       </div>
       <div className="p-4"><CategoryChart rows={rows} /></div>
     </section>

@@ -49,14 +49,14 @@ export function DashboardCollectionSummary({ dateReference }: { dateReference: s
       href: "/app/compta/tresorerie/impayes-clients", query: rejections,
     }] : []),
   ];
-  return <section aria-labelledby="collection-summary-title" className="min-w-0 border-y border-blue-200 bg-blue-50/30 dark:border-blue-900/60 dark:bg-blue-950/15">
-    <div className="border-b border-blue-200/70 bg-blue-50 px-4 py-3 dark:border-blue-900/50 dark:bg-blue-950/30">
-      <h2 id="collection-summary-title" className="text-base font-semibold text-blue-950 dark:text-blue-100">Encaissements actuels</h2>
-      <p className="mt-1 text-xs text-blue-800/80 dark:text-blue-200/80">Situation au {formatTreasuryDate(dateReference)}</p>
+  return <section aria-labelledby="collection-summary-title" className="min-w-0 border-y bg-card">
+    <div className="border-b bg-foreground/[0.04] px-4 py-3">
+      <h2 id="collection-summary-title" className="text-base font-semibold">Encaissements actuels</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Situation au {formatTreasuryDate(dateReference)}</p>
     </div>
     <div className="divide-y px-4">
       {indicators.map(indicator => <div key={indicator.label} className="min-w-0">
-        <Link to={indicator.href} className="group grid grid-cols-[minmax(0,1fr)_16px] items-center gap-x-3 gap-y-2 rounded-sm py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto_16px]">
+        <Link to={indicator.href} className="group grid grid-cols-[minmax(0,1fr)_16px] items-center gap-x-3 gap-y-2 rounded-sm py-3 outline-none focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_16px]">
           <div className="min-w-0">
             <p className="text-sm font-medium group-hover:underline">{indicator.label}</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">{indicator.detail}</p>

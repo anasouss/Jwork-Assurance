@@ -21,10 +21,10 @@ export function DashboardPortfolio({ rows, contractTypes, total, activeAssistanc
   date: string;
 }) {
   return (
-    <section className="min-w-0 border-y border-violet-200 bg-violet-50/25 dark:border-violet-900/60 dark:bg-violet-950/15">
-      <div className="border-b border-violet-200/70 bg-violet-50 px-4 py-3 dark:border-violet-900/50 dark:bg-violet-950/30">
-        <h2 className="text-base font-semibold text-violet-950 dark:text-violet-100">Portefeuille en vigueur</h2>
-        <p className="mt-1 text-xs text-violet-800/80 dark:text-violet-200/80">Contrats actuellement actifs couvrant le {formatDate(date)}</p>
+    <section className="min-w-0 border-y bg-card">
+      <div className="border-b bg-foreground/[0.04] px-4 py-3">
+        <h2 className="text-base font-semibold">Portefeuille en vigueur</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Contrats actuellement actifs couvrant le {formatDate(date)}</p>
       </div>
       <div className="p-4">
         <PortfolioChart rows={rows} contractTypes={contractTypes} total={total} />

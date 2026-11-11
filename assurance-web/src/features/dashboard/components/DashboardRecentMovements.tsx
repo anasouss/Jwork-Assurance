@@ -34,9 +34,9 @@ export function DashboardRecentMovements({
         ) : null}
       </div>
       {rows.length ? (
-        <div className="overflow-x-auto border-y border-emerald-200 bg-card dark:border-emerald-900/60">
+        <div className="overflow-x-auto border-y bg-card">
           <table className="w-full min-w-[940px] text-sm">
-            <thead className="bg-emerald-100/80 text-left text-xs text-emerald-950 dark:bg-emerald-950/60 dark:text-emerald-100">
+            <thead className="bg-foreground/[0.04] text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-5 py-3 font-semibold">Police / contrat</th>
                 <th className="px-4 py-3 font-semibold">Dossier</th>

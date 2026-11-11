@@ -19,10 +19,10 @@ export function ProductionTrendChart({ rows: monthlyData, dateFrom, dateTo }: {
 }) {
   const hasProduction = monthlyData.some(item => item.primeTotale !== 0 || item.primeNette !== 0);
   return (
-    <section className="min-w-0 border-y border-emerald-200 bg-card dark:border-emerald-900/60">
-      <div className="border-b border-emerald-200/70 bg-emerald-50 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/30">
-        <h2 className="text-base font-semibold text-emerald-950 dark:text-emerald-100">Évolution de la production</h2>
-        <p className="mt-1 text-xs text-emerald-800/80 dark:text-emerald-200/80">Du {formatDate(dateFrom)} au {formatDate(dateTo)} · {monthlyData[0]?.granularite === "DAY" ? "par jour" : "par mois"} · MAD</p>
+    <section className="min-w-0 border-y bg-card">
+      <div className="border-b bg-foreground/[0.04] px-4 py-3">
+        <h2 className="text-base font-semibold">Évolution de la production</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Du {formatDate(dateFrom)} au {formatDate(dateTo)} · {monthlyData[0]?.granularite === "DAY" ? "par jour" : "par mois"} · MAD</p>
       </div>
       <div className="p-4">
           <div className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
@@ -30,7 +30,7 @@ export function ProductionTrendChart({ rows: monthlyData, dateFrom, dateTo }: {
             <span className="flex items-center gap-2"><span aria-hidden="true" className="w-5 border-t-2 border-dashed border-blue-600 dark:border-blue-400" />Prime nette</span>
           </div>
           {hasProduction ? (
-            <ChartContainer config={productionChartConfig} className="h-[310px] w-full aspect-auto">
+            <ChartContainer config={productionChartConfig} className="h-[240px] w-full aspect-auto sm:h-[260px]">
               <AreaChart data={monthlyData} margin={{ left: 0, right: 12, top: 8, bottom: 0 }} accessibilityLayer>
                 <CartesianGrid vertical={false} strokeDasharray="3 4" />
                 <XAxis dataKey="date" tickFormatter={(value: string) => format(dateOnly(value), monthlyData[0]?.granularite === "DAY" ? "dd MMM" : "MMM yy", { locale: fr })}

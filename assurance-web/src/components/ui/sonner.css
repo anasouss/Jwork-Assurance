@@ -15,17 +15,17 @@
 .app-toaster[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
   --toast-accent: var(--muted-foreground);
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: start;
-  column-gap: 12px;
+  column-gap: 10px;
   row-gap: 8px;
-  min-height: 64px;
-  padding: 16px 42px 16px 16px;
-  border: 1px solid color-mix(in srgb, var(--toast-accent) 24%, var(--border));
+  min-height: 56px;
+  padding: 12px 42px 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--toast-accent) 16%, var(--border));
   border-radius: 8px;
-  background: color-mix(in srgb, var(--toast-accent) 3%, var(--popover));
+  background: color-mix(in srgb, var(--toast-accent) 7%, var(--popover));
   color: var(--popover-foreground);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 12%);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 8%);
   font-size: 14px;
   letter-spacing: 0;
 }
@@ -51,8 +51,8 @@
   align-items: center;
   justify-content: center;
   grid-column: 1;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   margin: 0;
   border-radius: 6px;
   background: color-mix(in srgb, var(--toast-accent) 10%, var(--popover));
@@ -91,16 +91,21 @@
 }
 
 .app-toaster[data-sonner-toaster] [data-sonner-toast] [data-close-button] {
-  top: 8px;
+  top: 50%;
   right: 8px;
   left: auto;
   width: 28px;
   height: 28px;
-  transform: none;
+  transform: translateY(-50%);
   border: 0;
   border-radius: 4px;
   background: transparent;
   color: var(--muted-foreground);
+}
+
+.app-toaster[data-sonner-toaster] [data-close-button] > svg {
+  width: 14px;
+  height: 14px;
 }
 
 .app-toaster[data-sonner-toaster] [data-sonner-toast] [data-close-button]:hover {

@@ -41,7 +41,7 @@ export function Toaster({ className, style, toastOptions, icons, ...props }: Toa
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "8px",
-          "--width": "380px",
+          "--width": "356px",
           fontFamily: "var(--font-sans)",
           ...style,
         } as CSSProperties

@@ -219,7 +219,7 @@ export default function FacturationConventionsPage() {
       </header>
 
       <section className="border-y bg-card px-4 py-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_110px_minmax(260px,1fr)]">
+        <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-3 min-[1440px]:grid-cols-[minmax(160px,1fr)_112px_minmax(300px,1.5fr)_minmax(200px,1fr)_minmax(130px,0.8fr)_160px_auto] [&>div]:min-w-0">
           <div className="grid gap-1.5"><Label>Convention</Label>
             <Select value={filters.conventionId} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, periode: "" }))}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une convention" /></SelectTrigger>
@@ -239,8 +239,6 @@ export default function FacturationConventionsPage() {
               </SelectItem>)}</SelectContent>
             </Select>
           </div>
-          {convention?.blocage && <p className="text-sm text-destructive sm:col-span-2 lg:col-span-3">{convention.blocage}</p>}
-          {conventions.isError && <p className="text-sm text-destructive">{conventions.error.message}</p>}
           <div className="grid gap-1.5">
             <Label htmlFor="billing-search">Destinataire, dossier ou police</Label>
             <Input
@@ -266,6 +264,24 @@ export default function FacturationConventionsPage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="billing-status">Statut</Label>
+            <Select
+              value={filters.statut}
+              onValueChange={(value) => setFilters((current) => ({
+                ...current,
+                statut: value as Filters["statut"],
+              }))}
+            >
+              <SelectTrigger id="billing-status"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tous les statuts</SelectItem>
+                <SelectItem value="A_FACTURER">À facturer</SelectItem>
+                <SelectItem value="FACTUREE">Facturées</SelectItem>
+                <SelectItem value="ANNULEE">Annulées</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-end gap-2">
             <Button type="button" onClick={applyFilters} title="Rechercher">
               <Search className="size-4" />
@@ -275,23 +291,8 @@ export default function FacturationConventionsPage() {
             </Button>
           </div>
         </div>
-        <div className="mt-3 w-56">
-          <Select
-            value={filters.statut}
-            onValueChange={(value) => setFilters((current) => ({
-              ...current,
-              statut: value as Filters["statut"],
-            }))}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Tous les statuts</SelectItem>
-              <SelectItem value="A_FACTURER">À facturer</SelectItem>
-              <SelectItem value="FACTUREE">Facturées</SelectItem>
-              <SelectItem value="ANNULEE">Annulées</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {convention?.blocage && <p className="mt-3 text-sm text-destructive">{convention.blocage}</p>}
+        {conventions.isError && <p className="mt-3 text-sm text-destructive">{conventions.error.message}</p>}
       </section>
 
       <section className="grid grid-cols-2 divide-x border md:grid-cols-4">

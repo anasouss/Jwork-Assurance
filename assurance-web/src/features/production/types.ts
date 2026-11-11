@@ -1105,6 +1105,7 @@ export type CreateContratRequest = {
 };
 
 export type QuittancePreview = {
+  typeImpactMouvement?: string | null;
   requiresConventionPayment?: boolean;
   contratId?: string | null;
   mouvementContratId?: string | null;

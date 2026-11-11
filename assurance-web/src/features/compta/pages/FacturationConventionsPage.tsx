@@ -219,18 +219,18 @@ export default function FacturationConventionsPage() {
       </header>
 
       <section className="border-y bg-card px-4 py-4">
-        <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-3 min-[1440px]:grid-cols-[minmax(160px,1fr)_112px_minmax(300px,1.5fr)_minmax(200px,1fr)_minmax(130px,0.8fr)_160px_auto] [&>div]:min-w-0">
-          <div className="grid gap-1.5"><Label>Convention</Label>
+        <div className="flex flex-wrap items-end gap-3 [&>div]:min-w-0">
+          <div className="grid w-full gap-1.5 sm:max-w-[240px] sm:flex-[1_1_160px]"><Label>Convention</Label>
             <Select value={filters.conventionId} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, periode: "" }))}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une convention" /></SelectTrigger>
               <SelectContent>{conventions.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1.5"><Label htmlFor="billing-year">Année du cycle</Label>
+          <div className="grid w-28 shrink-0 gap-1.5"><Label htmlFor="billing-year">Année du cycle</Label>
             <Input id="billing-year" type="number" min={1900} max={2200} value={filters.annee}
               onChange={event => setFilters(current => ({ ...current, annee: Number(event.target.value), periode: "" }))} />
           </div>
-          <div className="grid gap-1.5"><Label>Période à facturer</Label>
+          <div className="grid w-full gap-1.5 sm:max-w-[400px] sm:flex-[1.5_1_310px]"><Label>Période à facturer</Label>
             <Select value={filters.periode} disabled={!convention?.periodes.length}
               onValueChange={value => setFilters(current => ({ ...current, periode: value }))}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une période" /></SelectTrigger>
@@ -239,7 +239,7 @@ export default function FacturationConventionsPage() {
               </SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid w-full gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]">
             <Label htmlFor="billing-search">Destinataire, dossier ou police</Label>
             <Input
               id="billing-search"
@@ -249,7 +249,7 @@ export default function FacturationConventionsPage() {
               onKeyDown={(event) => event.key === "Enter" && applyFilters()}
             />
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid w-full gap-1.5 sm:max-w-[200px] sm:flex-[1_1_130px]">
             <Label>Compagnie</Label>
             <Select
               value={filters.compagnieId}
@@ -264,7 +264,7 @@ export default function FacturationConventionsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-1.5">
+          <div className="grid w-full gap-1.5 sm:w-[150px] sm:shrink-0">
             <Label htmlFor="billing-status">Statut</Label>
             <Select
               value={filters.statut}
@@ -282,7 +282,7 @@ export default function FacturationConventionsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex shrink-0 items-end gap-2">
             <Button type="button" onClick={applyFilters} title="Rechercher">
               <Search className="size-4" />
             </Button>

@@ -23,7 +23,7 @@ export function ConventionBillingSources({ rows, selected, selectionKey, loading
       <thead className="bg-orange-600 text-left text-xs text-white"><tr>
         <th className="w-10 px-3 py-3"><Checkbox checked={checked} disabled={!canSelect || !compatible.length}
           onCheckedChange={value => onTogglePage(value === true)} aria-label="Sélectionner les lignes d'un même client ou groupe" /></th>
-        <th className="px-3 py-3">Client / groupe facturé</th>
+        <th className="px-3 py-3">Client</th>
         {["Quittance N°", "Police N°", "Compagnie", "Mouvement", "Assuré", "Véhicule", "Date d'effet", "Date d'expiration", "Montant bulletin", "Montant à payer"].map((label, index) =>
           <th key={label} className={`px-3 py-3 ${index >= 8 ? "text-right" : ""}`}>{label}</th>)}
       </tr></thead>

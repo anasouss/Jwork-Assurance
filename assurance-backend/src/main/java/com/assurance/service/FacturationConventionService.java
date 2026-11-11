@@ -117,14 +117,29 @@ public class FacturationConventionService {
                 .filter(item -> item.number() == periodNumber).findFirst()
                 .orElseThrow(() -> new BadRequestException("Periode incompatible avec le fractionnement de la convention"));
         synchronizeSchedules(agenceId, conventionId);
-        List<Long> ids = echeanceRepository.findPendingPeriod(agenceId, conventionId, period.start(), period.end()).stream()
-                .map(EcheanceFacturationConvention::getId).toList();
-        if (ids.isEmpty()) {
-            String payer = convention.getClientFacturation() == null ? null : convention.getClientFacturation().getNomAffichage();
-            return new PreparationFactureConventionResponse(List.of(), new ConventionInvoicePreviewResponse(
-                    convention.getIntitule(), payer, period.start(), period.end(), ZERO, List.of()));
+        List<EcheanceFacturationConvention> schedules = echeanceRepository.findPendingPeriod(agenceId, conventionId, period.start(), period.end());
+        Set<Long> contractIds = schedules.stream().map(item -> item.getContrat().getId()).collect(Collectors.toSet());
+        Map<Long, Client> subscribers = loadSubscribers(contractIds);
+        Map<Long, List<ElementFacturable>> elements = loadElements(contractIds);
+        Map<Long, List<EcheanceFacturationConvention>> allSchedules = contractIds.stream().collect(Collectors.toMap(
+                Function.identity(), echeanceRepository::findByContratIdAndActifTrueOrderByNumeroPeriodeAsc));
+        List<PreparationFactureConventionResponse.Ligne> rows = new ArrayList<>();
+        for (EcheanceFacturationConvention schedule : schedules) {
+            Payer payer = resolvePayer(schedule.getContrat(), subscribers);
+            List<ConventionInvoicePreviewResponse.Line> lines = new ArrayList<>();
+            for (ElementFacturable element : elements.getOrDefault(schedule.getContrat().getId(), List.of())) {
+                if (!isBillable(element) || !ConventionPaymentPolicy.isInvoice(element) || !matchesSource(element, schedule)) continue;
+                BigDecimal amount = elementBulletin(element) == null ? null
+                        : allocate(element, schedule, allSchedules.get(schedule.getContrat().getId())).ttc();
+                lines.add(invoiceLine(element, schedule, amount));
+            }
+            String blocked = lines.isEmpty() ? "Aucune source facturable"
+                    : lines.stream().anyMatch(line -> line.montantAPayer() == null) ? "Montant bulletin manquant" : null;
+            rows.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(),
+                    payer.group() == null ? payer.client().getId() : payer.group().getId(),
+                    payer.group() == null ? "CLIENT" : "GROUPE", payer.name(), blocked, lines));
         }
-        return new PreparationFactureConventionResponse(ids, preview(agenceId, ids));
+        return new PreparationFactureConventionResponse(convention.getIntitule(), period.start(), period.end(), rows);
     }
 
     @Transactional(readOnly = true)
@@ -146,13 +161,7 @@ public class FacturationConventionService {
                         + schedule.getContrat().getNumeroDossier());
                 Amount amount = allocate(element, schedule, schedules);
                 if (amount.ttc().signum() == 0) continue;
-                var details = details(element);
-                lines.add(new com.assurance.dto.response.ConventionInvoicePreviewResponse.Line(details.numeroQuittance(),
-                        schedule.getContrat().getNumeroPolice(), companyName(element),
-                        element.getMouvementContrat() == null ? element.getLibelle() : billingDetails.movementLabel(element.getMouvementContrat()),
-                        details.assure(), details.vehicule(),
-                        element.getDateDebut() == null ? schedule.getContrat().getDateEffet() : element.getDateDebut(),
-                        element.getDateFin() == null ? schedule.getContrat().getDateEcheance() : element.getDateFin(), elementBulletin(element), amount.ttc()));
+                lines.add(invoiceLine(element, schedule, amount.ttc()));
             }
         }
         return new com.assurance.dto.response.ConventionInvoicePreviewResponse(selected.get(0).getContrat().getConvention().getIntitule(),
@@ -182,6 +191,14 @@ public class FacturationConventionService {
 
     private ConventionBillingDetailsService.Details details(ElementFacturable element) {
         return billingDetails.details(element);
+    }
+
+    private ConventionInvoicePreviewResponse.Line invoiceLine(ElementFacturable element, EcheanceFacturationConvention schedule, BigDecimal amount) {
+        var source = details(element);
+        return new ConventionInvoicePreviewResponse.Line(source.numeroQuittance(), schedule.getContrat().getNumeroPolice(), companyName(element),
+                element.getMouvementContrat() == null ? element.getLibelle() : billingDetails.movementLabel(element.getMouvementContrat()),
+                source.assure(), source.vehicule(), element.getDateDebut() == null ? schedule.getContrat().getDateEffet() : element.getDateDebut(),
+                element.getDateFin() == null ? schedule.getContrat().getDateEcheance() : element.getDateFin(), elementBulletin(element), amount);
     }
 
     private String companyName(ElementFacturable element) {
@@ -371,7 +388,6 @@ public class FacturationConventionService {
         validateSelection(selected);
         synchronizeSchedules(agenceId, selected.get(0).getContrat().getConvention().getId());
         validateSelection(selected);
-        validateCompletePeriod(agenceId, selected);
         Payer payer = resolveSinglePayer(selected);
 
         Map<Long, List<EcheanceFacturationConvention>> schedulesByContract = contractIds.stream()
@@ -494,17 +510,6 @@ public class FacturationConventionService {
         });
         echeanceRepository.saveAll(selected);
         return documentClientService.detail(agenceId, saved.getId());
-    }
-
-    private void validateCompletePeriod(Long agenceId, List<EcheanceFacturationConvention> selected) {
-        EcheanceFacturationConvention first = selected.get(0);
-        Set<Long> expected = echeanceRepository.findPendingPeriod(agenceId, first.getContrat().getConvention().getId(),
-                        first.getPeriodeDebut(), first.getPeriodeFin()).stream()
-                .map(EcheanceFacturationConvention::getId).collect(Collectors.toSet());
-        Set<Long> requested = selected.stream().map(EcheanceFacturationConvention::getId).collect(Collectors.toSet());
-        if (!expected.equals(requested)) {
-            throw new BadRequestException("Le contenu de la periode a change. Actualisez le detail de la facture avant de valider.");
-        }
     }
 
     private void synchronizeSchedules(Long agenceId) {
@@ -798,11 +803,6 @@ public class FacturationConventionService {
     }
 
     private Payer resolvePayer(Contrat contract, Map<Long, Client> subscribers) {
-        Client conventionPayer = contract.getConvention() == null ? null : contract.getConvention().getClientFacturation();
-        if (conventionPayer != null) {
-            return new Payer("C:" + conventionPayer.getId(), conventionPayer, null, conventionPayer.getNomAffichage(),
-                    conventionPayer.getCodeClient(), clientAddress(conventionPayer));
-        }
         GroupeClient group = contract.getGroupeFacturation();
         boolean consolidated = group != null
                 && (contract.getModeFacturation() == ModeFacturationContrat.CONSOLIDEE_GROUPE
@@ -837,7 +837,7 @@ public class FacturationConventionService {
                 .map(item -> resolvePayer(item.getContrat(), subscribers))
                 .toList();
         if (payers.isEmpty() || payers.stream().map(Payer::key).distinct().count() != 1) {
-            throw new BadRequestException("Les échéances doivent appartenir au même payeur. Configurez le destinataire des factures de la convention.");
+            throw new BadRequestException("Sélectionnez les lignes d'un même client ou groupe de facturation pour préparer une facture.");
         }
         return payers.get(0);
     }

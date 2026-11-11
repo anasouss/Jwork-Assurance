@@ -21,7 +21,6 @@ public class UpsertConventionRequest {
 
     private String description;
     private String organismeConventionne;
-    private Long clientFacturationId;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
 

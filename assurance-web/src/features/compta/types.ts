@@ -305,13 +305,22 @@ export type ConventionInvoicePreview = {
     dateEffet?: string | null;
     dateExpiration?: string | null;
     montantBulletin: number | null;
-    montantAPayer: number;
+    montantAPayer: number | null;
   }[];
 };
 
 export type ConventionInvoicePreparation = {
-  echeanceIds: string[];
-  apercu: ConventionInvoicePreview;
+  convention: string;
+  periodeDebut: string;
+  periodeFin: string;
+  lignes: {
+    echeanceId: string;
+    payeurId: string;
+    payeurType: "CLIENT" | "GROUPE";
+    payeurNom: string;
+    blocage?: string | null;
+    details: ConventionInvoicePreview["lignes"];
+  }[];
 };
 
 export type ConventionProductionFilters = {

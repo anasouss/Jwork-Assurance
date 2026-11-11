@@ -150,7 +150,7 @@ export const comptaApi = {
     const result = unwrap(await apiFetch<ApiResponse<ConventionInvoicePreparation>>(
       `/api/v1/compta/facturation-conventions/preparation${buildQueryString(params)}`
     ));
-    return { ...result, echeanceIds: result.echeanceIds.map(String) };
+    return { ...result, lignes: result.lignes.map(row => ({ ...row, echeanceId: String(row.echeanceId), payeurId: String(row.payeurId) })) };
   },
 
   async previewConventionInvoice(echeanceIds: string[]) {

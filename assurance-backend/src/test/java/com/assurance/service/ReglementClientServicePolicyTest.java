@@ -48,6 +48,8 @@ class ReglementClientServicePolicyTest {
     @Mock private com.assurance.repository.AgenceRepository conventionAgencyRepository;
     @Mock private com.assurance.repository.ElementFacturableRepository conventionElementRepository;
     @Mock private com.assurance.repository.ConventionRepository conventionRepository;
+    @Mock private com.assurance.repository.ContratClientRepository conventionContractClients;
+    @Mock private ConventionBillingDetailsService conventionDetails;
     @InjectMocks private FacturationConventionService conventionBilling;
 
     @BeforeEach
@@ -148,13 +150,61 @@ class ReglementClientServicePolicyTest {
         when(conventionScheduleRepository.findPendingPeriod(7L, 22L, java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 3, 31)))
                 .thenReturn(List.of());
         var result = conventionBilling.preparePeriod(7L, 22L, 2026, 1);
-        assertThat(result.echeanceIds()).isEmpty();
-        assertThat(result.apercu().convention()).isEqualTo("AOSFOC");
-        assertThat(result.apercu().periodeDebut()).isEqualTo(java.time.LocalDate.of(2026, 1, 1));
-        assertThat(result.apercu().periodeFin()).isEqualTo(java.time.LocalDate.of(2026, 3, 31));
-        assertThat(result.apercu().lignes()).isEmpty();
-        assertThat(result.apercu().total()).isEqualByComparingTo("0.00");
+        assertThat(result.convention()).isEqualTo("AOSFOC");
+        assertThat(result.periodeDebut()).isEqualTo(java.time.LocalDate.of(2026, 1, 1));
+        assertThat(result.periodeFin()).isEqualTo(java.time.LocalDate.of(2026, 3, 31));
+        assertThat(result.lignes()).isEmpty();
         verify(conventionScheduleRepository).findPendingPeriod(7L, 22L, java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 3, 31));
+    }
+
+    @Test
+    void mainPeriodListCanContainDifferentClientsWhileInvoicePreviewRemainsSinglePayer() {
+        var start = java.time.LocalDate.of(2026, 1, 1);
+        var end = java.time.LocalDate.of(2026, 12, 31);
+        var convention = com.assurance.entity.Convention.builder().intitule("AOSFOC")
+                .typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE).echeance("01/01")
+                .fractionnement(com.assurance.enums.Fractionnement.ANNUEL).build();
+        convention.setId(22L);
+        var schedules = new java.util.ArrayList<com.assurance.entity.EcheanceFacturationConvention>();
+        var elements = new java.util.ArrayList<ElementFacturable>();
+        for (int index = 0; index < 2; index++) {
+            var client = com.assurance.entity.Client.builder().nom("CLIENT " + index).build();
+            client.setId(10L + index);
+            var contract = Contrat.builder().convention(convention).payeurPrime(client).modeReglement("facture")
+                    .typeContrat(com.assurance.enums.TypeContrat.CONVENTION).montantBulletin(new BigDecimal("100.00"))
+                    .dateEffet(start).dateEcheance(end).build();
+            contract.setId(100L + index);
+            var element = ElementFacturable.builder().contrat(contract).nature(com.assurance.enums.NatureElementFacturable.CONTRAT)
+                    .statut(com.assurance.enums.StatutElementFacturable.QUITTANCE).dateDebut(start).dateFin(end)
+                    .primeNette(new BigDecimal("80.00")).primeTotale(new BigDecimal("95.00")).build();
+            element.setId(200L + index);
+            elements.add(element);
+            var schedule = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
+                    .periodeDebut(start).periodeFin(end).build();
+            schedule.setId(300L + index);
+            schedules.add(schedule);
+            when(conventionScheduleRepository.findByContratIdAndActifTrueOrderByNumeroPeriodeAsc(contract.getId())).thenReturn(List.of(schedule));
+        }
+        when(conventionRepository.findByAgenceIdAndId(7L, 22L)).thenReturn(java.util.Optional.of(convention));
+        when(conventionAgencyRepository.findByIdForUpdate(7L)).thenReturn(java.util.Optional.of(com.assurance.entity.Agence.builder().build()));
+        when(conventionScheduleRepository.findPendingPeriod(7L, 22L, start, end)).thenReturn(schedules);
+        when(conventionElementRepository.findByContratIdInAndActifTrueOrderByDateDebutAscIdAsc(any())).thenReturn(elements);
+        when(conventionDetails.details(any())).thenReturn(new ConventionBillingDetailsService.Details("Q-001", "Assure", "PL-001"));
+        var result = conventionBilling.preparePeriod(7L, 22L, 2026, 1);
+        assertThat(result.lignes()).hasSize(2);
+        assertThat(result.lignes()).extracting(com.assurance.dto.response.PreparationFactureConventionResponse.Ligne::payeurId)
+                .containsExactly(10L, 11L);
+        assertThat(result.lignes()).allSatisfy(row -> {
+            assertThat(row.blocage()).isNull();
+            assertThat(row.details()).hasSize(1);
+        });
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "resolveSinglePayer", schedules))
+                .isInstanceOf(BadRequestException.class);
+        when(conventionScheduleRepository.findSelected(7L, List.of(300L))).thenReturn(List.of(schedules.get(0)));
+        var invoice = conventionBilling.preview(7L, List.of(300L));
+        assertThat(invoice.payeur()).isEqualTo("CLIENT 0");
+        assertThat(invoice.lignes()).hasSize(1);
+        assertThat(invoice.total()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -175,22 +225,21 @@ class ReglementClientServicePolicyTest {
     }
 
     @Test
-    void invoiceCannotOmitALineFromTheCurrentPeriod() {
-        var convention = com.assurance.entity.Convention.builder().build();
-        convention.setId(22L);
-        var contract = Contrat.builder().convention(convention).build();
-        var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
-                .periodeDebut(java.time.LocalDate.of(2026, 1, 1)).periodeFin(java.time.LocalDate.of(2026, 3, 31)).build();
-        first.setId(1L);
-        var second = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
-                .periodeDebut(first.getPeriodeDebut()).periodeFin(first.getPeriodeFin()).build();
-        second.setId(2L);
-        when(conventionScheduleRepository.findPendingPeriod(7L, 22L, first.getPeriodeDebut(), first.getPeriodeFin()))
-                .thenReturn(List.of(first, second));
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateCompletePeriod", 7L, List.of(first)))
-                .isInstanceOf(BadRequestException.class);
-        org.assertj.core.api.Assertions.assertThatCode(() -> ReflectionTestUtils.invokeMethod(
-                conventionBilling, "validateCompletePeriod", 7L, List.of(first, second))).doesNotThrowAnyException();
+    void billingUsesTheExistingContractPayerOrConfiguredConsolidatedGroup() {
+        var client = com.assurance.entity.Client.builder().nom("CLIENT A").codeClient("C001").build();
+        client.setId(11L);
+        var contract = Contrat.builder().payeurPrime(client).build();
+        Object direct = ReflectionTestUtils.invokeMethod(conventionBilling, "resolvePayer", contract, java.util.Map.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(direct, "key")).isEqualTo("C:11");
+        var group = com.assurance.entity.GroupeClient.builder().libelle("AOSFOC").code("GR001").clientTresorerie(client).build();
+        group.setId(22L);
+        contract.setGroupeFacturation(group);
+        contract.setModeFacturation(com.assurance.enums.ModeFacturationContrat.CONSOLIDEE_GROUPE);
+        Object consolidated = ReflectionTestUtils.invokeMethod(conventionBilling, "resolvePayer", contract, java.util.Map.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(consolidated, "key")).isEqualTo("G:22");
+        contract.setModeFacturation(null);
+        Object ungrouped = ReflectionTestUtils.invokeMethod(conventionBilling, "resolvePayer", contract, java.util.Map.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(ungrouped, "key")).isEqualTo("C:11");
     }
 
     @Test

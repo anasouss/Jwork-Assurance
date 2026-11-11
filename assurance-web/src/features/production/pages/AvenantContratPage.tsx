@@ -513,6 +513,7 @@ export default function AvenantContratPage() {
         queryClient.invalidateQueries({ queryKey: amendmentKeys.context(contratId) }),
         queryClient.invalidateQueries({ queryKey: attestationStockKeys.all }),
         queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing-preparation"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-receivable-selection"] }),

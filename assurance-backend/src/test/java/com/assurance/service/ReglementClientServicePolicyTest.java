@@ -47,6 +47,7 @@ class ReglementClientServicePolicyTest {
     @Mock private com.assurance.repository.EcheanceFacturationConventionRepository conventionScheduleRepository;
     @Mock private com.assurance.repository.AgenceRepository conventionAgencyRepository;
     @Mock private com.assurance.repository.ElementFacturableRepository conventionElementRepository;
+    @Mock private com.assurance.repository.ConventionRepository conventionRepository;
     @InjectMocks private FacturationConventionService conventionBilling;
 
     @BeforeEach
@@ -134,6 +135,62 @@ class ReglementClientServicePolicyTest {
         movement.setModeReglementConvention(com.assurance.enums.ModeReglementConvention.BUREAU);
         Object bureauAmount = ReflectionTestUtils.invokeMethod(conventionBilling, "allocate", element, first, schedules);
         assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(bureauAmount, "ttc")).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void periodPreparationReturnsAnEmptyDetailedPreviewForAnAlreadyBilledOrEmptyPeriod() {
+        var convention = com.assurance.entity.Convention.builder().intitule("AOSFOC")
+                .typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE).echeance("01/01")
+                .fractionnement(com.assurance.enums.Fractionnement.TRIMESTRIEL).build();
+        convention.setId(22L);
+        when(conventionRepository.findByAgenceIdAndId(7L, 22L)).thenReturn(java.util.Optional.of(convention));
+        when(conventionAgencyRepository.findByIdForUpdate(7L)).thenReturn(java.util.Optional.of(com.assurance.entity.Agence.builder().build()));
+        when(conventionScheduleRepository.findPendingPeriod(7L, 22L, java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 3, 31)))
+                .thenReturn(List.of());
+        var result = conventionBilling.preparePeriod(7L, 22L, 2026, 1);
+        assertThat(result.echeanceIds()).isEmpty();
+        assertThat(result.apercu().convention()).isEqualTo("AOSFOC");
+        assertThat(result.apercu().periodeDebut()).isEqualTo(java.time.LocalDate.of(2026, 1, 1));
+        assertThat(result.apercu().periodeFin()).isEqualTo(java.time.LocalDate.of(2026, 3, 31));
+        assertThat(result.apercu().lignes()).isEmpty();
+        assertThat(result.apercu().total()).isEqualByComparingTo("0.00");
+        verify(conventionScheduleRepository).findPendingPeriod(7L, 22L, java.time.LocalDate.of(2026, 1, 1), java.time.LocalDate.of(2026, 3, 31));
+    }
+
+    @Test
+    void periodPreparationCannotUseAnotherAgencysConvention() {
+        when(conventionRepository.findByAgenceIdAndId(7L, 22L)).thenReturn(java.util.Optional.empty());
+        assertThatThrownBy(() -> conventionBilling.preparePeriod(7L, 22L, 2026, 1))
+                .isInstanceOf(com.assurance.exception.ResourceNotFoundException.class);
+        org.mockito.Mockito.verifyNoInteractions(conventionAgencyRepository, conventionScheduleRepository);
+    }
+
+    @Test
+    void periodPreparationRejectsAQuarterForAnAnnualConvention() {
+        var convention = com.assurance.entity.Convention.builder().typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE)
+                .echeance("01/01").fractionnement(com.assurance.enums.Fractionnement.ANNUEL).build();
+        when(conventionRepository.findByAgenceIdAndId(7L, 22L)).thenReturn(java.util.Optional.of(convention));
+        assertThatThrownBy(() -> conventionBilling.preparePeriod(7L, 22L, 2026, 2)).isInstanceOf(BadRequestException.class);
+        org.mockito.Mockito.verifyNoInteractions(conventionAgencyRepository, conventionScheduleRepository);
+    }
+
+    @Test
+    void invoiceCannotOmitALineFromTheCurrentPeriod() {
+        var convention = com.assurance.entity.Convention.builder().build();
+        convention.setId(22L);
+        var contract = Contrat.builder().convention(convention).build();
+        var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
+                .periodeDebut(java.time.LocalDate.of(2026, 1, 1)).periodeFin(java.time.LocalDate.of(2026, 3, 31)).build();
+        first.setId(1L);
+        var second = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
+                .periodeDebut(first.getPeriodeDebut()).periodeFin(first.getPeriodeFin()).build();
+        second.setId(2L);
+        when(conventionScheduleRepository.findPendingPeriod(7L, 22L, first.getPeriodeDebut(), first.getPeriodeFin()))
+                .thenReturn(List.of(first, second));
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateCompletePeriod", 7L, List.of(first)))
+                .isInstanceOf(BadRequestException.class);
+        org.assertj.core.api.Assertions.assertThatCode(() -> ReflectionTestUtils.invokeMethod(
+                conventionBilling, "validateCompletePeriod", 7L, List.of(first, second))).doesNotThrowAnyException();
     }
 
     @Test
@@ -242,6 +299,10 @@ class ReglementClientServicePolicyTest {
                 .modeReglementConvention(com.assurance.enums.ModeReglementConvention.FACTURE).build();
         movement.setId(50L);
         contract.getMouvements().add(movement);
+        when(conventionElementRepository.findByContratIdInAndActifTrueOrderByDateDebutAscIdAsc(List.of(10L)))
+                .thenReturn(List.of(ElementFacturable.builder().contrat(contract).mouvementContrat(movement)
+                        .nature(com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT)
+                        .statut(com.assurance.enums.StatutElementFacturable.QUITTANCE).build()));
         var issued = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
                 .periodeDebut(start).periodeFin(end).numeroPeriode(1).nombrePeriodes(1)
                 .statut(com.assurance.enums.StatutEcheanceFacturationConvention.FACTUREE).build();

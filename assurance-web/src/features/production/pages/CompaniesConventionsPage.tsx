@@ -157,6 +157,7 @@ export default function CompaniesConventionsPage() {
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "conventions"] });
       await queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing-options"] });
       await queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing-preparation"] });
       toast.success("Convention enregistrée");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Convention impossible à enregistrer"),

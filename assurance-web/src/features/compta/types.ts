@@ -291,7 +291,7 @@ export type ConventionBillingOption = {
 
 export type ConventionInvoicePreview = {
   convention: string;
-  payeur: string;
+  payeur: string | null;
   periodeDebut: string;
   periodeFin: string;
   total: number;
@@ -307,6 +307,11 @@ export type ConventionInvoicePreview = {
     montantBulletin: number | null;
     montantAPayer: number;
   }[];
+};
+
+export type ConventionInvoicePreparation = {
+  echeanceIds: string[];
+  apercu: ConventionInvoicePreview;
 };
 
 export type ConventionProductionFilters = {

@@ -27,6 +27,25 @@ public interface EcheanceFacturationConventionRepository
 
     List<EcheanceFacturationConvention> findByContratIdOrderByNumeroPeriodeAsc(Long contratId);
 
+    @EntityGraph(attributePaths = {"contrat", "contrat.convention", "contrat.payeurPrime", "contrat.groupeFacturation"})
+    @Query("""
+            select e from EcheanceFacturationConvention e
+            where e.agence.id = :agenceId
+              and e.contrat.agence.id = :agenceId
+              and e.contrat.convention.id = :conventionId
+              and e.actif = true
+              and e.statut = com.assurance.enums.StatutEcheanceFacturationConvention.A_FACTURER
+              and e.documentClient is null
+              and e.periodeDebut = :debut and e.periodeFin = :fin
+            order by e.id
+            """)
+    List<EcheanceFacturationConvention> findPendingPeriod(
+            @Param("agenceId") Long agenceId,
+            @Param("conventionId") Long conventionId,
+            @Param("debut") java.time.LocalDate debut,
+            @Param("fin") java.time.LocalDate fin
+    );
+
     @org.springframework.data.jpa.repository.Modifying
     @Query("""
             update EcheanceFacturationConvention e set e.actif = false

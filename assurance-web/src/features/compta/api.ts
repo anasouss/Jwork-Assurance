@@ -24,6 +24,7 @@ import type {
   ConventionBillingPage,
   ConventionBillingOption,
   ConventionInvoicePreview,
+  ConventionInvoicePreparation,
   ConventionProductionFilters,
   ConventionProductionPage,
   ConventionBillingStatus,
@@ -143,6 +144,13 @@ export const comptaApi = {
     return unwrap(await apiFetch<ApiResponse<ConventionBillingOption[]>>(
       `/api/v1/compta/facturation-conventions/conventions${buildQueryString({ annee })}`
     )).map(row => ({ ...row, id: String(row.id) }));
+  },
+
+  async prepareConventionInvoice(params: { conventionId: string; annee: number; periode: number }) {
+    const result = unwrap(await apiFetch<ApiResponse<ConventionInvoicePreparation>>(
+      `/api/v1/compta/facturation-conventions/preparation${buildQueryString(params)}`
+    ));
+    return { ...result, echeanceIds: result.echeanceIds.map(String) };
   },
 
   async previewConventionInvoice(echeanceIds: string[]) {

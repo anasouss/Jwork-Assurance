@@ -20,7 +20,7 @@ export function ProductionTrendChart({ rows: monthlyData, dateFrom, dateTo }: {
   const hasProduction = monthlyData.some(item => item.primeTotale !== 0 || item.primeNette !== 0);
   return (
     <section className="min-w-0 border-y bg-card">
-      <div className="border-b bg-foreground/[0.04] px-4 py-3">
+      <div className="border-b bg-foreground/[0.06] px-4 py-3">
         <h2 className="text-base font-semibold">Évolution de la production</h2>
         <p className="mt-1 text-xs text-muted-foreground">Du {formatDate(dateFrom)} au {formatDate(dateTo)} · {monthlyData[0]?.granularite === "DAY" ? "par jour" : "par mois"} · MAD</p>
       </div>

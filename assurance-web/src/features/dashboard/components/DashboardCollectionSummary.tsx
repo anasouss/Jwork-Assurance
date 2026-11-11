@@ -50,7 +50,7 @@ export function DashboardCollectionSummary({ dateReference }: { dateReference: s
     }] : []),
   ];
   return <section aria-labelledby="collection-summary-title" className="min-w-0 border-y bg-card">
-    <div className="border-b bg-foreground/[0.04] px-4 py-3">
+    <div className="border-b bg-foreground/[0.06] px-4 py-3">
       <h2 id="collection-summary-title" className="text-base font-semibold">Encaissements actuels</h2>
       <p className="mt-1 text-xs text-muted-foreground">Situation au {formatTreasuryDate(dateReference)}</p>
     </div>

@@ -45,7 +45,7 @@ export function DashboardWorkQueue({ data, permissions }: { data: DashboardData;
 
   return (
     <section aria-labelledby="work-queue-title" className="min-w-0 border-y bg-card">
-      <div className="border-b bg-foreground/[0.04] px-4 py-3">
+      <div className="border-b bg-foreground/[0.06] px-4 py-3">
         <h2 id="work-queue-title" className="text-base font-semibold">À traiter</h2>
         <p className="mt-1 text-xs text-muted-foreground">Situation au {formatDate(data.dateReference)}</p>
       </div>

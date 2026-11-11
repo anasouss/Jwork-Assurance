@@ -22,7 +22,7 @@ export function DashboardPortfolio({ rows, contractTypes, total, activeAssistanc
 }) {
   return (
     <section className="min-w-0 border-y bg-card">
-      <div className="border-b bg-foreground/[0.04] px-4 py-3">
+      <div className="border-b bg-foreground/[0.06] px-4 py-3">
         <h2 className="text-base font-semibold">Portefeuille en vigueur</h2>
         <p className="mt-1 text-xs text-muted-foreground">Contrats actuellement actifs couvrant le {formatDate(date)}</p>
       </div>

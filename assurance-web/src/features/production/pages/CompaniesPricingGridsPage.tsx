@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit, Plus, RotateCcw, Search, SlidersHorizontal, TableProperties } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Badge } from "@/components/ui/badge";

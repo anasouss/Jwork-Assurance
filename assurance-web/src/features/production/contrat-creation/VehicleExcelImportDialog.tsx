@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AlertCircle, CheckCircle2, Download, FileDown, FileSpreadsheet, Loader2, Upload } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

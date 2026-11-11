@@ -2,7 +2,7 @@ import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, CircleDollarSign, FileText, FolderOpen, Landmark, Phone, Printer, ShieldAlert, ShieldCheck, UserRound, X } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

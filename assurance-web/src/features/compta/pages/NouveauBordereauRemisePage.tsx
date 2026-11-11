@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Banknote, FileClock, Plus, ReceiptText } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";

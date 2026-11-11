@@ -1,6 +1,6 @@
 import { useId, useState, type DragEvent, type ReactNode } from "react";
 import { FileText, FileUp, Upload, X } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

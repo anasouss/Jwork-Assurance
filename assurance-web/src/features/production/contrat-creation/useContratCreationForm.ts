@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ApiError } from "@/lib/api/base";
 import { attestationStockKeys, contractKeys } from "@/lib/query-keys";
 import { clientApi } from "../api/clients";

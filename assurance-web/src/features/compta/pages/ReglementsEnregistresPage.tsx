@@ -17,7 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Badge } from "@/components/ui/badge";

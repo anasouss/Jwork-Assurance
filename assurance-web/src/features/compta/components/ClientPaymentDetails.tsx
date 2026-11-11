@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Download, Landmark } from "lucide-react";
 import { Link } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { downloadBlob } from "@/lib/download";

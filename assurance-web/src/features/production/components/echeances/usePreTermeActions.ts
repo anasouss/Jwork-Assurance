@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { contractKeys } from "@/lib/query-keys";
 import { contractApi } from "../../api/contracts";
 import { renewalDraftPath } from "../../renewals/navigation";

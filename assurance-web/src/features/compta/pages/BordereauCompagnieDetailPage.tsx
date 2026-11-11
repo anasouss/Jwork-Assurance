@@ -11,7 +11,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   AlertDialog,
   AlertDialogAction,

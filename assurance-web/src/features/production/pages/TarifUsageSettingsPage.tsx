@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Check, ChevronDown, ChevronRight, ChevronsUpDown, Edit, History, Percent, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { ServerPagination } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";

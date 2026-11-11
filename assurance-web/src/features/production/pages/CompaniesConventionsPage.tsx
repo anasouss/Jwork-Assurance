@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Edit, Plus, Search, SlidersHorizontal } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";

@@ -1,40 +1,52 @@
-
+import type { CSSProperties } from "react";
 import {
   CircleCheckIcon,
   InfoIcon,
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
-} from "lucide-react"
-import { useTheme } from "next-themes"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { cn } from "@/lib/utils";
+import "./sonner.css";
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+export function Toaster({ className, style, toastOptions, icons, ...props }: ToasterProps) {
+  const { theme = "system" } = useTheme();
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      position="top-right"
+      duration={5000}
+      closeButton
+      visibleToasts={3}
+      gap={12}
+      offset={24}
+      mobileOffset={16}
+      containerAriaLabel="Notifications"
+      {...props}
+      className={cn("app-toaster", className)}
       icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
+        success: <><CircleCheckIcon aria-hidden="true" /><span className="sr-only">Succès : </span></>,
+        error: <><OctagonXIcon aria-hidden="true" /><span className="sr-only">Erreur : </span></>,
+        warning: <><TriangleAlertIcon aria-hidden="true" /><span className="sr-only">Attention : </span></>,
+        info: <><InfoIcon aria-hidden="true" /><span className="sr-only">Information : </span></>,
+        loading: <Loader2Icon aria-label="En cours" className="animate-spin motion-reduce:animate-none" />,
+        ...icons,
       }}
       style={
         {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--border-radius": "8px",
+          "--width": "380px",
           fontFamily: "var(--font-sans)",
-        } as React.CSSProperties
+          ...style,
+        } as CSSProperties
       }
-      {...props}
+      toastOptions={{ closeButtonAriaLabel: "Fermer la notification", ...toastOptions }}
     />
-  )
+  );
 }
-
-export { Toaster }

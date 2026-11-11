@@ -277,6 +277,60 @@ export type ConventionBillingInstallment = {
   taxes: number;
   accessoires: number;
   montantTtc: number;
+  montantBulletin: number | null;
+  blocage?: string | null;
+};
+
+export type ConventionBillingOption = {
+  id: string;
+  intitule: string;
+  fractionnement: Fractionnement | null;
+  blocage?: string | null;
+  periodes: { numero: number; debut: string; fin: string }[];
+};
+
+export type ConventionInvoicePreview = {
+  convention: string;
+  payeur: string;
+  periodeDebut: string;
+  periodeFin: string;
+  total: number;
+  lignes: {
+    numeroQuittance?: string | null;
+    numeroPolice?: string | null;
+    compagnie?: string | null;
+    mouvement?: string | null;
+    assure?: string | null;
+    vehicule?: string | null;
+    dateEffet?: string | null;
+    dateExpiration?: string | null;
+    montantBulletin: number | null;
+    montantAPayer: number;
+  }[];
+};
+
+export type ConventionProductionFilters = {
+  conventionId?: string;
+  compagnieId?: string;
+  mode?: "BUREAU" | "FACTURE";
+  typeDate: "EFFET" | "EMISSION";
+  dateDu: string;
+  dateAu: string;
+};
+
+export type ConventionProductionPage = {
+  rows: (Omit<ConventionInvoicePreview["lignes"][number], "montantBulletin" | "montantAPayer"> & {
+    id: string;
+    convention?: string | null;
+    primeNette: number;
+    taxes: number;
+    montantTtc: number;
+    mode?: "BUREAU" | "FACTURE" | null;
+    montantClient?: number | null;
+  })[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
 };
 
 export type ConventionBillingPage = {
@@ -292,6 +346,7 @@ export type ConventionBillingPage = {
 
 export type CreateConventionInvoiceRequest = {
   echeanceIds: string[];
+  montantAttendu: number;
   dateEcheance?: string;
   notes?: string;
 };
@@ -377,6 +432,9 @@ export type ClientDocumentLine = {
   numeroQuittance: string;
   mouvement: string;
   compagnie: string;
+  assureConvention?: string | null;
+  vehiculeConvention?: string | null;
+  montantBulletinConvention?: number | null;
   debit: number;
   credit: number;
   primeNette: number;
@@ -409,6 +467,7 @@ export type ClientDocument = {
   totalCredit: number;
   totalDocument: number;
   notes?: string | null;
+  conventionFacturee?: string | null;
   versionDocument: number;
   documentOrigineId?: string | null;
   numeroDocumentOrigine?: string | null;

@@ -118,6 +118,9 @@ public class DocumentClient extends AuditedEntity {
     @Column(length = 1000)
     private String notes;
 
+    @Column(name = "convention_facturee", length = 220)
+    private String conventionFacturee;
+
     @Column(name = "version_document", nullable = false)
     @Builder.Default
     private Integer versionDocument = 1;

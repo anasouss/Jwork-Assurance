@@ -20,6 +20,7 @@ public class EcheanceFacturationConventionPageResponse {
     @Builder
     public static class Summary {
         private long total;
+        @Getter(onMethod_ = @com.fasterxml.jackson.annotation.JsonProperty("aFacturer"))
         private long aFacturer;
         private long facturees;
         private BigDecimal montantAFacturer;
@@ -65,5 +66,7 @@ public class EcheanceFacturationConventionPageResponse {
         private BigDecimal taxes;
         private BigDecimal accessoires;
         private BigDecimal montantTtc;
+        private String blocage;
+        private BigDecimal montantBulletin;
     }
 }

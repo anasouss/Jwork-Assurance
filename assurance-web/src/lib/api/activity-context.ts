@@ -14,6 +14,7 @@ export function activitySurfaceForPath(path: string) {
   if (path.startsWith("/app/crm")) return "CLIENT_REGISTER";
   if (path.startsWith("/app/compta/releves-factures")) return "CLIENT_ACCOUNTING";
   if (path.startsWith("/app/compta/facturation-conventions")) return "CONVENTION_BILLING";
+  if (path.startsWith("/app/compta/conventions/production")) return "CONVENTION_BILLING";
   if (path.startsWith("/app/compta/reglements")) return "CLIENT_PAYMENTS";
   if (path.startsWith("/app/compta/bordereaux-compagnies")) return "COMPANY_ACCOUNTING";
   if (path.startsWith("/app/compta/quittances")) return "COMPANY_ASSIGNMENTS";

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
+import { DatePicker } from "@/components/ui/date-picker";
+import { clientApi } from "../api/clients";
+import { toDateOnly } from "../date";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SortableTableHead, type TableSortDirection } from "@/components/ui/sortable-table-head";
@@ -46,6 +50,14 @@ export default function CompaniesConventionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [grilleDialogOpen, setGrilleDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertConventionRequest>(emptyConvention(""));
+  const [billingClientSearch, setBillingClientSearch] = useState("");
+  const billingClientQuery = useDeferredValue(billingClientSearch.trim());
+  const billingClients = useQuery({
+    queryKey: ["clients", "convention-billing-payer", billingClientQuery],
+    queryFn: () => clientApi.listClients({ query: billingClientQuery, size: 25 }),
+    enabled: dialogOpen && billingClientQuery.length >= 2,
+  });
+  const [billingClientOption, setBillingClientOption] = useState<{ value: string; label: string } | null>(null);
 
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
@@ -95,6 +107,9 @@ export default function CompaniesConventionsPage() {
     if (!dialogOpen) return;
     const defaultCompany = compagnieId === ALL_COMPANIES ? "" : compagnieId;
     setPayload(editing ? conventionPayload(editing) : emptyConvention(defaultCompany));
+    setBillingClientSearch("");
+    setBillingClientOption(editing && conventionField(editing, "clientFacturationId")
+      ? { value: conventionField(editing, "clientFacturationId"), label: conventionField(editing, "clientFacturationNom") } : null);
   }, [compagnieId, dialogOpen, editing]);
 
   const allowedUsageIds = useMemo(() => {
@@ -140,6 +155,8 @@ export default function CompaniesConventionsPage() {
       setDialogOpen(false);
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ["referentiel", "conventions"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing-options"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing"] });
       toast.success("Convention enregistrée");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Convention impossible à enregistrer"),
@@ -306,6 +323,25 @@ export default function CompaniesConventionsPage() {
                 </SelectContent>
               </Select>
             </Field>
+            <Field label="Destinataire des factures">
+              <AutocompleteSelect
+                value={payload.clientFacturationId ?? ""}
+                onQueryChange={setBillingClientSearch}
+                options={Array.from(new Map([
+                  ...(billingClientOption ? [[billingClientOption.value, billingClientOption] as const] : []),
+                  ...(billingClients.data?.items ?? []).map(client => [client.id, { value: client.id, label: client.nomAffichage ?? client.id }] as const),
+                ]).values())}
+                placeholder="Nom, code client, RC ou CIN"
+                onValueChange={value => {
+                  updatePayload(setPayload, { clientFacturationId: value || undefined });
+                  const client = billingClients.data?.items.find(item => item.id === value);
+                  if (client) setBillingClientOption({ value, label: client.nomAffichage ?? value });
+                }}
+              />
+            </Field>
+            {payload.typeEcheance === "DATE_A_DATE" && <Field label="Début du cycle de facturation">
+              <DatePicker date={payload.dateEffet} onSelect={date => updatePayload(setPayload, { dateEffet: toDateOnly(date) ?? undefined })} />
+            </Field>}
             {payload.typeEcheance === "A_ECHEANCE" ? (
               <Field label="Échéance (jj/mm)" required>
                 <EcheanceInput
@@ -492,6 +528,9 @@ function conventionPayload(convention: ReferenceOption): UpsertConventionRequest
     intitule: convention.libelle,
     description: conventionField(convention, "description"),
     organismeConventionne: conventionField(convention, "organismeConventionne"),
+    clientFacturationId: conventionField(convention, "clientFacturationId") || undefined,
+    dateEffet: conventionField(convention, "dateEffet") || undefined,
+    dateEcheance: conventionField(convention, "dateEcheance") || undefined,
     typeEcheance: conventionField(convention, "typeEcheance") === "A_ECHEANCE" ? "A_ECHEANCE" : "DATE_A_DATE",
     echeance: conventionField(convention, "echeance"),
     fractionnement: parseFractionnement(conventionField(convention, "fractionnement")),

@@ -28,7 +28,7 @@ public interface ContratRepository extends JpaRepository<Contrat, Long> {
             select c from Contrat c
             where c.agence.id = :agenceId
               and c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
-              and c.statut = com.assurance.enums.StatutContrat.ACTIVE
+              and c.statut <> com.assurance.enums.StatutContrat.DRAFT
               and c.prospection = false
               and c.brouillon = false
               and (lower(trim(coalesce(c.modeReglement, ''))) = 'facture'

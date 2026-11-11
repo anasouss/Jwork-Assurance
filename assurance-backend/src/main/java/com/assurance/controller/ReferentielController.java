@@ -121,6 +121,7 @@ public class ReferentielController {
     private final TarifUsageRepository tarifUsageRepository;
     private final VilleRepository villeRepository;
     private final CategorieClientRepository categorieClientRepository;
+    private final com.assurance.repository.ClientRepository conventionClientRepository;
     private final GroupeExclusionGarantieRepository groupeExclusionGarantieRepository;
     private final GroupeUsageAttestationRepository groupeUsageAttestationRepository;
     private final ConventionRepository conventionRepository;
@@ -1714,6 +1715,9 @@ public class ReferentielController {
         convention.setIntitule(request.getIntitule());
         convention.setDescription(blankToNull(request.getDescription()));
         convention.setOrganismeConventionne(blankToNull(request.getOrganismeConventionne()));
+        convention.setClientFacturation(request.getClientFacturationId() == null ? null
+                : conventionClientRepository.findByAgenceIdAndId(agenceId, request.getClientFacturationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Client", request.getClientFacturationId())));
         convention.setCategorieClient(categorieClient);
         convention.setGrilleTarifaire(grille);
         convention.setDateEffet(request.getDateEffet());
@@ -1735,6 +1739,8 @@ public class ReferentielController {
                 .putValue("compagnieAssuranceId", compagnie != null ? compagnie.getId() : null)
                 .putValue("compagnieAssuranceLibelle", compagnie != null ? compagnie.getNom() : null)
                 .putValue("organismeConventionne", convention.getOrganismeConventionne())
+                .putValue("clientFacturationId", convention.getClientFacturation() == null ? null : convention.getClientFacturation().getId())
+                .putValue("clientFacturationNom", convention.getClientFacturation() == null ? null : convention.getClientFacturation().getNomAffichage())
                 .putValue("categorieClientId", categorieClient != null ? categorieClient.getId() : null)
                 .putValue("categorieClientLibelle", categorieClient != null ? categorieClient.getLibelle() : null)
                 .putValue("grilleTarifaireId", grille != null ? grille.getId() : null)

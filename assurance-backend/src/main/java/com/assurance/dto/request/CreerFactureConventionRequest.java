@@ -15,6 +15,9 @@ public class CreerFactureConventionRequest {
     @NotEmpty(message = "Sélectionnez au moins une échéance")
     private List<Long> echeanceIds;
 
+    @jakarta.validation.constraints.NotNull
+    private java.math.BigDecimal montantAttendu;
+
     @FutureOrPresent(message = "La date d'échéance ne peut pas être passée")
     private LocalDate dateEcheance;
 

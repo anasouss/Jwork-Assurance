@@ -491,6 +491,9 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and c.prospection = false
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+                    and not exists (select assistanceElement.id from ElementFacturable assistanceElement
+                        where assistanceElement = q.elementFacturable
+                          and assistanceElement.nature not in (com.assurance.enums.NatureElementFacturable.CONTRAT, com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT))
                     and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
                          or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )
@@ -579,6 +582,9 @@ public interface QuittanceRepository extends JpaRepository<Quittance, Long> {
               and c.prospection = false
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+                    and not exists (select assistanceElement.id from ElementFacturable assistanceElement
+                        where assistanceElement = q.elementFacturable
+                          and assistanceElement.nature not in (com.assurance.enums.NatureElementFacturable.CONTRAT, com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT))
                     and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
                          or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )

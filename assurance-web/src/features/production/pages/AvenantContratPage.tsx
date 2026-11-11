@@ -901,8 +901,8 @@ export default function AvenantContratPage() {
   const save = () => {
     if (contrat?.typeContrat === "CONVENTION" && preview?.requiresConventionPayment) {
       if (!modeReglement) { toast.error("Sélectionnez le mode de règlement de l'avenant"); return; }
-      if (modeReglement === "facture" && (!numeroBonCommande.trim() || !(Number(numberValue(montantBulletin)) > 0))) {
-        toast.error("Renseignez le bon de commande et le montant du bulletin de l'avenant"); return;
+      if (modeReglement === "facture" && ((preview.typeImpactMouvement !== "RETOUR_PRIME" && !numeroBonCommande.trim()) || !(Number(numberValue(montantBulletin)) > 0))) {
+        toast.error("Renseignez le montant du bulletin et, pour une prime à payer, le bon de commande"); return;
       }
     }
     const request = buildRequest();
@@ -1131,7 +1131,7 @@ export default function AvenantContratPage() {
             </Field>
             {modeReglement === "facture" && <>
               <Field label="N° bon de commande de l'avenant"><Input maxLength={120} value={numeroBonCommande} onChange={event => setNumeroBonCommande(event.target.value)} /></Field>
-              <Field label="Montant du bulletin de l'avenant"><Input inputMode="decimal" value={montantBulletin} onChange={event => setMontantBulletin(event.target.value)} /></Field>
+              <Field label={preview?.typeImpactMouvement === "RETOUR_PRIME" ? "Montant du bulletin à déduire" : "Montant du bulletin de l'avenant"}><Input inputMode="decimal" value={montantBulletin} onChange={event => setMontantBulletin(event.target.value)} /></Field>
             </>}
           </>}
         </CardContent>

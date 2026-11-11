@@ -120,7 +120,11 @@ public class ReleveClientPdfRenderer {
                 writeClientReference(document, source, bold);
             }
             boolean denseStatement = isDenseStatement(source);
-            writeDocumentLines(document, source, bold, bold, fleetAnnexes, denseStatement);
+            if (source.getConventionFacturee() != null) {
+                writeConventionSummary(document, source, bold);
+            } else {
+                writeDocumentLines(document, source, bold, bold, fleetAnnexes, denseStatement);
+            }
             if (!isInvoice(source)) {
                 writeTotal(document, source, bold, denseStatement);
             }
@@ -137,11 +141,59 @@ public class ReleveClientPdfRenderer {
             } else if (source.getStatut() == StatutDocumentClient.REMPLACE) {
                 writeReplacement(document, source, bold);
             }
-            writeFleetAnnexes(document, source, fleetAnnexes);
+            if (source.getConventionFacturee() != null) {
+                writeConventionAnnex(document, source, bold);
+            } else {
+                writeFleetAnnexes(document, source, fleetAnnexes);
+            }
 
             document.close();
             return output.toByteArray();
         }
+    }
+
+    private void writeConventionSummary(Document document, DocumentClient source, PdfFont bold) {
+        document.add(new Paragraph(source.getConventionFacturee()).setFont(bold).setTextAlignment(TextAlignment.CENTER));
+        Table table = new Table(new float[]{4, 1}).useAllAvailableWidth();
+        addHeader(table, "LIBELLÉ", bold);
+        addHeader(table, "MONTANT (MAD)", bold);
+        String label = source.getLignes().stream().map(LigneDocumentClient::getLibelleDocument)
+                .filter(java.util.Objects::nonNull).distinct().collect(Collectors.joining("\n"));
+        addValue(table, (label.isBlank() ? "Production convention" : label) + "\nPériode du "
+                + LONG_DATE_FORMAT.format(source.getPeriodeDebut()) + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()), TextAlignment.LEFT, null);
+        addValue(table, amount(source.getTotalDocument()), TextAlignment.RIGHT, bold);
+        document.add(table);
+    }
+
+    private void writeConventionAnnex(Document document, DocumentClient source, PdfFont bold) {
+        document.add(new com.itextpdf.layout.element.AreaBreak(PageSize.A4.rotate()));
+        Table table = new Table(new float[]{10, 11, 12, 9, 14, 11, 9, 9, 10, 10}).useAllAvailableWidth()
+                .setFontSize(7).setKeepTogether(false);
+        table.addHeaderCell(new Cell(1, 10).setBorder(Border.NO_BORDER).setPaddingBottom(10)
+                .add(new Paragraph(source.getConventionFacturee() + "\nAnnexe de la facture N° " + source.getNumero()
+                        + " - du " + LONG_DATE_FORMAT.format(source.getPeriodeDebut()) + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()))
+                        .setFont(bold).setFontSize(11).setTextAlignment(TextAlignment.CENTER)));
+        for (String label : java.util.List.of("Quittance N°", "Police N°", "Cie", "Mouvement", "Assuré", "Véhicule",
+                "Date d'effet", "Date d'expiration", "Montant bulletin", "Montant à payer")) addHeader(table, label, bold);
+        source.getLignes().stream().sorted(Comparator.comparing(LigneDocumentClient::getOrdre)).forEach(line -> {
+            addValue(table, fallback(line.getNumeroQuittance()), TextAlignment.LEFT, null);
+            addValue(table, fallback(line.getNumeroPolice()), TextAlignment.LEFT, null);
+            addValue(table, fallback(line.getCompagnie()), TextAlignment.LEFT, null);
+            addValue(table, fallback(line.getMouvement()), TextAlignment.LEFT, null);
+            addValue(table, fallback(line.getAssureConvention()), TextAlignment.LEFT, null);
+            addValue(table, fallback(line.getVehiculeConvention()), TextAlignment.LEFT, null);
+            addValue(table, line.getDateOperation() == null ? "-" : LONG_DATE_FORMAT.format(line.getDateOperation()), TextAlignment.CENTER, null);
+            addValue(table, line.getDateEcheance() == null ? "-" : LONG_DATE_FORMAT.format(line.getDateEcheance()), TextAlignment.CENTER, null);
+            addValue(table, amount(line.getMontantBulletinConvention()), TextAlignment.RIGHT, null);
+            addValue(table, amount(line.getMontantTtc()), TextAlignment.RIGHT, bold);
+        });
+        table.addCell(new Cell(1, 9).add(new Paragraph("TOTAL À PAYER (MAD)").setFont(bold)).setTextAlignment(TextAlignment.RIGHT));
+        addValue(table, amount(source.getTotalDocument()), TextAlignment.RIGHT, bold);
+        document.add(table);
+    }
+
+    private String fallback(String value) {
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private void writeLetterHead(Document document, PdfDocument pdf, DocumentClient source, PdfFont bold) {

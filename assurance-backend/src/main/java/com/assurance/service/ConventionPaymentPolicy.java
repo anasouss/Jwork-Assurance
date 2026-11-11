@@ -25,6 +25,8 @@ public final class ConventionPaymentPolicy {
     public static boolean isInvoice(ElementFacturable element) {
         Contrat contract = element.getContrat();
         if (contract == null || contract.getTypeContrat() != TypeContrat.CONVENTION) return false;
+        if (element.getNature() != com.assurance.enums.NatureElementFacturable.CONTRAT
+                && element.getNature() != com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT) return false;
         MouvementContrat movement = element.getMouvementContrat();
         ModeReglementConvention mode = movement == null || movement.getModeReglementConvention() == null
                 ? inheritedMode(contract) : movement.getModeReglementConvention();
@@ -34,10 +36,8 @@ public final class ConventionPaymentPolicy {
     public static QuittanceResponse preview(Contrat contract, QuittanceResponse response) {
         BigDecimal premium = "RETOUR_PRIME".equals(response.getTypeImpactMouvement())
                 ? zero(response.getPrimeTotale()).abs().negate() : zero(response.getPrimeTotale());
-        BigDecimal assistance = response.getAssistances() == null ? BigDecimal.ZERO : response.getAssistances().stream()
-                .map(item -> zero(item.getPrimeTotale())).reduce(BigDecimal.ZERO, BigDecimal::add);
         response.setRequiresConventionPayment(contract.getTypeContrat() == TypeContrat.CONVENTION
-                && premium.add(assistance).signum() > 0);
+                && premium.signum() != 0);
         return response;
     }
 
@@ -54,12 +54,14 @@ public final class ConventionPaymentPolicy {
         if (mode == null) throw new BadRequestException("Selectionnez le mode de reglement de l'avenant");
         if (mode == ModeReglementConvention.FACTURE) {
             String order = request.getNumeroBonCommande() == null ? "" : request.getNumeroBonCommande().trim();
-            if (order.isEmpty() || order.length() > 120) throw new BadRequestException("Le numero de bon de commande de l'avenant est obligatoire (120 caracteres maximum)");
+            boolean credit = "RETOUR_PRIME".equals(response.getTypeImpactMouvement())
+                    || zero(response.getPrimeTotale()).signum() < 0;
+            if ((!credit && order.isEmpty()) || order.length() > 120) throw new BadRequestException("Le numero de bon de commande de l'avenant est obligatoire (120 caracteres maximum)");
             BigDecimal amount = request.getMontantBulletin();
             if (amount == null || amount.signum() <= 0 || amount.scale() > 2 || amount.precision() - amount.scale() > 12) {
                 throw new BadRequestException("Renseignez un montant de bulletin positif pour cet avenant, avec deux decimales maximum");
             }
-            movement.setNumeroBonCommande(order);
+            movement.setNumeroBonCommande(order.isEmpty() ? null : order);
             movement.setMontantBulletin(amount);
         } else {
             movement.setNumeroBonCommande(null);

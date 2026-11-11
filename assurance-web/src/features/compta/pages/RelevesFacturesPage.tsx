@@ -21,6 +21,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ConventionInvoiceLines } from "../components/ConventionInvoiceLines";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1351,7 +1352,19 @@ function DocumentDetailDialog(props: {
                 </Button>
               </div>
             ) : null}
-            <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800">
+            {document.conventionFacturee ? <ConventionInvoiceLines preview={{
+              convention: document.conventionFacturee,
+              payeur: document.payeurNom,
+              periodeDebut: document.periodeDebut,
+              periodeFin: document.periodeFin,
+              total: document.totalDocument,
+              lignes: document.lignes.map(line => ({
+                numeroQuittance: line.numeroQuittance, numeroPolice: line.numeroPolice, compagnie: line.compagnie,
+                mouvement: line.mouvement, assure: line.assureConvention, vehicule: line.vehiculeConvention,
+                dateEffet: line.dateOperation, dateExpiration: line.dateEcheance,
+                montantBulletin: line.montantBulletinConvention ?? null, montantAPayer: line.montantTtc,
+              })),
+            }} /> : <div className="overflow-x-auto rounded-md border border-slate-200 dark:border-slate-800">
               <table className="w-full min-w-[900px] text-sm">
                 <thead className="border-b bg-slate-100/80 text-xs uppercase text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                   <tr>
@@ -1394,7 +1407,7 @@ function DocumentDetailDialog(props: {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>}
           </div>
         ) : null}
         <DialogFooter>

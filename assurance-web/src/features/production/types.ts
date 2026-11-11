@@ -1493,6 +1493,9 @@ export type UpsertConventionRequest = {
   intitule: string;
   description?: string;
   organismeConventionne?: string;
+  clientFacturationId?: string;
+  dateEffet?: string;
+  dateEcheance?: string;
   typeEcheance: "A_ECHEANCE" | "DATE_A_DATE";
   echeance?: string;
   fractionnement?: "MENSUEL" | "TRIMESTRIEL" | "SEMESTRIEL" | "ANNUEL";

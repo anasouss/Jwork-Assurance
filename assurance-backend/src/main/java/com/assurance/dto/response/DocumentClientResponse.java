@@ -35,6 +35,7 @@ public class DocumentClientResponse {
     private BigDecimal totalCredit;
     private BigDecimal totalDocument;
     private String notes;
+    private String conventionFacturee;
     private Integer versionDocument;
     private Long documentOrigineId;
     private String numeroDocumentOrigine;
@@ -65,6 +66,9 @@ public class DocumentClientResponse {
         private String numeroQuittance;
         private String mouvement;
         private String compagnie;
+        private String assureConvention;
+        private String vehiculeConvention;
+        private BigDecimal montantBulletinConvention;
         private BigDecimal debit;
         private BigDecimal credit;
         private BigDecimal primeNette;

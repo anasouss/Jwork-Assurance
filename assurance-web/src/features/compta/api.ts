@@ -22,6 +22,10 @@ import type {
   ClientDocumentType,
   ClientDocumentDueDateProposal,
   ConventionBillingPage,
+  ConventionBillingOption,
+  ConventionInvoicePreview,
+  ConventionProductionFilters,
+  ConventionProductionPage,
   ConventionBillingStatus,
   CreateConventionInvoiceRequest,
   CreateClientDocumentRequest,
@@ -133,6 +137,30 @@ export const comptaApi = {
         `/api/v1/compta/quittances/compagnies-disponibles${buildQueryString({ brancheId })}`
       )
     ).map(normalizeCompanyCounterparty);
+  },
+
+  async conventionBillingOptions(annee: number) {
+    return unwrap(await apiFetch<ApiResponse<ConventionBillingOption[]>>(
+      `/api/v1/compta/facturation-conventions/conventions${buildQueryString({ annee })}`
+    )).map(row => ({ ...row, id: String(row.id) }));
+  },
+
+  async previewConventionInvoice(echeanceIds: string[]) {
+    return unwrap(await apiFetch<ApiResponse<ConventionInvoicePreview>>(
+      "/api/v1/compta/facturation-conventions/apercu",
+      { method: "POST", body: JSON.stringify({ echeanceIds }) }
+    ));
+  },
+
+  async conventionProduction(params: ConventionProductionFilters & { page: number; size: number }) {
+    const result = unwrap(await apiFetch<ApiResponse<ConventionProductionPage>>(
+      `/api/v1/compta/conventions/production${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(row => ({ ...row, id: String(row.id) })) };
+  },
+
+  exportConventionProduction(params: ConventionProductionFilters) {
+    return apiFetchBlob(`/api/v1/compta/conventions/production/export${buildQueryString(params)}`);
   },
 
   async conventionBillingInstallments(params: {

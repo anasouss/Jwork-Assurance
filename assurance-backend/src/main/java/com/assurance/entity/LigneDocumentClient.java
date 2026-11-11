@@ -72,6 +72,15 @@ public class LigneDocumentClient extends BaseEntity {
     @Column(name = "compagnie", length = 180)
     private String compagnie;
 
+    @Column(name = "assure_convention", length = 500)
+    private String assureConvention;
+
+    @Column(name = "vehicule_convention", length = 1000)
+    private String vehiculeConvention;
+
+    @Column(name = "montant_bulletin_convention", precision = 16, scale = 2)
+    private BigDecimal montantBulletinConvention;
+
     @Column(nullable = false, precision = 16, scale = 2)
     private BigDecimal debit;
 

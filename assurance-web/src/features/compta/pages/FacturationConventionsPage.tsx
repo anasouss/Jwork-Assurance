@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, FilePlus2, RotateCcw, Search } from "lucide-react";
 import { toast } from "@/lib/toast";
@@ -22,6 +23,7 @@ import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { ConventionInvoiceLines } from "../components/ConventionInvoiceLines";
 import { formatAccountingAmount } from "../format";
 import type {
   ConventionBillingInstallment,
@@ -36,6 +38,9 @@ type Filters = {
   compagnieId: string;
   dateDu: string;
   dateAu: string;
+  conventionId: string;
+  annee: number;
+  periode: string;
 };
 
 const INITIAL_FILTERS: Filters = {
@@ -44,6 +49,9 @@ const INITIAL_FILTERS: Filters = {
   compagnieId: "ALL",
   dateDu: "",
   dateAu: "",
+  conventionId: "",
+  annee: new Date().getFullYear(),
+  periode: "",
 };
 
 export default function FacturationConventionsPage() {
@@ -63,9 +71,15 @@ export default function FacturationConventionsPage() {
     queryFn: comptaApi.companies,
     staleTime: 60_000,
   });
+  const conventions = useQuery({
+    queryKey: ["compta", "convention-billing-options", filters.annee],
+    queryFn: () => comptaApi.conventionBillingOptions(filters.annee),
+  });
+  const convention = conventions.data?.find(item => item.id === filters.conventionId);
   const params = useMemo(() => ({
     statut: applied.statut === "ALL" ? undefined : applied.statut,
     compagnieId: applied.compagnieId === "ALL" ? undefined : applied.compagnieId,
+    conventionId: applied.conventionId || undefined,
     dateDu: applied.dateDu || undefined,
     dateAu: applied.dateAu || undefined,
     search: applied.search.trim() || undefined,
@@ -75,6 +89,7 @@ export default function FacturationConventionsPage() {
   const installments = useQuery({
     queryKey: ["compta", "convention-billing", params],
     queryFn: () => comptaApi.conventionBillingInstallments(params),
+    enabled: Boolean(applied.conventionId && applied.dateDu && applied.dateAu),
   });
 
   const selectedRows = Object.values(selected);
@@ -83,7 +98,12 @@ export default function FacturationConventionsPage() {
   const selectableRows = (installments.data?.rows ?? []).filter(isSelectable);
   const allPageSelected = selectableRows.length > 0
     && selectableRows.every((row) => Boolean(selected[row.id]));
-  const selectedTotal = selectedRows.reduce((sum, row) => sum + row.montantTtc, 0);
+  const preview = useQuery({
+    queryKey: ["compta", "convention-invoice-preview", selectedIds],
+    queryFn: () => comptaApi.previewConventionInvoice(selectedIds),
+    enabled: issueOpen && selectedIds.length > 0,
+    staleTime: 0,
+  });
   const dueDateProposal = useQuery({
     queryKey: ["compta", "convention-invoice-due-date", selectedIds],
     queryFn: () => comptaApi.proposeConventionInvoiceDueDate(selectedIds),
@@ -109,11 +129,14 @@ export default function FacturationConventionsPage() {
   const issue = useMutation({
     mutationFn: () => comptaApi.createConventionInvoice({
       echeanceIds: selectedIds,
+      montantAttendu: preview.data!.total,
       dateEcheance: hasPaymentCondition ? dueDate || undefined : undefined,
       notes: notes.trim() || undefined,
     }),
     onSuccess: async (document) => {
-      toast.success(`Facture ${document.numero} émise`);
+      toast.success(`Facture ${document.numero} émise`, {
+        action: { label: "Ouvrir", onClick: () => window.open(`/app/compta/releves-factures?documentId=${document.id}`, "_blank", "noopener,noreferrer") },
+      });
       setIssueOpen(false);
       setSelected({});
       setDueDate("");
@@ -123,13 +146,21 @@ export default function FacturationConventionsPage() {
         queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
       ]);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Émission impossible"),
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Émission impossible");
+      void preview.refetch();
+    },
   });
 
   function applyFilters() {
+    const period = convention?.periodes.find(item => String(item.numero) === filters.periode);
+    if (!period) {
+      toast.error(convention?.blocage || "Sélectionnez une convention et une période de facturation.");
+      return;
+    }
     setPage(0);
     setSelected({});
-    setApplied(filters);
+    setApplied({ ...filters, dateDu: period.debut, dateAu: period.debut });
   }
 
   function resetFilters() {
@@ -148,12 +179,12 @@ export default function FacturationConventionsPage() {
       });
       return;
     }
-    const payerKey = `${row.payeurType}:${row.payeurId}`;
+    const payerKey = selectionKey(row);
     const incompatible = selectedRows.some(
-      (item) => `${item.payeurType}:${item.payeurId}` !== payerKey
+      (item) => selectionKey(item) !== payerKey
     );
     if (incompatible) {
-      toast.error("Une facture ne peut regrouper que les échéances d'un même payeur.");
+      toast.error("Sélectionnez une seule convention, une seule période et un même payeur.");
       return;
     }
     setSelected((current) => ({ ...current, [row.id]: row }));
@@ -161,33 +192,57 @@ export default function FacturationConventionsPage() {
 
   function togglePage(checked: boolean) {
     if (!checked) {
-      setSelected({});
+      setSelected(current => Object.fromEntries(Object.entries(current).filter(([id]) => !selectableRows.some(row => row.id === id))));
       return;
     }
-    const first = selectableRows[0];
+    const first = selectedRows[0] ?? selectableRows[0];
     if (!first) return;
-    const payerKey = `${first.payeurType}:${first.payeurId}`;
-    setSelected(Object.fromEntries(
+    const payerKey = selectionKey(first);
+    setSelected(current => ({ ...current, ...Object.fromEntries(
       selectableRows
-        .filter((row) => `${row.payeurType}:${row.payeurId}` === payerKey)
+        .filter((row) => selectionKey(row) === payerKey)
         .map((row) => [row.id, row])
-    ));
+    ) }));
   }
 
   return (
     <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-      <header>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
         <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Comptabilité</div>
         <h1 className="mt-1 text-xl font-semibold">Facturation conventions</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Échéances contractuelles et factures des conventions réglées sur facture.
         </p>
+        </div>
+        <Button asChild variant="outline"><Link to="/app/compta/conventions/production">Consultation de la production</Link></Button>
       </header>
 
       <section className="border-y bg-card px-4 py-4">
-        <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_220px_180px_180px_auto]">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_110px_minmax(260px,1fr)]">
+          <div className="grid gap-1.5"><Label>Convention</Label>
+            <Select value={filters.conventionId} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, periode: "" }))}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner une convention" /></SelectTrigger>
+              <SelectContent>{conventions.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5"><Label htmlFor="billing-year">Année du cycle</Label>
+            <Input id="billing-year" type="number" min={1900} max={2200} value={filters.annee}
+              onChange={event => setFilters(current => ({ ...current, annee: Number(event.target.value), periode: "" }))} />
+          </div>
+          <div className="grid gap-1.5"><Label>Période à facturer</Label>
+            <Select value={filters.periode} disabled={!convention?.periodes.length}
+              onValueChange={value => setFilters(current => ({ ...current, periode: value }))}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner une période" /></SelectTrigger>
+              <SelectContent>{convention?.periodes.map(period => <SelectItem key={period.numero} value={String(period.numero)}>
+                {periodLabel(convention.fractionnement, period.numero)} · {shortDate(period.debut)} au {shortDate(period.fin)}
+              </SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          {convention?.blocage && <p className="text-sm text-destructive sm:col-span-2 lg:col-span-3">{convention.blocage}</p>}
+          {conventions.isError && <p className="text-sm text-destructive">{conventions.error.message}</p>}
           <div className="grid gap-1.5">
-            <Label htmlFor="billing-search">Cible, dossier, police ou convention</Label>
+            <Label htmlFor="billing-search">Destinataire, dossier ou police</Label>
             <Input
               id="billing-search"
               value={filters.search}
@@ -211,16 +266,6 @@ export default function FacturationConventionsPage() {
               </SelectContent>
             </Select>
           </div>
-          <DateFilter
-            label="Échéance du"
-            value={filters.dateDu}
-            onChange={(value) => setFilters((current) => ({ ...current, dateDu: value }))}
-          />
-          <DateFilter
-            label="Échéance au"
-            value={filters.dateAu}
-            onChange={(value) => setFilters((current) => ({ ...current, dateAu: value }))}
-          />
           <div className="flex items-end gap-2">
             <Button type="button" onClick={applyFilters} title="Rechercher">
               <Search className="size-4" />
@@ -258,7 +303,7 @@ export default function FacturationConventionsPage() {
 
       <section className="overflow-hidden border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-          <h2 className="font-semibold">Échéances de facturation</h2>
+          <h2 className="font-semibold">Échéances de facturation <span className="font-normal text-muted-foreground">· MAD</span></h2>
           {canIssue ? (
             <Button
               type="button"
@@ -266,7 +311,7 @@ export default function FacturationConventionsPage() {
               onClick={() => setIssueOpen(true)}
             >
               <FilePlus2 className="size-4" />
-              Émettre la facture ({selectedRows.length})
+              Préparer la facture ({selectedRows.length})
             </Button>
           ) : null}
         </div>
@@ -281,29 +326,26 @@ export default function FacturationConventionsPage() {
                     aria-label="Sélectionner les échéances compatibles de la page"
                   />
                 </th>
-                <th className="px-3 py-3 text-left">Cible</th>
+                <th className="px-3 py-3 text-left">Destinataire</th>
                 <th className="px-3 py-3 text-left">Convention / contrat</th>
                 <th className="px-3 py-3 text-left">Compagnie</th>
                 <th className="px-3 py-3 text-left">Période</th>
-                <th className="px-3 py-3 text-left">Échéance</th>
-                <th className="px-3 py-3 text-right">Prime nette</th>
-                <th className="px-3 py-3 text-right">Taxes</th>
-                <th className="px-3 py-3 text-right">Accessoires</th>
-                <th className="px-3 py-3 text-right">TTC</th>
+                <th className="px-3 py-3 text-right">Montant bulletin</th>
+                <th className="px-3 py-3 text-right">Montant à payer</th>
                 <th className="px-3 py-3 text-center">Statut</th>
                 <th className="w-14 px-3 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {installments.isLoading ? (
-                <TableRowsSkeleton colSpan={12} rows={8} />
+                <TableRowsSkeleton colSpan={9} rows={8} />
               ) : installments.isError ? (
-                <tr><td colSpan={12} className="px-4 py-10 text-center text-destructive">
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-destructive">
                   {installments.error instanceof Error ? installments.error.message : "Chargement impossible"}
                 </td></tr>
               ) : !installments.data?.rows.length ? (
-                <tr><td colSpan={12} className="px-4 py-12 text-center text-muted-foreground">
-                  Aucune échéance ne correspond aux filtres.
+                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                  {applied.conventionId ? "Aucune échéance ne correspond aux filtres." : "Sélectionnez une convention et une période."}
                 </td></tr>
               ) : installments.data.rows.map((row) => (
                 <tr key={row.id} className="hover:bg-muted/30">
@@ -328,18 +370,17 @@ export default function FacturationConventionsPage() {
                   <td className="px-3 py-3">{row.compagnie || "-"}</td>
                   <td className="px-3 py-3">
                     <div>{shortDate(row.periodeDebut)} au {shortDate(row.periodeFin)}</div>
-                    <div className="text-xs text-muted-foreground">Période {row.numeroPeriode}/{row.nombrePeriodes}</div>
+                    <div className="text-xs text-muted-foreground">{periodLabel(row.fractionnement, row.numeroPeriode)}</div>
+                    {row.blocage && <div className="text-xs text-destructive">{row.blocage}</div>}
                   </td>
-                  <td className="px-3 py-3">{shortDate(row.dateEcheance)}</td>
-                  <Amount value={row.primeNette} />
-                  <Amount value={row.taxes} />
-                  <Amount value={row.accessoires} />
+                  <Amount value={row.montantBulletin} />
                   <Amount value={row.montantTtc} strong />
                   <td className="px-3 py-3 text-center"><StatusBadge status={row.statut} /></td>
                   <td className="px-3 py-3 text-center">
                     {row.documentId ? (
                       <a
                         href={`/app/compta/releves-factures?documentId=${row.documentId}`}
+                        target="_blank" rel="noopener noreferrer"
                         className="inline-flex size-8 items-center justify-center rounded-md hover:bg-muted"
                         title="Voir le document"
                       >
@@ -360,20 +401,22 @@ export default function FacturationConventionsPage() {
           loading={installments.isFetching}
           onPageChange={(nextPage) => {
             setPage(nextPage);
-            setSelected({});
           }}
         />
       </section>
 
-      <Dialog open={issueOpen} onOpenChange={setIssueOpen}>
-        <DialogContent>
+      <Dialog open={issueOpen} onOpenChange={open => { if (!issue.isPending) setIssueOpen(open); }}>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[min(1400px,96vw)]">
           <DialogHeader>
             <DialogTitle>Émettre la facture convention</DialogTitle>
             <DialogDescription>
-              {selectedRows.length} échéance(s) pour {selectedRows[0]?.payeurNom}. Total : {money(selectedTotal)} MAD.
+              {preview.data ? `${preview.data.convention} · ${preview.data.payeur} · du ${shortDate(preview.data.periodeDebut)} au ${shortDate(preview.data.periodeFin)}` : "Aperçu de la facture"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
+            {preview.isLoading && <p className="text-sm text-muted-foreground">Chargement du détail...</p>}
+            {preview.isError && <p className="text-sm text-destructive">{preview.error.message}</p>}
+            {preview.data && <ConventionInvoiceLines preview={preview.data} />}
             <div className="grid gap-1.5">
               {dueDateProposal.isLoading ? (
                 <p className="text-xs text-muted-foreground">Calcul de l’échéance applicable...</p>
@@ -412,10 +455,11 @@ export default function FacturationConventionsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIssueOpen(false)}>Annuler</Button>
+            <Button type="button" variant="outline" disabled={issue.isPending} onClick={() => setIssueOpen(false)}>Annuler</Button>
             <Button
               type="button"
               disabled={issue.isPending
+                || preview.isFetching || preview.isError || !preview.data?.lignes.length
                 || dueDateProposal.isLoading
                 || dueDateProposal.isError
                 || (hasPaymentCondition && !dueDate)}
@@ -430,16 +474,13 @@ export default function FacturationConventionsPage() {
   );
 }
 
-function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="grid gap-1.5">
-      <Label>{label}</Label>
-      <DatePicker
-        date={value || undefined}
-        onSelect={(date) => onChange(toDateOnly(date) ?? "")}
-      />
-    </div>
-  );
+function selectionKey(row: ConventionBillingInstallment) {
+  return `${row.conventionId}:${row.periodeDebut}:${row.periodeFin}:${row.payeurType}:${row.payeurId}`;
+}
+
+function periodLabel(frequency: string | null, number: number) {
+  const label = frequency === "TRIMESTRIEL" ? "Trimestre" : frequency === "SEMESTRIEL" ? "Semestre" : frequency === "MENSUEL" ? "Mois" : "Année";
+  return `${label} ${number}`;
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -451,8 +492,8 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Amount({ value, strong = false }: { value: number; strong?: boolean }) {
-  return <td className={`px-3 py-3 text-right tabular-nums ${strong ? "font-semibold" : ""}`}>{money(value)}</td>;
+function Amount({ value, strong = false }: { value: number | null; strong?: boolean }) {
+  return <td className={`px-3 py-3 text-right tabular-nums ${strong ? "font-semibold" : ""}`}>{value == null ? "-" : money(value)}</td>;
 }
 
 function StatusBadge({ status }: { status: ConventionBillingStatus }) {
@@ -462,7 +503,7 @@ function StatusBadge({ status }: { status: ConventionBillingStatus }) {
 }
 
 function isSelectable(row: ConventionBillingInstallment) {
-  return row.statut === "A_FACTURER" && row.montantTtc !== 0;
+  return row.statut === "A_FACTURER" && row.montantTtc !== 0 && !row.blocage;
 }
 
 function money(value: number) {

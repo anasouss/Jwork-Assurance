@@ -78,6 +78,7 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
   { module: "compta", title: "Relevés et factures", url: "/app/compta/releves-factures", icon: FileText, permission: "quittance:view" },
   { module: "compta", title: "Facturation conventions", url: "/app/compta/facturation-conventions", icon: ReceiptText, permission: "quittance:view" },
+  { module: "compta", title: "Production conventions", url: "/app/compta/conventions/production", icon: ReceiptText, permission: "quittance:view" },
   { module: "compta", title: "Encaissements en attente", url: "/app/compta/tresorerie/encaissements-en-attente", icon: Hourglass, permission: "tresorerie:view" },
   { module: "compta", title: "Bordereaux bancaires", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
   { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2, permission: "bordereau-compagnie:view" },

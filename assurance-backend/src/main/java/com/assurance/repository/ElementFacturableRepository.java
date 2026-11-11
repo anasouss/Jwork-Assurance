@@ -18,7 +18,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
-public interface ElementFacturableRepository extends JpaRepository<ElementFacturable, Long> {
+public interface ElementFacturableRepository extends JpaRepository<ElementFacturable, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<ElementFacturable> {
     @Query("""
             select coalesce(sum(e.primeNette), 0) as primeNette,
                    coalesce(sum(
@@ -152,6 +152,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               ), 0) < e.primeTotale
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+                    and e.nature in (com.assurance.enums.NatureElementFacturable.CONTRAT, com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT)
                     and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
                          or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )
@@ -348,6 +349,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
               ), 0) < e.primeTotale
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
+                    and e.nature in (com.assurance.enums.NatureElementFacturable.CONTRAT, com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT)
                     and ((m.modeReglementConvention is not null and m.modeReglementConvention = com.assurance.enums.ModeReglementConvention.FACTURE)
                          or (m.modeReglementConvention is null and lower(trim(coalesce(c.modeReglement, ''))) = 'facture'))
               )

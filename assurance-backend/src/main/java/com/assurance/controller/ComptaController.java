@@ -351,6 +351,22 @@ public class ComptaController {
                 .body(file);
     }
 
+    @GetMapping("/facturation-conventions/conventions")
+    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    public ResponseEntity<ApiResponse<java.util.List<FacturationConventionService.ConventionOption>>> billingConventions(
+            @RequestParam int annee
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(facturationConventionService.conventions(TenantContext.getCurrentAgence(), annee)));
+    }
+
+    @PostMapping("/facturation-conventions/apercu")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<com.assurance.dto.response.ConventionInvoicePreviewResponse>> previewConventionInvoice(
+            @Valid @RequestBody PropositionEcheanceFactureConventionRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(facturationConventionService.preview(TenantContext.getCurrentAgence(), request.getEcheanceIds())));
+    }
+
     @GetMapping("/facturation-conventions/echeances")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<EcheanceFacturationConventionPageResponse>> echeancesConvention(

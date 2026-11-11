@@ -1319,6 +1319,9 @@ public class DocumentClientService {
                         .numeroQuittance(line.getNumeroQuittance())
                         .mouvement(line.getMouvement())
                         .compagnie(line.getCompagnie())
+                        .assureConvention(line.getAssureConvention())
+                        .vehiculeConvention(line.getVehiculeConvention())
+                        .montantBulletinConvention(line.getMontantBulletinConvention())
                         .debit(line.getDebit())
                         .credit(line.getCredit())
                         .primeNette(line.getPrimeNette())
@@ -1358,6 +1361,7 @@ public class DocumentClientService {
                 .totalCredit(document.getTotalCredit())
                 .totalDocument(document.getTotalDocument())
                 .notes(document.getNotes())
+                .conventionFacturee(document.getConventionFacturee())
                 .versionDocument(document.getVersionDocument())
                 .documentOrigineId(document.getDocumentOrigine() == null
                         ? null : document.getDocumentOrigine().getId())

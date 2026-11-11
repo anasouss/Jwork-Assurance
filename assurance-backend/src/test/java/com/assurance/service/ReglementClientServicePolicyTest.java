@@ -45,6 +45,8 @@ class ReglementClientServicePolicyTest {
 
     @Mock private com.assurance.repository.ContratRepository conventionContractRepository;
     @Mock private com.assurance.repository.EcheanceFacturationConventionRepository conventionScheduleRepository;
+    @Mock private com.assurance.repository.AgenceRepository conventionAgencyRepository;
+    @Mock private com.assurance.repository.ElementFacturableRepository conventionElementRepository;
     @InjectMocks private FacturationConventionService conventionBilling;
 
     @BeforeEach
@@ -83,7 +85,8 @@ class ReglementClientServicePolicyTest {
         var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION).modeReglement("facture").build();
         var movement = com.assurance.entity.MouvementContrat.builder().contrat(contract)
                 .modeReglementConvention(com.assurance.enums.ModeReglementConvention.BUREAU).build();
-        var element = ElementFacturable.builder().contrat(contract).mouvementContrat(movement).build();
+        var element = ElementFacturable.builder().contrat(contract).mouvementContrat(movement)
+                .nature(com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT).build();
         assertThat(ConventionPaymentPolicy.isInvoice(element)).isFalse();
         movement.setModeReglementConvention(com.assurance.enums.ModeReglementConvention.FACTURE);
         contract.setModeReglement("bureau");
@@ -102,11 +105,17 @@ class ReglementClientServicePolicyTest {
                 .modeReglement("facture").dateEffet(start).dateEcheance(end).build();
         var movement = com.assurance.entity.MouvementContrat.builder().contrat(contract)
                 .statut(com.assurance.enums.StatutMouvementContrat.VALIDE)
+                .montantBulletin(new BigDecimal("1840.00"))
                 .modeReglementConvention(com.assurance.enums.ModeReglementConvention.FACTURE).build();
+        contract.setId(10L);
         movement.setId(50L);
         var element = ElementFacturable.builder().contrat(contract).mouvementContrat(movement)
+                .nature(com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT)
                 .actif(true).statut(com.assurance.enums.StatutElementFacturable.QUITTANCE)
                 .dateDebut(start).dateFin(end).primeNette(new BigDecimal("80.00")).primeTotale(new BigDecimal("100.00")).build();
+        element.setId(20L);
+        when(conventionElementRepository.findByContratIdInAndActifTrueOrderByDateDebutAscIdAsc(List.of(10L)))
+                .thenReturn(List.of(element));
         var base = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract).periodeDebut(start).periodeFin(end).build();
         var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract).mouvement(movement)
                 .sourceKey("MOUVEMENT-50").periodeDebut(start).periodeFin(java.time.LocalDate.of(2026, 6, 30)).build();
@@ -119,10 +128,103 @@ class ReglementClientServicePolicyTest {
         assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(baseAmount, "ttc")).isEqualByComparingTo("0.00");
         BigDecimal firstTtc = ReflectionTestUtils.invokeMethod(firstAmount, "ttc");
         BigDecimal secondTtc = ReflectionTestUtils.invokeMethod(secondAmount, "ttc");
-        assertThat(firstTtc.add(secondTtc)).isEqualByComparingTo("100.00");
+        assertThat(firstTtc).isEqualByComparingTo("920.00");
+        assertThat(secondTtc).isEqualByComparingTo("920.00");
+        assertThat(firstTtc.add(secondTtc)).isEqualByComparingTo("1840.00");
         movement.setModeReglementConvention(com.assurance.enums.ModeReglementConvention.BUREAU);
         Object bureauAmount = ReflectionTestUtils.invokeMethod(conventionBilling, "allocate", element, first, schedules);
         assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(bureauAmount, "ttc")).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void invoicePreviewNeverAcceptsAnIdOutsideTheCurrentAgency() {
+        when(conventionScheduleRepository.findSelected(7L, List.of(99L))).thenReturn(List.of());
+        assertThatThrownBy(() -> conventionBilling.preview(7L, List.of(99L))).isInstanceOf(BadRequestException.class);
+        verify(conventionScheduleRepository).findSelected(7L, List.of(99L));
+    }
+
+    @Test
+    void oneInvoiceCannotCombineConventionsOrBillingPeriods() {
+        var convention = com.assurance.entity.Convention.builder().typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE)
+                .echeance("01/01").fractionnement(com.assurance.enums.Fractionnement.TRIMESTRIEL).build();
+        convention.setId(1L);
+        var otherConvention = com.assurance.entity.Convention.builder().build();
+        otherConvention.setId(2L);
+        var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(Contrat.builder().convention(convention).build())
+                .periodeDebut(java.time.LocalDate.of(2026, 1, 1)).periodeFin(java.time.LocalDate.of(2026, 3, 31)).build();
+        var second = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(Contrat.builder().convention(otherConvention).build())
+                .periodeDebut(first.getPeriodeDebut()).periodeFin(first.getPeriodeFin()).build();
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateSelection", List.of(first, second)))
+                .isInstanceOf(BadRequestException.class);
+        second.getContrat().setConvention(convention);
+        second.setPeriodeDebut(java.time.LocalDate.of(2026, 4, 1));
+        second.setPeriodeFin(java.time.LocalDate.of(2026, 6, 30));
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateSelection", List.of(first, second)))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void bulletinFromTheMailIsSplitEquallyIncludingThePartialFirstQuarter() {
+        var start = java.time.LocalDate.of(2026, 2, 25);
+        var end = java.time.LocalDate.of(2026, 12, 31);
+        var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION)
+                .modeReglement("facture").montantBulletin(new BigDecimal("1840.00"))
+                .dateEffet(start).dateEcheance(end).build();
+        contract.setId(10L);
+        var element = ElementFacturable.builder().contrat(contract).nature(com.assurance.enums.NatureElementFacturable.CONTRAT)
+                .actif(true).statut(com.assurance.enums.StatutElementFacturable.QUITTANCE)
+                .dateDebut(start).dateFin(end).primeNette(new BigDecimal("1500.00")).primeTotale(new BigDecimal("1700.00")).build();
+        element.setId(20L);
+        when(conventionElementRepository.findByContratIdInAndActifTrueOrderByDateDebutAscIdAsc(List.of(10L)))
+                .thenReturn(List.of(element));
+        var schedules = java.util.stream.IntStream.range(0, 4).mapToObj(index -> {
+            var boundary = java.time.LocalDate.of(2026, 1, 1).plusMonths(index * 3L);
+            return com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract)
+                    .periodeDebut(boundary).periodeFin(boundary.plusMonths(3).minusDays(1)).build();
+        }).toList();
+        for (var schedule : schedules) {
+            Object amount = ReflectionTestUtils.invokeMethod(conventionBilling, "allocate", element, schedule, schedules);
+            assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(amount, "ttc")).isEqualByComparingTo("460.00");
+        }
+        assertThat(element.getPrimeTotale()).isEqualByComparingTo("1700.00");
+        contract.setMontantBulletin(new BigDecimal("999999999999.99"));
+        element.setDateDebut(java.time.LocalDate.of(2026, 4, 25));
+        var remaining = schedules.subList(1, 4);
+        for (var schedule : remaining) {
+            Object amount = ReflectionTestUtils.invokeMethod(conventionBilling, "allocate", element, schedule, remaining);
+            assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(amount, "ttc")).isEqualByComparingTo("333333333333.33");
+        }
+    }
+
+    @Test
+    void negativeMovementCapturesItsOwnBulletinRatherThanReusingTheOriginalContractAmount() {
+        var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION).modeReglement("facture")
+                .montantBulletin(new BigDecimal("1840.00")).build();
+        var response = com.assurance.dto.response.QuittanceResponse.builder().typeImpactMouvement("RETOUR_PRIME")
+                .primeTotale(new BigDecimal("250.00")).build();
+        var request = new com.assurance.dto.request.AvenantRequest();
+        request.setModeReglement(com.assurance.enums.ModeReglementConvention.FACTURE);
+        request.setMontantBulletin(new BigDecimal("200.00"));
+        var movement = com.assurance.entity.MouvementContrat.builder().contrat(contract).build();
+        ConventionPaymentPolicy.apply(contract, movement, request, response);
+        assertThat(response.getRequiresConventionPayment()).isTrue();
+        assertThat(movement.getMontantBulletin()).isEqualByComparingTo("200.00");
+        assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.FACTURE);
+        assertThat(contract.getMontantBulletin()).isEqualByComparingTo("1840.00");
+    }
+
+    @Test
+    void assistanceRemainsASeparateSourceOutsideConventionBulletinBilling() {
+        var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION).modeReglement("facture").build();
+        var assistance = ElementFacturable.builder().contrat(contract).nature(com.assurance.enums.NatureElementFacturable.ASSISTANCE).build();
+        assertThat(ConventionPaymentPolicy.isInvoice(assistance)).isFalse();
+    }
+
+    @Test
+    void pendingCountUsesTheFrontendJsonPropertyName() {
+        var summary = com.assurance.dto.response.EcheanceFacturationConventionPageResponse.Summary.builder().aFacturer(20).build();
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(summary);
+        assertThat(json.get("aFacturer").asInt()).isEqualTo(20);
     }
 
     @Test
@@ -130,7 +232,9 @@ class ReglementClientServicePolicyTest {
         var start = java.time.LocalDate.of(2026, 1, 1);
         var end = java.time.LocalDate.of(2026, 12, 31);
         var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION)
-                .modeReglement("facture").dateEffet(start).dateEcheance(end).build();
+                .modeReglement("facture").dateEffet(start).dateEcheance(end)
+                .convention(com.assurance.entity.Convention.builder().typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE)
+                        .echeance("01/01").fractionnement(com.assurance.enums.Fractionnement.ANNUEL).build()).build();
         contract.setId(10L);
         var movement = com.assurance.entity.MouvementContrat.builder().contrat(contract)
                 .dateEffet(java.time.LocalDate.of(2026, 6, 1)).dateEcheance(end)
@@ -142,6 +246,7 @@ class ReglementClientServicePolicyTest {
                 .periodeDebut(start).periodeFin(end).numeroPeriode(1).nombrePeriodes(1)
                 .statut(com.assurance.enums.StatutEcheanceFacturationConvention.FACTUREE).build();
         when(conventionContractRepository.findConventionInvoiceContracts(7L)).thenReturn(List.of(contract));
+        when(conventionAgencyRepository.findByIdForUpdate(7L)).thenReturn(java.util.Optional.of(com.assurance.entity.Agence.builder().build()));
         when(conventionScheduleRepository.findByContratIdOrderByNumeroPeriodeAsc(10L)).thenReturn(List.of(issued));
         ReflectionTestUtils.invokeMethod(conventionBilling, "synchronizeSchedules", 7L);
         verify(conventionScheduleRepository).saveAll(org.mockito.ArgumentMatchers.argThat(rows -> {

@@ -32,7 +32,7 @@ export function ClientResidenceFields({ client, onChange, villes, disabled, erro
         onValueChange={(value) => {
           if (foreign) previousResidence.current.villeEtrangere = client.villeEtrangere;
           else previousResidence.current.villeId = client.villeId;
-          onChange({ paysResidence: value,
+          onChange({ clientEtranger: true, paysResidence: value,
             villeId: value === "MA" ? previousResidence.current.villeId : undefined,
             villeEtrangere: value === "MA" ? undefined : previousResidence.current.villeEtrangere });
         }} />

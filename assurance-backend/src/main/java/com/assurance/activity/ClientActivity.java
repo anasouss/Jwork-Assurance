@@ -82,6 +82,7 @@ public final class ClientActivity {
                 .put("Raison sociale", client.getRaisonSociale())
                 .put("CIN", client.getCin()).put("Validité CIN", client.getCinValidite())
                 .put("Piece d'identite principale", client.getTypePieceIdentite())
+                .put("Client étranger", client.getClientEtranger())
                 .put("Pays de residence", client.getPaysResidence())
                 .put("Ville a l'etranger", client.getVilleEtrangere())
                 .put("Validite carte de residence", client.getCarteResidenceValidite())

@@ -103,6 +103,7 @@ class ClientServiceTest {
     @Test
     void crmUpdateKeepsCodeAndPreservedFieldsWithoutReassigningGroups() {
         Client client = client();
+        client.setClientEtranger(true);
         Ville city = Ville.builder().nom("Tiznit").build();
         city.setId(331L);
         when(clients.findByAgenceIdAndId(7L, 42L)).thenReturn(Optional.of(client));
@@ -117,6 +118,7 @@ class ClientServiceTest {
         request.setConducteurHabituel(false);
         var result = service.update(7L, 42L, request);
         assertThat(result.getCodeClient()).isEqualTo("C000042");
+        assertThat(result.getClientEtranger()).isTrue();
         assertThat(result.getTelephone()).isEqualTo("0600000000");
         assertThat(result.getPassport()).isEqualTo("PASS42");
         assertThat(result.getNumeroPermis()).isEqualTo("PER42");

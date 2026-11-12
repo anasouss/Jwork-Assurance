@@ -72,4 +72,14 @@ describe("client profile disclosure", () => {
     }));
     expect(html).toContain('data-state="checked"');
   });
+
+  it("keeps the selector and checkbox visible when a foreign client selects CIN", () => {
+    const profile: ClientProfile = { ...client, clientEtranger: true, typePieceIdentite: "CIN", paysResidence: "MA" };
+    const fields = renderToStaticMarkup(createElement(ClientIdentityFields, { client: profile, onChange: () => {} }));
+    const toggle = renderToStaticMarkup(createElement(ClientInternationalToggle, { client: profile, onChange: () => {} }));
+    expect(fields).toContain('data-slot="select-trigger"');
+    expect(fields).toContain("N° CIN");
+    expect(fields).toContain("Validité CIN");
+    expect(toggle).toContain('data-state="checked"');
+  });
 });

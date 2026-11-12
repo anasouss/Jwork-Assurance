@@ -25,6 +25,7 @@ public class ClientResponse {
     private String raisonSociale;
     private String cin;
     private TypePieceIdentite typePieceIdentite;
+    private Boolean clientEtranger;
     private String paysResidence;
     private String villeEtrangere;
     private String rc;

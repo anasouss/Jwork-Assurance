@@ -21,10 +21,10 @@ export function ClientIdentityFields({ client, onChange, onIdentityChange = onCh
   return <>
     {internationalClient(client) ? <Field label="Pièce d'identité" required error={errors[`${errorPrefix}typePieceIdentite`]}>
       <Select value={document.value} disabled={disabled} onValueChange={(value) => {
-        onChange({ typePieceIdentite: value as ClientProfile["typePieceIdentite"] });
+        onChange({ typePieceIdentite: value as ClientProfile["typePieceIdentite"], clientEtranger: true });
       }}>
         <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>{IDENTITY_DOCUMENTS.filter((item) => item.value !== "CIN" || document.value === "CIN").map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+        <SelectContent>{IDENTITY_DOCUMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
       </Select>
     </Field> : null}
     <Field label={`N° ${document.label}`} required error={errors[`${errorPrefix}${document.numberKey}`]}>

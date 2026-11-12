@@ -36,6 +36,7 @@ export function clientRecordDraft(client: ClientResponse): ClientInput["client"]
     genre: client.genre, prenom: client.prenom, nom: client.nom, raisonSociale: client.raisonSociale,
     cin: client.cin, cinValidite: client.cinValidite, passport: client.passport,
     typePieceIdentite: client.typePieceIdentite, paysResidence: client.paysResidence, villeEtrangere: client.villeEtrangere,
+    clientEtranger: client.clientEtranger,
     passportValidite: client.passportValidite, carteResidence: client.carteResidence, nationalite: client.nationalite,
     carteResidenceValidite: client.carteResidenceValidite,
     rc: client.rc, ice: client.ice, iff: client.iff, patente: client.patente, cnss: client.cnss,

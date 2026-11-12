@@ -82,6 +82,9 @@ public class Client extends BaseEntity {
     @Column(name = "type_piece_identite", length = 30)
     private TypePieceIdentite typePieceIdentite;
 
+    @Column(name = "client_etranger")
+    private Boolean clientEtranger;
+
     @Column(name = "pays_residence", length = 2)
     private String paysResidence;
 

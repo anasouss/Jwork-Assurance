@@ -51,6 +51,11 @@ final class ClientProfilePolicy {
         } else {
             request.setTypePieceIdentite(null);
         }
+        if (request.getClientEtranger() == null) {
+            request.setClientEtranger((request.getTypePieceIdentite() != null
+                    && request.getTypePieceIdentite() != TypePieceIdentite.CIN)
+                    || (hasText(request.getPaysResidence()) && !"MA".equals(request.getPaysResidence())));
+        }
     }
 
     static void validateIdentity(CreateClientRequest request) {

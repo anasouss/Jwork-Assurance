@@ -33,6 +33,7 @@ public class CreateClientRequest {
     private String raisonSociale;
     private String cin;
     private TypePieceIdentite typePieceIdentite;
+    private Boolean clientEtranger;
     @Size(max = 2)
     private String paysResidence;
     @Size(max = 160)

@@ -43,4 +43,13 @@ describe("client identity and residence", () => {
     expect(internationalClient({ ...client, paysResidence: "FR" })).toBe(true);
     expect(foreignResidence({ ...client, typePieceIdentite: "PASSEPORT", paysResidence: "MA" })).toBe(false);
   });
+
+  it("keeps a foreign client with CIN in expanded mode independently of residence", () => {
+    const foreignClient: ClientProfile = { ...client, clientEtranger: true, typePieceIdentite: "CIN", paysResidence: "MA" };
+    expect(internationalClient(foreignClient)).toBe(true);
+    expect(identityDocument(foreignClient).value).toBe("CIN");
+    expect(clientIdentityErrors(foreignClient, "2026-11-12")).toEqual({});
+    expect(foreignResidence(foreignClient)).toBe(false);
+    expect(internationalClient({ ...foreignClient, clientEtranger: false })).toBe(false);
+  });
 });

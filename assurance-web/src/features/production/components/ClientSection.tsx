@@ -211,6 +211,7 @@ export function ClientSection({
                 cin: found.cin ?? undefined,
                 cinValidite: found.cinValidite ?? undefined,
                 typePieceIdentite: found.typePieceIdentite,
+                clientEtranger: found.clientEtranger,
                 passport: found.passport,
                 passportValidite: found.passportValidite,
                 carteResidence: found.carteResidence,
@@ -474,8 +475,6 @@ export function ClientSection({
                     </Select>
                   </Field>
                 ) : null}
-              </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               {!morale ? (
                 <>
                     <Field label="Nom" required error={errors[`clients.${index}.client.nom`]}>

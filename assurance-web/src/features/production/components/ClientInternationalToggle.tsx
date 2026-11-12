@@ -14,13 +14,8 @@ export function ClientInternationalToggle({ client, onChange, disabled }: {
     <Checkbox checked={internationalClient(client)} disabled={disabled} onCheckedChange={(checked) => {
       if (!foreignResidence(client)) previous.current.localCity = client.villeId;
       if (checked) {
-        const country = physical ? previous.current.country
-          : previous.current.country === "MA" ? "" : previous.current.country;
-        const document = previous.current.document !== "CIN" || country !== "MA"
-          ? previous.current.document
-          : client.passport ? "PASSEPORT" : client.carteResidence ? "CARTE_RESIDENCE" : "PASSEPORT";
-        onChange({ typePieceIdentite: physical
-          ? document : undefined,
+        const country = previous.current.country;
+        onChange({ clientEtranger: true, typePieceIdentite: physical ? previous.current.document : undefined,
         paysResidence: country,
         villeId: country === "MA" ? previous.current.localCity : undefined,
         villeEtrangere: country === "MA" ? undefined : previous.current.foreignCity });
@@ -28,7 +23,7 @@ export function ClientInternationalToggle({ client, onChange, disabled }: {
         previous.current.document = identityDocument(client).value;
         previous.current.country = client.paysResidence ?? "MA";
         previous.current.foreignCity = client.villeEtrangere;
-        onChange({ typePieceIdentite: physical ? "CIN" : undefined, paysResidence: "MA",
+        onChange({ clientEtranger: false, typePieceIdentite: physical ? "CIN" : undefined, paysResidence: "MA",
           villeId: previous.current.localCity, villeEtrangere: undefined });
       }
     }} />

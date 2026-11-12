@@ -462,6 +462,7 @@ export type ClientInput = {
     raisonSociale?: string;
     cin?: string;
     typePieceIdentite?: "CIN" | "PASSEPORT" | "CARTE_RESIDENCE";
+    clientEtranger?: boolean;
     paysResidence?: string;
     villeEtrangere?: string;
     cinValidite?: string;

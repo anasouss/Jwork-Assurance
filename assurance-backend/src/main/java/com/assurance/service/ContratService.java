@@ -2010,6 +2010,7 @@ public class ContratService {
                     aliasRequest.setCategorieClientId(client.getCategorieClient().getId());
                 }
                 aliasRequest.setTypePieceIdentite(client.getTypePieceIdentite());
+                aliasRequest.setClientEtranger(client.getClientEtranger());
                 aliasRequest.setCin(client.getCin());
                 aliasRequest.setCinValidite(client.getCinValidite());
                 aliasRequest.setPassport(client.getPassport());

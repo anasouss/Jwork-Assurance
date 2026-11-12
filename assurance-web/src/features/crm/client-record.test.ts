@@ -65,4 +65,10 @@ describe("client record editing", () => {
     expect(draft).toMatchObject({ typePieceIdentite: "CARTE_RESIDENCE", carteResidenceValidite: "2031-01-01",
       paysResidence: "FR", villeEtrangere: "Lyon", adresse: "Rue 1" });
   });
+
+  it("preserves the foreign-client flag for a CIN holder residing in Morocco", () => {
+    const draft = clientRecordDraft({ id: "6", typeClient: "PERSONNE_PHYSIQUE", clientEtranger: true,
+      typePieceIdentite: "CIN", cin: "AB123", cinValidite: "2031-01-01", paysResidence: "MA", villeId: "1" });
+    expect(draft).toMatchObject({ clientEtranger: true, typePieceIdentite: "CIN", paysResidence: "MA" });
+  });
 });

@@ -19,6 +19,7 @@ export function foreignResidence(client: ClientProfile) {
 }
 
 export function internationalClient(client: ClientProfile) {
+  if (client.clientEtranger != null) return client.clientEtranger;
   return foreignResidence(client)
     || (client.typeClient === "PERSONNE_PHYSIQUE" && identityDocument(client).value !== "CIN");
 }

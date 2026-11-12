@@ -15,6 +15,22 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ClientProfilePolicyTest {
     @Test
+    void foreignClientCanKeepCinAndMoroccanResidence() {
+        var request = person();
+        request.setClientEtranger(true);
+        request.setTypePieceIdentite(TypePieceIdentite.CIN);
+        request.setCin("AB123");
+        request.setCinValidite(LocalDate.now().plusYears(2));
+        request.setPaysResidence("MA");
+        request.setVilleId(1L);
+        ClientProfilePolicy.normalize(request);
+        assertThat(request.getClientEtranger()).isTrue();
+        assertThat(request.getTypePieceIdentite()).isEqualTo(TypePieceIdentite.CIN);
+        assertThat(request.getPaysResidence()).isEqualTo("MA");
+        assertThatCode(() -> ClientProfilePolicy.validateIdentity(request)).doesNotThrowAnyException();
+    }
+
+    @Test
     void preservesLegacyCinAndDerivesMoroccanResidenceFromReferenceCity() {
         var request = person();
         request.setCin("AB123");

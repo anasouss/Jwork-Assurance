@@ -453,6 +453,7 @@ function ClientDialog({
         cin: clean(draft.cin),
         cinValidite: draft.cinValidite,
         typePieceIdentite: draft.typePieceIdentite,
+        clientEtranger: draft.clientEtranger,
         passport: clean(draft.passport),
         passportValidite: draft.passportValidite,
         carteResidence: clean(draft.carteResidence),

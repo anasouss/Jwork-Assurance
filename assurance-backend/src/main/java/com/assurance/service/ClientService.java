@@ -147,6 +147,7 @@ public class ClientService {
                 .raisonSociale(request.getRaisonSociale())
                 .cin(request.getCin())
                 .typePieceIdentite(request.getTypePieceIdentite())
+                .clientEtranger(request.getClientEtranger())
                 .paysResidence(request.getPaysResidence())
                 .villeEtrangere(request.getVilleEtrangere())
                 .rc(request.getRc())
@@ -207,11 +208,17 @@ public class ClientService {
         if (request.getTypeClient() != client.getTypeClient()) {
             throw new BadRequestException("Le type d'un client existant ne peut pas être modifié depuis sa fiche");
         }
+        if (request.getClientEtranger() == null) {
+            request.setClientEtranger(client.getClientEtranger());
+        }
         validateStandaloneClient(request);
         return toResponse(updateEntity(agenceId, clientId, request));
     }
 
     private Client updateEntityRecord(Long agenceId, Client client, CreateClientRequest request) {
+        if (request.getClientEtranger() == null) {
+            request.setClientEtranger(client.getClientEtranger());
+        }
         if (request.getPaysResidence() == null && client.getPaysResidence() != null) {
             request.setPaysResidence(client.getPaysResidence());
             if (request.getVilleEtrangere() == null && !"MA".equals(client.getPaysResidence())) {
@@ -299,6 +306,7 @@ public class ClientService {
                 .raisonSociale(client.getRaisonSociale())
                 .cin(client.getCin())
                 .typePieceIdentite(client.getTypePieceIdentite())
+                .clientEtranger(client.getClientEtranger())
                 .paysResidence(client.getPaysResidence())
                 .villeEtrangere(client.getVilleEtrangere())
                 .rc(client.getRc())
@@ -362,6 +370,7 @@ public class ClientService {
         client.setRaisonSociale(request.getRaisonSociale());
         client.setCin(request.getCin());
         client.setTypePieceIdentite(request.getTypePieceIdentite());
+        client.setClientEtranger(request.getClientEtranger());
         client.setPaysResidence(request.getPaysResidence());
         client.setVilleEtrangere(request.getVilleEtrangere());
         client.setRc(request.getRc());

@@ -28,6 +28,7 @@ import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeExclus
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
 import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeExclusionGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertSousClasseRequest, UpsertUsageRequest } from "../types";
+import { PERIODES_COUVERTURE, periodesForUsage } from "../coverage-periods";
 
 export function MarquesSettingsPage() {
   return (
@@ -661,6 +662,8 @@ export function UsagesSettingsPage() {
       code: editing.code ?? "",
       libelle: editing.libelle,
       criteria: String(editing.criteria ?? ""),
+      fermeUniquement: Boolean(editing.fermeUniquement),
+      periodesAutorisees: periodesForUsage(editing).map((periode) => periode.value),
       groupeUsageAttestationId: String(editing.groupeUsageAttestationId ?? ""),
       consommeAttestation: editing.consommeAttestation !== false,
       byCarburant: Boolean(editing.byCarburant),
@@ -726,6 +729,7 @@ export function UsagesSettingsPage() {
             </Field>
           </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <Flag label="Ferme uniquement" checked={payload.fermeUniquement} onChange={(value) => setPayload((current) => ({ ...current, fermeUniquement: value }))} />
             <Flag label="Consomme attestation" checked={payload.consommeAttestation} onChange={(value) => setPayload((current) => ({ ...current, consommeAttestation: value }))} />
             <Flag label="Carburant" checked={payload.byCarburant} onChange={(value) => setPayload((current) => ({ ...current, byCarburant: value }))} />
             <Flag label="Puissance fiscale" checked={payload.byPuissanceFiscale} onChange={(value) => setPayload((current) => ({ ...current, byPuissanceFiscale: value }))} />
@@ -736,6 +740,22 @@ export function UsagesSettingsPage() {
             <Flag label="Garanties personne" checked={payload.garantiesPersonne} onChange={(value) => setPayload((current) => ({ ...current, garantiesPersonne: value }))} />
             <Flag label="Actif" checked={payload.actif} onChange={(value) => setPayload((current) => ({ ...current, actif: value }))} />
           </div>
+          <fieldset className="space-y-3 border-t pt-3">
+            <legend className="text-sm font-medium">Périodes de couverture autorisées</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {PERIODES_COUVERTURE.map((periode) => (
+                <Flag key={periode.value} label={periode.label}
+                  checked={payload.periodesAutorisees?.includes(periode.value) ?? false}
+                  onChange={(checked) => setPayload((current) => ({
+                    ...current,
+                    periodesAutorisees: checked
+                      ? [...(current.periodesAutorisees ?? []), periode.value]
+                      : (current.periodesAutorisees ?? []).filter((value) => value !== periode.value),
+                  }))}
+                />
+              ))}
+            </div>
+          </fieldset>
           <div className="flex gap-2">
             <Button disabled={save.isPending} onClick={() => {
               const parsed = usageSchema.safeParse(cleanTextPayload(payload));
@@ -2091,6 +2111,8 @@ function emptyUsage(): UpsertUsageRequest {
     code: "",
     libelle: "",
     criteria: "",
+    fermeUniquement: false,
+    periodesAutorisees: [],
     groupeUsageAttestationId: undefined,
     consommeAttestation: true,
     byCarburant: false,

@@ -100,7 +100,7 @@ export default function ConventionProductionPage() {
             {showCompany && <td className="px-3 py-3">{row.compagnie || "-"}</td>}
             {[row.numeroPolice, row.mouvement, row.assure, row.vehicule, date(row.dateEffet), date(row.dateExpiration)].map((value, index) => <td key={index} className="px-3 py-3">{value || "-"}</td>)}
             {[row.primeNette, row.taxes, row.montantTtc].map((value, index) => <td key={index} className="px-3 py-3 text-right tabular-nums">{formatAccountingAmount(value)}</td>)}
-            <td className="px-3 py-3">{row.mode === "FACTURE" ? "Facture" : row.mode === "BUREAU" ? "Bureau" : "-"}</td>
+            <td className="px-3 py-3">{row.mode === "facture" ? "Facture" : row.mode === "bureau" ? "Bureau" : "-"}</td>
             <td className="px-3 py-3 text-right font-semibold tabular-nums">{row.montantClient == null ? "-" : formatAccountingAmount(row.montantClient)}</td>
           </tr>)}</tbody>
       </table></div>

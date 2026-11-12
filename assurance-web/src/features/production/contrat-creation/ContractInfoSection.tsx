@@ -178,6 +178,8 @@ export function ContractInfoSection({
                 form.setClients(
                   form.clients.map((client) =>
                     client.role === "SOUSCRIPTEUR"
+                      || client.sameAsRole === "SOUSCRIPTEUR"
+                      || (Boolean(souscripteur?.clientId) && client.clientId === souscripteur?.clientId)
                       ? { ...client, client: { ...client.client, categorieClientId: value } }
                       : client
                   )
@@ -274,6 +276,18 @@ export function ContractInfoSection({
             </Select>
           </Field>
         ) : null}
+        {form.periodesAutorisees.length > 0 ? (
+          <Field label="Périodicité" required error={form.validationErrors.periodicite}>
+            <Select value={form.periodeCouverture} onValueChange={form.setPeriodeCouverture}>
+              <SelectTrigger><SelectValue placeholder="Période" /></SelectTrigger>
+              <SelectContent>
+                {form.periodesAutorisees.map((periode) => (
+                  <SelectItem key={periode.value} value={periode.value}>{periode.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
         {isFlotte ? (
           <>
             {showFlotteNumeroPolice ? (
@@ -288,6 +302,7 @@ export function ContractInfoSection({
             <Field label="Type de contrat" required error={form.validationErrors.typeRenouvellement}>
               <Select
                 value={form.typeRenouvellement}
+                disabled={form.fermeUniquement}
                 onValueChange={(value) => {
                   form.setTypeRenouvellement(value as "renouvelable" | "ferme");
                   if (value === "ferme") {
@@ -297,7 +312,7 @@ export function ContractInfoSection({
               >
                 <SelectTrigger><SelectValue placeholder="Type de contrat" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="renouvelable">Renouvelable</SelectItem>
+                  {!form.fermeUniquement ? <SelectItem value="renouvelable">Renouvelable</SelectItem> : null}
                   <SelectItem value="ferme">Ferme</SelectItem>
                 </SelectContent>
               </Select>
@@ -315,9 +330,9 @@ export function ContractInfoSection({
               <DatePicker disabled={form.renewalMode} date={form.dateEffet} onSelect={(date) => form.setDateEffet(toDateOnly(date))} />
             </Field>
             <Field label="Date échéance" required error={form.validationErrors.dateEcheance}>
-              <DatePicker disabled={form.renewalMode || form.showContractEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
+              <DatePicker disabled={form.renewalMode || form.lockDateEcheance} date={form.dateEcheance} onSelect={(date) => form.setDateEcheance(toDateOnly(date))} />
             </Field>
-            {showFractionnement ? (
+            {showFractionnement && form.periodesAutorisees.length === 0 ? (
               <Field label="Fractionnement">
                 <Select
                   value={form.fractionnement}
@@ -384,6 +399,7 @@ export function ContractInfoSection({
             <Field label="Type de contrat" required error={form.validationErrors.typeRenouvellement}>
               <Select
                 value={form.typeRenouvellement}
+                disabled={form.fermeUniquement}
                 onValueChange={(value) => {
                   form.setTypeRenouvellement(value as "renouvelable" | "ferme");
                   if (value === "ferme") {
@@ -393,7 +409,7 @@ export function ContractInfoSection({
               >
                 <SelectTrigger><SelectValue placeholder="Type de contrat" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="renouvelable">Renouvelable</SelectItem>
+                  {!form.fermeUniquement ? <SelectItem value="renouvelable">Renouvelable</SelectItem> : null}
                   <SelectItem value="ferme">Ferme</SelectItem>
                 </SelectContent>
               </Select>
@@ -407,7 +423,7 @@ export function ContractInfoSection({
                 />
               </Field>
             ) : null}
-            {showFractionnement && (!readOnlyConventionContext || showConventionDateToDateFractionnement) ? (
+            {showFractionnement && form.periodesAutorisees.length === 0 && (!readOnlyConventionContext || showConventionDateToDateFractionnement) ? (
               <Field label="Périodicité">
                 <Select
                   value={form.fractionnement}

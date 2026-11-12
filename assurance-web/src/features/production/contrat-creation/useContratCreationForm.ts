@@ -12,6 +12,7 @@ import {
 import { contractServiceApi } from "../api/contract-services";
 import { referenceApi } from "../api/references";
 import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
+import { coverageExpiration, periodesForUsage } from "../coverage-periods";
 import { renewalReturnPath } from "../renewals/navigation";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
@@ -58,6 +59,7 @@ export function useContratCreationForm(
   const [dateEffet, setDateEffet] = useState<string | undefined>();
   const [dateEcheance, setDateEcheance] = useState<string | undefined>();
   const [typeRenouvellement, setTypeRenouvellement] = useState<"renouvelable" | "ferme">("renouvelable");
+  const [periodeCouverture, setPeriodeCouverture] = useState("");
   const [modeTermeRenouvellement, setModeTermeRenouvellement] = useState<"CABINET" | "COMPAGNIE">("CABINET");
   const [echeance, setEcheance] = useState<string | undefined>();
   const [modeReglement, setModeReglement] = useState("bureau");
@@ -263,14 +265,20 @@ export function useContratCreationForm(
   const selectedConventionEcheance = typeof selectedConvention?.echeance === "string" ? selectedConvention.echeance : undefined;
   const conventionHasFixedEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE";
   const conventionUsesPeriodicite = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "DATE_A_DATE";
+  const fermeUniquement = Boolean(selectedUsage?.fermeUniquement);
+  const periodesAutorisees = periodesForUsage(selectedUsage);
+  const hasCoveragePeriods = periodesAutorisees.length > 0;
+  const effectivePeriodeCouverture = periodesAutorisees.some((periode) => periode.value === periodeCouverture)
+    ? periodeCouverture : periodesAutorisees[0]?.value;
+  const effectiveTypeRenouvellement = fermeUniquement ? "ferme" : typeRenouvellement;
   const effectiveEcheance = typeContrat === "CONVENTION" && selectedConventionTypeEcheance === "A_ECHEANCE"
     ? selectedConventionEcheance
     : echeance;
-  const showContractEcheance = typeRenouvellement === "renouvelable"
+  const showContractEcheance = !hasCoveragePeriods && effectiveTypeRenouvellement === "renouvelable"
     && (typeContrat === "CONVENTION"
       ? conventionHasFixedEcheance
       : typeContrat === "FLOTTE" || fractionnement === "ANNUEL");
-  const lockDateEcheance = showContractEcheance || conventionUsesPeriodicite;
+  const lockDateEcheance = showContractEcheance || conventionUsesPeriodicite || hasCoveragePeriods;
 
   const lignesGrille = useQuery({
     queryKey: ["lignes-grille", grilleTarifaireId, grilleUsageFilter],
@@ -316,6 +324,7 @@ export function useContratCreationForm(
     setDateEffet(hydrated.dateEffet);
     setDateEcheance(hydrated.dateEcheance);
     setTypeRenouvellement(hydrated.typeRenouvellement);
+    setPeriodeCouverture(draft.periodicite ?? "");
     setModeTermeRenouvellement(hydrated.modeTermeRenouvellement);
     setEcheance(hydrated.echeance);
     setModeReglement(hydrated.modeReglement);
@@ -407,9 +416,9 @@ export function useContratCreationForm(
     dateEffet,
     dateEcheance,
     echeance: showContractEcheance ? effectiveEcheance : undefined,
-    typeRenouvellement,
+    typeRenouvellement: effectiveTypeRenouvellement,
     modeTermeRenouvellement: options?.renewalMode ? modeTermeRenouvellement : undefined,
-    periodicite: periodiciteFromFractionnement(fractionnement),
+    periodicite: hasCoveragePeriods ? effectivePeriodeCouverture : periodiciteFromFractionnement(fractionnement),
     modeReglement: typeContrat === "CONVENTION" ? modeReglement : undefined,
     numeroBonCommande: typeContrat === "CONVENTION" && modeReglement === "facture" ? emptyToUndefined(numeroBonCommande) : undefined,
     montantBulletin: typeContrat === "CONVENTION" && modeReglement === "facture" ? positiveNumberOrUndefined(montantBulletin) : undefined,
@@ -501,6 +510,9 @@ export function useContratCreationForm(
     effectiveEcheance,
     showContractEcheance,
     typeRenouvellement,
+    effectiveTypeRenouvellement,
+    hasCoveragePeriods,
+    effectivePeriodeCouverture,
     modeTermeRenouvellement,
     modeReglement,
     isConventionInvoice,
@@ -1405,24 +1417,30 @@ export function useContratCreationForm(
   }, [dateEffet, dateEcheance, effectiveEcheance, showContractEcheance]);
 
   useEffect(() => {
-    if (!conventionUsesPeriodicite || !dateEffet) {
+    if (!conventionUsesPeriodicite || hasCoveragePeriods || !dateEffet) {
       return;
     }
     const computed = computeDateEcheanceFromMonths(dateEffet, monthsFromFractionnement(fractionnement));
     if (computed && computed !== dateEcheance) {
       setDateEcheance(computed);
     }
-  }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement]);
+  }, [conventionUsesPeriodicite, hasCoveragePeriods, dateEffet, dateEcheance, fractionnement]);
 
   useEffect(() => {
-    if (typeContrat === "FLOTTE" || showContractEcheance || conventionUsesPeriodicite || !dateEffet) {
+    if (typeContrat === "FLOTTE" || showContractEcheance || conventionUsesPeriodicite || hasCoveragePeriods || !dateEffet) {
       return;
     }
     const computed = computeDateEcheanceFromMonths(dateEffet, monthsFromFractionnement(fractionnement));
     if (computed && computed !== dateEcheance) {
       setDateEcheance(computed);
     }
-  }, [conventionUsesPeriodicite, dateEffet, dateEcheance, fractionnement, showContractEcheance, typeContrat]);
+  }, [conventionUsesPeriodicite, hasCoveragePeriods, dateEffet, dateEcheance, fractionnement, showContractEcheance, typeContrat]);
+
+  useEffect(() => {
+    if (!hasCoveragePeriods) return;
+    const computed = coverageExpiration(dateEffet, effectivePeriodeCouverture);
+    if (computed && computed !== dateEcheance) setDateEcheance(computed);
+  }, [hasCoveragePeriods, dateEffet, dateEcheance, effectivePeriodeCouverture]);
 
   return {
     typeContrat,
@@ -1487,8 +1505,12 @@ export function useContratCreationForm(
     setDateEffet,
     dateEcheance,
     setDateEcheance,
-    typeRenouvellement,
+    typeRenouvellement: effectiveTypeRenouvellement,
     setTypeRenouvellement,
+    fermeUniquement,
+    periodesAutorisees,
+    periodeCouverture: effectivePeriodeCouverture,
+    setPeriodeCouverture,
     modeTermeRenouvellement,
     echeance,
     setEcheance,

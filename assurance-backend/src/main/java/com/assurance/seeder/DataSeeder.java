@@ -920,6 +920,15 @@ public class DataSeeder implements CommandLineRunner {
                         .byPrime(byPrime)
                         .byCategorieTransport(byCategorieTransport)
                         .garantiesPersonne(garantiesPersonne)
+                        .fermeUniquement("F".equalsIgnoreCase(code))
+                        .periodesAutorisees("F".equalsIgnoreCase(code)
+                                ? new java.util.HashSet<>(List.of(
+                                        com.assurance.enums.PeriodeCouverture.J5,
+                                        com.assurance.enums.PeriodeCouverture.J10,
+                                        com.assurance.enums.PeriodeCouverture.M1,
+                                        com.assurance.enums.PeriodeCouverture.M3,
+                                        com.assurance.enums.PeriodeCouverture.M6))
+                                : new java.util.HashSet<>())
                         .tauxExtensionRemorque(defaultTauxExtensionRemorque(code))
                         .actif(true)
                         .build());

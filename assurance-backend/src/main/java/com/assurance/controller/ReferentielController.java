@@ -152,6 +152,8 @@ public class ReferentielController {
                 .filter(usage -> Boolean.TRUE.equals(usage.getActif()))
                 .map(usage -> option(usage.getId(), usage.getCode(), usage.getLibelle())
                         .putValue("byCarburant", usage.getByCarburant())
+                        .putValue("fermeUniquement", usage.getFermeUniquement())
+                        .putValue("periodesAutorisees", usage.getPeriodesAutorisees().stream().sorted().toList())
                         .putValue("byPuissanceFiscale", usage.getByPuissanceFiscale())
                         .putValue("bySousClasse", usage.getBySousClasse())
                         .putValue("byPtc", usage.getByPtc())
@@ -2147,6 +2149,13 @@ public class ReferentielController {
         usage.setCode(request.getCode());
         usage.setLibelle(request.getLibelle());
         usage.setCriteria(request.getCriteria());
+        if (request.getFermeUniquement() != null) {
+            usage.setFermeUniquement(request.getFermeUniquement());
+        }
+        if (request.getPeriodesAutorisees() != null) {
+            usage.getPeriodesAutorisees().clear();
+            usage.getPeriodesAutorisees().addAll(request.getPeriodesAutorisees());
+        }
         usage.setGroupeUsageAttestation(groupe);
         usage.setConsommeAttestation(request.getConsommeAttestation() == null ? true : request.getConsommeAttestation());
         usage.setByCarburant(Boolean.TRUE.equals(request.getByCarburant()));
@@ -2164,6 +2173,8 @@ public class ReferentielController {
 
     private Map<String, Object> toUsageResponse(Usage usage) {
         return option(usage.getId(), usage.getCode(), usage.getLibelle())
+                .putValue("fermeUniquement", usage.getFermeUniquement())
+                .putValue("periodesAutorisees", usage.getPeriodesAutorisees().stream().sorted().toList())
                 .putValue("criteria", usage.getCriteria())
                 .putValue("byCarburant", usage.getByCarburant())
                 .putValue("byPuissanceFiscale", usage.getByPuissanceFiscale())

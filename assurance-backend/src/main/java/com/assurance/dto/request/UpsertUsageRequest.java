@@ -1,11 +1,14 @@
 package com.assurance.dto.request;
 
+import com.assurance.enums.PeriodeCouverture;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 @Data
 public class UpsertUsageRequest {
@@ -16,6 +19,8 @@ public class UpsertUsageRequest {
     private String libelle;
 
     private String criteria;
+    private Boolean fermeUniquement;
+    private Set<@NotNull PeriodeCouverture> periodesAutorisees;
     private Long groupeUsageAttestationId;
     private Boolean consommeAttestation;
     private Boolean byCarburant;

@@ -60,6 +60,10 @@ public final class ReferenceCatalogueActivity {
         List<ActivityReference> references = group == null ? List.of() : List.of(groupReference(group));
         return state(ActivityRecordType.USAGE, usage.getId(), label(usage.getCode(), usage.getLibelle()),
                 new ActivityValues().put("Code", usage.getCode()).put("Libelle", usage.getLibelle()).put("Criteres", usage.getCriteria())
+                        .put("Ferme uniquement", usage.getFermeUniquement())
+                        .put("Periodes autorisees", usage.getPeriodesAutorisees().stream().sorted()
+                                .map(com.assurance.enums.PeriodeCouverture::getLibelle)
+                                .collect(java.util.stream.Collectors.joining(", ")))
                         .put("Groupe d'attestations", group == null ? null : label(group.getCode(), group.getLibelle()))
                         .put("Consomme une attestation", usage.getConsommeAttestation()).put("Tarification par carburant", usage.getByCarburant())
                         .put("Tarification par puissance fiscale", usage.getByPuissanceFiscale()).put("Tarification par sous-classe", usage.getBySousClasse())

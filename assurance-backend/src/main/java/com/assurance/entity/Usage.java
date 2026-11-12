@@ -1,6 +1,11 @@
 package com.assurance.entity;
 
+import com.assurance.enums.PeriodeCouverture;
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -35,6 +40,17 @@ public class Usage extends BaseEntity {
 
     @Column(length = 500)
     private String criteria;
+
+    @Builder.Default
+    @Column(name = "ferme_uniquement", nullable = false)
+    private Boolean fermeUniquement = false;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "usage_periodes_couverture", joinColumns = @JoinColumn(name = "usage_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "periode", nullable = false, length = 20)
+    @Builder.Default
+    private Set<PeriodeCouverture> periodesAutorisees = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupe_usage_attestation_id")

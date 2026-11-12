@@ -339,7 +339,7 @@ export type ConventionProductionPage = {
     primeNette: number;
     taxes: number;
     montantTtc: number;
-    mode?: "BUREAU" | "FACTURE" | null;
+    mode?: "bureau" | "facture" | null;
     montantClient?: number | null;
   })[];
   totalElements: number;

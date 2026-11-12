@@ -31,6 +31,9 @@ public class ContratActionService {
         var mouvements = typeMouvementContratRepository.findByActifTrueOrderByOrdreAffichageAsc().stream()
                 .filter(type -> type.getTypesContratAutorises().isEmpty() || type.getTypesContratAutorises().contains(contrat.getTypeContrat()))
                 .filter(type -> !contratClos)
+                .filter(type -> !Boolean.TRUE.equals(type.getRenouvelleContrat())
+                        || ("renouvelable".equalsIgnoreCase(contrat.getTypeRenouvellement())
+                        && (contrat.getUsage() == null || !Boolean.TRUE.equals(contrat.getUsage().getFermeUniquement()))))
                 .filter(type -> type.getCategorie() == CategorieMouvementContrat.AVENANT || type.getCategorie() == CategorieMouvementContrat.RENOUVELLEMENT)
                 .map(this::toMouvementDisponible)
                 .toList();

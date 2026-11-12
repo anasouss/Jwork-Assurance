@@ -22,6 +22,8 @@ export type ReferenceOption = {
   byPtc?: boolean | null;
   byPrime?: boolean | null;
   byCategorieTransport?: boolean | null;
+  fermeUniquement?: boolean | null;
+  periodesAutorisees?: import("./coverage-periods").PeriodeCouverture[];
   tauxExtensionRemorque?: number | null;
   [key: string]: unknown;
 };
@@ -1349,6 +1351,8 @@ export type UpsertUsageRequest = {
   code: string;
   libelle: string;
   criteria?: string;
+  fermeUniquement?: boolean;
+  periodesAutorisees?: import("./coverage-periods").PeriodeCouverture[];
   groupeUsageAttestationId?: string;
   consommeAttestation?: boolean;
   byCarburant?: boolean;

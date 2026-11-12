@@ -2000,7 +2000,13 @@ public class ContratService {
                 continue;
             }
             if (input.getClient() != null) {
-                client = clientService.updateEntity(agenceId, client.getId(), input.getClient());
+                CreateClientRequest aliasRequest = new CreateClientRequest();
+                org.springframework.beans.BeanUtils.copyProperties(input.getClient(), aliasRequest);
+                // An alias carries role details, not a second category for the same person.
+                if (client.getCategorieClient() != null) {
+                    aliasRequest.setCategorieClientId(client.getCategorieClient().getId());
+                }
+                client = clientService.updateEntity(agenceId, client.getId(), aliasRequest);
             }
             applyClientGroupAssignment(agenceId, input, client, contrat.getDateEffet());
             saveClientLink(contrat, input, client);
@@ -2171,6 +2177,9 @@ public class ContratService {
             if (client == null) {
                 continue;
             }
+            if (client.getCategorieClient() == null) {
+                applySubmittedClientCategory(client, input);
+            }
             addPreviewClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
         }
@@ -2198,8 +2207,10 @@ public class ContratService {
             return null;
         }
         if (input.getClientId() != null) {
-            return clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
+            Client client = clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+            applySubmittedClientCategory(client, input);
+            return client;
         }
         if (input.getClient() == null) {
             if (finalMode) {
@@ -5097,7 +5108,8 @@ public class ContratService {
         if (Boolean.TRUE.equals(source.getRenouvele())) {
             throw new BadRequestException("Le contrat est déjà renouvelé");
         }
-        if (!"renouvelable".equalsIgnoreCase(blankToNull(source.getTypeRenouvellement()))) {
+        if (!"renouvelable".equalsIgnoreCase(blankToNull(source.getTypeRenouvellement()))
+                || (source.getUsage() != null && Boolean.TRUE.equals(source.getUsage().getFermeUniquement()))) {
             throw new BadRequestException("Ce contrat n'est pas renouvelable");
         }
         if (source.getDateEcheance() == null) {
@@ -5516,8 +5528,12 @@ public class ContratService {
 
     private Client resolveClientForPreview(Long agenceId, CreateContratRequest.ClientInput input) {
         if (input.getClientId() != null) {
-            return clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
+            Client persisted = clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+            Client preview = new Client();
+            org.springframework.beans.BeanUtils.copyProperties(persisted, preview);
+            applySubmittedClientCategory(preview, input);
+            return preview;
         }
         if (input.getClient() == null) {
             throw new BadRequestException("Le role " + input.getRole() + " doit renseigner clientId ou client");
@@ -5538,6 +5554,15 @@ public class ContratService {
                 .categorieClient(categorieClient)
                 .ville(ville)
                 .build();
+    }
+
+    private void applySubmittedClientCategory(Client client, CreateContratRequest.ClientInput input) {
+        if (input.getClient() == null || input.getClient().getCategorieClientId() == null) {
+            return;
+        }
+        Long categoryId = input.getClient().getCategorieClientId();
+        client.setCategorieClient(categorieClientRepository.findByIdWithUsages(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("CategorieClient", categoryId)));
     }
 
     private List<Vehicule> buildVehiculesPreview(
@@ -7885,10 +7910,16 @@ public class ContratService {
     }
 
     private ContractDates resolveContractDates(CreateContratRequest request) {
+        Usage usage = request.getUsageId() == null ? null : usageRepository.findById(request.getUsageId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usage", request.getUsageId()));
         String normalizedEcheance = echeanceService.normalizeCode(request.getEcheance());
         LocalDate dateEcheance = normalizedEcheance == null
                 ? request.getDateEcheance()
                 : echeanceService.resolveDateEcheance(request.getDateEffet(), normalizedEcheance, request.getDateEcheance());
+        dateEcheance = UsageContractPolicy.resolveExpiration(usage, request, dateEcheance);
+        if (usage != null && (Boolean.TRUE.equals(usage.getFermeUniquement()) || !usage.getPeriodesAutorisees().isEmpty())) {
+            normalizedEcheance = null;
+        }
         return new ContractDates(request.getDateEffet(), dateEcheance, normalizedEcheance);
     }
 

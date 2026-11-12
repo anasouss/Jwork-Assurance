@@ -88,6 +88,8 @@ export const usageSchema = z.object({
   code: z.string().min(1, "Code obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),
   criteria: z.string().optional(),
+  fermeUniquement: z.boolean().optional(),
+  periodesAutorisees: z.array(z.enum(["J5", "J10", "M1", "M3", "M6", "M12"])).optional(),
   groupeUsageAttestationId: z.string().optional(),
   consommeAttestation: z.boolean().optional(),
   byCarburant: z.boolean().optional(),

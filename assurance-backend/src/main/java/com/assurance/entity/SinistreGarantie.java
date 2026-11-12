@@ -33,6 +33,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class SinistreGarantie extends BaseEntity {
 
+    @Column(name = "responsabilite_civile_snapshot", nullable = false)
+    private boolean responsabiliteCivile;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sinistre_id", nullable = false)
     private Sinistre sinistre;

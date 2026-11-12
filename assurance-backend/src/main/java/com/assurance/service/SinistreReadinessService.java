@@ -55,15 +55,23 @@ public class SinistreReadinessService {
         List<SinistreGarantie> involved = context.involvedGuarantees();
 
         if (target == StatutSinistre.DECLARE || target == StatutSinistre.TRANSMIS_COMPAGNIE) {
+            blockers.addAll(SinistreQualificationService.declarationBlockers(sinistre));
             if (!hasText(sinistre.getCirconstances())) {
                 blockers.add("Renseignez les circonstances du sinistre");
             }
             if (involved.isEmpty()) {
                 blockers.add("Sélectionnez au moins une garantie impliquée");
             }
+            if (involved.stream().anyMatch(SinistreGarantie::isResponsabiliteCivile)
+                    && sinistre.getTauxResponsabilite() == null) {
+                blockers.add("Renseignez la responsabilite RC (0, 50 ou 100)");
+            }
         }
 
         if (target == StatutSinistre.TRANSMIS_COMPAGNIE) {
+            if (!hasText(sinistre.getReferenceCompagnie())) {
+                blockers.add("Renseignez la reference compagnie avant transmission");
+            }
             documentRequirementService.applicable(
                     sinistre.getAgence().getId(),
                     sinistre.getNature()

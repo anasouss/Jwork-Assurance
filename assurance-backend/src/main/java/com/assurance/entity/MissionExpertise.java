@@ -67,6 +67,11 @@ public class MissionExpertise extends BaseEntity {
     @Column(nullable = false, length = 30)
     private StatutMissionExpertise statut = StatutMissionExpertise.A_MANDATER;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private com.assurance.enums.PhaseExpertiseSinistre phase = com.assurance.enums.PhaseExpertiseSinistre.AVANT;
+
     @Column(length = 1000)
     private String notes;
 }

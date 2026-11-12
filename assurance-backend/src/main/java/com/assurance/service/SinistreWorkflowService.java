@@ -43,6 +43,11 @@ public class SinistreWorkflowService {
                 && statut != StatutSinistre.REJETE;
     }
 
+    public boolean isEditable(Sinistre sinistre) {
+        return isEditable(sinistre.getStatut())
+                && sinistre.getEtapeSuivi() != com.assurance.enums.EtapeSuiviSinistre.CLOTURE;
+    }
+
     public Set<StatutSinistre> availableTransitions(StatutSinistre statut) {
         return TRANSITIONS.getOrDefault(statut, Set.of());
     }

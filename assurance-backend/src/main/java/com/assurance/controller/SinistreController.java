@@ -4,6 +4,7 @@ import com.assurance.dto.request.AddProvisionSinistreRequest;
 import com.assurance.dto.request.AddSinistreOperationRequest;
 import com.assurance.dto.request.AddSinistrePartieRequest;
 import com.assurance.dto.request.CreateSinistreRequest;
+import com.assurance.dto.request.InitialSinistreDocumentRequest;
 import com.assurance.dto.request.TransitionSinistreRequest;
 import com.assurance.dto.request.UpdateSinistreGarantieRequest;
 import com.assurance.dto.request.UpdateSinistreGarantiesRequest;
@@ -53,6 +54,7 @@ public class SinistreController {
     private final SinistreCouvertureService couvertureService;
     private final SinistreDashboardService dashboardService;
     private final TresorerieService tresorerieService;
+    private final com.assurance.service.SinistreOuvertureService ouvertureService;
 
     @GetMapping("/doublons")
     @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:create')")
@@ -115,6 +117,7 @@ public class SinistreController {
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) StatutSinistre statut,
             @RequestParam(required = false) NatureSinistre nature,
+            @RequestParam(required = false) com.assurance.enums.EtapeSuiviSinistre etapeSuivi,
             @RequestParam(required = false) LocalDate dateDu,
             @RequestParam(required = false) LocalDate dateAu,
             @RequestParam(defaultValue = "0") int page,
@@ -128,6 +131,7 @@ public class SinistreController {
                 brancheId,
                 statut,
                 nature,
+                etapeSuivi,
                 dateDu,
                 dateAu,
                 page,
@@ -140,11 +144,38 @@ public class SinistreController {
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> create(
             @Valid @RequestBody CreateSinistreRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(sinistreService.create(
+        return ResponseEntity.ok(ApiResponse.success(ouvertureService.ouvrir(
                 TenantContext.getCurrentAgence(),
                 TenantContext.getCurrentUser(),
-                request
+                request,
+                List.of(),
+                List.of()
         ), "Sinistre enregistré"));
+    }
+
+    @PostMapping(value = "/ouverture", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('PERM_sinistre:create')")
+    public ResponseEntity<ApiResponse<SinistreDetailResponse>> ouvrir(
+            @Valid @org.springframework.web.bind.annotation.RequestPart("request") CreateSinistreRequest request,
+            @Valid @org.springframework.web.bind.annotation.RequestPart(value = "documents", required = false)
+            List<@Valid InitialSinistreDocumentRequest> documents,
+            @org.springframework.web.bind.annotation.RequestPart(value = "files", required = false)
+            List<org.springframework.web.multipart.MultipartFile> files
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(ouvertureService.ouvrir(
+                TenantContext.getCurrentAgence(), TenantContext.getCurrentUser(), request, documents, files
+        ), "Sinistre enregistre"));
+    }
+
+    @PostMapping("/{id}/etape")
+    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    public ResponseEntity<ApiResponse<SinistreDetailResponse>> transitionEtape(
+            @PathVariable Long id,
+            @Valid @RequestBody com.assurance.dto.request.TransitionEtapeSinistreRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(sinistreService.transitionEtape(
+                TenantContext.getCurrentAgence(), TenantContext.getCurrentUser(), id, request
+        ), "Suivi du sinistre mis a jour"));
     }
 
     @GetMapping("/{id}")

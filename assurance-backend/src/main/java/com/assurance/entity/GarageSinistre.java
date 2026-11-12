@@ -51,6 +51,9 @@ public class GarageSinistre extends BaseEntity {
     @Column(length = 500)
     private String adresse;
 
+    @Column(nullable = false)
+    private boolean conventionne;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean actif = true;

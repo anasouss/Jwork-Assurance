@@ -8,7 +8,11 @@ import type { ApiResponse } from "@/lib/types";
 import type {
   CoveragePreview,
   Intervenant,
-  NatureSinistre,
+  EtapeSuiviSinistre,
+  OpeningDocument,
+  SinistreListParams,
+  SinistreOpeningRequest,
+  SinistreContractOption,
   PagedResponse,
   SinistreDashboard,
   SinistreDetail,
@@ -30,10 +34,12 @@ export const sinistreKeys = {
   detail: (id: string) => [...sinistreKeys.all, "detail", id] as const,
   coverage: (contractId: string, date: string) =>
     [...sinistreKeys.all, "coverage", contractId, date] as const,
+  contracts: (brancheId: string, query: string) =>
+    [...sinistreKeys.all, "contracts", brancheId, query] as const,
   duplicates: (contractId: string, vehicleId: string | undefined, date: string) =>
     [...sinistreKeys.all, "duplicates", contractId, vehicleId, date] as const,
-  experts: (includeInactive: boolean) =>
-    [...sinistreKeys.all, "experts", includeInactive] as const,
+  experts: (includeInactive: boolean, villeId?: string) =>
+    [...sinistreKeys.all, "experts", includeInactive, villeId] as const,
   garages: (includeInactive: boolean) =>
     [...sinistreKeys.all, "garages", includeInactive] as const,
   managers: () => [...sinistreKeys.all, "managers"] as const,
@@ -41,6 +47,11 @@ export const sinistreKeys = {
 };
 
 export const sinistreApi = {
+  async lookupContracts(brancheId: string, query: string) {
+    return unwrap(await apiFetch<ApiResponse<SinistreContractOption[]>>(
+      `/api/v1/sinistres/contrats${buildQueryString({ brancheId, query })}`,
+    ));
+  },
   async treasuryAccounts() {
     return unwrap(
       await apiFetch<ApiResponse<SinistreTreasuryAccount[]>>(
@@ -63,18 +74,14 @@ export const sinistreApi = {
     );
   },
 
-  async list(params: {
-    query?: string;
-    clientId?: string;
-    contratId?: string;
-    brancheId?: string;
-    statut?: StatutSinistre;
-    nature?: NatureSinistre;
-    dateDu?: string;
-    dateAu?: string;
-    page: number;
-    size: number;
-  }) {
+  exportRegister(params: SinistreListParams) {
+    const filters = { ...params };
+    delete filters.page;
+    delete filters.size;
+    return apiFetchBlob(`/api/v1/sinistres/registre/export${buildQueryString(filters)}`);
+  },
+
+  async list(params: SinistreListParams) {
     return unwrap(
       await apiFetch<ApiResponse<PagedResponse<SinistreSummary>>>(
         `/api/v1/sinistres${buildQueryString(params)}`,
@@ -105,6 +112,26 @@ export const sinistreApi = {
         body: JSON.stringify(request),
       }),
     );
+  },
+
+  async open(request: SinistreOpeningRequest, documents: OpeningDocument[]) {
+    const form = new FormData();
+    form.append("request", new Blob([JSON.stringify(request)], { type: "application/json" }));
+    form.append("documents", new Blob([JSON.stringify(documents.map((document) => ({
+      type: document.type,
+      dateDocument: document.dateDocument,
+      reference: document.reference,
+      commentaire: document.commentaire,
+    })))], { type: "application/json" }));
+    documents.forEach(({ file }) => form.append("files", file));
+    return unwrap(await apiUpload<ApiResponse<SinistreDetail>>("/api/v1/sinistres/ouverture", form));
+  },
+
+  async changeStage(id: string, etapeSuivi: EtapeSuiviSinistre, motif: string | undefined, version: number) {
+    return unwrap(await apiFetch<ApiResponse<SinistreDetail>>(`/api/v1/sinistres/${id}/etape`, {
+      method: "POST",
+      body: JSON.stringify({ etapeSuivi, motif, version }),
+    }));
   },
 
   async get(id: string) {
@@ -295,10 +322,10 @@ export const sinistreApi = {
     );
   },
 
-  async experts(includeInactive = false) {
+  async experts(includeInactive = false, villeId?: string) {
     return unwrap(
       await apiFetch<ApiResponse<Intervenant[]>>(
-        `/api/v1/sinistres/referentiels/experts${buildQueryString({ includeInactive })}`,
+        `/api/v1/sinistres/referentiels/experts${buildQueryString({ includeInactive, villeId })}`,
       ),
     );
   },

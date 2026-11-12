@@ -16,6 +16,14 @@ public class SinistreSummaryResponse {
     private String numeroSinistre;
     private String referenceCompagnie;
     private StatutSinistre statut;
+    private com.assurance.enums.EtapeSuiviSinistre etapeSuivi;
+    private com.assurance.enums.TypeDommageSinistre typeDommage;
+    private com.assurance.enums.ModeReparationSinistre modeReparation;
+    private BigDecimal tauxResponsabilite;
+    private Long garageId;
+    private String garage;
+    private String premierExpert;
+    private java.util.List<String> garantiesImpliquees;
     private NatureSinistre nature;
     private LocalDate dateSinistre;
     private LocalDate dateDeclaration;

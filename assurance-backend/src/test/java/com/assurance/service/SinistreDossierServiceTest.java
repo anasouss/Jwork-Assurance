@@ -122,9 +122,9 @@ class SinistreDossierServiceTest {
 
         Utilisateur user = new Utilisateur();
         user.setId(7L);
-        when(claimService.resolve(1L, 35L)).thenReturn(claim);
+        when(claimService.resolveForUpdate(1L, 35L)).thenReturn(claim);
         when(claimService.resolveCurrentUser(1L, 7L)).thenReturn(user);
-        when(workflow.isEditable(StatutSinistre.EN_ATTENTE_REGLEMENT)).thenReturn(true);
+        when(workflow.isEditable(claim)).thenReturn(true);
         when(readiness.totalIndemnisable(35L)).thenReturn(new BigDecimal("1000.00"));
         when(readiness.totalSettled(35L)).thenReturn(BigDecimal.ZERO);
         when(operations.save(any())).thenAnswer(call -> {
@@ -218,6 +218,52 @@ class SinistreDossierServiceTest {
     }
 
     @Test
+    void designatedRepairGarageCanReceiveSettlementWithoutAnExpertMission() {
+        var garage = com.assurance.entity.GarageSinistre.builder()
+                .agence(claim.getAgence()).raisonSociale("Garage PEC").conventionne(true).build();
+        garage.setId(71L);
+        claim.setGarage(garage);
+        when(garages.findByIdAndAgenceId(71L, 1L)).thenReturn(java.util.Optional.of(garage));
+        var request = operationRequest();
+        request.setTypeContrepartie(TypeContrepartieSinistre.GARAGE);
+        request.setContrepartieId(71L);
+
+        service.addOperation(1L, 7L, 35L, request);
+
+        assertThat(savedOperations).singleElement().satisfies(operation -> {
+            assertThat(operation.getContrepartieGarage()).isSameAs(garage);
+            assertThat(operation.getContrepartieNomSnapshot()).isEqualTo("Garage PEC");
+        });
+    }
+
+    @Test
+    void unrelatedAgencyGarageCannotReceiveClaimSettlement() {
+        var garage = com.assurance.entity.GarageSinistre.builder()
+                .agence(claim.getAgence()).raisonSociale("Garage sans lien").build();
+        garage.setId(72L);
+        when(garages.findByIdAndAgenceId(72L, 1L)).thenReturn(java.util.Optional.of(garage));
+        var request = operationRequest();
+        request.setTypeContrepartie(TypeContrepartieSinistre.GARAGE);
+        request.setContrepartieId(72L);
+
+        assertThatThrownBy(() -> service.addOperation(1L, 7L, 35L, request))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("ni à la réparation ni à une mission");
+        assertThat(savedOperations).isEmpty();
+    }
+
+    @Test
+    void missionRejectsExpertOutsideCurrentAgency() {
+        var request = new com.assurance.dto.request.UpsertMissionExpertiseRequest();
+        request.setExpertId(500L);
+        request.setDateMission(LocalDate.now().minusDays(1));
+        request.setStatut(com.assurance.enums.StatutMissionExpertise.MANDATEE);
+        assertThatThrownBy(() -> service.saveMission(1L, 7L, 35L, null, request))
+                .isInstanceOf(com.assurance.exception.ResourceNotFoundException.class);
+        verify(experts).findByIdAndAgenceId(500L, 1L);
+        verifyNoInteractions(missions);
+    }
+
+    @Test
     void deletingOnePartyDoesNotReportUnchangedRemainingPartyAsModified() {
         var first = SinistreDetailResponse.Partie.builder().id(1L).nom("Amine").build();
         var remaining = SinistreDetailResponse.Partie.builder().id(2L).nom("Nadia").build();
@@ -229,5 +275,16 @@ class SinistreDossierServiceTest {
         assertThat(command.subject().type()).isEqualTo(ActivityRecordType.PARTIE_SINISTRE);
         assertThat(command.references()).anyMatch(reference -> reference.type() == ActivityRecordType.SINISTRE);
         assertThat(command.changes()).allMatch(change -> !change.label().contains("Nadia"));
+    }
+
+    @Test
+    void operationalStageIsIncludedInBusinessActivitySnapshot() {
+        var before = ClaimActivity.snapshot(SinistreDetailResponse.builder()
+                .etapeSuivi(com.assurance.enums.EtapeSuiviSinistre.OUVERTURE).build());
+        var after = SinistreDetailResponse.builder()
+                .etapeSuivi(com.assurance.enums.EtapeSuiviSinistre.INSTANCE_CLIENT).build();
+        var command = ClaimActivity.command(claim, before, after, ActivityAction.UPDATED,
+                "Suivi modifie", "CLAIM_WORKFLOW_TRANSITION");
+        assertThat(command.changes()).anyMatch(change -> change.label().equals("Etape de suivi"));
     }
 }

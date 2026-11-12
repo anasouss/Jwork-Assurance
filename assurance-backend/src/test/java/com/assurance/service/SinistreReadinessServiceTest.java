@@ -125,6 +125,29 @@ class SinistreReadinessServiceTest {
         return claim;
     }
 
+    @Test
+    void declarationNeedsAutomobileQualificationAndSnapshotRcResponsibility() {
+        Sinistre claim = claim(15L, StatutSinistre.BROUILLON);
+        claim.setCouverture(com.assurance.entity.SinistreCouverture.builder().brancheCode("AUTOMOBILE").build());
+        SinistreGarantie guarantee = acceptedGuarantee("1000");
+        guarantee.setResponsabiliteCivile(true);
+        when(guarantees.findForDetailOrderByConfiguredDisplay(15L)).thenReturn(List.of(guarantee));
+        assertThat(service.blockers(claim, StatutSinistre.DECLARE)).hasSize(3);
+        claim.setTypeDommage(com.assurance.enums.TypeDommageSinistre.MATERIEL);
+        claim.setModeReparation(com.assurance.enums.ModeReparationSinistre.NORMAL);
+        claim.setTauxResponsabilite(BigDecimal.ZERO);
+        assertThat(service.blockers(claim, StatutSinistre.DECLARE)).isEmpty();
+    }
+
+    @Test
+    void companyReferenceIsRequiredOnlyForTransmissionNotDeclaration() {
+        Sinistre claim = claim(16L, StatutSinistre.DECLARE);
+        when(guarantees.findForDetailOrderByConfiguredDisplay(16L)).thenReturn(List.of(acceptedGuarantee("100")));
+        assertThat(service.blockers(claim, StatutSinistre.DECLARE)).isEmpty();
+        assertThat(service.blockers(claim, StatutSinistre.TRANSMIS_COMPAGNIE))
+                .contains("Renseignez la reference compagnie avant transmission");
+    }
+
     private SinistreGarantie acceptedGuarantee(String amount) {
         return SinistreGarantie.builder()
                 .impliquee(true)

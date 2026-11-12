@@ -15,6 +15,12 @@ public interface ExpertSinistreRepository extends JpaRepository<ExpertSinistre, 
     @EntityGraph(attributePaths = "ville")
     List<ExpertSinistre> findByAgenceIdOrderByNomAsc(Long agenceId);
 
+    @EntityGraph(attributePaths = "ville")
+    List<ExpertSinistre> findByAgenceIdAndVilleIdOrderByNomAsc(Long agenceId, Long villeId);
+
+    @EntityGraph(attributePaths = "ville")
+    List<ExpertSinistre> findByAgenceIdAndVilleIdAndActifTrueOrderByNomAsc(Long agenceId, Long villeId);
+
     Optional<ExpertSinistre> findByIdAndAgenceId(Long id, Long agenceId);
 
     boolean existsByAgenceIdAndCodeIgnoreCase(Long agenceId, String code);

@@ -31,6 +31,8 @@ public final class ClaimActivity {
         List<ActivityReference> references = new ArrayList<>();
         part(parts, "header", "", new ActivityValues().put("Numero de sinistre", claim.getNumeroSinistre())
                 .put("Reference compagnie", claim.getReferenceCompagnie()).put("Statut", label(claim.getStatut()))
+                .put("Etape de suivi", label(claim.getEtapeSuivi())).put("Type de dommage", label(claim.getTypeDommage()))
+                .put("Mode de reparation", label(claim.getModeReparation())).put("Garage de reparation", claim.getGarage())
                 .put("Nature", label(claim.getNature())).put("Date du sinistre", claim.getDateSinistre()).put("Heure", claim.getHeureSinistre())
                 .put("Date de declaration", claim.getDateDeclaration()).put("Transmission", claim.getDateTransmission()).put("Cloture", claim.getDateCloture())
                 .put("Ville", claim.getVille()).put("Lieu", claim.getLieu()).put("Circonstances", claim.getCirconstances())
@@ -73,6 +75,7 @@ public final class ClaimActivity {
         index = 0;
         for (var mission : items(claim.getMissionsExpertise())) {
             part(parts, "mission:" + mission.getId(), "Mission " + (++index), new ActivityValues().put("Reference", mission.getReferenceMission())
+                    .put("Phase", label(mission.getPhase()))
                     .put("Expert", mission.getExpert()).put("Garage", mission.getGarage()).put("Date de mission", mission.getDateMission())
                     .put("Date du rapport", mission.getDateRapport()).put("Estimation", mission.getMontantEstime()).put("Montant accepte", mission.getMontantAccepte())
                     .put("Statut", label(mission.getStatut())).put("Notes", mission.getNotes()));
@@ -293,7 +296,8 @@ public final class ClaimActivity {
 
     public static Map<String, String> intervenantSnapshot(SinistreIntervenantResponse person) {
         return new ActivityValues().put("Code", person.getCode()).put("Nom", person.getNom()).put("Telephone", person.getTelephone())
-                .put("E-mail", person.getEmail()).put("Adresse", person.getAdresse()).put("Ville", person.getVille()).put("Actif", person.isActif()).snapshot();
+                .put("E-mail", person.getEmail()).put("Adresse", person.getAdresse()).put("Ville", person.getVille())
+                .put("Conventionne", person.isConventionne()).put("Actif", person.isActif()).snapshot();
     }
 
     public static ActivityCommand intervenantCommand(Long agencyId, SinistreIntervenantResponse person, Map<String, String> before,

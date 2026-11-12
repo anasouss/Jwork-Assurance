@@ -17,6 +17,9 @@ public class UpsertMissionExpertiseRequest {
 
     private Long garageId;
 
+    @NotNull
+    private com.assurance.enums.PhaseExpertiseSinistre phase = com.assurance.enums.PhaseExpertiseSinistre.AVANT;
+
     @Size(max = 100)
     private String referenceMission;
 

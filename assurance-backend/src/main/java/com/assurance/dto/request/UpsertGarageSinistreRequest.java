@@ -29,4 +29,6 @@ public class UpsertGarageSinistreRequest {
     private Long villeId;
 
     private Boolean actif;
+
+    private Boolean conventionne;
 }

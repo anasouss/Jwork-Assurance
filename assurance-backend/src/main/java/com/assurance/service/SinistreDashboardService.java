@@ -1,6 +1,7 @@
 package com.assurance.service;
 
 import com.assurance.dto.response.SinistreDashboardResponse;
+import com.assurance.enums.EtapeSuiviSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import com.assurance.repository.ProvisionSinistreRepository;
@@ -47,9 +48,10 @@ public class SinistreDashboardService {
                         month.atDay(1),
                         month.atEndOfMonth()
                 ))
-                .enExpertise(sinistreRepository.countByAgenceIdAndStatutIn(
+                .enExpertise(sinistreRepository.countByAgenceIdAndEtapeSuiviInAndStatutIn(
                         agenceId,
-                        List.of(StatutSinistre.EXPERTISE)
+                        List.of(EtapeSuiviSinistre.EXPERTISE_AVANT, EtapeSuiviSinistre.EXPERTISE_APRES),
+                        OPEN_STATUSES
                 ))
                 .enAttenteReglement(sinistreRepository.countByAgenceIdAndStatutIn(
                         agenceId,

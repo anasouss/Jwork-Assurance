@@ -15,4 +15,5 @@ public class SinistreIntervenantResponse {
     private Long villeId;
     private String ville;
     private boolean actif;
+    private boolean conventionne;
 }

@@ -1,3 +1,73 @@
+export type EtapeSuiviSinistre = "OUVERTURE" | "EXPERTISE_AVANT" | "INSTANCE_CLIENT" | "EXPERTISE_APRES" | "COMPAGNIE" | "CLOTURE";
+export type TypeDommageSinistre = "MATERIEL" | "CORPOREL" | "MIXTE";
+export type ModeReparationSinistre = "NORMAL" | "PEC" | "RAPIDE";
+export type PhaseExpertise = "AVANT" | "APRES";
+export type EtapeTransition = { etapeSuivi: EtapeSuiviSinistre; autorisee: boolean; blocages: string[]; motifObligatoire: boolean };
+export type SinistreListParams = {
+  query?: string;
+  clientId?: string;
+  contratId?: string;
+  brancheId?: string;
+  statut?: StatutSinistre;
+  etapeSuivi?: EtapeSuiviSinistre;
+  nature?: NatureSinistre;
+  dateDu?: string;
+  dateAu?: string;
+  page?: number;
+  size?: number;
+};
+export type SinistreContractOption = {
+  id: string;
+  numeroPolice?: string | null;
+  numeroDossier?: string | null;
+  brancheAssuranceCode?: string | null;
+  brancheAssuranceLibelle?: string | null;
+  compagnieCode?: string | null;
+  compagnieLibelle?: string | null;
+  clients?: Array<{ role: string; nomAffichage?: string | null }>;
+  dateEffet?: string | null;
+  dateEcheance?: string | null;
+};
+export type OpeningDocument = {
+  file: File;
+  type: "CONSTAT" | "PV_POLICE" | "DECLARATION";
+  dateDocument?: string;
+  reference?: string;
+  commentaire?: string;
+};
+export type MissionExpertiseRequest = {
+  expertId: string;
+  garageId?: string;
+  phase: PhaseExpertise;
+  referenceMission?: string;
+  dateMission: string;
+  dateRapport?: string;
+  montantEstime?: number;
+  montantAccepte?: number;
+  statut: SinistreDetail["missionsExpertise"][number]["statut"];
+  notes?: string;
+};
+export type SinistreOpeningRequest = {
+  contratId: string;
+  vehiculeId?: string;
+  nature: NatureSinistre;
+  dateSinistre: string;
+  heureSinistre?: string;
+  dateDeclaration: string;
+  villeId?: string;
+  lieu?: string;
+  circonstances?: string;
+  garantieIds: string[];
+  declarer: boolean;
+  referenceCompagnie?: string;
+  numeroPv?: string;
+  tauxResponsabilite?: number;
+  typeDommage?: TypeDommageSinistre;
+  modeReparation?: ModeReparationSinistre;
+  garageId?: string;
+  expertInitial?: MissionExpertiseRequest;
+};
+
 export type StatutSinistre =
   | "BROUILLON"
   | "DECLARE"
@@ -77,6 +147,14 @@ export type SinistreSummary = {
   id: string;
   numeroSinistre: string;
   referenceCompagnie?: string | null;
+  etapeSuivi: EtapeSuiviSinistre;
+  typeDommage?: TypeDommageSinistre | null;
+  modeReparation?: ModeReparationSinistre | null;
+  tauxResponsabilite?: number | null;
+  garageId?: string | null;
+  garage?: string | null;
+  premierExpert?: string | null;
+  garantiesImpliquees?: string[];
   statut: StatutSinistre;
   nature: NatureSinistre;
   dateSinistre: string;
@@ -137,6 +215,7 @@ export type CoverageGuarantee = {
   mouvementGarantieId: string;
   code: string;
   libelle: string;
+  responsabiliteCivile: boolean;
   typeGarantie: "VEHICULE" | "PERSONNE";
   capital?: number | null;
   prime?: number | null;
@@ -145,7 +224,10 @@ export type CoverageGuarantee = {
   franchiseMinimale?: number | null;
 };
 
-export type SinistreDetail = SinistreSummary & {
+export type SinistreDetail = Omit<SinistreSummary,
+  | "numeroPolice" | "numeroDossier" | "compagnie" | "assure" | "immatriculation"
+  | "provisionCourante" | "totalRegle" | "totalRecours" | "updatedAt"
+> & {
   version: number;
   heureSinistre?: string | null;
   dateTransmission?: string | null;
@@ -194,6 +276,7 @@ export type SinistreDetail = SinistreSummary & {
     code: string;
     libelle: string;
     impliquee: boolean;
+    responsabiliteCivile: boolean;
     capital?: number | null;
     prime?: number | null;
     taux?: number | null;
@@ -242,6 +325,7 @@ export type SinistreDetail = SinistreSummary & {
     id: string;
     expertId: string;
     expert: string;
+    phase: PhaseExpertise;
     garageId?: string | null;
     garage?: string | null;
     referenceMission?: string | null;
@@ -296,10 +380,13 @@ export type SinistreDetail = SinistreSummary & {
     description: string;
     ancienStatut?: StatutSinistre | null;
     nouveauStatut?: StatutSinistre | null;
+    ancienneEtape?: EtapeSuiviSinistre | null;
+    nouvelleEtape?: EtapeSuiviSinistre | null;
     utilisateur: string;
     createdAt: string;
   }>;
   workflow: {
+    etapes: EtapeTransition[];
     transitions: Array<{
       statut: StatutSinistre;
       autorisee: boolean;
@@ -351,4 +438,5 @@ export type Intervenant = {
   villeId?: string | null;
   ville?: string | null;
   actif: boolean;
+  conventionne?: boolean;
 };

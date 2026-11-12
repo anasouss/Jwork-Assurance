@@ -79,7 +79,7 @@ public class SinistreDocumentService {
             String commentaire,
             MultipartFile file
     ) {
-        Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
+        Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
         return recordChange(sinistre, ActivityAction.CREATED, "Document ajoute au sinistre", "CLAIM_DOCUMENT_UPLOAD", null, () -> {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
@@ -162,7 +162,7 @@ public class SinistreDocumentService {
         if (statut == StatutDocumentSinistre.RECU) {
             throw new BadRequestException("Le contrôle doit valider ou rejeter le document");
         }
-        Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
+        Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
         return recordChange(sinistre, statut == StatutDocumentSinistre.VALIDE ? ActivityAction.VALIDATED : ActivityAction.REJECTED,
                 statut == StatutDocumentSinistre.VALIDE ? "Document du sinistre valide" : "Document du sinistre rejete",
                 "CLAIM_DOCUMENT_REVIEW", documentId, () -> {
@@ -192,7 +192,7 @@ public class SinistreDocumentService {
             Long sinistreId,
             Long documentId
     ) {
-        Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
+        Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
         return recordChange(sinistre, ActivityAction.DELETED, "Document du sinistre supprime", "CLAIM_DOCUMENT_DELETION", documentId, () -> {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
@@ -227,7 +227,7 @@ public class SinistreDocumentService {
     }
 
     private void assertEditable(Sinistre sinistre) {
-        if (!workflowService.isEditable(sinistre.getStatut())) {
+        if (!workflowService.isEditable(sinistre)) {
             throw new BadRequestException("Le sinistre doit être rouvert avant de modifier ses documents");
         }
     }
@@ -288,9 +288,9 @@ public class SinistreDocumentService {
                 .toString();
         Path path = resolveStorageKey(storageKey);
         Path directory = path.getParent();
-        try {
+        try (var input = file.getInputStream()) {
             Files.createDirectories(directory);
-            Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(input, path, StandardCopyOption.REPLACE_EXISTING);
             return new StoredDocument(
                     storageKey,
                     originalName,
@@ -299,6 +299,7 @@ public class SinistreDocumentService {
                     path
             );
         } catch (IOException error) {
+            deleteQuietly(path);
             throw new IllegalStateException("Impossible d'enregistrer le document du sinistre", error);
         }
     }

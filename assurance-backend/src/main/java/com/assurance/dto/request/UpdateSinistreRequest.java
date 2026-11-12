@@ -38,4 +38,10 @@ public class UpdateSinistreRequest {
     private String prochaineAction;
 
     private LocalDate dateEcheanceAction;
+
+    private com.assurance.enums.TypeDommageSinistre typeDommage;
+
+    private com.assurance.enums.ModeReparationSinistre modeReparation;
+
+    private Long garageId;
 }

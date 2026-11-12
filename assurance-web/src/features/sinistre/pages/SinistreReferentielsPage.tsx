@@ -207,7 +207,7 @@ function IntervenantTable({
               {items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.code}</TableCell>
-                  <TableCell>{item.nom}</TableCell>
+                  <TableCell>{item.nom}{kind === "GARAGE" ? <div className="text-xs text-muted-foreground">{item.conventionne ? "Conventionné" : "Non conventionné"}</div> : null}</TableCell>
                   <TableCell>
                     <div>{item.telephone || "-"}</div>
                     <div className="text-xs text-muted-foreground">

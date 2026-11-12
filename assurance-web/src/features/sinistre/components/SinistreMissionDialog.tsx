@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Intervenant, SinistreDetail } from "../types";
+import type { Intervenant, PhaseExpertise, SinistreDetail } from "../types";
 
 type Mission = SinistreDetail["missionsExpertise"][number];
 export function SinistreMissionDialog({
@@ -28,6 +28,7 @@ export function SinistreMissionDialog({
   experts,
   garages,
   saving,
+  initialPhase = "AVANT",
   onOpenChange,
   onSubmit,
 }: {
@@ -36,11 +37,13 @@ export function SinistreMissionDialog({
   experts: Intervenant[];
   garages: Intervenant[];
   saving: boolean;
+  initialPhase?: PhaseExpertise;
   onOpenChange: (open: boolean) => void;
   onSubmit: (missionId: string | null, request: object) => void;
 }) {
   const [form, setForm] = useState({
     expertId: "",
+    phase: "AVANT",
     garageId: "",
     referenceMission: "",
     dateMission: todayIso(),
@@ -56,6 +59,7 @@ export function SinistreMissionDialog({
       mission
         ? {
             expertId: mission.expertId,
+            phase: mission.phase,
             garageId: mission.garageId || "",
             referenceMission: mission.referenceMission || "",
             dateMission: mission.dateMission,
@@ -73,6 +77,7 @@ export function SinistreMissionDialog({
           }
         : {
             expertId: "",
+            phase: initialPhase,
             garageId: "",
             referenceMission: "",
             dateMission: todayIso(),
@@ -83,7 +88,7 @@ export function SinistreMissionDialog({
             notes: "",
           },
     );
-  }, [open, mission]);
+  }, [open, mission, initialPhase]);
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
@@ -93,11 +98,15 @@ export function SinistreMissionDialog({
           <DialogTitle>
             {mission ? "Modifier la mission" : "Mandater un expert"}
           </DialogTitle>
-          <DialogDescription>
-            Le garage est facultatif et peut être renseigné après l’expertise.
-          </DialogDescription>
+          <DialogDescription className="sr-only">Mission d’expertise du dossier</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Phase *">
+            <Select value={form.phase} onValueChange={(value) => update("phase", value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="AVANT">Avant réparation</SelectItem><SelectItem value="APRES">Après réparation</SelectItem></SelectContent>
+            </Select>
+          </Field>
           <Field label="Expert *">
             <Select
               value={form.expertId}
@@ -213,6 +222,7 @@ export function SinistreMissionDialog({
             onClick={() =>
               onSubmit(mission?.id ?? null, {
                 expertId: form.expertId,
+                phase: form.phase,
                 garageId: form.garageId || undefined,
                 referenceMission: form.referenceMission.trim() || undefined,
                 dateMission: form.dateMission,

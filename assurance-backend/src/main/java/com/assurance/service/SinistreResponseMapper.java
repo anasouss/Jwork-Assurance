@@ -43,6 +43,7 @@ public class SinistreResponseMapper {
     private final SinistreDocumentRequirementService documentRequirementService;
     private final SinistreEvenementRepository evenementRepository;
     private final SinistreReadinessService readinessService;
+    private final SinistreSuiviService suiviService;
 
     public SinistreSummaryResponse toSummary(Sinistre sinistre) {
         SinistreCouverture couverture = resolveCouverture(sinistre);
@@ -56,6 +57,20 @@ public class SinistreResponseMapper {
                 .numeroSinistre(sinistre.getNumeroSinistre())
                 .referenceCompagnie(sinistre.getReferenceCompagnie())
                 .statut(sinistre.getStatut())
+                .etapeSuivi(sinistre.getEtapeSuivi())
+                .typeDommage(sinistre.getTypeDommage())
+                .modeReparation(sinistre.getModeReparation())
+                .tauxResponsabilite(sinistre.getTauxResponsabilite())
+                .garageId(sinistre.getGarage() == null ? null : sinistre.getGarage().getId())
+                .garage(sinistre.getGarageNomSnapshot())
+                .premierExpert(missionRepository.findBySinistreIdOrderByDateMissionDescCreatedAtDesc(sinistre.getId())
+                        .stream().filter(mission -> mission.getStatut() != com.assurance.enums.StatutMissionExpertise.ANNULEE)
+                        .min(java.util.Comparator.comparing(MissionExpertise::getDateMission)
+                                .thenComparing(MissionExpertise::getId))
+                        .map(MissionExpertise::getExpertNomSnapshot).orElse(null))
+                .garantiesImpliquees(garantieRepository.findForDetailOrderByConfiguredDisplay(sinistre.getId())
+                        .stream().filter(SinistreGarantie::isImpliquee)
+                        .map(SinistreGarantie::getSnapshotLibelle).toList())
                 .nature(sinistre.getNature())
                 .dateSinistre(sinistre.getDateSinistre())
                 .dateDeclaration(sinistre.getDateDeclaration())
@@ -96,9 +111,21 @@ public class SinistreResponseMapper {
         return SinistreDetailResponse.builder()
                 .id(sinistre.getId())
                 .version(sinistre.getVersion())
+                .premierExpert(missions.stream()
+                        .filter(mission -> mission.getStatut() != com.assurance.enums.StatutMissionExpertise.ANNULEE)
+                        .min(java.util.Comparator.comparing(MissionExpertise::getDateMission)
+                                .thenComparing(MissionExpertise::getId))
+                        .map(MissionExpertise::getExpertNomSnapshot).orElse(null))
+                .garantiesImpliquees(garanties.stream().filter(SinistreGarantie::isImpliquee)
+                        .map(SinistreGarantie::getSnapshotLibelle).toList())
                 .numeroSinistre(sinistre.getNumeroSinistre())
                 .referenceCompagnie(sinistre.getReferenceCompagnie())
                 .statut(sinistre.getStatut())
+                .etapeSuivi(sinistre.getEtapeSuivi())
+                .typeDommage(sinistre.getTypeDommage())
+                .modeReparation(sinistre.getModeReparation())
+                .garageId(sinistre.getGarage() == null ? null : sinistre.getGarage().getId())
+                .garage(sinistre.getGarageNomSnapshot())
                 .nature(sinistre.getNature())
                 .dateSinistre(sinistre.getDateSinistre())
                 .heureSinistre(sinistre.getHeureSinistre())
@@ -141,6 +168,16 @@ public class SinistreResponseMapper {
             List<SinistreDocument> documents
     ) {
         return SinistreDetailResponse.Workflow.builder()
+                .etapes(suiviService.destinations(sinistre.getEtapeSuivi()).stream()
+                        .map(cible -> {
+                            var blocages = suiviService.blockers(sinistre, cible);
+                            return SinistreDetailResponse.Workflow.Etape.builder()
+                                    .etapeSuivi(cible)
+                                    .autorisee(blocages.isEmpty())
+                                    .motifObligatoire(suiviService.requiresReason(sinistre.getEtapeSuivi(), cible))
+                                    .blocages(blocages)
+                                    .build();
+                        }).toList())
                 .transitions(readinessService.transitions(sinistre).stream()
                         .map(item -> SinistreDetailResponse.Workflow.Transition.builder()
                                 .statut(item.statut())
@@ -222,6 +259,7 @@ public class SinistreResponseMapper {
                 .code(item.getSnapshotCode())
                 .libelle(item.getSnapshotLibelle())
                 .impliquee(item.isImpliquee())
+                .responsabiliteCivile(item.isResponsabiliteCivile())
                 .capital(item.getSnapshotCapital())
                 .prime(item.getSnapshotPrime())
                 .taux(item.getSnapshotTaux())
@@ -276,6 +314,7 @@ public class SinistreResponseMapper {
 
     private SinistreDetailResponse.Mission toMission(MissionExpertise item) {
         return SinistreDetailResponse.Mission.builder()
+                .phase(item.getPhase())
                 .id(item.getId())
                 .expertId(item.getExpert().getId())
                 .expert(item.getExpertNomSnapshot())
@@ -362,6 +401,8 @@ public class SinistreResponseMapper {
                 .description(item.getDescription())
                 .ancienStatut(item.getAncienStatut())
                 .nouveauStatut(item.getNouveauStatut())
+                .ancienneEtape(item.getAncienneEtape())
+                .nouvelleEtape(item.getNouvelleEtape())
                 .utilisateur(fullName(item.getUtilisateur()))
                 .createdAt(item.getCreatedAt())
                 .build();

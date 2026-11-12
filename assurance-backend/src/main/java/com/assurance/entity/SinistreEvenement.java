@@ -49,4 +49,12 @@ public class SinistreEvenement extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "nouveau_statut", length = 40)
     private StatutSinistre nouveauStatut;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ancienne_etape", length = 30)
+    private com.assurance.enums.EtapeSuiviSinistre ancienneEtape;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "nouvelle_etape", length = 30)
+    private com.assurance.enums.EtapeSuiviSinistre nouvelleEtape;
 }

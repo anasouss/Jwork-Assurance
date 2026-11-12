@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, LoaderCircle, MapPin, Pencil, ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
@@ -16,8 +16,9 @@ import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
+import { SinistreOpeningFields, type OpeningFields } from "../components/SinistreOpeningFields";
 import { natureLabels } from "../format";
-import type { CoverageGuarantee, NatureSinistre } from "../types";
+import type { CoverageGuarantee, NatureSinistre, OpeningDocument } from "../types";
 
 const GUARANTEE_GROUPS = [
   { type: "VEHICULE", label: "Garanties du risque" },
@@ -26,9 +27,14 @@ const GUARANTEE_GROUPS = [
 const VALID_NATURES = new Set<NatureSinistre>([
   "ACCIDENT", "VOL", "INCENDIE", "BRIS_DE_GLACE", "DOMMAGE_VEHICULE", "CORPOREL", "ASSISTANCE", "AUTRE",
 ]);
+const emptyOpeningFields: OpeningFields = {
+  referenceCompagnie: "", numeroPv: "", typeDommage: "", modeReparation: "",
+  tauxResponsabilite: "", garageId: "", expertVilleId: "", expertId: "", dateMission: "",
+};
 
 export default function SinistreDeclarationPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const contratId = params.get("contratId") ?? "";
   const dateSinistre = params.get("dateSinistre") ?? "";
@@ -43,11 +49,17 @@ export default function SinistreDeclarationPage() {
   const [lieu, setLieu] = useState("");
   const [circonstances, setCirconstances] = useState("");
   const [guaranteeIds, setGuaranteeIds] = useState<string[]>([]);
+  const [opening, setOpening] = useState(emptyOpeningFields);
+  const [documents, setDocuments] = useState<OpeningDocument[]>([]);
 
   useEffect(() => {
     if (!hasContext) setContextOpen(true);
     setGuaranteeIds([]);
   }, [contratId, dateSinistre, hasContext, requestedVehicleId]);
+  useEffect(() => {
+    setOpening(emptyOpeningFields);
+    setDocuments([]);
+  }, [contratId, requestedVehicleId]);
 
   const coverage = useQuery({
     queryKey: hasContext ? sinistreKeys.coverage(contratId, dateSinistre) : ["sinistres", "coverage", "declaration-idle"],
@@ -62,6 +74,7 @@ export default function SinistreDeclarationPage() {
       ?? (coverage.data.vehicules.length === 1 ? coverage.data.vehicules[0] : undefined);
   }, [automobile, coverage.data, requestedVehicleId]);
   const guarantees = selectedVehicle?.garanties ?? coverage.data?.garanties ?? [];
+  const responsabiliteCivile = guarantees.some((item) => guaranteeIds.includes(item.id) && item.responsabiliteCivile);
   const initialContract = useMemo(() => coverage.data ? ({
     id: coverage.data.contratId,
     numeroPolice: coverage.data.numeroPolice,
@@ -70,11 +83,11 @@ export default function SinistreDeclarationPage() {
     brancheAssuranceLibelle: coverage.data.brancheLibelle,
     compagnieLibelle: coverage.data.compagnie,
     clients: [{
-      clientId: "",
       nomAffichage: coverage.data.assure,
       role: "PROPRIETAIRE",
-      principalPourRole: true,
     }],
+    dateEffet: coverage.data.dateEffet,
+    dateEcheance: coverage.data.dateEcheance,
   }) : undefined, [coverage.data]);
   const duplicates = useQuery({
     queryKey: hasContext && coverage.data && (!automobile || selectedVehicle)
@@ -89,21 +102,42 @@ export default function SinistreDeclarationPage() {
     staleTime: 60_000,
   });
   const create = useMutation({
-    mutationFn: (declarer: boolean) => sinistreApi.create({
-      contratId,
-      vehiculeId: selectedVehicle?.id,
-      nature,
-      dateSinistre,
-      heureSinistre: heureSinistre || undefined,
-      dateDeclaration,
-      villeId: villeId || undefined,
-      lieu: lieu.trim() || undefined,
-      circonstances: circonstances.trim() || undefined,
-      garantieIds: guaranteeIds,
-      declarer,
-    }),
+    mutationFn: (declarer: boolean) => {
+      if (!nature) throw new Error("La nature du sinistre est obligatoire");
+      return sinistreApi.open({
+        contratId,
+        vehiculeId: selectedVehicle?.id,
+        nature,
+        dateSinistre,
+        heureSinistre: heureSinistre || undefined,
+        dateDeclaration,
+        villeId: villeId || undefined,
+        lieu: lieu.trim() || undefined,
+        circonstances: circonstances.trim() || undefined,
+        garantieIds: guaranteeIds,
+        declarer,
+        referenceCompagnie: opening.referenceCompagnie.trim() || undefined,
+        numeroPv: opening.numeroPv.trim() || undefined,
+        ...(automobile ? {
+          typeDommage: opening.typeDommage || undefined,
+          modeReparation: opening.modeReparation || undefined,
+          garageId: opening.garageId || undefined,
+        } : {}),
+        tauxResponsabilite: responsabiliteCivile && opening.tauxResponsabilite !== "" ? Number(opening.tauxResponsabilite) : undefined,
+        expertInitial: opening.expertId ? {
+          expertId: opening.expertId,
+          garageId: automobile ? opening.garageId || undefined : undefined,
+          phase: "AVANT",
+          dateMission: opening.dateMission,
+          statut: "MANDATEE",
+        } : undefined,
+      }, documents);
+    },
     onSuccess: (result) => {
       toast.success(result.statut === "BROUILLON" ? "Brouillon enregistré" : "Sinistre déclaré");
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.dashboard() });
+      queryClient.setQueryData(sinistreKeys.detail(result.id), result);
       navigate(`/app/sinistre/dossiers/${result.id}`);
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
@@ -116,6 +150,34 @@ export default function SinistreDeclarationPage() {
     }
     if (!dateDeclaration) {
       toast.error("La date de déclaration est obligatoire");
+      return;
+    }
+    if (dateDeclaration < dateSinistre) {
+      toast.error("La déclaration ne peut pas précéder le sinistre");
+      return;
+    }
+    if (automobile && declarer && (!opening.typeDommage || !opening.modeReparation)) {
+      toast.error("Sélectionnez les dommages et le mode de réparation");
+      return;
+    }
+    if (automobile && opening.modeReparation === "PEC" && !opening.garageId) {
+      toast.error("Sélectionnez un garage conventionné pour la prise en charge");
+      return;
+    }
+    if (declarer && responsabiliteCivile && opening.tauxResponsabilite === "") {
+      toast.error("Sélectionnez le taux de responsabilité RC");
+      return;
+    }
+    if (opening.expertId && !opening.dateMission) {
+      toast.error("La date de mission initiale est obligatoire");
+      return;
+    }
+    if (opening.expertId && opening.dateMission < dateSinistre) {
+      toast.error("La mission initiale ne peut pas précéder le sinistre");
+      return;
+    }
+    if (documents.some(({ file }) => file.size > 30 * 1024 * 1024) || documents.reduce((total, { file }) => total + file.size, 0) > 31 * 1024 * 1024) {
+      toast.error("Pièces trop volumineuses : 30 Mo par fichier, 31 Mo au total");
       return;
     }
     if (declarer && (!circonstances.trim() || guaranteeIds.length === 0)) {
@@ -134,10 +196,9 @@ export default function SinistreDeclarationPage() {
           </Button>
           <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">Sinistres</p>
           <h1 className="text-xl font-semibold">Déclarer un sinistre</h1>
-          <p className="text-sm text-muted-foreground">Complétez les circonstances et identifiez les garanties impliquées.</p>
         </div>
         {hasContext ? (
-          <Button variant="outline" onClick={() => setContextOpen(true)}><Pencil className="size-4" /> Modifier le contexte</Button>
+          <Button variant="outline" disabled={create.isPending} onClick={() => setContextOpen(true)}><Pencil className="size-4" /> Modifier le contexte</Button>
         ) : null}
       </div>
 
@@ -191,7 +252,7 @@ export default function SinistreDeclarationPage() {
             </div>
           ) : null}
 
-          <Section title="Circonstances de l’événement" description="Renseignez les informations connues au moment de la déclaration." icon={MapPin}>
+          <Section title="Circonstances de l’événement" icon={MapPin}>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Field label="Date de déclaration *"><DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={(date) => setDateDeclaration(toIso(date))} /></Field>
               <Field label="Heure du sinistre"><TimePicker value={heureSinistre} onChange={setHeureSinistre} /></Field>
@@ -205,9 +266,14 @@ export default function SinistreDeclarationPage() {
             </div>
           </Section>
 
-          <Section title="Garanties impliquées" description="Sélectionnez uniquement les garanties concernées par l’événement." icon={ShieldCheck}>
+          <Section title="Garanties impliquées" icon={ShieldCheck}>
             <GuaranteeTable guarantees={guarantees} selectedIds={guaranteeIds} onToggle={(id, checked) =>
               setGuaranteeIds((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id))} />
+          </Section>
+
+          <Section title="Ouverture et intervenants" icon={ShieldCheck}>
+            <SinistreOpeningFields automobile={automobile} responsabiliteCivile={responsabiliteCivile} value={opening} onChange={setOpening}
+              documents={documents} onDocumentsChange={setDocuments} disabled={create.isPending} />
           </Section>
 
           <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
@@ -236,16 +302,15 @@ function ContextItem({ label, value }: { label: string; value: string }) {
   return <div className="min-w-0 bg-card px-4 py-3"><p className="text-xs font-medium uppercase text-muted-foreground">{label}</p><p className="mt-1 truncate font-semibold" title={value}>{value}</p></div>;
 }
 
-function Section({ title, description, icon: Icon, children }: {
+function Section({ title, icon: Icon, children }: {
   title: string;
-  description: string;
   icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
 }) {
-  return <section className="overflow-hidden rounded-md border bg-card">
+  return <section className="border-t bg-background">
     <div className="flex items-center gap-3 border-b bg-muted/25 px-5 py-4">
       <span className="grid size-9 shrink-0 place-items-center rounded-md border bg-background"><Icon className="size-4 text-sky-700 dark:text-sky-400" /></span>
-      <div className="min-w-0"><h2 className="text-base font-semibold">{title}</h2><p className="mt-0.5 text-xs text-muted-foreground">{description}</p></div>
+      <div className="min-w-0"><h2 className="text-base font-semibold">{title}</h2></div>
     </div>
     <div className="p-5">{children}</div>
   </section>;

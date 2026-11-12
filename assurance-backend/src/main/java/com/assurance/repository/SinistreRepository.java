@@ -26,7 +26,17 @@ public interface SinistreRepository extends JpaRepository<Sinistre, Long>, JpaSp
     })
     Optional<Sinistre> findByIdAndAgenceId(Long id, Long agenceId);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from Sinistre s where s.id = :id and s.agence.id = :agenceId")
+    Optional<Sinistre> findByIdAndAgenceIdForUpdate(@Param("id") Long id, @Param("agenceId") Long agenceId);
+
     long countByAgenceIdAndStatutIn(Long agenceId, List<StatutSinistre> statuts);
+
+    long countByAgenceIdAndEtapeSuiviInAndStatutIn(
+            Long agenceId,
+            List<com.assurance.enums.EtapeSuiviSinistre> etapes,
+            List<StatutSinistre> statuts
+    );
 
     long countByAgenceIdAndDateDeclarationBetween(Long agenceId, LocalDate dateDu, LocalDate dateAu);
 

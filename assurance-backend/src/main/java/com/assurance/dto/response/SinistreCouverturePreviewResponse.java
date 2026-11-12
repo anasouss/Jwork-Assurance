@@ -46,6 +46,7 @@ public class SinistreCouverturePreviewResponse {
         private String code;
         private String libelle;
         private TypeGarantie typeGarantie;
+        private boolean responsabiliteCivile;
         private BigDecimal capital;
         private BigDecimal prime;
         private BigDecimal taux;

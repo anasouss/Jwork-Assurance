@@ -29,6 +29,7 @@ import java.time.LocalTime;
         uniqueConstraints = @UniqueConstraint(name = "uk_sinistre_agence_numero", columnNames = {"agence_id", "numero_sinistre"}),
         indexes = {
                 @Index(name = "idx_sinistre_agence_statut", columnList = "agence_id,statut"),
+                @Index(name = "idx_sinistre_agence_etape", columnList = "agence_id,etape_suivi"),
                 @Index(name = "idx_sinistre_contrat", columnList = "contrat_id"),
                 @Index(name = "idx_sinistre_client", columnList = "client_id"),
                 @Index(name = "idx_sinistre_date", columnList = "date_sinistre")
@@ -80,6 +81,26 @@ public class Sinistre extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)
     private StatutSinistre statut;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "etape_suivi", nullable = false, length = 30)
+    private com.assurance.enums.EtapeSuiviSinistre etapeSuivi = com.assurance.enums.EtapeSuiviSinistre.OUVERTURE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_dommage", length = 20)
+    private com.assurance.enums.TypeDommageSinistre typeDommage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode_reparation", length = 20)
+    private com.assurance.enums.ModeReparationSinistre modeReparation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "garage_id")
+    private GarageSinistre garage;
+
+    @Column(name = "garage_nom_snapshot", length = 180)
+    private String garageNomSnapshot;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 40)

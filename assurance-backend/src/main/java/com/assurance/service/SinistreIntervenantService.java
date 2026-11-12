@@ -35,9 +35,21 @@ public class SinistreIntervenantService {
 
     @Transactional(readOnly = true)
     public List<SinistreIntervenantResponse> listExperts(Long agenceId, boolean includeInactive) {
-        List<ExpertSinistre> experts = includeInactive
-                ? expertRepository.findByAgenceIdOrderByNomAsc(agenceId)
-                : expertRepository.findByAgenceIdAndActifTrueOrderByNomAsc(agenceId);
+        return listExperts(agenceId, includeInactive, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SinistreIntervenantResponse> listExperts(Long agenceId, boolean includeInactive, Long villeId) {
+        List<ExpertSinistre> experts;
+        if (villeId == null) {
+            experts = includeInactive
+                    ? expertRepository.findByAgenceIdOrderByNomAsc(agenceId)
+                    : expertRepository.findByAgenceIdAndActifTrueOrderByNomAsc(agenceId);
+        } else {
+            experts = includeInactive
+                    ? expertRepository.findByAgenceIdAndVilleIdOrderByNomAsc(agenceId, villeId)
+                    : expertRepository.findByAgenceIdAndVilleIdAndActifTrueOrderByNomAsc(agenceId, villeId);
+        }
         return experts.stream().map(this::toResponse).toList();
     }
 
@@ -105,6 +117,9 @@ public class SinistreIntervenantService {
         garage.setAdresse(trimToNull(request.getAdresse()));
         garage.setVille(resolveVille(request.getVilleId()));
         garage.setActif(request.getActif() == null || request.getActif());
+        if (request.getConventionne() != null) {
+            garage.setConventionne(request.getConventionne());
+        }
         garage = garageRepository.save(garage);
         var response = toResponse(garage);
         activityRecorder.record(ClaimActivity.intervenantCommand(garage.getAgence().getId(), response, before, ActivityRecordType.GARAGE_SINISTRE, id == null));
@@ -148,6 +163,7 @@ public class SinistreIntervenantService {
                 .villeId(garage.getVille() == null ? null : garage.getVille().getId())
                 .ville(garage.getVille() == null ? null : garage.getVille().getNom())
                 .actif(garage.isActif())
+                .conventionne(garage.isConventionne())
                 .build();
     }
 

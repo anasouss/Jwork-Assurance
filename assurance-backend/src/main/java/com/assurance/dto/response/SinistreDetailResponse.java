@@ -29,6 +29,13 @@ public class SinistreDetailResponse {
     private String numeroSinistre;
     private String referenceCompagnie;
     private StatutSinistre statut;
+    private com.assurance.enums.EtapeSuiviSinistre etapeSuivi;
+    private com.assurance.enums.TypeDommageSinistre typeDommage;
+    private com.assurance.enums.ModeReparationSinistre modeReparation;
+    private Long garageId;
+    private String garage;
+    private String premierExpert;
+    private List<String> garantiesImpliquees;
     private NatureSinistre nature;
     private LocalDate dateSinistre;
     private LocalTime heureSinistre;
@@ -95,10 +102,19 @@ public class SinistreDetailResponse {
     @Builder
     public static class Workflow {
         private List<Transition> transitions;
+        private List<Etape> etapes;
         private int documentsRecus;
         private int documentsRejetes;
         private List<DocumentRequis> documentsRequis;
 
+        @Data
+        @Builder
+        public static class Etape {
+            private com.assurance.enums.EtapeSuiviSinistre etapeSuivi;
+            private boolean autorisee;
+            private boolean motifObligatoire;
+            private List<String> blocages;
+        }
         @Data
         @Builder
         public static class DocumentRequis {
@@ -127,6 +143,7 @@ public class SinistreDetailResponse {
         private String code;
         private String libelle;
         private boolean impliquee;
+        private boolean responsabiliteCivile;
         private BigDecimal capital;
         private BigDecimal prime;
         private BigDecimal taux;
@@ -182,6 +199,7 @@ public class SinistreDetailResponse {
     @Builder
     public static class Mission {
         private Long id;
+        private com.assurance.enums.PhaseExpertiseSinistre phase;
         private Long expertId;
         private String expert;
         private Long garageId;
@@ -242,6 +260,8 @@ public class SinistreDetailResponse {
         private String description;
         private StatutSinistre ancienStatut;
         private StatutSinistre nouveauStatut;
+        private com.assurance.enums.EtapeSuiviSinistre ancienneEtape;
+        private com.assurance.enums.EtapeSuiviSinistre nouvelleEtape;
         private String utilisateur;
         private LocalDateTime createdAt;
     }

@@ -4,6 +4,7 @@ import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreEvenement;
 import com.assurance.entity.Utilisateur;
 import com.assurance.enums.StatutSinistre;
+import com.assurance.enums.EtapeSuiviSinistre;
 import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.repository.SinistreEvenementRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,23 @@ import org.springframework.stereotype.Service;
 public class SinistreEvenementService {
 
     private final SinistreEvenementRepository evenementRepository;
+
+    public void recordStage(
+            Sinistre sinistre,
+            Utilisateur utilisateur,
+            EtapeSuiviSinistre ancienneEtape,
+            EtapeSuiviSinistre nouvelleEtape,
+            String description
+    ) {
+        evenementRepository.save(SinistreEvenement.builder()
+                .sinistre(sinistre)
+                .utilisateur(utilisateur)
+                .type(TypeEvenementSinistre.CHANGEMENT_ETAPE)
+                .description(description)
+                .ancienneEtape(ancienneEtape)
+                .nouvelleEtape(nouvelleEtape)
+                .build());
+    }
 
     public void record(
             Sinistre sinistre,

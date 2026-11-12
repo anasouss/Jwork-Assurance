@@ -157,7 +157,7 @@ public class SinistreDossierService {
 
     @Transactional
     public void deleteEarlyClaim(Long agenceId, Long sinistreId) {
-        Sinistre sinistre = sinistreService.resolve(agenceId, sinistreId);
+        Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
         var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
         if (!DELETABLE_STATUSES.contains(sinistre.getStatut())) {
             throw new BadRequestException(
@@ -356,6 +356,7 @@ public class SinistreDossierService {
             mission.setMontantEstime(request.getMontantEstime());
             mission.setMontantAccepte(request.getMontantAccepte());
             mission.setStatut(request.getStatut());
+            mission.setPhase(request.getPhase());
             mission.setNotes(trimToNull(request.getNotes()));
             missionRepository.save(mission);
             evenementService.record(
@@ -610,8 +611,10 @@ public class SinistreDossierService {
                 requireCounterpartyId(id);
                 GarageSinistre garage = garageRepository.findByIdAndAgenceId(id, context.sinistre().getAgence().getId())
                         .orElseThrow(() -> new ResourceNotFoundException("GarageSinistre", id));
-                if (!missionRepository.existsBySinistreIdAndGarageId(context.sinistre().getId(), id)) {
-                    throw new BadRequestException("Le garage sélectionné n'est lié à aucune mission de ce sinistre");
+                boolean repairGarage = context.sinistre().getGarage() != null
+                        && java.util.Objects.equals(context.sinistre().getGarage().getId(), id);
+                if (!repairGarage && !missionRepository.existsBySinistreIdAndGarageId(context.sinistre().getId(), id)) {
+                    throw new BadRequestException("Le garage sélectionné n'est lié ni à la réparation ni à une mission de ce sinistre");
                 }
                 yield new ResolvedCounterparty(null, null, null, garage,
                         garage.getRaisonSociale(), null, null);
@@ -719,13 +722,13 @@ public class SinistreDossierService {
 
     private Context context(Long agenceId, Long utilisateurId, Long sinistreId) {
         return new Context(
-                sinistreService.resolve(agenceId, sinistreId),
+                sinistreService.resolveForUpdate(agenceId, sinistreId),
                 sinistreService.resolveCurrentUser(agenceId, utilisateurId)
         );
     }
 
     private void assertEditable(Sinistre sinistre) {
-        if (!workflowService.isEditable(sinistre.getStatut())) {
+        if (!workflowService.isEditable(sinistre)) {
             throw new BadRequestException("Le sinistre doit être rouvert avant cette opération");
         }
     }

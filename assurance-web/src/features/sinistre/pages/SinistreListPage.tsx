@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
+  ChevronDown,
+  Download,
   Eye,
   FilePlus2,
   MoreHorizontal,
@@ -11,6 +13,7 @@ import {
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
+import { downloadBlob } from "@/lib/download";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import {
   AlertDialog,
@@ -23,7 +26,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,11 +53,14 @@ import {
 } from "@/components/ui/table";
 import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
-import { formatDate, formatMoney, natureLabels, statusLabels } from "../format";
+import { formatDate, natureLabels, statusLabels } from "../format";
+import { repairLabels, suiviLabels } from "../workflow";
+import { SinistreTracking } from "../components/SinistreTracking";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 import type {
   NatureSinistre,
+  EtapeSuiviSinistre,
   SinistreSummary,
   StatutSinistre,
 } from "../types";
@@ -65,12 +70,14 @@ type Filters = {
   query: string;
   statut: string;
   nature: string;
+  etapeSuivi: string;
   dateDu: string;
   dateAu: string;
 };
 type PortfolioScope = { clientId: string; contratId: string; brancheId: string };
 
-export default function SinistreListPage() {
+export default function SinistreListPage({ mode = "consultation" }: { mode?: "consultation" | "registre" }) {
+  const isRegister = mode === "registre";
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [initial] = useState(() => readState(params));
@@ -91,6 +98,7 @@ export default function SinistreListPage() {
     null,
   );
   const [declarationOpen, setDeclarationOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const request = useMemo(
     () => ({
       query: applied.query.trim() || undefined,
@@ -107,6 +115,7 @@ export default function SinistreListPage() {
           : (applied.nature as NatureSinistre),
       dateDu: applied.dateDu || undefined,
       dateAu: applied.dateAu || undefined,
+      etapeSuivi: applied.etapeSuivi === "ALL" ? undefined : applied.etapeSuivi as EtapeSuiviSinistre,
       page,
       size: PAGE_SIZE,
     }),
@@ -116,6 +125,11 @@ export default function SinistreListPage() {
     queryKey: sinistreKeys.list(request),
     queryFn: () => sinistreApi.list(request),
     placeholderData: (previous) => previous,
+  });
+  const exportRegister = useMutation({
+    mutationFn: () => sinistreApi.exportRegister(request),
+    onSuccess: (blob) => downloadBlob(blob, "registre-sinistres.xlsx"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Export impossible"),
   });
   const cancelClaim = useMutation({
     mutationFn: (id: string) =>
@@ -171,17 +185,18 @@ export default function SinistreListPage() {
           <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">
             Sinistres
           </p>
-          <h1 className="text-xl font-semibold">Dossiers sinistre</h1>
-          <p className="text-sm text-muted-foreground">
-            Suivi opérationnel et financier des déclarations.
-          </p>
+          <h1 className="text-xl font-semibold">{isRegister ? "Registre des sinistres" : "Consultation et suivi"}</h1>
         </div>
-        {canCreate ? (
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline"><Link to="/app/sinistre">Module sinistres</Link></Button>
+          <Button variant="outline" disabled={exportRegister.isPending || list.isPending || list.isError} onClick={() => exportRegister.mutate()}><Download className="size-4" />{exportRegister.isPending ? "Export en cours…" : "Registre Excel"}</Button>
+        {canCreate && !isRegister ? (
           <Button onClick={() => setDeclarationOpen(true)}>
             <FilePlus2 className="size-4" />
             Déclarer
           </Button>
         ) : null}
+        </div>
       </div>
       {scope.clientId ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sky-200 bg-sky-50 px-4 py-2 text-sm dark:border-sky-900 dark:bg-sky-950/30">
@@ -197,13 +212,12 @@ export default function SinistreListPage() {
           </div>
         </div>
       ) : null}
-      <Card className="shadow-none">
-        <CardContent className="pt-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_210px_210px_180px_180px_auto]">
+      <section aria-label="Filtres des sinistres" className="border-y bg-muted/20 p-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <Field label="Recherche">
               <Input
                 value={filters.query}
-                placeholder="N° sinistre, police, assuré…"
+                placeholder="N° sinistre, réf. compagnie, police, assuré, immatriculation…"
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
@@ -263,6 +277,9 @@ export default function SinistreListPage() {
                 }
               />
             </Field>
+            <Field label="Étape de suivi"><Select value={filters.etapeSuivi} onValueChange={(etapeSuivi) => setFilters((current) => ({ ...current, etapeSuivi }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les étapes</SelectItem>{Object.entries(suiviLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+            </Select></Field>
             <Field label="Au">
               <DatePicker
                 date={filters.dateAu}
@@ -289,22 +306,24 @@ export default function SinistreListPage() {
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-      <Card className="shadow-none">
-        <CardContent className="p-0">
+      </section>
+      {list.isError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 text-sm text-destructive"><span>{list.error instanceof Error ? list.error.message : "Chargement des dossiers impossible."}</span><Button variant="outline" onClick={() => list.refetch()}>Réessayer</Button></div> : null}
+      <section aria-label="Résultats des sinistres" className="min-w-0 border">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1320px]">
+            <Table className="min-w-[1600px]">
               <TableHeader className="bg-sky-700 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-sky-700">
                   <TableHead>N° sinistre</TableHead>
+                  <TableHead>Réf. compagnie</TableHead>
                   <TableHead>Assuré</TableHead>
                   <TableHead>Police</TableHead>
-                  <TableHead>Nature</TableHead>
+                  <TableHead>Véhicule</TableHead>
                   <TableHead>Date sinistre</TableHead>
+                  <TableHead>Déclaration</TableHead>
                   <TableHead>Compagnie</TableHead>
-                  <TableHead>Immatriculation</TableHead>
-                  <TableHead>Provision</TableHead>
+                  <TableHead>Garanties impliquées</TableHead>
+                  <TableHead>Réparation</TableHead>
+                  <TableHead>Premier expert</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Suivi</TableHead>
                   <TableHead className="w-20 text-right">Action</TableHead>
@@ -312,10 +331,10 @@ export default function SinistreListPage() {
               </TableHeader>
               <TableBody>
                 {list.isLoading ? (
-                  <TableRowsSkeleton rows={7} colSpan={11} />
+                  <TableRowsSkeleton rows={7} colSpan={14} />
                 ) : null}
                 {(list.data?.items ?? []).map((item) => (
-                  <TableRow key={item.id}>
+                  <Fragment key={item.id}><TableRow>
                     <TableCell>
                       <Link
                         className="font-medium text-sky-700 hover:underline dark:text-sky-400"
@@ -323,21 +342,24 @@ export default function SinistreListPage() {
                       >
                         {item.numeroSinistre}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {item.referenceCompagnie || "-"}
-                      </div>
                     </TableCell>
+                    <TableCell>{item.referenceCompagnie || "-"}</TableCell>
                     <TableCell>{item.assure || "-"}</TableCell>
                     <TableCell>{item.numeroPolice || "-"}</TableCell>
-                    <TableCell>{natureLabels[item.nature]}</TableCell>
-                    <TableCell>{formatDate(item.dateSinistre)}</TableCell>
-                    <TableCell>{item.compagnie || "-"}</TableCell>
                     <TableCell>{item.immatriculation || "-"}</TableCell>
-                    <TableCell>{formatMoney(item.provisionCourante)}</TableCell>
+                    <TableCell>{formatDate(item.dateSinistre)}</TableCell>
+                    <TableCell>{formatDate(item.dateDeclaration)}</TableCell>
+                    <TableCell>{item.compagnie || "-"}</TableCell>
+                    <TableCell className="max-w-56 whitespace-normal">{item.garantiesImpliquees?.join(", ") || "-"}</TableCell>
+                    <TableCell>{item.modeReparation ? repairLabels[item.modeReparation] : "-"}</TableCell>
+                    <TableCell>{item.premierExpert || "-"}</TableCell>
                     <TableCell>
                       <SinistreStatusBadge statut={item.statut} />
                     </TableCell>
                     <TableCell>
+                      {isRegister ? <span className="font-medium">{suiviLabels[item.etapeSuivi]}</span> : <button type="button" aria-expanded={expandedId === item.id} aria-controls={`claim-tracking-${item.id}`} className="mb-1 flex items-center gap-2 text-left text-sm font-medium text-sky-700 hover:underline dark:text-sky-400" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
+                        <ChevronDown className={`size-4 shrink-0 ${expandedId === item.id ? "rotate-180" : ""}`} />{suiviLabels[item.etapeSuivi] || "Suivi opérationnel"}
+                      </button>}
                       <div>{item.prochaineAction || "-"}</div>
                       <div className="text-xs text-muted-foreground">
                         {[item.gestionnaire, item.dateEcheanceAction ? formatDate(item.dateEcheanceAction) : null]
@@ -363,7 +385,7 @@ export default function SinistreListPage() {
                               Ouvrir le dossier
                             </Link>
                           </DropdownMenuItem>
-                          {canManage && canCancelClaim(item.statut) ? (
+                          {canManage && !isRegister && canCancelClaim(item.statut) ? (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -385,12 +407,12 @@ export default function SinistreListPage() {
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
-                  </TableRow>
+                  </TableRow>{expandedId === item.id ? <TableRow><TableCell colSpan={14} className="whitespace-normal bg-muted/20 px-4 py-3"><div id={`claim-tracking-${item.id}`}><ExpandedTracking id={item.id} /></div></TableCell></TableRow> : null}</Fragment>
                 ))}
-                {!list.isLoading && (list.data?.items.length ?? 0) === 0 ? (
+                {!list.isLoading && !list.isError && (list.data?.items.length ?? 0) === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={11}
+                      colSpan={14}
                       className="py-10 text-center text-muted-foreground"
                     >
                       Aucun dossier ne correspond aux critères.
@@ -408,8 +430,7 @@ export default function SinistreListPage() {
             loading={list.isFetching}
             onPageChange={changePage}
           />
-        </CardContent>
-      </Card>
+      </section>
       <SinistreDeclarationContextDialog
         open={declarationOpen}
         onOpenChange={setDeclarationOpen}
@@ -495,7 +516,7 @@ function Field({
   );
 }
 function emptyFilters(): Filters {
-  return { query: "", statut: "ALL", nature: "ALL", dateDu: "", dateAu: "" };
+  return { query: "", statut: "ALL", nature: "ALL", etapeSuivi: "ALL", dateDu: "", dateAu: "" };
 }
 function readState(params: URLSearchParams) {
   return {
@@ -509,6 +530,7 @@ function readState(params: URLSearchParams) {
       query: params.get("q") || "",
       statut: params.get("statut") || "ALL",
       nature: params.get("nature") || "ALL",
+      etapeSuivi: params.get("etapeSuivi") || "ALL",
       dateDu: params.get("dateDu") || "",
       dateAu: params.get("dateAu") || "",
     },
@@ -522,6 +544,7 @@ function writeState(filters: Filters, page: number, scope: PortfolioScope) {
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (filters.statut !== "ALL") params.set("statut", filters.statut);
   if (filters.nature !== "ALL") params.set("nature", filters.nature);
+  if (filters.etapeSuivi !== "ALL") params.set("etapeSuivi", filters.etapeSuivi);
   if (filters.dateDu) params.set("dateDu", filters.dateDu);
   if (filters.dateAu) params.set("dateAu", filters.dateAu);
   if (page > 0) params.set("page", String(page));
@@ -533,4 +556,11 @@ function toIso(date?: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function ExpandedTracking({ id }: { id: string }) {
+  const detail = useQuery({ queryKey: sinistreKeys.detail(id), queryFn: () => sinistreApi.get(id) });
+  if (detail.isPending) return <p className="py-3 text-sm text-muted-foreground">Chargement du suivi…</p>;
+  if (detail.isError) return <div role="alert" className="flex items-center gap-3 text-sm text-destructive">{detail.error instanceof Error ? detail.error.message : "Suivi indisponible"}<Button variant="outline" size="sm" onClick={() => detail.refetch()}>Réessayer</Button></div>;
+  return <SinistreTracking dossier={detail.data} />;
 }

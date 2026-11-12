@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -30,35 +30,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { contractApi } from "@/features/production/api/contracts";
-import type { ContratListItem } from "@/features/production/types";
+import { referenceApi } from "@/features/production/api/references";
 import { cn } from "@/lib/utils";
 import { sinistreApi, sinistreKeys } from "../api";
 import { natureLabels } from "../format";
-import type { NatureSinistre } from "../types";
+import type { NatureSinistre, SinistreContractOption } from "../types";
 
 const NATURES = Object.entries(natureLabels) as Array<[NatureSinistre, string]>;
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialContract?: ContextContract;
+  initialContract?: SinistreContractOption;
   initialDateSinistre?: string;
   initialNature?: NatureSinistre;
   initialVehicleId?: string;
 };
-
-type ContextContract = Pick<
-  ContratListItem,
-  | "id"
-  | "numeroPolice"
-  | "numeroDossier"
-  | "brancheAssuranceCode"
-  | "brancheAssuranceLibelle"
-  | "compagnieCode"
-  | "compagnieLibelle"
-  | "clients"
->;
 
 export function SinistreDeclarationContextDialog({
   open,
@@ -72,10 +59,18 @@ export function SinistreDeclarationContextDialog({
   const wasOpen = useRef(false);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
-  const [contract, setContract] = useState<ContextContract | null>(null);
+  const [contract, setContract] = useState<SinistreContractOption | null>(null);
   const [dateSinistre, setDateSinistre] = useState("");
   const [nature, setNature] = useState<NatureSinistre>("ACCIDENT");
   const [vehiculeId, setVehiculeId] = useState("");
+  const [brancheId, setBrancheId] = useState("");
+  const branches = useQuery({
+    queryKey: ["referentiel", "branches-assurance"],
+    queryFn: () => referenceApi.list("branches-assurance"),
+    enabled: open,
+    staleTime: 60_000,
+  });
+  const effectiveBrancheId = brancheId || branches.data?.find((item) => item.code === contract?.brancheAssuranceCode)?.id || "";
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -84,28 +79,17 @@ export function SinistreDeclarationContextDialog({
       setDateSinistre(initialDateSinistre);
       setNature(initialNature);
       setVehiculeId(initialVehicleId);
+      setBrancheId("");
     }
     wasOpen.current = open;
   }, [initialContract, initialDateSinistre, initialNature, initialVehicleId, open]);
 
   const contracts = useQuery({
-    queryKey: ["contracts", "sinistre-context-search", deferredSearch],
-    queryFn: () =>
-      contractApi.listContrats({
-        search: deferredSearch,
-        typeDate: "EFFET",
-        page: 0,
-        size: 10,
-      }),
-    enabled: open && deferredSearch.length >= 2 && !contract,
+    queryKey: sinistreKeys.contracts(effectiveBrancheId, deferredSearch),
+    queryFn: () => sinistreApi.lookupContracts(effectiveBrancheId, deferredSearch),
+    enabled: open && Boolean(effectiveBrancheId) && deferredSearch.length >= 2 && !contract,
   });
-  const contractItems = useMemo(
-    () =>
-      (contracts.data?.items ?? [])
-        .flatMap((group) => group.contrats)
-        .filter((item) => !item.brouillon && !item.prospection && item.statut !== "DRAFT"),
-    [contracts.data],
-  );
+  const contractItems = contracts.data ?? [];
   const coverage = useQuery({
     queryKey:
       contract && dateSinistre
@@ -127,13 +111,14 @@ export function SinistreDeclarationContextDialog({
     }
   }, [automobile, coverage.data]);
 
-  function selectContract(item: ContextContract) {
+  function selectContract(item: SinistreContractOption) {
     setContract(item);
     setSearch("");
     setVehiculeId("");
   }
 
   function resetContract() {
+    setBrancheId(effectiveBrancheId);
     setContract(null);
     setVehiculeId("");
   }
@@ -164,14 +149,21 @@ export function SinistreDeclarationContextDialog({
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:!max-w-3xl">
         <DialogHeader>
           <DialogTitle>Commencer une déclaration</DialogTitle>
-          <DialogDescription>
-            Identifiez la police et l’événement. Les garanties seront vérifiées à la date du sinistre.
-          </DialogDescription>
+          <DialogDescription className="sr-only">Police et événement du sinistre</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 py-1">
           <div className="grid gap-2">
-            <Label htmlFor="claim-contract-search">Police ou assuré</Label>
+            <Label>Branche *</Label>
+            <Select value={effectiveBrancheId}
+              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); }}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
+              <SelectContent>{(branches.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}</SelectContent>
+            </Select>
+            {branches.isError ? <p role="alert" className="text-sm text-destructive">Chargement des branches impossible.</p> : null}
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="claim-contract-search">Police, assuré ou immatriculation *</Label>
             {contract ? (
               <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/35 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -184,6 +176,7 @@ export function SinistreDeclarationContextDialog({
                   <p className="mt-1 text-sm text-muted-foreground">
                     {mainInsured(contract)} · {contract.compagnieLibelle || contract.compagnieCode || "-"}
                   </p>
+                  {contract.dateEffet || contract.dateEcheance ? <p className="mt-1 text-xs text-muted-foreground">{contractPeriod(contract)}</p> : null}
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={resetContract}>
                   Changer
@@ -196,6 +189,7 @@ export function SinistreDeclarationContextDialog({
                   id="claim-contract-search"
                   className="pl-9"
                   autoFocus
+                  disabled={!effectiveBrancheId}
                   value={search}
                   placeholder="N° police, dossier, assuré, immatriculation ou attestation"
                   onChange={(event) => setSearch(event.target.value)}
@@ -206,6 +200,8 @@ export function SinistreDeclarationContextDialog({
                       <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
                         <LoaderCircle className="size-4 animate-spin" /> Recherche en cours…
                       </p>
+                    ) : contracts.isError ? (
+                      <p role="alert" className="p-4 text-sm text-destructive">{contracts.error instanceof Error ? contracts.error.message : "Recherche impossible."}</p>
                     ) : contractItems.length > 0 ? (
                       <div className="divide-y">
                         {contractItems.map((item) => (
@@ -225,6 +221,7 @@ export function SinistreDeclarationContextDialog({
                               <span className="block truncate text-sm text-muted-foreground">
                                 {mainInsured(item)} · {item.compagnieLibelle || item.compagnieCode || "-"}
                               </span>
+                              <span className="mt-1 block text-xs text-muted-foreground">{contractPeriod(item)}</span>
                             </span>
                             <Check className="size-4 shrink-0 text-muted-foreground" />
                           </button>
@@ -347,13 +344,17 @@ export function SinistreDeclarationContextDialog({
   );
 }
 
-function mainInsured(contract: ContextContract) {
+function mainInsured(contract: SinistreContractOption) {
   return (
     contract.clients?.find((client) => client.role === "PROPRIETAIRE")?.nomAffichage ||
     contract.clients?.find((client) => client.role === "SOUSCRIPTEUR")?.nomAffichage ||
     contract.clients?.[0]?.nomAffichage ||
     "Assuré non renseigné"
   );
+}
+
+function contractPeriod(contract: SinistreContractOption) {
+  return `${contract.dateEffet ? formatIsoDate(contract.dateEffet) : "-"} au ${contract.dateEcheance ? formatIsoDate(contract.dateEcheance) : "-"}`;
 }
 
 function toIso(date?: Date) {

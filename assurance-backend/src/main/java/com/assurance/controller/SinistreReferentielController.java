@@ -29,13 +29,15 @@ public class SinistreReferentielController {
     private final SinistreIntervenantService intervenantService;
 
     @GetMapping("/experts")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:referentiel', 'PERM_sinistre:create')")
     public ResponseEntity<ApiResponse<List<SinistreIntervenantResponse>>> listExperts(
-            @RequestParam(defaultValue = "false") boolean includeInactive
+            @RequestParam(defaultValue = "false") boolean includeInactive,
+            @RequestParam(required = false) Long villeId
     ) {
         return ResponseEntity.ok(ApiResponse.success(intervenantService.listExperts(
                 TenantContext.getCurrentAgence(),
-                includeInactive
+                includeInactive,
+                villeId
         )));
     }
 
@@ -57,7 +59,7 @@ public class SinistreReferentielController {
     }
 
     @GetMapping("/garages")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:referentiel', 'PERM_sinistre:create')")
     public ResponseEntity<ApiResponse<List<SinistreIntervenantResponse>>> listGarages(
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {

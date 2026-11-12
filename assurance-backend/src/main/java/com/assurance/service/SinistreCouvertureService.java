@@ -98,7 +98,15 @@ public class SinistreCouvertureService {
                     "Aucun mouvement contractuel valide ne couvre la date du sinistre"
             );
         }
+        MouvementContrat mouvementCourant = mouvements.get(mouvements.size() - 1);
+        if (mouvementCourant.getTypeMouvement() != null
+                && Boolean.TRUE.equals(mouvementCourant.getTypeMouvement().getClotureContrat())) {
+            throw new BadRequestException("Le contrat était clôturé à la date du sinistre");
+        }
         Map<Long, MouvementVehicule> vehicules = replayVehicules(mouvements);
+        vehicules.values().removeIf(snapshot ->
+                (snapshot.getDateEffet() != null && dateSinistre.isBefore(snapshot.getDateEffet()))
+                        || (snapshot.getDateEcheance() != null && dateSinistre.isAfter(snapshot.getDateEcheance())));
         if (vehicules.isEmpty() && isAutomobile(contrat)) {
             throw new BadRequestException(
                     "Aucun véhicule couvert n'a été trouvé à la date du sinistre"
@@ -145,16 +153,14 @@ public class SinistreCouvertureService {
             List<MouvementVehicule> snapshots = mouvementVehiculeRepository
                     .findByMouvementContratId(mouvement.getId());
             Map<Long, MouvementVehicule> apres = byVehicule(snapshots, NatureSnapshotMouvement.APRES);
-            if (!apres.isEmpty()) {
-                snapshots.stream()
-                        .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
-                        .map(MouvementVehicule::getVehicule)
-                        .filter(Objects::nonNull)
-                        .map(Vehicule::getId)
-                        .filter(id -> !apres.containsKey(id))
-                        .forEach(state::remove);
-                state.putAll(apres);
-            }
+            snapshots.stream()
+                    .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
+                    .map(MouvementVehicule::getVehicule)
+                    .filter(Objects::nonNull)
+                    .map(Vehicule::getId)
+                    .filter(id -> !apres.containsKey(id))
+                    .forEach(state::remove);
+            state.putAll(apres);
             snapshots.stream()
                     .filter(snapshot -> snapshot.getVehicule() != null)
                     .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
@@ -221,15 +227,13 @@ public class SinistreCouvertureService {
             List<MouvementGarantie> snapshots = mouvementGarantieRepository
                     .findByMouvementContratId(mouvement.getId());
             Map<GarantieKey, MouvementGarantie> apres = byGarantie(snapshots, NatureSnapshotMouvement.APRES);
-            if (!apres.isEmpty()) {
-                snapshots.stream()
-                        .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
-                        .map(this::garantieKey)
-                        .filter(Objects::nonNull)
-                        .filter(key -> !apres.containsKey(key))
-                        .forEach(state::remove);
-                state.putAll(apres);
-            }
+            snapshots.stream()
+                    .filter(snapshot -> snapshot.getNature() == NatureSnapshotMouvement.AVANT)
+                    .map(this::garantieKey)
+                    .filter(Objects::nonNull)
+                    .filter(key -> !apres.containsKey(key))
+                    .forEach(state::remove);
+            state.putAll(apres);
             snapshots.stream()
                     .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.AVANT)
                     .filter(snapshot -> snapshot.getNature() != NatureSnapshotMouvement.APRES)

@@ -345,6 +345,9 @@ function buildCounterpartyOptions(dossier: SinistreDetail) {
   ];
   const experts = new Map<string, string>();
   const garages = new Map<string, string>();
+  if (dossier.garageId && dossier.garage) {
+    garages.set(dossier.garageId, dossier.garage);
+  }
   dossier.missionsExpertise.forEach((mission) => {
     experts.set(mission.expertId, mission.expert);
     if (mission.garageId && mission.garage) {

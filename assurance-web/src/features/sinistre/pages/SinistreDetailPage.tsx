@@ -84,11 +84,14 @@ import {
 } from "../components/SinistreDocumentDialog";
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
+import { SinistreTracking } from "../components/SinistreTracking";
+import { damageLabels, repairLabels, suiviLabels } from "../workflow";
 import type {
   DecisionCouverture,
   SinistreDetail,
   StatutSinistre,
   TypeDocument,
+  Intervenant,
 } from "../types";
 
 export default function SinistreDetailPage() {
@@ -342,20 +345,22 @@ export default function SinistreDetailPage() {
           </Button>
           {canManage && dossier.workflow.transitions.length > 0 ? (
             <Button onClick={() => setTransitionOpen(true)}>
-              Faire évoluer le dossier
+              Changer le statut
             </Button>
           ) : null}
         </div>
       </div>
       <WorkflowReadiness dossier={dossier} />
+      <SinistreTracking dossier={dossier} />
       <div className="grid gap-3">
         <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
           <GeneralSection
             dossier={dossier}
             cities={cities.data ?? []}
             managers={managers.data ?? []}
+            garages={garages.data ?? []}
             responsibilityVisible={
-              coverageAssessmentVisible && dossier.nature === "ACCIDENT"
+              dossier.garanties.some((item) => item.impliquee && item.responsabiliteCivile)
             }
             editable={canManage && !locked}
             saving={update.isPending}
@@ -481,6 +486,7 @@ export default function SinistreDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Phase</TableHead>
                     <TableHead>Expert</TableHead>
                     <TableHead>Garage</TableHead>
                     <TableHead>Mission</TableHead>
@@ -503,6 +509,7 @@ export default function SinistreDetailPage() {
                         }
                       }}
                     >
+                      <TableCell>{item.phase === "APRES" ? "Après réparation" : "Avant réparation"}</TableCell>
                       <TableCell className="font-medium">
                         {item.expert}
                       </TableCell>
@@ -524,7 +531,7 @@ export default function SinistreDetailPage() {
                   {dossier.missionsExpertise.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-4 text-center text-muted-foreground"
                       >
                         Aucune expertise mandatée.
@@ -732,6 +739,7 @@ export default function SinistreDetailPage() {
         }
       />
       <SinistreMissionDialog
+        initialPhase={dossier.etapeSuivi === "EXPERTISE_APRES" ? "APRES" : "AVANT"}
         open={missionOpen}
         mission={editingMission}
         experts={experts.data ?? []}
@@ -833,6 +841,9 @@ function HistoryDialog({
                   {item.utilisateur}
                   {item.ancienStatut && item.nouveauStatut
                     ? ` · ${statusLabels[item.ancienStatut]} → ${statusLabels[item.nouveauStatut]}`
+                    : ""}
+                  {item.ancienneEtape && item.nouvelleEtape
+                    ? ` · ${suiviLabels[item.ancienneEtape]} → ${suiviLabels[item.nouvelleEtape]}`
                     : ""}
                 </p>
               </div>
@@ -1198,6 +1209,7 @@ function GeneralSection({
   dossier,
   cities,
   managers,
+  garages,
   responsibilityVisible,
   editable,
   saving,
@@ -1206,6 +1218,7 @@ function GeneralSection({
   dossier: SinistreDetail;
   cities: Array<{ id: string; libelle: string }>;
   managers: Array<{ id: string; nom: string }>;
+  garages: Intervenant[];
   responsibilityVisible: boolean;
   editable: boolean;
   saving: boolean;
@@ -1222,6 +1235,9 @@ function GeneralSection({
     gestionnaireId: "",
     prochaineAction: "",
     dateEcheanceAction: "",
+    typeDommage: "",
+    modeReparation: "",
+    garageId: "",
   });
   const [trackingOpen, setTrackingOpen] = useState(
     Boolean(
@@ -1244,6 +1260,9 @@ function GeneralSection({
         gestionnaireId: dossier.gestionnaireId || "",
         prochaineAction: dossier.prochaineAction || "",
         dateEcheanceAction: dossier.dateEcheanceAction || "",
+        typeDommage: dossier.typeDommage || "",
+        modeReparation: dossier.modeReparation || "",
+        garageId: dossier.garageId || "",
       }),
     [dossier],
   );
@@ -1256,7 +1275,7 @@ function GeneralSection({
           {editable ? (
             <Button
               size="sm"
-              disabled={saving}
+              disabled={saving || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
               onClick={() =>
                 onSave({
                   referenceCompagnie:
@@ -1277,6 +1296,11 @@ function GeneralSection({
                   gestionnaireId: form.gestionnaireId || dossier.gestionnaireId,
                   prochaineAction: form.prochaineAction.trim() || undefined,
                   dateEcheanceAction: form.dateEcheanceAction || undefined,
+                  ...(dossier.couverture.brancheCode === "AUTOMOBILE" ? {
+                    typeDommage: form.typeDommage || undefined,
+                    modeReparation: form.modeReparation || undefined,
+                    garageId: form.garageId || null,
+                  } : {}),
                 })
               }
             >
@@ -1290,6 +1314,10 @@ function GeneralSection({
           <Info label="Dossier" value={dossier.couverture.numeroDossier} />
           <Info label="Compagnie" value={dossier.couverture.compagnie} />
           <Info label="Assuré" value={dossier.couverture.assure} />
+          <Info label="Date de déclaration" value={formatDate(dossier.dateDeclaration)} />
+          <Info label="Dommages" value={dossier.typeDommage ? damageLabels[dossier.typeDommage] : undefined} />
+          <Info label="Réparation" value={dossier.modeReparation ? repairLabels[dossier.modeReparation] : undefined} />
+          <Info label="Garage" value={dossier.garage} />
           <Info
             label="Mouvement"
             value={`${dossier.couverture.numeroMouvement} · ${formatDate(dossier.couverture.dateEffet)}`}
@@ -1309,6 +1337,17 @@ function GeneralSection({
           />
         </dl>
         <div className="grid gap-4 sm:grid-cols-2">
+          {dossier.couverture.brancheCode === "AUTOMOBILE" ? <>
+            <Field label="Dommages"><Select disabled={!editable || saving} value={form.typeDommage} onValueChange={(value) => update("typeDommage", value)}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{Object.entries(damageLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+            </Select></Field>
+            <Field label="Mode de réparation"><Select disabled={!editable || saving} value={form.modeReparation} onValueChange={(value) => setForm((current) => ({ ...current, modeReparation: value, garageId: "" }))}>
+              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{Object.entries(repairLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+            </Select></Field>
+            <Field label={form.modeReparation === "PEC" ? "Garage conventionné *" : "Garage"}><Select disabled={!editable || saving} value={form.garageId || "NONE"} onValueChange={(value) => update("garageId", value === "NONE" ? "" : value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{dossier.garageId && !garages.some((item) => item.id === dossier.garageId) ? <SelectItem value={dossier.garageId}>{dossier.garage || "Garage actuel"}</SelectItem> : null}{garages.filter((item) => form.modeReparation !== "PEC" || item.conventionne || item.id === dossier.garageId).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}</SelectItem>)}</SelectContent>
+            </Select></Field>
+          </> : null}
           <Field label="Ville">
             <SinistreVilleSelect
               cities={cities}
@@ -1354,20 +1393,19 @@ function GeneralSection({
           </Field>
           {responsibilityVisible ? (
             <div className="sm:col-span-2">
-              <Field label="Responsabilité retenue">
+              <Field label="Responsabilité RC *">
                 <Select
                   disabled={!editable}
-                  value={form.responsabilite}
+                  value={form.responsabilite === "NON_DETERMINEE" ? "" : form.responsabilite}
                   onValueChange={(value) => update("responsabilite", value)}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NON_DETERMINEE">À déterminer</SelectItem>
-                    <SelectItem value="0">Adversaire responsable</SelectItem>
-                    <SelectItem value="50">Responsabilité partagée 50/50</SelectItem>
-                    <SelectItem value="100">Assuré responsable</SelectItem>
+                    <SelectItem value="0">0 %</SelectItem>
+                    <SelectItem value="50">50 %</SelectItem>
+                    <SelectItem value="100">100 %</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
@@ -1746,7 +1784,7 @@ function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
         <CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" />
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold text-amber-950 dark:text-amber-100">
-            Actions requises avant la prochaine étape
+            Contrôles documentaires et statut
           </h2>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-amber-950/80 dark:text-amber-200/80">
             {dossier.workflow.documentsRecus > 0 ? (

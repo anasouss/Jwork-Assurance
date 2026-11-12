@@ -19,6 +19,7 @@ import com.assurance.entity.SinistreGarantie;
 import com.assurance.entity.Utilisateur;
 import com.assurance.entity.Ville;
 import com.assurance.enums.DecisionCouvertureSinistre;
+import com.assurance.enums.EtapeSuiviSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.exception.BadRequestException;
@@ -65,6 +66,20 @@ public class SinistreService {
     private final SinistreEvenementService evenementService;
     private final SinistreResponseMapper responseMapper;
     private final BusinessActivityRecorder activityRecorder;
+    private final SinistreQualificationService qualificationService;
+    private final SinistreSuiviService suiviService;
+
+    @Transactional
+    public SinistreDetailResponse transitionEtape(Long agenceId, Long utilisateurId, Long id,
+            com.assurance.dto.request.TransitionEtapeSinistreRequest request) {
+        Sinistre sinistre = resolveForUpdate(agenceId, id);
+        var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
+        suiviService.transition(agenceId, utilisateurId, id, request);
+        var detail = responseMapper.toDetail(sinistre);
+        activityRecorder.record(ClaimActivity.withReason(ClaimActivity.command(sinistre, before, detail,
+                ActivityAction.UPDATED, "Suivi du sinistre modifie", "CLAIM_WORKFLOW_TRANSITION"), request.getMotif()));
+        return detail;
+    }
 
     @Transactional(readOnly = true)
     public List<SinistreDoublonResponse> findPossibleDuplicates(
@@ -129,6 +144,11 @@ public class SinistreService {
         boolean declarer = Boolean.TRUE.equals(request.getDeclarer());
         if (declarer) {
             assertDeclarationReady(request.getCirconstances(), garantiesImpliquees);
+            boolean rc = couverture.garanties().stream().anyMatch(item -> garantiesImpliquees.contains(item.getGarantie().getId())
+                    && Boolean.TRUE.equals(item.getGarantie().getResponsabiliteCivile()));
+            if (rc && request.getTauxResponsabilite() == null) {
+                throw new BadRequestException("Renseignez la responsabilite RC (0, 50 ou 100)");
+            }
         }
 
         Sinistre sinistre = sinistreRepository.save(Sinistre.builder()
@@ -159,6 +179,16 @@ public class SinistreService {
                         garantiesImpliquees.contains(item.getGarantie().getId())
                 ))
                 .toList());
+        sinistre.setReferenceCompagnie(trimToNull(request.getReferenceCompagnie()));
+        sinistre.setNumeroPv(trimToNull(request.getNumeroPv()));
+        qualificationService.apply(sinistre, request.getTypeDommage(), request.getModeReparation(),
+                request.getGarageId(), request.getTauxResponsabilite());
+        if (declarer) {
+            List<String> blockers = SinistreQualificationService.declarationBlockers(sinistre);
+            if (!blockers.isEmpty()) {
+                throw new BadRequestException(String.join(". ", blockers));
+            }
+        }
         evenementService.record(
                 sinistre,
                 acteur,
@@ -187,16 +217,40 @@ public class SinistreService {
             int page,
             int size
     ) {
+        return list(agenceId, query, clientId, contratId, brancheId, statut, nature, null, dateDu, dateAu, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<SinistreSummaryResponse> list(
+            Long agenceId, String query, Long clientId, Long contratId, Long brancheId,
+            StatutSinistre statut, com.assurance.enums.NatureSinistre nature,
+            com.assurance.enums.EtapeSuiviSinistre etapeSuivi, LocalDate dateDu, LocalDate dateAu,
+            int page, int size
+    ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Page<Sinistre> result = sinistreRepository.findAll(
-                specification(agenceId, query, clientId, contratId, brancheId, statut, nature, dateDu, dateAu),
-                PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt"))
+                specification(agenceId, query, clientId, contratId, brancheId, statut, nature, etapeSuivi, dateDu, dateAu),
+                PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt")
+                        .and(Sort.by(Sort.Direction.DESC, "id")))
         );
         return PagedResponse.<SinistreSummaryResponse>builder()
                 .items(result.getContent().stream().map(responseMapper::toSummary).toList())
                 .page(PageMetadata.from(result))
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SinistreSummaryResponse> registre(
+            Long agenceId, String query, Long clientId, Long contratId, Long brancheId,
+            StatutSinistre statut, com.assurance.enums.NatureSinistre nature,
+            com.assurance.enums.EtapeSuiviSinistre etapeSuivi, LocalDate dateDu, LocalDate dateAu
+    ) {
+        return sinistreRepository.findAll(
+                        specification(agenceId, query, clientId, contratId, brancheId, statut, nature,
+                                etapeSuivi, dateDu, dateAu),
+                        Sort.by(Sort.Direction.DESC, "updatedAt").and(Sort.by(Sort.Direction.DESC, "id")))
+                .stream().map(responseMapper::toSummary).toList();
     }
 
     @Transactional
@@ -207,8 +261,8 @@ public class SinistreService {
             UpdateSinistreRequest request
     ) {
         Utilisateur acteur = resolveCurrentUser(agenceId, utilisateurId);
-        Sinistre sinistre = resolve(agenceId, id);
-        if (!workflowService.isEditable(sinistre.getStatut())) {
+        Sinistre sinistre = resolveForUpdate(agenceId, id);
+        if (!workflowService.isEditable(sinistre)) {
             throw new BadRequestException("Le sinistre doit être rouvert avant modification");
         }
         var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
@@ -217,8 +271,20 @@ public class SinistreService {
         sinistre.setLieu(trimToNull(request.getLieu()));
         sinistre.setCirconstances(trimToNull(request.getCirconstances()));
         sinistre.setNumeroPv(trimToNull(request.getNumeroPv()));
-        sinistre.setTauxResponsabilite(request.getTauxResponsabilite());
+        qualificationService.apply(sinistre, request.getTypeDommage(), request.getModeReparation(),
+                request.getGarageId(), request.getTauxResponsabilite());
         sinistre.setNotes(trimToNull(request.getNotes()));
+        if (sinistre.getStatut() != StatutSinistre.BROUILLON) {
+            List<String> blockers = SinistreQualificationService.declarationBlockers(sinistre);
+            if (!blockers.isEmpty()) {
+                throw new BadRequestException(String.join(". ", blockers));
+            }
+        }
+        if (sinistre.getStatut() != StatutSinistre.BROUILLON && request.getTauxResponsabilite() == null
+                && garantieRepository.findForDetailOrderByConfiguredDisplay(id).stream()
+                .anyMatch(item -> item.isImpliquee() && item.isResponsabiliteCivile())) {
+            throw new BadRequestException("Renseignez la responsabilite RC (0, 50 ou 100)");
+        }
         if (request.getGestionnaireId() != null) {
             sinistre.setGestionnaire(resolveGestionnaire(agenceId, request.getGestionnaireId()));
         }
@@ -232,6 +298,7 @@ public class SinistreService {
         sinistre.setProchaineAction(nextAction);
         sinistre.setDateEcheanceAction(request.getDateEcheanceAction());
         sinistreRepository.save(sinistre);
+        sinistreRepository.flush();
         evenementService.record(
                 sinistre,
                 acteur,
@@ -252,7 +319,7 @@ public class SinistreService {
             TransitionSinistreRequest request
     ) {
         Utilisateur acteur = resolveCurrentUser(agenceId, utilisateurId);
-        Sinistre sinistre = resolve(agenceId, id);
+        Sinistre sinistre = resolveForUpdate(agenceId, id);
         List<String> blockers = readinessService.blockers(sinistre, request.getStatut());
         if (!blockers.isEmpty()) {
             throw new BadRequestException(String.join(". ", blockers));
@@ -261,12 +328,25 @@ public class SinistreService {
             throw new BadRequestException("Le motif est obligatoire pour ce changement de statut");
         }
         StatutSinistre ancien = sinistre.getStatut();
+        EtapeSuiviSinistre ancienneEtape = sinistre.getEtapeSuivi();
         var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
         workflowService.transition(sinistre, request.getStatut());
+        if (request.getStatut() == StatutSinistre.CLOTURE) {
+            sinistre.setEtapeSuivi(EtapeSuiviSinistre.CLOTURE);
+        } else if (request.getStatut() == StatutSinistre.ROUVERT
+                && ancienneEtape == EtapeSuiviSinistre.CLOTURE) {
+            sinistre.setEtapeSuivi(EtapeSuiviSinistre.COMPAGNIE);
+        } else if (request.getStatut() == StatutSinistre.TRANSMIS_COMPAGNIE) {
+            sinistre.setEtapeSuivi(EtapeSuiviSinistre.COMPAGNIE);
+        }
         sinistreRepository.save(sinistre);
+        sinistreRepository.flush();
         String description = "Statut modifié de " + ancien + " vers " + request.getStatut();
         if (hasText(request.getMotif())) {
             description += " : " + request.getMotif().trim();
+        }
+        if (ancienneEtape != sinistre.getEtapeSuivi()) {
+            evenementService.recordStage(sinistre, acteur, ancienneEtape, sinistre.getEtapeSuivi(), description);
         }
         evenementService.record(
                 sinistre,
@@ -286,6 +366,11 @@ public class SinistreService {
 
     public Sinistre resolve(Long agenceId, Long id) {
         return sinistreRepository.findByIdAndAgenceId(id, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sinistre", id));
+    }
+
+    public Sinistre resolveForUpdate(Long agenceId, Long id) {
+        return sinistreRepository.findByIdAndAgenceIdForUpdate(id, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sinistre", id));
     }
 
@@ -348,6 +433,7 @@ public class SinistreService {
                 .impliquee(impliquee)
                 .snapshotCode(source.getGarantie().getCode())
                 .snapshotLibelle(source.getGarantie().getLibelle())
+                .responsabiliteCivile(Boolean.TRUE.equals(source.getGarantie().getResponsabiliteCivile()))
                 .snapshotCapital(source.getCapital())
                 .snapshotPrime(source.getPrime())
                 .snapshotTaux(source.getTaux())
@@ -425,9 +511,13 @@ public class SinistreService {
             Long brancheId,
             StatutSinistre statut,
             com.assurance.enums.NatureSinistre nature,
+            com.assurance.enums.EtapeSuiviSinistre etapeSuivi,
             LocalDate dateDu,
             LocalDate dateAu
     ) {
+        if (dateDu != null && dateAu != null && dateDu.isAfter(dateAu)) {
+            throw new BadRequestException("La date de debut ne peut pas depasser la date de fin");
+        }
         return (root, criteriaQuery, builder) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
             predicates.add(builder.equal(root.get("agence").get("id"), agenceId));
@@ -446,6 +536,9 @@ public class SinistreService {
             if (nature != null) {
                 predicates.add(builder.equal(root.get("nature"), nature));
             }
+            if (etapeSuivi != null) {
+                predicates.add(builder.equal(root.get("etapeSuivi"), etapeSuivi));
+            }
             if (dateDu != null) {
                 predicates.add(builder.greaterThanOrEqualTo(root.get("dateSinistre"), dateDu));
             }
@@ -454,16 +547,14 @@ public class SinistreService {
             }
             if (hasText(query)) {
                 String pattern = "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
-                var client = root.join("client", JoinType.LEFT);
-                var contrat = root.join("contrat", JoinType.LEFT);
+                var couverture = root.join("couverture", JoinType.LEFT);
                 predicates.add(builder.or(
                         builder.like(builder.lower(root.get("numeroSinistre")), pattern),
                         builder.like(builder.lower(root.get("referenceCompagnie")), pattern),
-                        builder.like(builder.lower(contrat.get("numeroPolice")), pattern),
-                        builder.like(builder.lower(contrat.get("numeroDossier")), pattern),
-                        builder.like(builder.lower(client.get("nom")), pattern),
-                        builder.like(builder.lower(client.get("prenom")), pattern),
-                        builder.like(builder.lower(client.get("raisonSociale")), pattern)
+                        builder.like(builder.lower(couverture.get("numeroPolice")), pattern),
+                        builder.like(builder.lower(couverture.get("numeroDossier")), pattern),
+                        builder.like(builder.lower(couverture.get("assure")), pattern),
+                        builder.like(builder.lower(couverture.get("immatriculation")), pattern)
                 ));
             }
             criteriaQuery.distinct(true);

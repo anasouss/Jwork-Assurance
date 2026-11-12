@@ -44,6 +44,7 @@ export function SinistreIntervenantDialog({
     adresse: "",
     villeId: "",
     actif: true,
+    conventionne: false,
   });
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function SinistreIntervenantDialog({
       adresse: intervenant?.adresse ?? "",
       villeId: intervenant?.villeId ?? "",
       actif: intervenant?.actif ?? true,
+      conventionne: intervenant?.conventionne ?? false,
     });
   }, [intervenant, open]);
 
@@ -72,6 +74,7 @@ export function SinistreIntervenantDialog({
       adresse: form.adresse.trim() || undefined,
       villeId: form.villeId || undefined,
       actif: form.actif,
+      ...(kind === "GARAGE" ? { conventionne: form.conventionne } : {}),
     });
   }
 
@@ -83,10 +86,7 @@ export function SinistreIntervenantDialog({
             {intervenant ? "Modifier" : "Ajouter"}{" "}
             {kind === "EXPERT" ? "un expert" : "un garage"}
           </DialogTitle>
-          <DialogDescription>
-            Ce référentiel appartient à l’agence courante et alimente les
-            missions d’expertise.
-          </DialogDescription>
+          <DialogDescription className="sr-only">Coordonnées de l’intervenant</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Code *">
@@ -145,6 +145,10 @@ export function SinistreIntervenantDialog({
               />
             </Field>
           </div>
+          {kind === "GARAGE" ? <label className="flex items-center justify-between gap-3 text-sm sm:col-span-2">
+            Garage conventionné
+            <Switch checked={form.conventionne} onCheckedChange={(value) => update("conventionne", value)} />
+          </label> : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

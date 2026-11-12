@@ -155,6 +155,21 @@ export function ContractInfoSection({
     reductionSaharienneEligible,
   ]);
 
+  const coveragePeriodField = form.periodesAutorisees.length > 0 ? (
+    <Field label="Périodicité" required error={form.validationErrors.periodicite}>
+      <Select value={form.periodeCouverture} onValueChange={form.setPeriodeCouverture}>
+        <SelectTrigger><SelectValue placeholder="Période" /></SelectTrigger>
+        <SelectContent>
+          {form.periodesAutorisees.map((periode) => (
+            <SelectItem key={periode.value} value={periode.value}>
+              {coveragePeriodLabel(periode.value, form.typeRenouvellement)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  ) : null;
+
   return (
     <SectionCard
       title="Contrat"
@@ -277,20 +292,6 @@ export function ContractInfoSection({
             </Select>
           </Field>
         ) : null}
-        {form.periodesAutorisees.length > 0 ? (
-          <Field label="Périodicité" required error={form.validationErrors.periodicite}>
-            <Select value={form.periodeCouverture} onValueChange={form.setPeriodeCouverture}>
-              <SelectTrigger><SelectValue placeholder="Période" /></SelectTrigger>
-              <SelectContent>
-                {form.periodesAutorisees.map((periode) => (
-                  <SelectItem key={periode.value} value={periode.value}>
-                    {coveragePeriodLabel(periode.value, form.typeRenouvellement)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        ) : null}
         {isFlotte ? (
           <>
             {showFlotteNumeroPolice ? (
@@ -320,6 +321,7 @@ export function ContractInfoSection({
                 </SelectContent>
               </Select>
             </Field>
+            {coveragePeriodField}
             {form.showContractEcheance ? (
               <Field label="Échéance" required error={form.validationErrors.echeance}>
                 <EcheanceInput
@@ -417,6 +419,7 @@ export function ContractInfoSection({
                 </SelectContent>
               </Select>
             </Field>
+            {coveragePeriodField}
             {form.typeContrat === "PARTICULIER" && form.showContractEcheance ? (
               <Field label="Échéance" required error={form.validationErrors.echeance}>
                 <EcheanceInput

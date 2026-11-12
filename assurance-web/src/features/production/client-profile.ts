@@ -15,11 +15,11 @@ export function identityDocument(client: ClientProfile) {
 }
 
 export function foreignResidence(client: ClientProfile) {
-  return Boolean(client.paysResidence && client.paysResidence !== "MA");
+  return client.paysResidence != null && client.paysResidence !== "MA";
 }
 
 export function residenceComplete(client: ClientProfile) {
-  return Boolean((foreignResidence(client) ? client.villeEtrangere?.trim() : client.villeId) && client.adresse?.trim());
+  return Boolean((foreignResidence(client) ? client.paysResidence && client.villeEtrangere?.trim() : client.villeId) && client.adresse?.trim());
 }
 
 export function identityComplete(client: ClientProfile) {

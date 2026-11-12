@@ -29,4 +29,11 @@ describe("client identity and residence", () => {
     expect(foreignResidence({ ...client, nationalite: "Française", paysResidence: "MA" })).toBe(false);
     expect(foreignResidence({ ...client, nationalite: "Marocaine", paysResidence: "FR" })).toBe(true);
   });
+
+  it("keeps foreign mode enabled while requiring a country to be selected", () => {
+    const pending: ClientProfile = { ...client, paysResidence: "", villeEtrangere: "Lyon", adresse: "Rue 1" };
+    expect(foreignResidence(pending)).toBe(true);
+    expect(residenceComplete(pending)).toBe(false);
+    expect(residenceComplete({ ...pending, paysResidence: "FR" })).toBe(true);
+  });
 });

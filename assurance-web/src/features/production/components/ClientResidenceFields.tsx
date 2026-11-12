@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { useRef } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Field } from "./Field";
@@ -15,19 +17,34 @@ export function ClientResidenceFields({ client, onChange, villes, disabled, erro
   errorPrefix?: string;
   addressClassName?: string;
 }) {
-  const countries = useQuery({ queryKey: ["referentiel", "pays"], queryFn: () => referenceApi.list("pays"), staleTime: Infinity });
   const foreign = foreignResidence(client);
-  const country = client.paysResidence ?? "MA";
+  const previousResidence = useRef({ villeId: client.villeId, paysResidence: foreign ? client.paysResidence : "",
+    villeEtrangere: client.villeEtrangere });
+  const countries = useQuery({ queryKey: ["referentiel", "pays"], queryFn: () => referenceApi.list("pays"),
+    staleTime: Infinity, enabled: foreign });
+  const country = client.paysResidence ?? "";
   return <>
-    <Field label="Pays de résidence" required error={errors[`${errorPrefix}paysResidence`]}>
+    <label className="flex min-h-10 items-center gap-2 self-end text-sm font-medium">
+      <Checkbox checked={foreign} disabled={disabled} onCheckedChange={(checked) => {
+        if (checked) {
+          previousResidence.current.villeId = client.villeId;
+          onChange({ paysResidence: previousResidence.current.paysResidence || "", villeId: undefined,
+            villeEtrangere: previousResidence.current.villeEtrangere });
+        } else {
+          previousResidence.current.paysResidence = client.paysResidence ?? "";
+          previousResidence.current.villeEtrangere = client.villeEtrangere;
+          onChange({ paysResidence: "MA", villeId: previousResidence.current.villeId, villeEtrangere: undefined });
+        }
+      }} />
+      Résidence à l'étranger
+    </label>
+    {foreign ? <Field label="Pays de résidence" required error={errors[`${errorPrefix}paysResidence`]}>
       <AutocompleteSelect value={country} disabled={disabled} placeholder="Pays"
-        options={(countries.data ?? []).map((item) => ({ value: item.id, label: item.libelle, keywords: item.code }))}
+        options={(countries.data ?? []).filter((item) => item.id !== "MA").map((item) => ({ value: item.id, label: item.libelle, keywords: item.code }))}
         emptyText={countries.isError ? "Liste des pays indisponible" : "Aucun pays trouvé"}
         invalidText="Sélectionnez un pays existant."
-        onValueChange={(value) => onChange({ paysResidence: value || undefined,
-          villeId: value === country ? client.villeId : undefined,
-          villeEtrangere: value === country ? client.villeEtrangere : undefined })} />
-    </Field>
+        onValueChange={(value) => onChange({ paysResidence: value, villeId: undefined })} />
+    </Field> : null}
     {foreign ? <Field label="Ville à l'étranger" required error={errors[`${errorPrefix}villeEtrangere`]}>
       <Input value={client.villeEtrangere ?? ""} maxLength={160} disabled={disabled}
         onChange={(event) => onChange({ villeEtrangere: event.target.value })} />

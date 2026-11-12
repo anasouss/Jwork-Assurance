@@ -17,6 +17,7 @@ import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
 import { ClientIdentityFields } from "./ClientIdentityFields";
 import { ClientResidenceFields } from "./ClientResidenceFields";
+import { foreignResidence, identityDocument } from "../client-profile";
 import type { ClientInput, ClientResponse, GenreClient, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -437,7 +438,7 @@ export function ClientSection({
                   </>
                 ) : (
                   <>
-                    <ClientIdentityFields client={item.client} disabled={disabledByCopy}
+                    <ClientIdentityFields key={item.clientId ?? "new"} client={item.client} disabled={disabledByCopy}
                       onChange={(patch) => updateClient(index, patch)} onIdentityChange={(patch) => updateIdentity(index, patch)}
                       onLookup={(params, immediate) => immediate ? void searchClient(index, params) : scheduleClientSearch(index, params)}
                       errors={errors} errorPrefix={`clients.${index}.client.`}
@@ -477,14 +478,14 @@ export function ClientSection({
                     <Field label="Prénom" required error={errors[`clients.${index}.client.prenom`]}>
                       <Input disabled={disabledByCopy} value={item.client.prenom ?? ""} onChange={(event) => updateClient(index, { prenom: event.target.value })} />
                     </Field>
-                    <Field label="Nationalité">
+                    {identityDocument(item.client).value !== "CIN" || foreignResidence(item.client) ? <Field label="Nationalité">
                       <Input disabled={disabledByCopy} value={item.client.nationalite ?? ""} maxLength={120}
                         onChange={(event) => updateClient(index, { nationalite: event.target.value })} />
-                    </Field>
+                    </Field> : null}
                 </div>
               ) : null}
               <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                <ClientResidenceFields client={item.client} disabled={disabledByCopy} villes={villes}
+                <ClientResidenceFields key={item.clientId ?? "new"} client={item.client} disabled={disabledByCopy} villes={villes}
                   onChange={(patch) => updateClient(index, patch)} errors={errors} errorPrefix={`clients.${index}.client.`}
                   addressClassName="lg:col-span-2" />
               </div>
@@ -586,7 +587,7 @@ export function ClientSection({
                       <Field label="Prénom" required error={errors[`clients.${conducteur.clientIndex}.client.prenom`]}>
                         <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
                       </Field>
-                      <ClientIdentityFields client={conducteur.client.client}
+                      <ClientIdentityFields key={conducteur.client.clientId ?? "new"} client={conducteur.client.client}
                         onChange={(patch) => updateClient(conducteur.clientIndex, patch)}
                         onIdentityChange={(patch) => updateIdentity(conducteur.clientIndex, patch)}
                         onLookup={(params, immediate) => immediate ? void searchClient(conducteur.clientIndex, params) : scheduleClientSearch(conducteur.clientIndex, params)}

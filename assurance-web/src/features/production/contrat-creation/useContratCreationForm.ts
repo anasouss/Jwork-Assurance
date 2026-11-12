@@ -856,6 +856,9 @@ export function useContratCreationForm(
       for (const [field, message] of Object.entries(clientIdentityErrors(item.client, today))) {
         nextErrors[`clients.${index}.client.${field}`] = message;
       }
+      if (foreignResidence(item.client) && !item.client.paysResidence?.trim()) {
+        nextErrors[`clients.${index}.client.paysResidence`] = "Pays de résidence obligatoire.";
+      }
       if (requireDriverDetails && isBeforeToday(item.client.dateValiditePermis, today)) {
         nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
       }
@@ -937,6 +940,7 @@ export function useContratCreationForm(
         const client = item.client;
         requireField(`clients.${index}.client.typeClient`, client.typeClient, "Type obligatoire.");
         if (foreignResidence(client)) {
+          requireField(`clients.${index}.client.paysResidence`, client.paysResidence, "Pays de résidence obligatoire.");
           requireField(`clients.${index}.client.villeEtrangere`, client.villeEtrangere, "Ville à l'étranger obligatoire.");
         } else {
           requireField(`clients.${index}.client.villeId`, client.villeId, "Ville obligatoire.");

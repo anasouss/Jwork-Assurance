@@ -42,7 +42,7 @@ import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
 import { ClientIdentityFields } from "@/features/production/components/ClientIdentityFields";
 import { ClientResidenceFields } from "@/features/production/components/ClientResidenceFields";
-import { clientIdentityErrors, primaryIdentityLabel, residenceComplete } from "@/features/production/client-profile";
+import { clientIdentityErrors, foreignResidence, identityDocument, primaryIdentityLabel, residenceComplete } from "@/features/production/client-profile";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
 import { ClientProfileDetails } from "@/features/crm/components/ClientProfileDetails";
@@ -557,14 +557,15 @@ function ClientDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <ClientIdentityFields client={draft} onChange={update} />
+              <ClientIdentityFields key={client?.id ?? "new"} client={draft} onChange={update} />
               <Field label="Nom" required>
                 <Input value={draft.nom ?? ""} onChange={(event) => update({ nom: event.target.value })} />
               </Field>
               <Field label="Prénom" required>
                 <Input value={draft.prenom ?? ""} onChange={(event) => update({ prenom: event.target.value })} />
               </Field>
-              <Field label="Nationalité"><Input value={draft.nationalite ?? ""} maxLength={120} onChange={event => update({ nationalite: event.target.value })} /></Field>
+              {identityDocument(draft).value !== "CIN" || foreignResidence(draft)
+                ? <Field label="Nationalité"><Input value={draft.nationalite ?? ""} maxLength={120} onChange={event => update({ nationalite: event.target.value })} /></Field> : null}
               {client && <>
                 <Field label="Date de naissance"><DatePicker date={draft.dateNaissance} onSelect={date => update({ dateNaissance: toDateOnly(date) })} /></Field>
                 <h3 className="border-t pt-4 text-sm font-semibold text-blue-800 sm:col-span-2 lg:col-span-3 dark:text-blue-200">Permis de conduire</h3>
@@ -594,7 +595,7 @@ function ClientDialog({
             </>
           )}
           {client && <h3 className="border-t pt-4 text-sm font-semibold text-blue-800 sm:col-span-2 lg:col-span-3 dark:text-blue-200">Coordonnées</h3>}
-          <ClientResidenceFields client={draft} onChange={update} villes={villesQuery.data ?? []} />
+          <ClientResidenceFields key={client?.id ?? "new"} client={draft} onChange={update} villes={villesQuery.data ?? []} />
           <div className="sm:col-span-2 lg:col-span-3">
             <TelephoneList client={{ role: "SOUSCRIPTEUR", principalPourRole: true, client: draft }} updateClient={update} />
           </div>

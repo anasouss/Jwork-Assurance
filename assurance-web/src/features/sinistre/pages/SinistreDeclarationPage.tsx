@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, LoaderCircle, MapPin, Pencil, ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
+import { useAuthStore } from "@/store/auth-store";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +19,10 @@ import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarat
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import { SinistreOpeningFields, type OpeningFields } from "../components/SinistreOpeningFields";
 import { natureLabels } from "../format";
-import type { CoverageGuarantee, NatureSinistre, OpeningDocument } from "../types";
+import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
+import { parseOpeningDamage } from "../opening-context";
+import { damageLabels } from "../workflow";
+import type { CoverageGuarantee, Intervenant, NatureSinistre, OpeningDocument } from "../types";
 
 const GUARANTEE_GROUPS = [
   { type: "VEHICULE", label: "Garanties du risque" },
@@ -28,14 +32,16 @@ const VALID_NATURES = new Set<NatureSinistre>([
   "ACCIDENT", "VOL", "INCENDIE", "BRIS_DE_GLACE", "DOMMAGE_VEHICULE", "CORPOREL", "ASSISTANCE", "AUTRE",
 ]);
 const emptyOpeningFields: OpeningFields = {
-  referenceCompagnie: "", numeroPv: "", typeDommage: "", modeReparation: "",
+  referenceCompagnie: "", numeroPv: "", modeReparation: "",
   tauxResponsabilite: "", garageId: "", expertVilleId: "", expertId: "", dateMission: "",
 };
 
 export default function SinistreDeclarationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const canCreateExpert = useAuthStore((state) => state.user?.permissions.includes("sinistre:referentiel") ?? false);
   const [params] = useSearchParams();
+  const typeDommage = parseOpeningDamage(params.get("typeDommage"));
   const contratId = params.get("contratId") ?? "";
   const dateSinistre = params.get("dateSinistre") ?? "";
   const requestedVehicleId = params.get("vehiculeId") ?? "";
@@ -51,6 +57,7 @@ export default function SinistreDeclarationPage() {
   const [guaranteeIds, setGuaranteeIds] = useState<string[]>([]);
   const [opening, setOpening] = useState(emptyOpeningFields);
   const [documents, setDocuments] = useState<OpeningDocument[]>([]);
+  const [expertDialogOpen, setExpertDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!hasContext) setContextOpen(true);
@@ -68,6 +75,9 @@ export default function SinistreDeclarationPage() {
     retry: false,
   });
   const automobile = coverage.data?.brancheCode === "AUTOMOBILE";
+  useEffect(() => {
+    if (automobile && !typeDommage) setContextOpen(true);
+  }, [automobile, typeDommage]);
   const selectedVehicle = useMemo(() => {
     if (!coverage.data || !automobile) return undefined;
     return coverage.data.vehicules.find((vehicle) => vehicle.id === requestedVehicleId)
@@ -101,6 +111,20 @@ export default function SinistreDeclarationPage() {
     queryFn: () => referenceApi.list("villes"),
     staleTime: 60_000,
   });
+  const createExpert = useMutation({
+    mutationFn: (request: object) => sinistreApi.saveExpert(null, request),
+    onSuccess: (expert) => {
+      queryClient.invalidateQueries({ queryKey: [...sinistreKeys.all, "experts"] });
+      if (expert.actif) {
+        queryClient.setQueryData<Intervenant[]>(sinistreKeys.experts(false, expert.villeId || undefined), (current = []) =>
+          [...current.filter((item) => item.id !== expert.id), expert].sort((a, b) => a.nom.localeCompare(b.nom, "fr")));
+        setOpening((current) => ({ ...current, expertVilleId: expert.villeId ?? "", expertId: expert.id }));
+      }
+      setExpertDialogOpen(false);
+      toast.success(expert.actif ? "Expert ajouté et sélectionné" : "Expert ajouté comme inactif, non sélectionné");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Ajout de l’expert impossible"),
+  });
   const create = useMutation({
     mutationFn: (declarer: boolean) => {
       if (!nature) throw new Error("La nature du sinistre est obligatoire");
@@ -119,7 +143,7 @@ export default function SinistreDeclarationPage() {
         referenceCompagnie: opening.referenceCompagnie.trim() || undefined,
         numeroPv: opening.numeroPv.trim() || undefined,
         ...(automobile ? {
-          typeDommage: opening.typeDommage || undefined,
+          typeDommage: typeDommage || undefined,
           modeReparation: opening.modeReparation || undefined,
           garageId: opening.garageId || undefined,
         } : {}),
@@ -143,7 +167,10 @@ export default function SinistreDeclarationPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
   });
 
+  const busy = create.isPending || createExpert.isPending;
+
   function submit(declarer: boolean) {
+    if (busy || expertDialogOpen) return;
     if (!hasContext || !coverage.data || (automobile && !selectedVehicle)) {
       toast.error("Le contexte de couverture est incomplet");
       return;
@@ -156,8 +183,13 @@ export default function SinistreDeclarationPage() {
       toast.error("La déclaration ne peut pas précéder le sinistre");
       return;
     }
-    if (automobile && declarer && (!opening.typeDommage || !opening.modeReparation)) {
-      toast.error("Sélectionnez les dommages et le mode de réparation");
+    if (automobile && !typeDommage) {
+      setContextOpen(true);
+      toast.error("Sélectionnez les dommages dans le contexte d’ouverture");
+      return;
+    }
+    if (automobile && declarer && !opening.modeReparation) {
+      toast.error("Sélectionnez le mode de réparation");
       return;
     }
     if (automobile && opening.modeReparation === "PEC" && !opening.garageId) {
@@ -195,10 +227,10 @@ export default function SinistreDeclarationPage() {
             <Link to="/app/sinistre/dossiers"><ArrowLeft className="size-4" /> Retour aux dossiers</Link>
           </Button>
           <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">Sinistres</p>
-          <h1 className="text-xl font-semibold">Déclarer un sinistre</h1>
+          <h1 className="text-xl font-semibold">Nouvelle ouverture</h1>
         </div>
         {hasContext ? (
-          <Button variant="outline" disabled={create.isPending} onClick={() => setContextOpen(true)}><Pencil className="size-4" /> Modifier le contexte</Button>
+          <Button variant="outline" disabled={busy} onClick={() => setContextOpen(true)}><Pencil className="size-4" /> Modifier le contexte</Button>
         ) : null}
       </div>
 
@@ -235,6 +267,7 @@ export default function SinistreDeclarationPage() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t bg-muted/20 px-4 py-3 text-sm">
               <span className="flex items-center gap-2"><CalendarDays className="size-4 text-muted-foreground" /> Sinistre du <strong>{formatIsoDate(dateSinistre)}</strong></span>
               <strong>{natureLabels[nature]}</strong>
+              {automobile && typeDommage ? <span>Dommages : <strong>{damageLabels[typeDommage]}</strong></span> : null}
               <span className="text-muted-foreground">{coverage.data.compagnie} · mouvement {coverage.data.numeroMouvement}</span>
             </div>
           </section>
@@ -273,15 +306,16 @@ export default function SinistreDeclarationPage() {
 
           <Section title="Ouverture et intervenants" icon={ShieldCheck}>
             <SinistreOpeningFields automobile={automobile} responsabiliteCivile={responsabiliteCivile} value={opening} onChange={setOpening}
-              documents={documents} onDocumentsChange={setDocuments} disabled={create.isPending} />
+              documents={documents} onDocumentsChange={setDocuments} disabled={busy}
+              onAddExpert={canCreateExpert ? () => setExpertDialogOpen(true) : undefined} />
           </Section>
 
           <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-            <Button variant="outline" disabled={create.isPending} onClick={() => submit(false)}>
+            <Button variant="outline" disabled={busy} onClick={() => submit(false)}>
               {create.isPending && create.variables === false ? <LoaderCircle className="size-4 animate-spin" /> : null} Enregistrer en brouillon
             </Button>
-            <Button disabled={create.isPending} onClick={() => submit(true)}>
-              {create.isPending && create.variables === true ? <LoaderCircle className="size-4 animate-spin" /> : null} Créer et déclarer
+            <Button disabled={busy} onClick={() => submit(true)}>
+              {create.isPending && create.variables === true ? <LoaderCircle className="size-4 animate-spin" /> : null} Enregistrer l’ouverture
             </Button>
           </div>
         </>
@@ -293,7 +327,12 @@ export default function SinistreDeclarationPage() {
         initialDateSinistre={dateSinistre}
         initialNature={nature ?? undefined}
         initialVehicleId={selectedVehicle?.id}
+        initialTypeDommage={typeDommage}
       />
+      <SinistreIntervenantDialog open={expertDialogOpen} kind="EXPERT" intervenant={null}
+        cities={cities.data ?? []} initialVilleId={opening.expertVilleId} saving={createExpert.isPending}
+        onOpenChange={setExpertDialogOpen}
+        onSubmit={(request) => { if (canCreateExpert && !busy) createExpert.mutate(request); }} />
     </div>
   );
 }

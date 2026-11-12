@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Paperclip, Trash2 } from "lucide-react";
+import { Paperclip, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
-import type { ModeReparationSinistre, OpeningDocument, TypeDommageSinistre } from "../types";
+import type { ModeReparationSinistre, OpeningDocument } from "../types";
 import { SinistreVilleSelect } from "./SinistreVilleSelect";
 import { appendOpeningFiles } from "../opening-files";
 import { toast } from "@/lib/toast";
@@ -20,7 +20,6 @@ const openingDocumentLabels: Record<OpeningDocument["type"], string> = {
 export type OpeningFields = {
   referenceCompagnie: string;
   numeroPv: string;
-  typeDommage: TypeDommageSinistre | "";
   modeReparation: ModeReparationSinistre | "";
   tauxResponsabilite: string;
   garageId: string;
@@ -29,7 +28,7 @@ export type OpeningFields = {
   dateMission: string;
 };
 
-export function SinistreOpeningFields({ automobile, responsabiliteCivile, value, onChange, documents, onDocumentsChange, disabled }: {
+export function SinistreOpeningFields({ automobile, responsabiliteCivile, value, onChange, documents, onDocumentsChange, disabled, onAddExpert }: {
   automobile: boolean;
   responsabiliteCivile: boolean;
   value: OpeningFields;
@@ -37,6 +36,7 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
   documents: OpeningDocument[];
   onDocumentsChange: (documents: OpeningDocument[]) => void;
   disabled: boolean;
+  onAddExpert?: () => void;
 }) {
   const cities = useQuery({ queryKey: ["referentiel", "villes", "sinistre"], queryFn: () => referenceApi.list("villes"), staleTime: 60_000 });
   const experts = useQuery({ queryKey: sinistreKeys.experts(false, value.expertVilleId || undefined), queryFn: () => sinistreApi.experts(false, value.expertVilleId || undefined) });
@@ -47,10 +47,6 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
       <Field label="Référence compagnie"><Input maxLength={100} value={value.referenceCompagnie} onChange={(event) => update("referenceCompagnie", event.target.value)} /></Field>
       <Field label="N° de procès-verbal"><Input maxLength={120} value={value.numeroPv} onChange={(event) => update("numeroPv", event.target.value)} /></Field>
       {automobile ? <>
-        <Field label="Dommages *"><Select disabled={disabled} value={value.typeDommage} onValueChange={(next) => update("typeDommage", next as TypeDommageSinistre)}>
-          <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>
-            <SelectItem value="MATERIEL">Matériel</SelectItem><SelectItem value="CORPOREL">Corporel</SelectItem><SelectItem value="MIXTE">Mixte</SelectItem>
-          </SelectContent></Select></Field>
         <Field label="Mode de réparation *"><Select disabled={disabled} value={value.modeReparation} onValueChange={(next) => onChange({ ...value, modeReparation: next as ModeReparationSinistre, garageId: "" })}>
           <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent><SelectItem value="NORMAL">Normal</SelectItem><SelectItem value="PEC">Prise en charge (PEC)</SelectItem><SelectItem value="RAPIDE">Rapide</SelectItem></SelectContent>
         </Select></Field>
@@ -63,9 +59,15 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
         <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent><SelectItem value="0">0 %</SelectItem><SelectItem value="50">50 %</SelectItem><SelectItem value="100">100 %</SelectItem></SelectContent>
       </Select></Field> : null}
       <Field label="Ville de l’expert"><SinistreVilleSelect disabled={disabled} cities={cities.data ?? []} value={value.expertVilleId} onValueChange={(expertVilleId) => onChange({ ...value, expertVilleId, expertId: "" })} /></Field>
-      <Field label="Expert initial"><Select disabled={disabled || experts.isPending || experts.isError} value={value.expertId || "NONE"} onValueChange={(next) => update("expertId", next === "NONE" ? "" : next)}>
-        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{(experts.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}</SelectContent>
-      </Select></Field>
+      <div className="grid content-start gap-1.5">
+        <div className="flex min-h-6 flex-wrap items-center justify-between gap-2">
+          <Label htmlFor="opening-expert">Expert initial</Label>
+          {onAddExpert ? <Button type="button" variant="ghost" size="sm" className="h-6 px-1 text-xs" disabled={disabled || cities.isPending || cities.isError} onClick={onAddExpert}><Plus className="size-3.5" />Ajouter un expert</Button> : null}
+        </div>
+        <Select disabled={disabled || experts.isPending || experts.isError} value={value.expertId || "NONE"} onValueChange={(next) => update("expertId", next === "NONE" ? "" : next)}>
+          <SelectTrigger id="opening-expert"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{(experts.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
       {value.expertId ? <Field label="Date de mission initiale *"><DatePicker disabled={disabled} date={value.dateMission} onSelect={(date) => update("dateMission", date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : "")} /></Field> : null}
     </fieldset>
     {experts.isError || garages.isError || cities.isError ? <p role="alert" className="text-sm text-destructive">{[experts.error, garages.error, cities.error].filter(Boolean).map((error) => error instanceof Error ? error.message : "Référentiel indisponible").join(" · ")}</p> : null}

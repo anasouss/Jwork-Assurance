@@ -27,6 +27,7 @@ export function SinistreIntervenantDialog({
   saving,
   onOpenChange,
   onSubmit,
+  initialVilleId = "",
 }: {
   open: boolean;
   kind: IntervenantKind;
@@ -35,6 +36,7 @@ export function SinistreIntervenantDialog({
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (request: object) => void;
+  initialVilleId?: string;
 }) {
   const [form, setForm] = useState({
     code: "",
@@ -55,11 +57,11 @@ export function SinistreIntervenantDialog({
       telephone: intervenant?.telephone ?? "",
       email: intervenant?.email ?? "",
       adresse: intervenant?.adresse ?? "",
-      villeId: intervenant?.villeId ?? "",
+      villeId: intervenant?.villeId ?? initialVilleId,
       actif: intervenant?.actif ?? true,
       conventionne: intervenant?.conventionne ?? false,
     });
-  }, [intervenant, open]);
+  }, [intervenant, open, initialVilleId]);
 
   function update(key: keyof typeof form, value: string | boolean) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -79,8 +81,8 @@ export function SinistreIntervenantDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+    <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
+      <DialogContent className="sm:max-w-2xl" showCloseButton={!saving}>
         <DialogHeader>
           <DialogTitle>
             {intervenant ? "Modifier" : "Ajouter"}{" "}
@@ -88,7 +90,7 @@ export function SinistreIntervenantDialog({
           </DialogTitle>
           <DialogDescription className="sr-only">Coordonnées de l’intervenant</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
           <Field label="Code *">
             <Input
               value={form.code}
@@ -149,9 +151,9 @@ export function SinistreIntervenantDialog({
             Garage conventionné
             <Switch checked={form.conventionne} onCheckedChange={(value) => update("conventionne", value)} />
           </label> : null}
-        </div>
+        </fieldset>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
           <Button

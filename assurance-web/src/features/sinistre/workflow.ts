@@ -10,4 +10,4 @@ export const suiviLabels: Record<EtapeSuiviSinistre, string> = {
   CLOTURE: "Clôture",
 };
 export const repairLabels: Record<ModeReparationSinistre, string> = { NORMAL: "Normal", PEC: "Prise en charge", RAPIDE: "Rapide" };
-export const damageLabels: Record<TypeDommageSinistre, string> = { MATERIEL: "Matériel", CORPOREL: "Corporel", MIXTE: "Mixte" };
+export const damageLabels: Record<TypeDommageSinistre, string> = { MATERIEL: "Matériel", CORPOREL: "Corporel", MIXTE: "Matériel et corporel" };

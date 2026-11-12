@@ -193,7 +193,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
         {canCreate && !isRegister ? (
           <Button onClick={() => setDeclarationOpen(true)}>
             <FilePlus2 className="size-4" />
-            Déclarer
+            Nouvelle ouverture
           </Button>
         ) : null}
         </div>

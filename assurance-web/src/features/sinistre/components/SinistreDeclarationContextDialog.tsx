@@ -34,7 +34,9 @@ import { referenceApi } from "@/features/production/api/references";
 import { cn } from "@/lib/utils";
 import { sinistreApi, sinistreKeys } from "../api";
 import { natureLabels } from "../format";
-import type { NatureSinistre, SinistreContractOption } from "../types";
+import { damageLabels } from "../workflow";
+import { openingContextParams } from "../opening-context";
+import type { NatureSinistre, SinistreContractOption, TypeDommageSinistre } from "../types";
 
 const NATURES = Object.entries(natureLabels) as Array<[NatureSinistre, string]>;
 
@@ -45,6 +47,7 @@ type Props = {
   initialDateSinistre?: string;
   initialNature?: NatureSinistre;
   initialVehicleId?: string;
+  initialTypeDommage?: TypeDommageSinistre | "";
 };
 
 export function SinistreDeclarationContextDialog({
@@ -54,6 +57,7 @@ export function SinistreDeclarationContextDialog({
   initialDateSinistre = "",
   initialNature = "ACCIDENT",
   initialVehicleId = "",
+  initialTypeDommage = "",
 }: Props) {
   const navigate = useNavigate();
   const wasOpen = useRef(false);
@@ -64,6 +68,7 @@ export function SinistreDeclarationContextDialog({
   const [nature, setNature] = useState<NatureSinistre>("ACCIDENT");
   const [vehiculeId, setVehiculeId] = useState("");
   const [brancheId, setBrancheId] = useState("");
+  const [typeDommage, setTypeDommage] = useState<TypeDommageSinistre | "">("");
   const branches = useQuery({
     queryKey: ["referentiel", "branches-assurance"],
     queryFn: () => referenceApi.list("branches-assurance"),
@@ -80,14 +85,18 @@ export function SinistreDeclarationContextDialog({
       setNature(initialNature);
       setVehiculeId(initialVehicleId);
       setBrancheId("");
+      setTypeDommage(initialTypeDommage);
     }
     wasOpen.current = open;
-  }, [initialContract, initialDateSinistre, initialNature, initialVehicleId, open]);
+  }, [initialContract, initialDateSinistre, initialNature, initialVehicleId, initialTypeDommage, open]);
+
+  const automobile = (branches.data?.find((item) => item.id === effectiveBrancheId)?.code
+    ?? contract?.brancheAssuranceCode) === "AUTOMOBILE";
 
   const contracts = useQuery({
     queryKey: sinistreKeys.contracts(effectiveBrancheId, deferredSearch),
     queryFn: () => sinistreApi.lookupContracts(effectiveBrancheId, deferredSearch),
-    enabled: open && Boolean(effectiveBrancheId) && deferredSearch.length >= 2 && !contract,
+    enabled: open && Boolean(effectiveBrancheId) && (!automobile || Boolean(typeDommage)) && deferredSearch.length >= 2 && !contract,
   });
   const contractItems = contracts.data ?? [];
   const coverage = useQuery({
@@ -99,8 +108,6 @@ export function SinistreDeclarationContextDialog({
     enabled: open && Boolean(contract && dateSinistre),
     retry: false,
   });
-  const automobile =
-    (coverage.data?.brancheCode ?? contract?.brancheAssuranceCode) === "AUTOMOBILE";
 
   useEffect(() => {
     if (!coverage.data) return;
@@ -125,12 +132,15 @@ export function SinistreDeclarationContextDialog({
 
   function continueDeclaration() {
     if (!contract || !dateSinistre || !coverage.data) return;
-    const params = new URLSearchParams({
+    if (automobile && !typeDommage) return;
+    const params = openingContextParams({
       contratId: contract.id,
       dateSinistre,
       nature,
+      vehiculeId,
+      automobile,
+      typeDommage,
     });
-    if (vehiculeId) params.set("vehiculeId", vehiculeId);
     onOpenChange(false);
     navigate(`/app/sinistre/declarer?${params.toString()}`);
   }
@@ -141,6 +151,7 @@ export function SinistreDeclarationContextDialog({
       dateSinistre &&
       coverage.data &&
       !coverage.isFetching &&
+      (!automobile || typeDommage) &&
       (!automobile || vehiculeId),
   );
 
@@ -148,19 +159,28 @@ export function SinistreDeclarationContextDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:!max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Commencer une déclaration</DialogTitle>
+          <DialogTitle>Nouvelle ouverture</DialogTitle>
           <DialogDescription className="sr-only">Police et événement du sinistre</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 py-1">
+          <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
             <Label>Branche *</Label>
             <Select value={effectiveBrancheId}
-              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); }}>
+              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); setTypeDommage(""); }}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
               <SelectContent>{(branches.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}</SelectContent>
             </Select>
             {branches.isError ? <p role="alert" className="text-sm text-destructive">Chargement des branches impossible.</p> : null}
+          </div>
+          {automobile ? <div className="grid gap-2">
+            <Label htmlFor="opening-damage">Dommages *</Label>
+            <Select value={typeDommage} onValueChange={(value) => setTypeDommage(value as TypeDommageSinistre)}>
+              <SelectTrigger id="opening-damage"><SelectValue placeholder="Sélectionner les dommages" /></SelectTrigger>
+              <SelectContent>{(Object.entries(damageLabels) as [TypeDommageSinistre, string][]).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div> : null}
           </div>
           <div className="grid gap-2">
             <Label htmlFor="claim-contract-search">Police, assuré ou immatriculation *</Label>
@@ -189,7 +209,7 @@ export function SinistreDeclarationContextDialog({
                   id="claim-contract-search"
                   className="pl-9"
                   autoFocus
-                  disabled={!effectiveBrancheId}
+                  disabled={!effectiveBrancheId || (automobile && !typeDommage)}
                   value={search}
                   placeholder="N° police, dossier, assuré, immatriculation ou attestation"
                   onChange={(event) => setSearch(event.target.value)}
@@ -335,7 +355,7 @@ export function SinistreDeclarationContextDialog({
             Annuler
           </Button>
           <Button type="button" disabled={!canContinue} onClick={continueDeclaration}>
-            Continuer la déclaration
+            Continuer l’ouverture
             <ArrowRight className="size-4" />
           </Button>
         </DialogFooter>

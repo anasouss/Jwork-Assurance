@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientIdentityErrors, foreignResidence, identityDocument, residenceComplete, type ClientProfile } from "./client-profile";
+import { clientIdentityErrors, foreignResidence, identityDocument, internationalClient, residenceComplete, type ClientProfile } from "./client-profile";
 
 describe("client identity and residence", () => {
   const client: ClientProfile = { typeClient: "PERSONNE_PHYSIQUE", cin: "AB123", cinValidite: "2031-01-01" };
@@ -35,5 +35,12 @@ describe("client identity and residence", () => {
     expect(foreignResidence(pending)).toBe(true);
     expect(residenceComplete(pending)).toBe(false);
     expect(residenceComplete({ ...pending, paysResidence: "FR" })).toBe(true);
+  });
+
+  it("allows expanded identity fields without forcing residence abroad", () => {
+    expect(internationalClient({ ...client, paysResidence: "MA" })).toBe(false);
+    expect(internationalClient({ ...client, typePieceIdentite: "PASSEPORT", paysResidence: "MA" })).toBe(true);
+    expect(internationalClient({ ...client, paysResidence: "FR" })).toBe(true);
+    expect(foreignResidence({ ...client, typePieceIdentite: "PASSEPORT", paysResidence: "MA" })).toBe(false);
   });
 });

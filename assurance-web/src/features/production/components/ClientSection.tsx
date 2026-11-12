@@ -17,7 +17,8 @@ import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
 import { ClientIdentityFields } from "./ClientIdentityFields";
 import { ClientResidenceFields } from "./ClientResidenceFields";
-import { foreignResidence, identityDocument } from "../client-profile";
+import { ClientInternationalToggle } from "./ClientInternationalToggle";
+import { internationalClient } from "../client-profile";
 import type { ClientInput, ClientResponse, GenreClient, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -379,8 +380,12 @@ export function ClientSection({
             .find(({ client }) => client.role === "CONDUCTEUR");
           return (
             <div key={index} className="rounded-lg border p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Identité souscripteur" : item.role === "PROPRIETAIRE" ? secondaryIdentityLabel : item.role}</div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <div className="text-sm font-medium">{item.role === "SOUSCRIPTEUR" ? "Identité souscripteur" : item.role === "PROPRIETAIRE" ? secondaryIdentityLabel : item.role}</div>
+                  <ClientInternationalToggle key={item.clientId ?? "new"} client={item.client}
+                    disabled={disabledByCopy} onChange={(patch) => updateClient(index, patch)} />
+                </div>
                 {clients.length > 1 && item.role !== "SOUSCRIPTEUR" && item.role !== "PROPRIETAIRE" ? (
                   <Button
                     type="button"
@@ -438,6 +443,15 @@ export function ClientSection({
                   </>
                 ) : (
                   <>
+                    <Field label="Genre" required error={errors[`clients.${index}.client.genre`]}>
+                      <Select value={item.client.genre ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { genre: value as GenreClient })}>
+                        <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="HOMME">Homme</SelectItem>
+                          <SelectItem value="FEMME">Femme</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                     <ClientIdentityFields key={item.clientId ?? "new"} client={item.client} disabled={disabledByCopy}
                       onChange={(patch) => updateClient(index, patch)} onIdentityChange={(patch) => updateIdentity(index, patch)}
                       onLookup={(params, immediate) => immediate ? void searchClient(index, params) : scheduleClientSearch(index, params)}
@@ -461,33 +475,24 @@ export function ClientSection({
                   </Field>
                 ) : null}
               </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               {!morale ? (
-                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                    <Field label="Genre" required error={errors[`clients.${index}.client.genre`]}>
-                      <Select value={item.client.genre ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { genre: value as GenreClient })}>
-                        <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="HOMME">Homme</SelectItem>
-                          <SelectItem value="FEMME">Femme</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
+                <>
                     <Field label="Nom" required error={errors[`clients.${index}.client.nom`]}>
                       <Input disabled={disabledByCopy} value={item.client.nom ?? ""} onChange={(event) => updateClient(index, { nom: event.target.value })} />
                     </Field>
                     <Field label="Prénom" required error={errors[`clients.${index}.client.prenom`]}>
                       <Input disabled={disabledByCopy} value={item.client.prenom ?? ""} onChange={(event) => updateClient(index, { prenom: event.target.value })} />
                     </Field>
-                    {identityDocument(item.client).value !== "CIN" || foreignResidence(item.client) ? <Field label="Nationalité">
+                    {internationalClient(item.client) ? <Field label="Nationalité">
                       <Input disabled={disabledByCopy} value={item.client.nationalite ?? ""} maxLength={120}
                         onChange={(event) => updateClient(index, { nationalite: event.target.value })} />
                     </Field> : null}
-                </div>
+                </>
               ) : null}
-              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <ClientResidenceFields key={item.clientId ?? "new"} client={item.client} disabled={disabledByCopy} villes={villes}
                   onChange={(patch) => updateClient(index, patch)} errors={errors} errorPrefix={`clients.${index}.client.`}
-                  addressClassName="lg:col-span-2" />
+                  addressClassName={internationalClient(item.client) ? "lg:col-span-2" : undefined} />
               </div>
               {requirePersonProfileDetails && !morale ? (
                 <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -572,6 +577,11 @@ export function ClientSection({
                   ) : null}
                   {requireDriverDetails && !proprietorIsDriver && conducteur ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="col-span-full flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <span className="text-sm font-medium">Identité conducteur</span>
+                        <ClientInternationalToggle key={conducteur.client.clientId ?? "new"} client={conducteur.client.client}
+                          onChange={(patch) => updateClient(conducteur.clientIndex, patch)} />
+                      </div>
                       <Field label="Genre" required error={errors[`clients.${conducteur.clientIndex}.client.genre`]}>
                         <Select value={conducteur.client.client.genre ?? ""} onValueChange={(value) => updateClient(conducteur.clientIndex, { genre: value as GenreClient })}>
                           <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>

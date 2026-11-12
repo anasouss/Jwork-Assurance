@@ -1,11 +1,10 @@
-import { useRef, type ReactNode } from "react";
-import { Checkbox } from "@/components/ui/checkbox";
+import type { ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
-import { IDENTITY_DOCUMENTS, identityDocument, type ClientProfile } from "../client-profile";
+import { IDENTITY_DOCUMENTS, identityDocument, internationalClient, type ClientProfile } from "../client-profile";
 
 export function ClientIdentityFields({ client, onChange, onIdentityChange = onChange, onLookup, disabled,
   errors = {}, errorPrefix = "", lookupMessage }: {
@@ -19,27 +18,13 @@ export function ClientIdentityFields({ client, onChange, onIdentityChange = onCh
   lookupMessage?: ReactNode;
 }) {
   const document = identityDocument(client);
-  const previousDocument = useRef(document.value);
-  const alternateIdentity = document.value !== "CIN";
   return <>
-    <label className="flex min-h-10 items-center gap-2 self-end text-sm font-medium">
-      <Checkbox checked={alternateIdentity} disabled={disabled} onCheckedChange={(checked) => {
-        if (!checked) {
-          previousDocument.current = document.value;
-          onChange({ typePieceIdentite: "CIN" });
-        } else {
-          onChange({ typePieceIdentite: previousDocument.current !== "CIN" ? previousDocument.current
-            : client.passport ? "PASSEPORT" : client.carteResidence ? "CARTE_RESIDENCE" : "PASSEPORT" });
-        }
-      }} />
-      Autre pièce d'identité
-    </label>
-    {alternateIdentity ? <Field label="Pièce d'identité" required error={errors[`${errorPrefix}typePieceIdentite`]}>
+    {internationalClient(client) ? <Field label="Pièce d'identité" required error={errors[`${errorPrefix}typePieceIdentite`]}>
       <Select value={document.value} disabled={disabled} onValueChange={(value) => {
         onChange({ typePieceIdentite: value as ClientProfile["typePieceIdentite"] });
       }}>
         <SelectTrigger><SelectValue /></SelectTrigger>
-        <SelectContent>{IDENTITY_DOCUMENTS.filter((item) => item.value !== "CIN").map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
+        <SelectContent>{IDENTITY_DOCUMENTS.filter((item) => item.value !== "CIN" || document.value === "CIN").map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}</SelectContent>
       </Select>
     </Field> : null}
     <Field label={`N° ${document.label}`} required error={errors[`${errorPrefix}${document.numberKey}`]}>

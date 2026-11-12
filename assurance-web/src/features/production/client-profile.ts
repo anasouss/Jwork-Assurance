@@ -18,6 +18,11 @@ export function foreignResidence(client: ClientProfile) {
   return client.paysResidence != null && client.paysResidence !== "MA";
 }
 
+export function internationalClient(client: ClientProfile) {
+  return foreignResidence(client)
+    || (client.typeClient === "PERSONNE_PHYSIQUE" && identityDocument(client).value !== "CIN");
+}
+
 export function residenceComplete(client: ClientProfile) {
   return Boolean((foreignResidence(client) ? client.paysResidence && client.villeEtrangere?.trim() : client.villeId) && client.adresse?.trim());
 }

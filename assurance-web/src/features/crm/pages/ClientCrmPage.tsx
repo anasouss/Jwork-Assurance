@@ -42,7 +42,8 @@ import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
 import { ClientIdentityFields } from "@/features/production/components/ClientIdentityFields";
 import { ClientResidenceFields } from "@/features/production/components/ClientResidenceFields";
-import { clientIdentityErrors, foreignResidence, identityDocument, primaryIdentityLabel, residenceComplete } from "@/features/production/client-profile";
+import { ClientInternationalToggle } from "@/features/production/components/ClientInternationalToggle";
+import { clientIdentityErrors, internationalClient, primaryIdentityLabel, residenceComplete } from "@/features/production/client-profile";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
 import { ClientProfileDetails } from "@/features/crm/components/ClientProfileDetails";
@@ -523,7 +524,11 @@ function ClientDialog({
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{client ? "Modifier le client" : "Nouveau client"}</DialogTitle>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pr-6">
+            <DialogTitle>{client ? "Modifier le client" : "Nouveau client"}</DialogTitle>
+            <ClientInternationalToggle key={client?.id ?? "new"} client={draft} onChange={update}
+              disabled={createMutation.isPending || !!createdClient} />
+          </div>
           <DialogDescription>{client ? `${client.codeClient || "Client"} · ${client.nomAffichage || client.raisonSociale || client.nom}` : "Créez la fiche CRM puis rattachez-la éventuellement à un groupe."}</DialogDescription>
         </DialogHeader>
         {createdClient && <p className="text-sm text-amber-700">Le client est créé. Les pièces restantes peuvent être envoyées à nouveau.</p>}
@@ -564,7 +569,7 @@ function ClientDialog({
               <Field label="Prénom" required>
                 <Input value={draft.prenom ?? ""} onChange={(event) => update({ prenom: event.target.value })} />
               </Field>
-              {identityDocument(draft).value !== "CIN" || foreignResidence(draft)
+              {internationalClient(draft)
                 ? <Field label="Nationalité"><Input value={draft.nationalite ?? ""} maxLength={120} onChange={event => update({ nationalite: event.target.value })} /></Field> : null}
               {client && <>
                 <Field label="Date de naissance"><DatePicker date={draft.dateNaissance} onSelect={date => update({ dateNaissance: toDateOnly(date) })} /></Field>

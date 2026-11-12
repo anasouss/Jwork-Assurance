@@ -11,6 +11,18 @@ export const PERIODES_COUVERTURE = [
 
 export type PeriodeCouverture = typeof PERIODES_COUVERTURE[number]["value"];
 
+export function coveragePeriodLabel(periode: PeriodeCouverture, typeContrat?: string | null) {
+  const option = PERIODES_COUVERTURE.find((item) => item.value === periode)!;
+  if (typeContrat !== "renouvelable" || option.jours > 0) return option.label;
+  switch (periode) {
+    case "M1": return "Mensuelle";
+    case "M3": return "Trimestrielle";
+    case "M6": return "Semestrielle";
+    case "M12": return "Annuelle";
+    default: return option.label;
+  }
+}
+
 export function periodesForUsage(usage?: { periodesAutorisees?: unknown } | null) {
   const values = usage?.periodesAutorisees;
   return PERIODES_COUVERTURE.filter((periode) => Array.isArray(values) && values.includes(periode.value));

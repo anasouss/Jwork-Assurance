@@ -728,8 +728,21 @@ export function UsagesSettingsPage() {
               </Select>
             </Field>
           </div>
+          <div className="max-w-sm">
+            <Field label="Types de contrat autorisés">
+              <Select
+                value={payload.fermeUniquement ? "ferme" : "both"}
+                onValueChange={(value) => setPayload((current) => ({ ...current, fermeUniquement: value === "ferme" }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="both">Ferme et renouvelable</SelectItem>
+                  <SelectItem value="ferme">Ferme uniquement</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-            <Flag label="Ferme uniquement" checked={payload.fermeUniquement} onChange={(value) => setPayload((current) => ({ ...current, fermeUniquement: value }))} />
             <Flag label="Consomme attestation" checked={payload.consommeAttestation} onChange={(value) => setPayload((current) => ({ ...current, consommeAttestation: value }))} />
             <Flag label="Carburant" checked={payload.byCarburant} onChange={(value) => setPayload((current) => ({ ...current, byCarburant: value }))} />
             <Flag label="Puissance fiscale" checked={payload.byPuissanceFiscale} onChange={(value) => setPayload((current) => ({ ...current, byPuissanceFiscale: value }))} />

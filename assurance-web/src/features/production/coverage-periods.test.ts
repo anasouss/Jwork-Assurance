@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { coverageExpiration, periodesForUsage } from "./coverage-periods";
+import { coverageExpiration, coveragePeriodLabel, periodesForUsage } from "./coverage-periods";
 
 describe("usage coverage periods", () => {
+  it.each([
+    ["M1", "1 mois", "Mensuelle"],
+    ["M3", "3 mois", "Trimestrielle"],
+    ["M6", "6 mois", "Semestrielle"],
+    ["M12", "12 mois", "Annuelle"],
+    ["J5", "5 jours", "5 jours"],
+    ["J10", "10 jours", "10 jours"],
+  ] as const)("labels %s according to the contract type", (period, duration, frequency) => {
+    expect(coveragePeriodLabel(period, "ferme")).toBe(duration);
+    expect(coveragePeriodLabel(period, "renouvelable")).toBe(frequency);
+    expect(coveragePeriodLabel(period)).toBe(duration);
+  });
+
   it("shows only the configured periods in chronological order", () => {
     expect(periodesForUsage({ periodesAutorisees: ["M6", "J5", "M3", "J10", "M1"] })
       .map((periode) => periode.value)).toEqual(["J5", "J10", "M1", "M3", "M6"]);

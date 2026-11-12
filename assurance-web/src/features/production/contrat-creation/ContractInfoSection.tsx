@@ -13,6 +13,7 @@ import { Field } from "../components/Field";
 import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { SectionCard } from "../components/SectionCard";
 import { toDateOnly } from "../date";
+import { coveragePeriodLabel } from "../coverage-periods";
 import { clientApi } from "../api/clients";
 import type { CreateContratRequest, ModeFacturationContrat, TypePayeurPrime } from "../types";
 import type { ContratCreationFormState, ContratSectionKey } from "./useContratCreationForm";
@@ -282,7 +283,9 @@ export function ContractInfoSection({
               <SelectTrigger><SelectValue placeholder="Période" /></SelectTrigger>
               <SelectContent>
                 {form.periodesAutorisees.map((periode) => (
-                  <SelectItem key={periode.value} value={periode.value}>{periode.label}</SelectItem>
+                  <SelectItem key={periode.value} value={periode.value}>
+                    {coveragePeriodLabel(periode.value, form.typeRenouvellement)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -436,10 +439,10 @@ export function ContractInfoSection({
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ANNUEL">Annuel</SelectItem>
-                    <SelectItem value="SEMESTRIEL">Semestriel</SelectItem>
-                    <SelectItem value="TRIMESTRIEL">Trimestriel</SelectItem>
-                    <SelectItem value="MENSUEL">Mensuel</SelectItem>
+                    <SelectItem value="ANNUEL">{coveragePeriodLabel("M12", form.typeRenouvellement)}</SelectItem>
+                    <SelectItem value="SEMESTRIEL">{coveragePeriodLabel("M6", form.typeRenouvellement)}</SelectItem>
+                    <SelectItem value="TRIMESTRIEL">{coveragePeriodLabel("M3", form.typeRenouvellement)}</SelectItem>
+                    <SelectItem value="MENSUEL">{coveragePeriodLabel("M1", form.typeRenouvellement)}</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>

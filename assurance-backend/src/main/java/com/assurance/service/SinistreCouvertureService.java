@@ -382,6 +382,7 @@ public class SinistreCouvertureService {
                 .code(snapshot.getGarantie().getCode())
                 .libelle(snapshot.getGarantie().getLibelle())
                 .typeGarantie(snapshot.getGarantie().getTypeGarantie())
+                .responsabiliteCivile(Boolean.TRUE.equals(snapshot.getGarantie().getResponsabiliteCivile()))
                 .capital(snapshot.getCapital())
                 .prime(snapshot.getPrime())
                 .taux(snapshot.getTaux())

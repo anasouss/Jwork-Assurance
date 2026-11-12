@@ -23,6 +23,9 @@ import com.assurance.repository.MouvementGarantieRepository;
 import com.assurance.repository.MouvementVehiculeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -133,6 +136,35 @@ class SinistreCouvertureServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(contracts).findByAgenceIdAndId(9L, 2L);
         verifyNoInteractions(movements, vehicles, guarantees);
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(booleans = {true, false})
+    void coveragePreviewIncludesConfiguredResponsibilityFlag(Boolean responsabiliteCivile) {
+        guarantee.setResponsabiliteCivile(responsabiliteCivile);
+        var globalSnapshot = guaranteeSnapshot(NatureSnapshotMouvement.AJOUT);
+        globalSnapshot.setVehicule(null);
+        when(guarantees.findByMouvementContratId(10L)).thenReturn(List.of(globalSnapshot));
+
+        var preview = service.preview(1L, 2L, lossDate);
+
+        boolean expected = Boolean.TRUE.equals(responsabiliteCivile);
+        assertThat(preview.getGaranties()).singleElement()
+                .satisfies(item -> assertThat(item.isResponsabiliteCivile()).isEqualTo(expected));
+        assertThat(preview.getVehicules()).singleElement()
+                .satisfies(item -> assertThat(item.getGaranties()).singleElement()
+                        .satisfies(coverage -> assertThat(coverage.isResponsabiliteCivile()).isEqualTo(expected)));
+    }
+
+    @Test
+    void vehicleGuaranteePreviewIncludesResponsibilityFlag() {
+        var preview = service.preview(1L, 2L, lossDate);
+
+        assertThat(preview.getGaranties()).isEmpty();
+        assertThat(preview.getVehicules()).singleElement()
+                .satisfies(item -> assertThat(item.getGaranties()).singleElement()
+                        .satisfies(coverage -> assertThat(coverage.isResponsabiliteCivile()).isTrue()));
     }
 
     private MouvementContrat movement(Long id, String number, LocalDate effectiveDate) {

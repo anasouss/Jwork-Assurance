@@ -65,22 +65,29 @@ public class ClientService {
     }
 
     private void validateStandaloneClient(CreateClientRequest request) {
+        ClientProfilePolicy.normalize(request);
         if (request.getTypeClient() == TypeClient.PERSONNE_PHYSIQUE) {
-            if (request.getGenre() == null || isBlank(request.getPrenom()) || isBlank(request.getNom())
-                    || isBlank(request.getCin()) || request.getCinValidite() == null) {
-                throw new BadRequestException("Le genre, le nom, le prénom, le CIN et sa validité sont obligatoires");
+            if (request.getGenre() == null || isBlank(request.getPrenom()) || isBlank(request.getNom())) {
+                throw new BadRequestException("Le genre, le nom et le prénom sont obligatoires");
             }
+            ClientProfilePolicy.validateIdentity(request);
         } else if (request.getTypeClient() == TypeClient.PERSONNE_MORALE
                 && (isBlank(request.getRaisonSociale()) || isBlank(request.getRc()))) {
             throw new BadRequestException("La raison sociale et le RC sont obligatoires");
         }
-        if (request.getVilleId() == null || isBlank(request.getAdresse()) || isBlank(request.getTelephone())) {
-            throw new BadRequestException("La ville, l'adresse et le téléphone sont obligatoires");
+        ClientProfilePolicy.validateResidence(request);
+        if (isBlank(resolveTelephonePrincipal(request))) {
+            throw new BadRequestException("Le téléphone est obligatoire");
         }
     }
 
     @Transactional(readOnly = true)
     public Optional<ClientResponse> searchByIdentity(Long agenceId, String cin, String passport, String rc) {
+        return searchByIdentity(agenceId, cin, passport, rc, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ClientResponse> searchByIdentity(Long agenceId, String cin, String passport, String rc, String carteResidence) {
         if (agenceId == null) {
             throw new BadRequestException("L'agence est obligatoire");
         }
@@ -96,6 +103,10 @@ public class ClientService {
             return clientRepository.findFirstByAgenceIdAndRcIgnoreCase(agenceId, rc.trim())
                     .map(this::toResponse);
         }
+        if (carteResidence != null && !carteResidence.isBlank()) {
+            return clientRepository.findFirstByAgenceIdAndCarteResidenceIgnoreCase(agenceId, carteResidence.trim())
+                    .map(this::toResponse);
+        }
         return Optional.empty();
     }
 
@@ -107,6 +118,7 @@ public class ClientService {
 
     private Client createEntityRecord(Long agenceId, CreateClientRequest request) {
         bindAgence(request, agenceId);
+        ClientProfilePolicy.normalize(request);
         if (request.getTypeClient() == null) {
             throw new BadRequestException("Le type client est obligatoire");
         }
@@ -134,6 +146,9 @@ public class ClientService {
                 .nom(request.getNom())
                 .raisonSociale(request.getRaisonSociale())
                 .cin(request.getCin())
+                .typePieceIdentite(request.getTypePieceIdentite())
+                .paysResidence(request.getPaysResidence())
+                .villeEtrangere(request.getVilleEtrangere())
                 .rc(request.getRc())
                 .ice(request.getIce())
                 .numeroPermis(request.getNumeroPermis())
@@ -148,6 +163,7 @@ public class ClientService {
                 .passport(request.getPassport())
                 .passportValidite(request.getPassportValidite())
                 .carteResidence(request.getCarteResidence())
+                .carteResidenceValidite(request.getCarteResidenceValidite())
                 .iff(request.getIff())
                 .patente(request.getPatente())
                 .cnss(request.getCnss())
@@ -196,6 +212,17 @@ public class ClientService {
     }
 
     private Client updateEntityRecord(Long agenceId, Client client, CreateClientRequest request) {
+        if (request.getPaysResidence() == null && client.getPaysResidence() != null) {
+            request.setPaysResidence(client.getPaysResidence());
+            if (request.getVilleEtrangere() == null && !"MA".equals(client.getPaysResidence())) {
+                request.setVilleEtrangere(client.getVilleEtrangere());
+            }
+        }
+        if (request.getCarteResidenceValidite() == null
+                && java.util.Objects.equals(request.getCarteResidence(), client.getCarteResidence())) {
+            request.setCarteResidenceValidite(client.getCarteResidenceValidite());
+        }
+        ClientProfilePolicy.normalize(request);
         Long clientId = client.getId();
         assertIdentityAvailable(agenceId, clientId, request);
         applyRequest(client, request);
@@ -215,6 +242,13 @@ public class ClientService {
     }
 
     private void assertIdentityAvailable(Long agenceId, Long currentClientId, CreateClientRequest request) {
+        if (!isBlank(request.getCarteResidence())) {
+            clientRepository.findFirstByAgenceIdAndCarteResidenceIgnoreCase(agenceId, request.getCarteResidence().trim())
+                    .filter(existing -> !existing.getId().equals(currentClientId))
+                    .ifPresent(existing -> {
+                        throw new BadRequestException("Un client avec cette carte de residence existe deja");
+                    });
+        }
         if (request.getCin() != null && !request.getCin().isBlank()) {
             clientRepository.findFirstByAgenceIdAndCinIgnoreCase(agenceId, request.getCin().trim())
                     .filter(existing -> !existing.getId().equals(currentClientId))
@@ -264,6 +298,9 @@ public class ClientService {
                 .nom(client.getNom())
                 .raisonSociale(client.getRaisonSociale())
                 .cin(client.getCin())
+                .typePieceIdentite(client.getTypePieceIdentite())
+                .paysResidence(client.getPaysResidence())
+                .villeEtrangere(client.getVilleEtrangere())
                 .rc(client.getRc())
                 .ice(client.getIce())
                 .numeroPermis(client.getNumeroPermis())
@@ -273,7 +310,7 @@ public class ClientService {
                 .dateNaissance(client.getDateNaissance())
                 .adresse(client.getAdresse())
                 .villeId(client.getVille() != null ? client.getVille().getId() : null)
-                .ville(client.getVille() != null ? client.getVille().getNom() : null)
+                .ville(client.getVilleResidence())
                 .villeSaharienne(client.getVille() != null ? client.getVille().getSaharienne() : null)
                 .categorieClientId(client.getCategorieClient() != null ? client.getCategorieClient().getId() : null)
                 .categorieClientCode(client.getCategorieClient() != null ? client.getCategorieClient().getCode() : null)
@@ -284,6 +321,7 @@ public class ClientService {
                 .passport(client.getPassport())
                 .passportValidite(client.getPassportValidite())
                 .carteResidence(client.getCarteResidence())
+                .carteResidenceValidite(client.getCarteResidenceValidite())
                 .iff(client.getIff())
                 .patente(client.getPatente())
                 .cnss(client.getCnss())
@@ -323,6 +361,9 @@ public class ClientService {
         client.setNom(request.getNom());
         client.setRaisonSociale(request.getRaisonSociale());
         client.setCin(request.getCin());
+        client.setTypePieceIdentite(request.getTypePieceIdentite());
+        client.setPaysResidence(request.getPaysResidence());
+        client.setVilleEtrangere(request.getVilleEtrangere());
         client.setRc(request.getRc());
         client.setIce(request.getIce());
         client.setNumeroPermis(request.getNumeroPermis());
@@ -337,6 +378,7 @@ public class ClientService {
         client.setPassport(request.getPassport());
         client.setPassportValidite(request.getPassportValidite());
         client.setCarteResidence(request.getCarteResidence());
+        client.setCarteResidenceValidite(request.getCarteResidenceValidite());
         client.setIff(request.getIff());
         client.setPatente(request.getPatente());
         client.setCnss(request.getCnss());

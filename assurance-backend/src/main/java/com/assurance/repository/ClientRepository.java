@@ -16,6 +16,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     Optional<Client> findByAgenceIdAndId(Long agenceId, Long id);
     Optional<Client> findFirstByAgenceIdAndCinIgnoreCase(Long agenceId, String cin);
     Optional<Client> findFirstByAgenceIdAndPassportIgnoreCase(Long agenceId, String passport);
+    Optional<Client> findFirstByAgenceIdAndCarteResidenceIgnoreCase(Long agenceId, String carteResidence);
     Optional<Client> findFirstByAgenceIdAndRcIgnoreCase(Long agenceId, String rc);
     List<Client> findByAgenceIdAndClientParentId(Long agenceId, Long clientParentId);
 

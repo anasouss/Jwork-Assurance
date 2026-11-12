@@ -13,6 +13,7 @@ export function clientProfileSections(client: ClientResponse) {
     ["Validité CIN", client.cinValidite && formatDocumentDate(client.cinValidite)],
     ["Passeport", client.passport], ["Validité passeport", client.passportValidite && formatDocumentDate(client.passportValidite)],
     ["Carte de résidence", client.carteResidence],
+    ["Validité carte de séjour", client.carteResidenceValidite && formatDocumentDate(client.carteResidenceValidite)],
   ];
   const sections = [{ key: "identity", title: client.typeClient === "PERSONNE_MORALE" ? "Identification de l’entreprise" : "Identité", fields: identity }];
   if (client.typeClient === "PERSONNE_PHYSIQUE" && (client.numeroPermis || client.dateDelivrancePermis || client.dateValiditePermis)) {
@@ -34,7 +35,9 @@ export function clientRecordDraft(client: ClientResponse): ClientInput["client"]
     typeClient: client.typeClient, clientParentId: client.clientParentId ?? undefined,
     genre: client.genre, prenom: client.prenom, nom: client.nom, raisonSociale: client.raisonSociale,
     cin: client.cin, cinValidite: client.cinValidite, passport: client.passport,
+    typePieceIdentite: client.typePieceIdentite, paysResidence: client.paysResidence, villeEtrangere: client.villeEtrangere,
     passportValidite: client.passportValidite, carteResidence: client.carteResidence, nationalite: client.nationalite,
+    carteResidenceValidite: client.carteResidenceValidite,
     rc: client.rc, ice: client.ice, iff: client.iff, patente: client.patente, cnss: client.cnss,
     numeroPermis: client.numeroPermis, dateDelivrancePermis: client.dateDelivrancePermis,
     dateValiditePermis: client.dateValiditePermis, dateNaissance: client.dateNaissance,

@@ -9,13 +9,14 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DatePicker } from "@/components/ui/date-picker";
-import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { SectionCard } from "./SectionCard";
 import { Field } from "./Field";
 import { toDateOnly } from "../date";
 import { clientApi } from "../api/clients";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
+import { ClientIdentityFields } from "./ClientIdentityFields";
+import { ClientResidenceFields } from "./ClientResidenceFields";
 import type { ClientInput, ClientResponse, GenreClient, GroupeClient, ReferenceOption, RelationGroupeClient } from "../types";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
 
@@ -207,6 +208,14 @@ export function ClientSection({
                 raisonSociale: found.raisonSociale ?? undefined,
                 cin: found.cin ?? undefined,
                 cinValidite: found.cinValidite ?? undefined,
+                typePieceIdentite: found.typePieceIdentite,
+                passport: found.passport,
+                passportValidite: found.passportValidite,
+                carteResidence: found.carteResidence,
+                carteResidenceValidite: found.carteResidenceValidite,
+                paysResidence: found.paysResidence,
+                villeEtrangere: found.villeEtrangere,
+                nationalite: found.nationalite,
                 rc: found.rc ?? undefined,
                 ice: found.ice ?? undefined,
                 iff: found.iff ?? undefined,
@@ -238,16 +247,16 @@ export function ClientSection({
     }
   };
 
-  const searchClient = async (index: number, params: { cin?: string; rc?: string }) => {
+  const searchClient = async (index: number, params: { cin?: string; rc?: string; passport?: string; carteResidence?: string }) => {
     const cin = params.cin?.trim();
     const rc = params.rc?.trim();
-    if (!cin && !rc) {
+    if (!cin && !rc && !params.passport?.trim() && !params.carteResidence?.trim()) {
       setLookupByIndex((current) => ({ ...current, [index]: { status: "idle" } }));
       return;
     }
     setLookupByIndex((current) => ({ ...current, [index]: { status: "loading", message: "Recherche du client..." } }));
     try {
-      const found = await clientApi.searchClient({ cin, rc });
+      const found = await clientApi.searchClient({ cin, rc, passport: params.passport?.trim(), carteResidence: params.carteResidence?.trim() });
       if (found) {
         fillExistingClient(index, found);
         setLookupByIndex((current) => ({
@@ -268,11 +277,11 @@ export function ClientSection({
     }
   };
 
-  const scheduleClientSearch = (index: number, params: { cin?: string; rc?: string }) => {
+  const scheduleClientSearch = (index: number, params: { cin?: string; rc?: string; passport?: string; carteResidence?: string }) => {
     clearTimeout(lookupTimers.current[index]);
     const cin = params.cin?.trim();
     const rc = params.rc?.trim();
-    if ((cin ?? rc ?? "").length < 3) {
+    if ((cin ?? rc ?? params.passport?.trim() ?? params.carteResidence?.trim() ?? "").length < 3) {
       setLookupByIndex((current) => ({ ...current, [index]: { status: "idle" } }));
       return;
     }
@@ -395,7 +404,7 @@ export function ClientSection({
                 <Field label="Type" required>
                   <Select
                     value={item.client.typeClient}
-                    disabled={disabledByCopy}
+                    disabled={disabledByCopy || Boolean(item.clientId)}
                     onValueChange={(value) => updateClient(index, { typeClient: value as ClientInput["client"]["typeClient"] })}
                   >
                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -428,30 +437,11 @@ export function ClientSection({
                   </>
                 ) : (
                   <>
-                    <Field label="Genre" required error={errors[`clients.${index}.client.genre`]}>
-                      <Select value={item.client.genre ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { genre: value as GenreClient })}>
-                        <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="HOMME">Homme</SelectItem>
-                          <SelectItem value="FEMME">Femme</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                    <Field label="CIN" required error={errors[`clients.${index}.client.cin`]}>
-                      <Input
-                        disabled={disabledByCopy}
-                        value={item.client.cin ?? ""}
-                        onBlur={() => searchClient(index, { cin: item.client.cin })}
-                        onChange={(event) => {
-                          updateIdentity(index, { cin: event.target.value });
-                          scheduleClientSearch(index, { cin: event.target.value });
-                        }}
-                      />
-                      <LookupMessage state={lookupByIndex[index]} />
-                    </Field>
-                    <Field label="Validité CIN" required error={errors[`clients.${index}.client.cinValidite`]}>
-                      <DatePicker date={item.client.cinValidite} disabled={disabledByCopy} onSelect={(date) => updateClient(index, { cinValidite: toDateOnly(date) })} />
-                    </Field>
+                    <ClientIdentityFields client={item.client} disabled={disabledByCopy}
+                      onChange={(patch) => updateClient(index, patch)} onIdentityChange={(patch) => updateIdentity(index, patch)}
+                      onLookup={(params, immediate) => immediate ? void searchClient(index, params) : scheduleClientSearch(index, params)}
+                      errors={errors} errorPrefix={`clients.${index}.client.`}
+                      lookupMessage={<LookupMessage state={lookupByIndex[index]} />} />
                   </>
                 )}
                 {isProprietaire && showProprietaireCategorie ? (
@@ -470,31 +460,33 @@ export function ClientSection({
                   </Field>
                 ) : null}
               </div>
-              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-                {!morale ? (
-                  <>
+              {!morale ? (
+                <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                    <Field label="Genre" required error={errors[`clients.${index}.client.genre`]}>
+                      <Select value={item.client.genre ?? ""} disabled={disabledByCopy} onValueChange={(value) => updateClient(index, { genre: value as GenreClient })}>
+                        <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="HOMME">Homme</SelectItem>
+                          <SelectItem value="FEMME">Femme</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                     <Field label="Nom" required error={errors[`clients.${index}.client.nom`]}>
                       <Input disabled={disabledByCopy} value={item.client.nom ?? ""} onChange={(event) => updateClient(index, { nom: event.target.value })} />
                     </Field>
                     <Field label="Prénom" required error={errors[`clients.${index}.client.prenom`]}>
                       <Input disabled={disabledByCopy} value={item.client.prenom ?? ""} onChange={(event) => updateClient(index, { prenom: event.target.value })} />
                     </Field>
-                  </>
-                ) : null}
-                <Field label="Ville" required error={errors[`clients.${index}.client.villeId`]}>
-                  <AutocompleteSelect
-                    value={item.client.villeId ?? ""}
-                    disabled={disabledByCopy}
-                    placeholder="Ville"
-                    emptyText="Aucune ville trouvée"
-                    invalidText="Ville invalide : choisissez une option existante."
-                    options={villes.map((ville) => ({ value: ville.id, label: ville.libelle, keywords: ville.code }))}
-                    onValueChange={(value) => updateClient(index, { villeId: value })}
-                  />
-                </Field>
-                <Field label="Adresse" required error={errors[`clients.${index}.client.adresse`]}>
-                  <Input disabled={disabledByCopy} value={item.client.adresse ?? ""} onChange={(event) => updateClient(index, { adresse: event.target.value })} />
-                </Field>
+                    <Field label="Nationalité">
+                      <Input disabled={disabledByCopy} value={item.client.nationalite ?? ""} maxLength={120}
+                        onChange={(event) => updateClient(index, { nationalite: event.target.value })} />
+                    </Field>
+                </div>
+              ) : null}
+              <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <ClientResidenceFields client={item.client} disabled={disabledByCopy} villes={villes}
+                  onChange={(patch) => updateClient(index, patch)} errors={errors} errorPrefix={`clients.${index}.client.`}
+                  addressClassName="lg:col-span-2" />
               </div>
               {requirePersonProfileDetails && !morale ? (
                 <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -594,17 +586,12 @@ export function ClientSection({
                       <Field label="Prénom" required error={errors[`clients.${conducteur.clientIndex}.client.prenom`]}>
                         <Input value={conducteur.client.client.prenom ?? ""} onChange={(event) => updateClient(conducteur.clientIndex, { prenom: event.target.value })} />
                       </Field>
-                      <Field label="CIN" required error={errors[`clients.${conducteur.clientIndex}.client.cin`]}>
-                        <Input
-                          value={conducteur.client.client.cin ?? ""}
-                          onBlur={() => searchClient(conducteur.clientIndex, { cin: conducteur.client.client.cin })}
-                          onChange={(event) => {
-                            updateIdentity(conducteur.clientIndex, { cin: event.target.value });
-                            scheduleClientSearch(conducteur.clientIndex, { cin: event.target.value });
-                          }}
-                        />
-                        <LookupMessage state={lookupByIndex[conducteur.clientIndex]} />
-                      </Field>
+                      <ClientIdentityFields client={conducteur.client.client}
+                        onChange={(patch) => updateClient(conducteur.clientIndex, patch)}
+                        onIdentityChange={(patch) => updateIdentity(conducteur.clientIndex, patch)}
+                        onLookup={(params, immediate) => immediate ? void searchClient(conducteur.clientIndex, params) : scheduleClientSearch(conducteur.clientIndex, params)}
+                        errors={errors} errorPrefix={`clients.${conducteur.clientIndex}.client.`}
+                        lookupMessage={<LookupMessage state={lookupByIndex[conducteur.clientIndex]} />} />
                       <Field label="Date de naissance">
                         <DatePicker date={conducteur.client.client.dateNaissance} onSelect={(date) => updateClient(conducteur.clientIndex, { dateNaissance: toDateOnly(date) })} />
                       </Field>

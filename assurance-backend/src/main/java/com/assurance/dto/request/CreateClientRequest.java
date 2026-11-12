@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.assurance.enums.GenreClient;
 import com.assurance.enums.RelationGroupeClient;
 import com.assurance.enums.TypeClient;
+import com.assurance.enums.TypePieceIdentite;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -30,6 +32,11 @@ public class CreateClientRequest {
     private String nom;
     private String raisonSociale;
     private String cin;
+    private TypePieceIdentite typePieceIdentite;
+    @Size(max = 2)
+    private String paysResidence;
+    @Size(max = 160)
+    private String villeEtrangere;
     private String rc;
     private String ice;
     private String numeroPermis;
@@ -44,6 +51,7 @@ public class CreateClientRequest {
     private String passport;
     private LocalDate passportValidite;
     private String carteResidence;
+    private LocalDate carteResidenceValidite;
     private String iff;
     private String patente;
     private String cnss;

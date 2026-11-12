@@ -1984,6 +1984,9 @@ public class ContratService {
             if (client == null) {
                 continue;
             }
+            if (finalMode) {
+                validateClientProfile(client, input.getRole());
+            }
             applyClientGroupAssignment(agenceId, input, client, contrat.getDateEffet());
             saveClientLink(contrat, input, client);
             resolvedByRole.put(input.getRole(), client);
@@ -2006,7 +2009,21 @@ public class ContratService {
                 if (client.getCategorieClient() != null) {
                     aliasRequest.setCategorieClientId(client.getCategorieClient().getId());
                 }
+                aliasRequest.setTypePieceIdentite(client.getTypePieceIdentite());
+                aliasRequest.setCin(client.getCin());
+                aliasRequest.setCinValidite(client.getCinValidite());
+                aliasRequest.setPassport(client.getPassport());
+                aliasRequest.setPassportValidite(client.getPassportValidite());
+                aliasRequest.setCarteResidence(client.getCarteResidence());
+                aliasRequest.setCarteResidenceValidite(client.getCarteResidenceValidite());
+                aliasRequest.setPaysResidence(client.getPaysResidence());
+                aliasRequest.setVilleId(client.getVille() == null ? null : client.getVille().getId());
+                aliasRequest.setVilleEtrangere(client.getVilleEtrangere());
+                aliasRequest.setAdresse(client.getAdresse());
                 client = clientService.updateEntity(agenceId, client.getId(), aliasRequest);
+            }
+            if (finalMode) {
+                validateClientProfile(client, input.getRole());
             }
             applyClientGroupAssignment(agenceId, input, client, contrat.getDateEffet());
             saveClientLink(contrat, input, client);
@@ -2022,6 +2039,14 @@ public class ContratService {
                 .principalPourRole(input.isPrincipalPourRole())
                 .build());
         contrat.getClients().add(link);
+    }
+
+    private void validateClientProfile(Client client, com.assurance.enums.RoleClientContrat role) {
+        CreateClientRequest profile = ClientProfilePolicy.profile(client);
+        ClientProfilePolicy.validateIdentity(profile);
+        if (role != com.assurance.enums.RoleClientContrat.CONDUCTEUR) {
+            ClientProfilePolicy.validateResidence(profile);
+        }
     }
 
     private void applyClientGroupAssignment(
@@ -2209,6 +2234,17 @@ public class ContratService {
         if (input.getClientId() != null) {
             Client client = clientRepository.findByAgenceIdAndId(agenceId, input.getClientId())
                     .orElseThrow(() -> new ResourceNotFoundException("Client", input.getClientId()));
+            if (input.getClient() != null && input.getClient().getTypeClient() != null) {
+                if (input.getClient().getTypeClient() != client.getTypeClient()) {
+                    throw new BadRequestException("Le type d'un client existant ne peut pas etre modifie");
+                }
+                CreateClientRequest profile = new CreateClientRequest();
+                org.springframework.beans.BeanUtils.copyProperties(input.getClient(), profile);
+                if (profile.getCategorieClientId() == null && client.getCategorieClient() != null) {
+                    profile.setCategorieClientId(client.getCategorieClient().getId());
+                }
+                return clientService.updateEntity(agenceId, client.getId(), profile);
+            }
             applySubmittedClientCategory(client, input);
             return client;
         }
@@ -2236,6 +2272,8 @@ public class ContratService {
         CreateClientRequest client = input.getClient();
         return hasText(client.getCodeClient())
                 || hasText(client.getCin())
+                || hasText(client.getPassport())
+                || hasText(client.getCarteResidence())
                 || hasText(client.getRc())
                 || hasText(client.getNom())
                 || hasText(client.getPrenom())

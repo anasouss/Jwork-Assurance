@@ -657,7 +657,7 @@ public class DevisPdfService {
             return "-";
         }
         String address = value(client.getAdresse(), "");
-        String city = client.getVille() == null ? "" : value(client.getVille().getNom(), "");
+        String city = value(client.getVilleResidence(), "");
         if (!address.isBlank() && !city.isBlank()) {
             return address + ", " + city;
         }

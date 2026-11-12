@@ -49,6 +49,37 @@ class ClientServiceTest {
     }
 
     @Test
+    void residenceCardLookupRemainsAgencyScoped() {
+        when(clients.findFirstByAgenceIdAndCarteResidenceIgnoreCase(7L, "CS123")).thenReturn(Optional.empty());
+        assertThat(service.searchByIdentity(7L, null, null, null, " CS123 ")).isEmpty();
+        verify(clients).findFirstByAgenceIdAndCarteResidenceIgnoreCase(7L, "CS123");
+        verifyNoMoreInteractions(clients);
+    }
+
+    @Test
+    void crmUpdatePersistsPassportAndActualForeignResidence() {
+        Client client = client();
+        when(clients.findByAgenceIdAndId(7L, 42L)).thenReturn(Optional.of(client));
+        when(clients.save(any(Client.class))).thenAnswer(call -> call.getArgument(0));
+        when(phones.save(any())).thenAnswer(call -> call.getArgument(0));
+        var request = request();
+        request.setTypePieceIdentite(com.assurance.enums.TypePieceIdentite.PASSEPORT);
+        request.setPassport("PA123");
+        request.setPassportValidite(LocalDate.now().plusYears(2));
+        request.setVilleId(null);
+        request.setPaysResidence("FR");
+        request.setVilleEtrangere("Lyon");
+
+        var response = service.update(7L, 42L, request);
+
+        assertThat(client.getPaysResidence()).isEqualTo("FR");
+        assertThat(client.getVille()).isNull();
+        assertThat(response.getVille()).isEqualTo("Lyon, France");
+        assertThat(response.getTypePieceIdentite()).isEqualTo(com.assurance.enums.TypePieceIdentite.PASSEPORT);
+        assertThat(response.getPassport()).isEqualTo("PA123");
+    }
+
+    @Test
     void crmUpdateCannotAccessAnotherAgencyClient() {
         when(clients.findByAgenceIdAndId(7L, 42L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.update(7L, 42L, request())).isInstanceOf(ResourceNotFoundException.class);

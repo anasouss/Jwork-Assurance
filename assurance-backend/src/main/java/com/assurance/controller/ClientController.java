@@ -134,10 +134,11 @@ public class ClientController {
     public ResponseEntity<ApiResponse<ClientResponse>> search(
             @RequestParam(required = false) String cin,
             @RequestParam(required = false) String passport,
-            @RequestParam(required = false) String rc
+            @RequestParam(required = false) String rc,
+            @RequestParam(required = false) String carteResidence
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                clientService.searchByIdentity(TenantContext.getCurrentAgence(), cin, passport, rc).orElse(null)
+                clientService.searchByIdentity(TenantContext.getCurrentAgence(), cin, passport, rc, carteResidence).orElse(null)
         ));
     }
 

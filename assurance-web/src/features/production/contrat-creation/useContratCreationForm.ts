@@ -13,6 +13,7 @@ import { contractServiceApi } from "../api/contract-services";
 import { referenceApi } from "../api/references";
 import { computeDateEcheanceFromCode, computeDateEcheanceFromMonths } from "../date";
 import { coverageExpiration, periodesForUsage } from "../coverage-periods";
+import { clientIdentityErrors, foreignResidence } from "../client-profile";
 import { renewalReturnPath } from "../renewals/navigation";
 import { contratSchema } from "../schemas";
 import { emptyClient } from "../components/ClientSection";
@@ -852,8 +853,8 @@ export function useContratCreationForm(
       ) {
         nextErrors[`clients.${index}.client.dateValiditePermis`] = "Validité permis obligatoire.";
       }
-      if (isBeforeToday(item.client.cinValidite, today)) {
-        nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
+      for (const [field, message] of Object.entries(clientIdentityErrors(item.client, today))) {
+        nextErrors[`clients.${index}.client.${field}`] = message;
       }
       if (requireDriverDetails && isBeforeToday(item.client.dateValiditePermis, today)) {
         nextErrors[`clients.${index}.client.dateValiditePermis`] = "La validité permis ne doit pas être expirée.";
@@ -935,20 +936,22 @@ export function useContratCreationForm(
         }
         const client = item.client;
         requireField(`clients.${index}.client.typeClient`, client.typeClient, "Type obligatoire.");
-        requireField(`clients.${index}.client.villeId`, client.villeId, "Ville obligatoire.");
+        if (foreignResidence(client)) {
+          requireField(`clients.${index}.client.villeEtrangere`, client.villeEtrangere, "Ville à l'étranger obligatoire.");
+        } else {
+          requireField(`clients.${index}.client.villeId`, client.villeId, "Ville obligatoire.");
+        }
         requireField(`clients.${index}.client.adresse`, client.adresse, "Adresse obligatoire.");
         if (client.typeClient === "PERSONNE_MORALE") {
           requireField(`clients.${index}.client.rc`, client.rc, "RC obligatoire.");
           requireField(`clients.${index}.client.raisonSociale`, client.raisonSociale, "Raison sociale obligatoire.");
         } else {
           requireField(`clients.${index}.client.genre`, client.genre, "Genre obligatoire.");
-          requireField(`clients.${index}.client.cin`, client.cin, "CIN obligatoire.");
-          requireField(`clients.${index}.client.cinValidite`, client.cinValidite, "Validité CIN obligatoire.");
+          for (const [field, message] of Object.entries(clientIdentityErrors(client, today))) {
+            nextErrors[`clients.${index}.client.${field}`] = message;
+          }
           requireField(`clients.${index}.client.nom`, client.nom, "Nom obligatoire.");
           requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom obligatoire.");
-          if (isBeforeToday(client.cinValidite, today)) {
-            nextErrors[`clients.${index}.client.cinValidite`] = "La validité CIN ne doit pas être expirée.";
-          }
         }
         if (typeContrat === "FLOTTE" && role === "PROPRIETAIRE") {
           requireField(`clients.${index}.client.categorieClientId`, client.categorieClientId, "Catégorie obligatoire.");
@@ -983,7 +986,9 @@ export function useContratCreationForm(
           .forEach(({ item, index }) => {
             const client = item.client;
             requireField(`clients.${index}.client.genre`, client.genre, "Genre du conducteur obligatoire.");
-            requireField(`clients.${index}.client.cin`, client.cin, "CIN conducteur obligatoire.");
+            for (const [field, message] of Object.entries(clientIdentityErrors(client, today))) {
+              nextErrors[`clients.${index}.client.${field}`] = message;
+            }
             requireField(`clients.${index}.client.nom`, client.nom, "Nom conducteur obligatoire.");
             requireField(`clients.${index}.client.prenom`, client.prenom, "Prénom conducteur obligatoire.");
             if (requireDriverPermitValidity) {
@@ -1684,7 +1689,7 @@ function isValidationErrorResolved(key: string, request: CreateContratRequest, t
     if (field === "telephones") {
       return hasTelephone(client.telephones);
     }
-    if (field === "cinValidite" || field === "dateValiditePermis") {
+    if (field === "cinValidite" || field === "passportValidite" || field === "carteResidenceValidite" || field === "dateValiditePermis") {
       const value = client[field];
       return Boolean(value && !isBeforeToday(value, today));
     }
@@ -2150,6 +2155,8 @@ function shouldPersistClientInput(input: ClientInput) {
   const client = input.client;
   return [
     client.cin,
+    client.passport,
+    client.carteResidence,
     client.rc,
     client.nom,
     client.prenom,

@@ -679,16 +679,18 @@ public class AssistanceAutomobileService {
             }
             return;
         }
-        if (request.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE
-                || (!hasText(request.getCin()) && !hasText(request.getPassport()))) {
-            throw new BadRequestException("Le CIN ou le passeport du " + role + " est obligatoire");
+        if (request.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE) {
+            throw new BadRequestException("Le type de client du " + role + " est obligatoire");
         }
+        ClientProfilePolicy.validateIdentity(request);
     }
 
     private void validatePersonProfile(Client client, String role) {
+        CreateClientRequest profile = ClientProfilePolicy.profile(client);
+        ClientProfilePolicy.validateResidence(profile);
         if (client.getTypeClient() == TypeClient.PERSONNE_MORALE) {
             if (!hasText(client.getRaisonSociale()) || !hasText(client.getRc())
-                    || !hasText(client.getAdresse()) || client.getVille() == null
+                    || !hasText(client.getAdresse())
                     || !hasText(client.getTelephone())) {
                 throw new BadRequestException("Le profil du " + role
                         + " doit contenir la raison sociale, le RC, l'adresse et le téléphone");
@@ -697,13 +699,13 @@ public class AssistanceAutomobileService {
         }
         if (client.getTypeClient() != TypeClient.PERSONNE_PHYSIQUE
                 || !hasText(client.getPrenom()) || !hasText(client.getNom())
-                || (!hasText(client.getCin()) && !hasText(client.getPassport()))
                 || client.getDateNaissance() == null
-                || !hasText(client.getAdresse()) || client.getVille() == null
+                || !hasText(client.getAdresse())
                 || !hasText(client.getTelephone())) {
             throw new BadRequestException("Le profil du " + role
                     + " doit contenir le nom, le document d'identité, la naissance, l'adresse et le téléphone");
         }
+        ClientProfilePolicy.validateIdentity(profile);
     }
 
     private void linkClient(Contrat contrat, Client client, RoleClientContrat role) {

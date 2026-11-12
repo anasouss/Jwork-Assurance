@@ -2,6 +2,7 @@ package com.assurance.entity;
 
 import com.assurance.enums.GenreClient;
 import com.assurance.enums.TypeClient;
+import com.assurance.enums.TypePieceIdentite;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -32,7 +33,8 @@ import java.util.List;
         @Index(name = "idx_client_type", columnList = "type_client"),
         @Index(name = "idx_client_cin", columnList = "cin"),
         @Index(name = "idx_client_rc", columnList = "rc"),
-        @Index(name = "idx_client_ice", columnList = "ice")
+        @Index(name = "idx_client_ice", columnList = "ice"),
+        @Index(name = "idx_client_agence_carte_residence", columnList = "agence_id,carte_residence")
 })
 @Getter
 @Setter
@@ -75,6 +77,16 @@ public class Client extends BaseEntity {
 
     @Column(length = 120)
     private String cin;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_piece_identite", length = 30)
+    private TypePieceIdentite typePieceIdentite;
+
+    @Column(name = "pays_residence", length = 2)
+    private String paysResidence;
+
+    @Column(name = "ville_etrangere", length = 160)
+    private String villeEtrangere;
 
     @Column(length = 120)
     private String rc;
@@ -128,6 +140,9 @@ public class Client extends BaseEntity {
     @Column(name = "carte_residence", length = 120)
     private String carteResidence;
 
+    @Column(name = "carte_residence_validite")
+    private LocalDate carteResidenceValidite;
+
     @Column(length = 120)
     private String iff;
 
@@ -150,5 +165,13 @@ public class Client extends BaseEntity {
             return raisonSociale;
         }
         return ((prenom == null ? "" : prenom) + " " + (nom == null ? "" : nom)).trim();
+    }
+
+    public String getVilleResidence() {
+        if (paysResidence != null && !"MA".equals(paysResidence)) {
+            String country = new java.util.Locale("", paysResidence).getDisplayCountry(java.util.Locale.FRENCH);
+            return villeEtrangere == null || villeEtrangere.isBlank() ? country : villeEtrangere + ", " + country;
+        }
+        return ville == null ? null : ville.getNom();
     }
 }

@@ -37,10 +37,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { useAuthStore } from "@/store/auth-store";
 import { clientApi } from "@/features/production/api/clients";
 import { TelephoneList } from "@/features/production/components/ClientSection";
+import { ClientIdentityFields } from "@/features/production/components/ClientIdentityFields";
+import { ClientResidenceFields } from "@/features/production/components/ClientResidenceFields";
+import { clientIdentityErrors, primaryIdentityLabel, residenceComplete } from "@/features/production/client-profile";
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
 import { ClientProfileDetails } from "@/features/crm/components/ClientProfileDetails";
@@ -359,7 +361,7 @@ function ClientPicker({
             <div className="min-w-0">
               <div className="truncate font-medium">{client.nomAffichage || client.raisonSociale || client.nom}</div>
               <div className="truncate text-xs text-muted-foreground">
-                {[client.codeClient || "Sans code", client.rc || client.cin || client.ice || "Identifiant non renseigné"].join(" · ")}
+                {[client.codeClient || "Sans code", primaryIdentityLabel(client) || client.ice || "Identifiant non renseigné"].join(" · ")}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -449,6 +451,14 @@ function ClientDialog({
         raisonSociale: clean(draft.raisonSociale),
         cin: clean(draft.cin),
         cinValidite: draft.cinValidite,
+        typePieceIdentite: draft.typePieceIdentite,
+        passport: clean(draft.passport),
+        passportValidite: draft.passportValidite,
+        carteResidence: clean(draft.carteResidence),
+        carteResidenceValidite: draft.carteResidenceValidite,
+        paysResidence: draft.paysResidence,
+        villeEtrangere: clean(draft.villeEtrangere),
+        nationalite: clean(draft.nationalite),
         rc: clean(draft.rc),
         ice: clean(draft.ice),
         iff: draft.typeClient === "PERSONNE_MORALE" ? clean(draft.iff) : undefined,
@@ -483,11 +493,11 @@ function ClientDialog({
   });
   const physical = draft.typeClient === "PERSONNE_PHYSIQUE";
   const valid = Boolean(
-    draft.villeId
-      && draft.adresse?.trim()
+    residenceComplete(draft)
       && telephones.length > 0 && telephones.every((telephone) => telephone.numero.trim())
       && (physical
-        ? draft.genre && draft.nom?.trim() && draft.prenom?.trim() && draft.cin?.trim() && draft.cinValidite
+        ? draft.genre && draft.nom?.trim() && draft.prenom?.trim()
+          && Object.keys(clientIdentityErrors(draft, toDateOnly(new Date())!)).length === 0
         : draft.raisonSociale?.trim() && draft.rc?.trim())
   );
   const acquisitionValid = isAcquisitionValid(draft.acquisition, acquisitionOptionsQuery.data);
@@ -547,24 +557,16 @@ function ClientDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="CIN" required>
-                <Input value={draft.cin ?? ""} onChange={(event) => update({ cin: event.target.value })} />
-              </Field>
-              <Field label="Validité CIN" required>
-                <DatePicker date={draft.cinValidite} onSelect={(date) => update({ cinValidite: toDateOnly(date) })} />
-              </Field>
+              <ClientIdentityFields client={draft} onChange={update} />
               <Field label="Nom" required>
                 <Input value={draft.nom ?? ""} onChange={(event) => update({ nom: event.target.value })} />
               </Field>
               <Field label="Prénom" required>
                 <Input value={draft.prenom ?? ""} onChange={(event) => update({ prenom: event.target.value })} />
               </Field>
+              <Field label="Nationalité"><Input value={draft.nationalite ?? ""} maxLength={120} onChange={event => update({ nationalite: event.target.value })} /></Field>
               {client && <>
                 <Field label="Date de naissance"><DatePicker date={draft.dateNaissance} onSelect={date => update({ dateNaissance: toDateOnly(date) })} /></Field>
-                <Field label="Nationalité"><Input value={draft.nationalite ?? ""} onChange={event => update({ nationalite: event.target.value })} /></Field>
-                <Field label="Passeport"><Input value={draft.passport ?? ""} onChange={event => update({ passport: event.target.value })} /></Field>
-                <Field label="Validité passeport"><DatePicker date={draft.passportValidite} onSelect={date => update({ passportValidite: toDateOnly(date) })} /></Field>
-                <Field label="Carte de résidence"><Input value={draft.carteResidence ?? ""} onChange={event => update({ carteResidence: event.target.value })} /></Field>
                 <h3 className="border-t pt-4 text-sm font-semibold text-blue-800 sm:col-span-2 lg:col-span-3 dark:text-blue-200">Permis de conduire</h3>
                 <Field label="Numéro de permis"><Input value={draft.numeroPermis ?? ""} onChange={event => update({ numeroPermis: event.target.value })} /></Field>
                 <Field label="Date de délivrance"><DatePicker date={draft.dateDelivrancePermis} onSelect={date => update({ dateDelivrancePermis: toDateOnly(date) })} /></Field>
@@ -592,19 +594,7 @@ function ClientDialog({
             </>
           )}
           {client && <h3 className="border-t pt-4 text-sm font-semibold text-blue-800 sm:col-span-2 lg:col-span-3 dark:text-blue-200">Coordonnées</h3>}
-          <Field label="Ville" required>
-            <AutocompleteSelect
-              value={draft.villeId ?? ""}
-              onValueChange={(value) => update({ villeId: value })}
-              options={(villesQuery.data ?? []).map((ville) => ({ value: ville.id, label: ville.libelle }))}
-              placeholder="Ville"
-              emptyText="Aucune ville trouvée"
-              invalidText="Choisissez une ville existante."
-            />
-          </Field>
-          <Field label="Adresse" required>
-            <Input value={draft.adresse ?? ""} onChange={(event) => update({ adresse: event.target.value })} />
-          </Field>
+          <ClientResidenceFields client={draft} onChange={update} villes={villesQuery.data ?? []} />
           <div className="sm:col-span-2 lg:col-span-3">
             <TelephoneList client={{ role: "SOUSCRIPTEUR", principalPourRole: true, client: draft }} updateClient={update} />
           </div>
@@ -718,7 +708,8 @@ function ClientDetail({
           <h1 className="break-words text-2xl font-semibold leading-tight">{client.nomAffichage || client.raisonSociale || client.nom}</h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <p className="break-words text-sm text-muted-foreground">
-              {[client.codeClient, client.rc ? `RC ${client.rc}` : client.cin ? `CIN ${client.cin}` : undefined, client.ice ? `ICE ${client.ice}` : undefined].filter(Boolean).join(" · ")}
+              {[client.codeClient, primaryIdentityLabel(client),
+                client.ice ? `ICE ${client.ice}` : undefined].filter(Boolean).join(" · ")}
             </p>
             <Badge variant="outline">{client.typeClient === "PERSONNE_MORALE" ? "Personne morale" : "Personne physique"}</Badge>
             <Badge variant={client.actif === false ? "gray" : "success"}>{client.actif === false ? "Inactif" : "Actif"}</Badge>

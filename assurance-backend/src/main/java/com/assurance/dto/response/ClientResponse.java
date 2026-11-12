@@ -2,6 +2,7 @@ package com.assurance.dto.response;
 
 import com.assurance.enums.GenreClient;
 import com.assurance.enums.TypeClient;
+import com.assurance.enums.TypePieceIdentite;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,6 +24,9 @@ public class ClientResponse {
     private String nom;
     private String raisonSociale;
     private String cin;
+    private TypePieceIdentite typePieceIdentite;
+    private String paysResidence;
+    private String villeEtrangere;
     private String rc;
     private String ice;
     private String numeroPermis;
@@ -43,6 +47,7 @@ public class ClientResponse {
     private String passport;
     private LocalDate passportValidite;
     private String carteResidence;
+    private LocalDate carteResidenceValidite;
     private String iff;
     private String patente;
     private String cnss;

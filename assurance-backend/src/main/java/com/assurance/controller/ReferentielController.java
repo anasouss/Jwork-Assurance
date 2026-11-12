@@ -145,6 +145,16 @@ public class ReferentielController {
                 .toList()));
     }
 
+    @GetMapping("/pays")
+    public ResponseEntity<ApiResponse<List<Map<String, String>>>> pays() {
+        List<Map<String, String>> countries = java.util.Arrays.stream(java.util.Locale.getISOCountries())
+                .map(code -> Map.of("id", code, "code", code, "libelle",
+                        new java.util.Locale("", code).getDisplayCountry(java.util.Locale.FRENCH)))
+                .sorted(Comparator.comparing(item -> item.get("libelle")))
+                .toList();
+        return ResponseEntity.ok(ApiResponse.success(countries));
+    }
+
     @GetMapping("/usages")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> usages() {

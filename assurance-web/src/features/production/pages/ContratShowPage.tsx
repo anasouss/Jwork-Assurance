@@ -972,6 +972,7 @@ function clientIdentity(client?: ClientResponse | null) {
   return [
     client.cin ? `CIN ${client.cin}` : null,
     client.passport ? `Passeport ${client.passport}` : null,
+    client.carteResidence ? `Carte de séjour ${client.carteResidence}` : null,
     client.numeroPermis ? `Permis ${client.numeroPermis}` : null,
   ].filter(Boolean).join(" · ") || "-";
 }

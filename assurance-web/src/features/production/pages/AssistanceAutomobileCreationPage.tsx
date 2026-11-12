@@ -22,6 +22,7 @@ import { SectionCard } from "../components/SectionCard";
 import { VehicleRegistrationLookupInput } from "../components/VehicleRegistrationLookupInput";
 import { toDateOnly } from "../date";
 import type { ContratSectionKey } from "../contrat-creation/useContratCreationForm";
+import { clientIdentityErrors, residenceComplete } from "../client-profile";
 import type {
   ClientInput,
   ContratSummary,
@@ -796,11 +797,12 @@ function validClient(input: ClientInput, requireCategory = true) {
     input.client.telephone?.trim()
     || input.client.telephones?.some((telephone) => telephone.numero.trim()),
   );
-  const common = Boolean(input.client.adresse && input.client.villeId && hasTelephone);
+  const common = residenceComplete(input.client) && hasTelephone;
   return input.client.typeClient === "PERSONNE_MORALE"
     ? common && Boolean(input.client.raisonSociale && input.client.rc
       && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId))
-    : common && Boolean(input.client.prenom && input.client.nom && (input.client.cin || input.client.passport) && input.client.dateNaissance
+    : common && Boolean(input.client.prenom && input.client.nom
+      && Object.keys(clientIdentityErrors(input.client, today)).length === 0 && input.client.dateNaissance
       && (!requireCategory || input.role !== "PROPRIETAIRE" || input.client.categorieClientId));
 }
 

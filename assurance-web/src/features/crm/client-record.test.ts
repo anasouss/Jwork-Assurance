@@ -57,4 +57,12 @@ describe("client record editing", () => {
     expect(clientRecordDraft(client).telephones).toEqual([{ numero: "0600000000", principal: true, whatsapp: false }]);
     expect(clientRecordDraft({ ...client, telephone: undefined }).telephones).toEqual([]);
   });
+
+  it("preserves foreign residence and the selected identity when reopening the editor", () => {
+    const draft = clientRecordDraft({ id: "5", typeClient: "PERSONNE_PHYSIQUE",
+      typePieceIdentite: "CARTE_RESIDENCE", carteResidence: "CS123", carteResidenceValidite: "2031-01-01",
+      paysResidence: "FR", villeEtrangere: "Lyon", adresse: "Rue 1" });
+    expect(draft).toMatchObject({ typePieceIdentite: "CARTE_RESIDENCE", carteResidenceValidite: "2031-01-01",
+      paysResidence: "FR", villeEtrangere: "Lyon", adresse: "Rue 1" });
+  });
 });

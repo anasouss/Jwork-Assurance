@@ -15,6 +15,7 @@ import type {
   SinistreContractOption,
   PagedResponse,
   SinistreDashboard,
+  SinistreStatistics,
   SinistreDetail,
   SinistreDuplicate,
   SinistreGestionnaire,
@@ -29,6 +30,7 @@ const unwrap = <T>(response: ApiResponse<T>) => response.data;
 export const sinistreKeys = {
   all: ["sinistres"] as const,
   dashboard: () => [...sinistreKeys.all, "dashboard"] as const,
+  statistics: (year: number) => [...sinistreKeys.dashboard(), "statistiques", year] as const,
   lists: () => [...sinistreKeys.all, "list"] as const,
   list: (params: object) => [...sinistreKeys.lists(), params] as const,
   detail: (id: string) => [...sinistreKeys.all, "detail", id] as const,
@@ -72,6 +74,12 @@ export const sinistreApi = {
         "/api/v1/sinistres/dashboard",
       ),
     );
+  },
+
+  async statistics(annee: number) {
+    return unwrap(await apiFetch<ApiResponse<SinistreStatistics>>(
+      `/api/v1/sinistres/statistiques${buildQueryString({ annee })}`,
+    ));
   },
 
   exportRegister(params: SinistreListParams) {

@@ -11,6 +11,14 @@ vi.mock("@/lib/api/base", async (importOriginal) => ({
 }));
 
 describe("claims API contracts", () => {
+  it("requests the selected declaration year and refreshes statistics with dashboard invalidations", async () => {
+    vi.mocked(apiFetch).mockResolvedValueOnce({ success: true, data: { annee: 2025 } });
+    expect(await sinistreApi.statistics(2025)).toEqual({ annee: 2025 });
+    expect(apiFetch).toHaveBeenCalledWith("/api/v1/sinistres/statistiques?annee=2025");
+    expect(sinistreKeys.statistics(2025).slice(0, sinistreKeys.dashboard().length)).toEqual(sinistreKeys.dashboard());
+    expect(sinistreKeys.statistics(2025)).not.toEqual(sinistreKeys.statistics(2026));
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiFetch).mockResolvedValue({ success: true, data: { id: "12" } });

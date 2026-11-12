@@ -1,202 +1,135 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Banknote,
-  ClipboardCheck,
-  FilePlus2,
-  FolderOpen,
-  RotateCcw,
-  Scale,
-  TriangleAlert,
-} from "lucide-react";
-import { Link } from "react-router-dom";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useAuthStore } from "@/store/auth-store";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { sinistreApi, sinistreKeys } from "../api";
-import { formatDate, formatMoney, natureLabels } from "../format";
-import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
-import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
+import { formatDate } from "../format";
+import { moneyAmount } from "@/features/production/utils/format";
+import type { SinistreStatistics } from "../types";
+
+const MONTHS = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."];
+const STAGE_COLORS: Record<string, string> = {
+  OUVERTURE: "#0284c7", EXPERTISE_AVANT: "#0891b2", INSTANCE_CLIENT: "#d97706",
+  EXPERTISE_APRES: "#6366f1", COMPAGNIE: "#059669", CLOTURE: "#64748b",
+};
+const count = (value: number) => value.toLocaleString("fr-MA").replace(/[\u00a0\u202f]/g, " ");
 
 export default function SinistreStatisticsPage() {
-  const [declarationOpen, setDeclarationOpen] = useState(false);
-  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canCreate = permissions.includes("sinistre:create");
-  const dashboard = useQuery({
-    queryKey: sinistreKeys.dashboard(),
-    queryFn: sinistreApi.dashboard,
-  });
+  const [params, setParams] = useSearchParams();
+  const currentYear = new Date().getFullYear();
+  const requestedYear = Number(params.get("annee"));
+  const year = Number.isInteger(requestedYear) && requestedYear >= 1900 && requestedYear <= currentYear ? requestedYear : currentYear;
+  const statistics = useQuery({ queryKey: sinistreKeys.statistics(year), queryFn: () => sinistreApi.statistics(year) });
+  const data = statistics.data;
+  const years = data?.anneesDisponibles ?? [...new Set([currentYear, year])];
 
-  const metrics = dashboard.data
-    ? [
-        {
-          label: "Dossiers ouverts",
-          value: dashboard.data.ouverts,
-          icon: FolderOpen,
-        },
-        {
-          label: "Actions en retard",
-          value: dashboard.data.actionsEnRetard,
-          icon: TriangleAlert,
-        },
-        {
-          label: "En expertise",
-          value: dashboard.data.enExpertise,
-          icon: ClipboardCheck,
-        },
-        {
-          label: "En attente de règlement",
-          value: dashboard.data.enAttenteReglement,
-          icon: Banknote,
-        },
-        {
-          label: "Provisions ouvertes",
-          value: formatMoney(dashboard.data.provisionsOuvertes),
-          icon: Scale,
-        },
-        {
-          label: "Recours de l’année",
-          value: formatMoney(dashboard.data.recoursAnnee),
-          icon: RotateCcw,
-        },
-      ]
-    : [];
-
-  return (
-    <div className="grid gap-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">
-            Sinistres
-          </p>
-          <h1 className="text-xl font-semibold">Statistiques des sinistres</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link to="/app/sinistre">Module sinistres</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/app/sinistre/dossiers">Voir les dossiers</Link>
-          </Button>
-          {canCreate ? (
-            <Button onClick={() => setDeclarationOpen(true)}>
-              <FilePlus2 className="size-4" />
-              Déclarer
-            </Button>
-          ) : null}
-        </div>
+  return <div className="grid min-w-0 gap-5">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div><h1 className="text-xl font-semibold">Statistiques des sinistres</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Déclarations {year}{data ? ` · situation au ${formatDate(data.dateSituation)}` : ""}</p>
       </div>
-
-      {dashboard.isError ? <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-destructive">
-        <span>{dashboard.error instanceof Error ? dashboard.error.message : "Chargement des statistiques impossible"}</span>
-        <Button variant="outline" onClick={() => dashboard.refetch()}>Réessayer</Button>
-      </div> : null}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {dashboard.isLoading
-          ? Array.from({ length: 6 }, (_, index) => (
-              <Skeleton key={index} className="h-24" />
-            ))
-          : metrics.map(({ label, value, icon: Icon }) => (
-              <Card key={label} className="shadow-none">
-                <CardContent className="flex items-center justify-between p-5">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{label}</p>
-                    <p className="mt-1 text-2xl font-semibold">{value}</p>
-                  </div>
-                  <div className="grid size-10 place-items-center rounded-md bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
-                    <Icon className="size-5" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="grid gap-1.5 text-xs font-medium">Année de déclaration
+          <Select value={String(year)} onValueChange={(value) => setParams({ annee: value })}>
+            <SelectTrigger className="w-32" aria-label="Année de déclaration"><SelectValue /></SelectTrigger>
+            <SelectContent>{years.map((value) => <SelectItem key={value} value={String(value)}>{value}</SelectItem>)}</SelectContent>
+          </Select>
+        </label>
+        <Button variant="outline" size="icon" title="Actualiser les statistiques" aria-label="Actualiser les statistiques" disabled={statistics.isFetching} onClick={() => statistics.refetch()}><RefreshCw className={`size-4 ${statistics.isFetching ? "animate-spin" : ""}`} /></Button>
+        <Button asChild variant="outline"><Link to="/app/sinistre"><ArrowLeft className="size-4" />Module sinistres</Link></Button>
       </div>
+    </header>
 
-      <Card className="shadow-none">
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Dossiers récents</CardTitle>
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/app/sinistre/dossiers">
-              Tout afficher
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-sky-700 [&_th]:text-white">
-                <TableRow>
-                  <TableHead>N° sinistre</TableHead>
-                  <TableHead>Assuré</TableHead>
-                  <TableHead>Nature</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Compagnie</TableHead>
-                  <TableHead>Prochaine action</TableHead>
-                  <TableHead>Statut</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(dashboard.data?.recents ?? []).map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <Link
-                        className="font-medium text-sky-700 hover:underline dark:text-sky-400"
-                        to={`/app/sinistre/dossiers/${item.id}`}
-                      >
-                        {item.numeroSinistre}
-                      </Link>
-                      <div className="text-xs text-muted-foreground">
-                        {item.numeroPolice || "Sans police"}
-                      </div>
-                    </TableCell>
-                    <TableCell>{item.assure || "-"}</TableCell>
-                    <TableCell>{natureLabels[item.nature]}</TableCell>
-                    <TableCell>{formatDate(item.dateSinistre)}</TableCell>
-                    <TableCell>{item.compagnie || "-"}</TableCell>
-                    <TableCell>
-                      <div>{item.prochaineAction || "-"}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {item.dateEcheanceAction
-                          ? `Échéance ${formatDate(item.dateEcheanceAction)}`
-                          : "-"}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <SinistreStatusBadge statut={item.statut} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!dashboard.isLoading && !dashboard.isError &&
-                (dashboard.data?.recents.length ?? 0) === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="py-10 text-center text-muted-foreground"
-                    >
-                      Aucun sinistre enregistré.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-      <SinistreDeclarationContextDialog
-        open={declarationOpen}
-        onOpenChange={setDeclarationOpen}
-      />
-    </div>
-  );
+    {statistics.isError ? <div role="alert" className="border-y border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+      {statistics.error instanceof Error ? statistics.error.message : "Chargement des statistiques impossible."}
+    </div> : statistics.isPending ? <div aria-label="Chargement des statistiques" className="grid gap-4">
+      <Skeleton className="h-24 w-full" /><div className="grid gap-4 lg:grid-cols-2"><Skeleton className="h-80" /><Skeleton className="h-80" /></div>
+    </div> : data ? <>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>Hors brouillons et dossiers annulés</span>
+        <div className="flex flex-wrap gap-4"><span>{count(data.rejetes)} rejeté(s)</span><span className={data.actionsEnRetard ? "font-medium text-amber-800 dark:text-amber-300" : ""}>{count(data.actionsEnRetard)} action(s) en retard</span></div>
+      </div>
+      <dl className="grid grid-cols-2 border-y bg-card md:grid-cols-4">
+        <Metric label="Dossiers déclarés" value={count(data.declares)} />
+        <Metric label="Encore ouverts" value={count(data.ouverts)} />
+        <Metric label="Clôturés" value={count(data.clotures)} />
+        <Metric label="Délai moyen de clôture" value={data.delaiMoyenClotureJours == null ? "-" : `${count(data.delaiMoyenClotureJours)} jours`} />
+      </dl>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <ChartSection title="Déclarations par mois" subtitle="Date de déclaration" empty={data.declares === 0}>
+          <ChartContainer config={{ declarations: { label: "Déclarations", color: "#0284c7" } }} className="h-[260px] w-full aspect-auto">
+            <BarChart data={data.evolution} accessibilityLayer margin={{ left: -12, right: 12, top: 10 }}>
+              <CartesianGrid vertical={false} strokeDasharray="3 4" />
+              <XAxis dataKey="mois" tickFormatter={(value: number) => MONTHS[value - 1]} axisLine={false} tickLine={false} minTickGap={18} tickMargin={10} />
+              <YAxis allowDecimals={false} tickFormatter={count} axisLine={false} tickLine={false} width={48} />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(value: unknown) => MONTHS[Number(value) - 1]} />} />
+              <Bar dataKey="declarations" fill="var(--color-declarations)" maxBarSize={36} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+            </BarChart>
+          </ChartContainer>
+        </ChartSection>
+        <Distribution title="Étapes de suivi" subtitle="Étape actuelle des dossiers de l’année" rows={data.parEtape} colors={STAGE_COLORS} empty={data.declares === 0} />
+      </div>
+      <section className="min-w-0 border-y bg-card">
+        <SectionHeader title="Situation financière" subtitle="Cumul des opérations non annulées de ces dossiers · MAD" />
+        <dl className="grid grid-cols-2 lg:grid-cols-4">
+          <Metric label="Provisions ouvertes" value={moneyAmount(data.provisionsOuvertes)} />
+          <Metric label="Règlements cumulés" value={moneyAmount(data.reglementsCumules)} />
+          <Metric label="Recours cumulés" value={moneyAmount(data.recoursCumules)} />
+          <Metric label="Frais cumulés" value={moneyAmount(data.fraisCumules)} />
+        </dl>
+      </section>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <Distribution title="Répartition par branche" subtitle="Dossiers déclarés" rows={data.parBranche} empty={data.declares === 0} />
+        <section className="min-w-0 border-y bg-card">
+          <SectionHeader title="Situation par compagnie" subtitle="Dossiers et montants cumulés · MAD" />
+          <div className="overflow-x-auto"><Table className="min-w-[680px]">
+            <TableHeader><TableRow><TableHead>Compagnie</TableHead><TableHead className="text-right">Dossiers</TableHead><TableHead className="text-right">Provisions</TableHead><TableHead className="text-right">Règlements</TableHead><TableHead className="text-right">Recours</TableHead><TableHead className="text-right">Frais</TableHead></TableRow></TableHeader>
+            <TableBody>{data.parCompagnie.map((company) => <TableRow key={company.id}>
+              <TableCell className="font-medium">{company.nom}</TableCell><TableCell className="text-right tabular-nums">{count(company.dossiers)}</TableCell>
+              {[company.provisions, company.reglements, company.recours, company.frais].map((amount, index) => <TableCell key={index} className="text-right tabular-nums">{moneyAmount(amount)}</TableCell>)}
+            </TableRow>)}
+              {!data.parCompagnie.length ? <TableRow><TableCell colSpan={6} className="h-40 text-center text-muted-foreground">Aucun dossier déclaré sur cette année.</TableCell></TableRow> : null}
+            </TableBody>
+          </Table></div>
+        </section>
+      </div>
+    </> : null}
+  </div>;
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0 border-r border-border px-4 py-4 last:border-r-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-lg font-semibold tabular-nums">{value}</dd></div>;
+}
+
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return <div className="border-b bg-muted/50 px-4 py-3"><h2 className="text-base font-semibold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{subtitle}</p></div>;
+}
+
+function ChartSection({ title, subtitle, children, empty }: { title: string; subtitle: string; children: React.ReactNode; empty: boolean }) {
+  return <section className="min-w-0 border-y bg-card"><SectionHeader title={title} subtitle={subtitle} />
+    <div className="p-4">{empty ? <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">Aucun dossier déclaré sur cette année.</div> : children}</div>
+  </section>;
+}
+
+function Distribution({ title, subtitle, rows, empty, colors }: {
+  title: string; subtitle: string; rows: SinistreStatistics["parEtape"]; empty: boolean; colors?: Record<string, string>;
+}) {
+  return <ChartSection title={title} subtitle={subtitle} empty={empty}>
+    <ChartContainer config={{ nombre: { label: "Dossiers", color: "#059669" } }} className="h-[260px] w-full aspect-auto">
+      <BarChart data={rows} layout="vertical" accessibilityLayer margin={{ left: 0, right: 18, top: 0 }}>
+        <CartesianGrid horizontal={false} strokeDasharray="3 4" />
+        <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} tickFormatter={count} />
+        <YAxis dataKey="libelle" type="category" width={114} axisLine={false} tickLine={false} tickFormatter={(value: string) => value.length > 20 ? `${value.slice(0, 19)}…` : value} />
+        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+        <Bar dataKey="nombre" fill="var(--color-nombre)" maxBarSize={22} radius={[0, 3, 3, 0]} isAnimationActive={false}>
+          {rows.map((row) => <Cell key={row.code} fill={colors?.[row.code] ?? "var(--color-nombre)"} />)}
+        </Bar>
+      </BarChart>
+    </ChartContainer>
+  </ChartSection>;
 }

@@ -307,9 +307,9 @@ function Section({ title, icon: Icon, children }: {
   icon: React.ComponentType<{ className?: string }>;
   children: React.ReactNode;
 }) {
-  return <section className="border-t bg-background">
-    <div className="flex items-center gap-3 border-b bg-muted/25 px-5 py-4">
-      <span className="grid size-9 shrink-0 place-items-center rounded-md border bg-background"><Icon className="size-4 text-sky-700 dark:text-sky-400" /></span>
+  return <section className="border-y bg-card">
+    <div className="flex items-center gap-3 border-b border-sky-200 bg-sky-100/70 px-5 py-3 dark:border-sky-900 dark:bg-sky-950/45">
+      <span className="grid size-8 shrink-0 place-items-center rounded-md bg-background/80"><Icon className="size-4 text-sky-700 dark:text-sky-300" /></span>
       <div className="min-w-0"><h2 className="text-base font-semibold">{title}</h2></div>
     </div>
     <div className="p-5">{children}</div>

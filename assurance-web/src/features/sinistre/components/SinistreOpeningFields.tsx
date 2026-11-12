@@ -3,12 +3,15 @@ import { Paperclip, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
 import type { ModeReparationSinistre, OpeningDocument, TypeDommageSinistre } from "../types";
 import { SinistreVilleSelect } from "./SinistreVilleSelect";
+import { appendOpeningFiles } from "../opening-files";
+import { toast } from "@/lib/toast";
 
 const openingDocumentLabels: Record<OpeningDocument["type"], string> = {
   CONSTAT: "Constat", PV_POLICE: "Procès-verbal", DECLARATION: "Déclaration",
@@ -69,12 +72,19 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
     <div className="border-t pt-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Paperclip className="size-4" /> Pièces d’ouverture</h3>
       <div className="grid gap-4 md:grid-cols-3">
-        {(["CONSTAT", "PV_POLICE", "DECLARATION"] as const).map((type) => <Field key={type} label={openingDocumentLabels[type]}>
-          <Input type="file" multiple disabled={disabled} aria-label={`Joindre : ${openingDocumentLabels[type]}`} onChange={(event) => {
-            onDocumentsChange([...documents, ...Array.from(event.target.files ?? []).map((file) => ({ file, type }))]);
-            event.target.value = "";
-          }} />
-        </Field>)}
+        {(["CONSTAT", "PV_POLICE", "DECLARATION"] as const).map((type) => <div key={type} className="grid content-start gap-2">
+          <h4 className="text-sm font-medium">{openingDocumentLabels[type]}</h4>
+          <FileDropzone multiple disabled={disabled} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            title={`Déposer ${type === "DECLARATION" ? "une déclaration" : type === "PV_POLICE" ? "un procès-verbal" : "un constat"}`}
+            description="PDF, JPG, PNG ou Word · 30 Mo par fichier · Parcourir"
+            className="bg-background"
+            onFilesSelect={(files) => {
+              const result = appendOpeningFiles(documents, files, type);
+              onDocumentsChange(result.documents);
+              if (result.errors.length) toast.error(result.errors.join("\n"));
+            }} />
+          <span className="text-xs text-muted-foreground">{documents.filter((document) => document.type === type).length} fichier(s)</span>
+        </div>)}
       </div>
       {documents.length > 0 ? <ul className="mt-3 divide-y">{documents.map((document, index) => <li key={`${index}-${document.file.name}`} className="flex items-center justify-between gap-3 py-2 text-sm">
         <span className="min-w-0 break-words">{document.file.name} <span className="text-muted-foreground">· {openingDocumentLabels[document.type]} · {(document.file.size / 1024 / 1024).toFixed(1).replace(".", ",")} Mo</span></span>

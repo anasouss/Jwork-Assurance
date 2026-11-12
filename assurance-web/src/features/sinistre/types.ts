@@ -185,6 +185,26 @@ export type SinistreDashboard = {
   recents: SinistreSummary[];
 };
 
+export type SinistreStatistics = {
+  annee: number;
+  dateSituation: string;
+  anneesDisponibles: number[];
+  declares: number;
+  ouverts: number;
+  clotures: number;
+  rejetes: number;
+  actionsEnRetard: number;
+  delaiMoyenClotureJours: number | null;
+  provisionsOuvertes: number;
+  reglementsCumules: number;
+  recoursCumules: number;
+  fraisCumules: number;
+  evolution: { mois: number; declarations: number }[];
+  parEtape: { code: string; libelle: string; nombre: number }[];
+  parBranche: { code: string; libelle: string; nombre: number }[];
+  parCompagnie: { id: string; nom: string; dossiers: number; provisions: number; reglements: number; recours: number; frais: number }[];
+};
+
 export type CoveragePreview = {
   contratId: string;
   numeroDossier?: string | null;

@@ -323,7 +323,7 @@ function FlottePolicySheet({
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>PF/PTC</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>ENERGIE</th>
               <th className="border border-slate-700 px-1 py-1" colSpan={hasDcCapital ? 4 : 3}>VALEURS</th>
-              <th className="border border-slate-700 px-1 py-1" colSpan={guaranteeCodes.length + (showAssistance ? 2 : 0)}>GARANTIES A ASSURER</th>
+              <th className="border border-slate-700 px-1 py-1" colSpan={guaranteeCodes.length + (showAssistance ? 2 : 0)}>GARANTIES ASSURÉES</th>
               <th className="border border-slate-700 px-1 py-1" rowSpan={2}>Montant total</th>
             </tr>
             <tr className="bg-slate-100 text-center font-bold text-blue-950">

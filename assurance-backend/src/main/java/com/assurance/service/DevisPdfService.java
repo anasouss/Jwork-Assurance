@@ -238,7 +238,7 @@ public class DevisPdfService {
             table.addCell(headerCell("ENERGIE", 2, 1));
         }
         table.addCell(headerCell("VALEURS", 1, valuesColumnsCount));
-        table.addCell(headerCell("GARANTIES A ASSURER", 1, guaranteeColumnsCount).setBackgroundColor(GUARANTEE_GROUP_BG));
+        table.addCell(headerCell("GARANTIES ASSURÉES", 1, guaranteeColumnsCount).setBackgroundColor(GUARANTEE_GROUP_BG));
         table.addCell(headerCell("Montant total", 2, 1));
 
         table.addCell(headerCell("Valeur à\nNeuf", 1, 1));

@@ -242,7 +242,7 @@ public class FlottePolicePdfService {
             addHeader(table, "ÉNERGIE", 2, 1, HEADER_BG, tableStyle);
         }
         addHeader(table, "VALEURS", 1, valueColumns, HEADER_BG, tableStyle);
-        addHeader(table, "GARANTIES À ASSURER", 1, guaranteeColumns, GUARANTEE_GROUP_BG, tableStyle);
+        addHeader(table, "GARANTIES ASSURÉES", 1, guaranteeColumns, GUARANTEE_GROUP_BG, tableStyle);
         addHeader(table, "Montant total", 2, 1, HEADER_BG, tableStyle);
         addHeader(table, "Valeur à\nneuf", 1, 1, HEADER_BG, tableStyle);
         addHeader(table, "Valeur\nvénale", 1, 1, HEADER_BG, tableStyle);

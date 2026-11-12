@@ -103,6 +103,21 @@ export const usageSchema = z.object({
   actif: z.boolean().optional(),
 });
 
+export const usageSettingsSchema = usageSchema.extend({
+  modePeriodes: z.enum(["STANDARD", "CUSTOM"]),
+}).superRefine((value, context) => {
+  if (value.modePeriodes === "CUSTOM" && !value.periodesAutorisees?.length) {
+    context.addIssue({
+      code: "custom",
+      path: ["periodesAutorisees"],
+      message: "Sélectionnez au moins une période de couverture.",
+    });
+  }
+}).transform(({ modePeriodes, ...request }) => ({
+  ...request,
+  periodesAutorisees: modePeriodes === "STANDARD" ? [] : request.periodesAutorisees,
+}));
+
 export const groupeUsageAttestationSchema = z.object({
   code: z.string().min(1, "Code obligatoire"),
   libelle: z.string().min(2, "Libelle obligatoire"),

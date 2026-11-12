@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { DocumentValidity } from "@/features/crm/components/ClientDocuments";
 import { documentStatus, documentValidityDate, formatDocumentDate } from "../utils/format";
 import { attachmentApi } from "../api/attachments";
+import { vehiclesWithoutDocument } from "../utils/attachment-vehicles";
 import type { PieceJointe, PiecesJointesContrat, TypeContrat, TypePieceJointe } from "../types";
 import {
   formatAttachmentSize,
@@ -76,6 +77,9 @@ export default function ContratPiecesJointesPage() {
 
   const data = piecesQuery.data;
   const selectedType = data?.types.find(type => type.id === selectedTypeId);
+  const availableVehicles = vehiclesWithoutDocument(data?.documentVehicles ?? [],
+    [...(data?.pieces ?? []), ...(data?.availableDocuments ?? [])], selectedType);
+  const selectedVehicleAvailable = availableVehicles.some(vehicle => vehicle.id === ownerId);
   const selectedOwner = selectedType?.documentOwner === "CLIENT" ? data?.documentClients?.find(owner => owner.id === ownerId)
     : data?.documentVehicles?.find(owner => owner.id === ownerId);
   const effectiveExpiry = selectedType?.documentValiditySource && selectedType.documentValiditySource !== "MANUAL"
@@ -134,6 +138,10 @@ export default function ContratPiecesJointesPage() {
     }
     if (uploadFiles.length === 0) {
       toast.error("Sélectionnez au moins un fichier");
+      return;
+    }
+    if (!replacement && selectedType?.documentOwner === "VEHICULE" && !selectedVehicleAvailable) {
+      toast.error("Sélectionnez un véhicule sans document de ce type.");
       return;
     }
     uploadMutation.mutate({
@@ -265,6 +273,7 @@ export default function ContratPiecesJointesPage() {
         title={replacement ? "Remplacer le document" : "Ajouter un document"}
         allowOther={!replacement}
         disabled={(selectedType?.documentExpiry === "REQUIRED" && !effectiveExpiry) ||
+          (!replacement && selectedType?.documentOwner === "VEHICULE" && !selectedVehicleAvailable) ||
           (!!replacement && !reason.trim()) || (!replacement && (selectedType?.documentOwner === "CLIENT" || selectedType?.documentOwner === "VEHICULE") && !ownerId)}
         onOpenChange={(open) => open ? setUploadOpen(true) : resetUpload()}
         onTypeChange={(value) => {
@@ -278,8 +287,12 @@ export default function ContratPiecesJointesPage() {
       >
         {!replacement && (selectedType?.documentOwner === "CLIENT" || selectedType?.documentOwner === "VEHICULE") && <label className="grid gap-2 text-sm font-medium">
           {selectedType.documentOwner === "CLIENT" ? "Titulaire du document *" : "Véhicule concerné *"}
-          <Select value={ownerId} onValueChange={setOwnerId}><SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>
-            {(selectedType.documentOwner === "CLIENT" ? data?.documentClients?.filter(client => !selectedType.typeClient || client.typeClient === selectedType.typeClient) : data?.documentVehicles)?.map(owner => <SelectItem key={owner.id} value={owner.id}>{owner.libelle}</SelectItem>)}
+          <Select
+            value={selectedType.documentOwner === "VEHICULE" && !selectedVehicleAvailable ? "" : ownerId}
+            onValueChange={setOwnerId}
+            disabled={selectedType.documentOwner === "VEHICULE" && availableVehicles.length === 0}
+          ><SelectTrigger><SelectValue placeholder={selectedType.documentOwner === "VEHICULE" && availableVehicles.length === 0 ? "Aucun véhicule disponible" : "Sélectionner"} /></SelectTrigger><SelectContent>
+            {(selectedType.documentOwner === "CLIENT" ? data?.documentClients?.filter(client => !selectedType.typeClient || client.typeClient === selectedType.typeClient) : availableVehicles)?.map(owner => <SelectItem key={owner.id} value={owner.id}>{owner.libelle}</SelectItem>)}
           </SelectContent></Select>
         </label>}
         <DocumentValidity type={selectedType} value={expiresOn} onChange={setExpiresOn} owner={selectedOwner} />

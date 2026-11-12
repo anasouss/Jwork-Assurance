@@ -24,7 +24,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { referenceApi } from "../api/references";
 import { referenceAdminApi } from "../api/reference-admin";
-import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeExclusionGarantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSchema } from "../schemas";
+import { clientCategorySchema, codeReferenceSchema, garantieSchema, groupeExclusionGarantieSchema, groupeUsageAttestationSchema, referenceSchema, transportCategorySchema, usageSettingsSchema } from "../schemas";
 import { Field } from "../components/Field";
 import { numberValue, toNumber } from "../utils/format";
 import type { ReferenceOption, UpsertCategorieClientRequest, UpsertCodeReferenceRequest, UpsertGarantieRequest, UpsertGroupeExclusionGarantieRequest, UpsertGroupeUsageAttestationRequest, UpsertReferenceRequest, UpsertSousClasseRequest, UpsertUsageRequest } from "../types";
@@ -656,8 +656,10 @@ export function UsagesSettingsPage() {
   const [editing, setEditing] = useState<ReferenceOption | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [payload, setPayload] = useState<UpsertUsageRequest>(emptyUsage());
+  const [modePeriodes, setModePeriodes] = useState<"STANDARD" | "CUSTOM">("STANDARD");
 
   useEffect(() => {
+    setModePeriodes(periodesForUsage(editing).length > 0 ? "CUSTOM" : "STANDARD");
     setPayload(editing ? {
       code: editing.code ?? "",
       libelle: editing.libelle,
@@ -693,7 +695,7 @@ export function UsagesSettingsPage() {
   return (
     <ReferenceShell title="Usages" description="Critères qui pilotent les champs visibles, le stock d'attestations et les garanties personne.">
       <div className="flex justify-end">
-        <Button onClick={() => { setEditing(null); setPayload(emptyUsage()); setDialogOpen(true); }}>
+        <Button onClick={() => { setEditing(null); setPayload(emptyUsage()); setModePeriodes("STANDARD"); setDialogOpen(true); }}>
           <Plus className="size-4" />
           Ajouter usage
         </Button>
@@ -755,7 +757,16 @@ export function UsagesSettingsPage() {
           </div>
           <fieldset className="space-y-3 border-t pt-3">
             <legend className="text-sm font-medium">Périodes de couverture autorisées</legend>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <Field label="Périodes" className="max-w-sm">
+              <Select value={modePeriodes} onValueChange={(value) => setModePeriodes(value as "STANDARD" | "CUSTOM")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="STANDARD">Standard : 1, 3, 6 et 12 mois</SelectItem>
+                  <SelectItem value="CUSTOM">Personnalisées</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {modePeriodes === "CUSTOM" ? <div className="grid gap-2 sm:grid-cols-3">
               {PERIODES_COUVERTURE.map((periode) => (
                 <Flag key={periode.value} label={periode.label}
                   checked={payload.periodesAutorisees?.includes(periode.value) ?? false}
@@ -767,11 +778,11 @@ export function UsagesSettingsPage() {
                   }))}
                 />
               ))}
-            </div>
+            </div> : null}
           </fieldset>
           <div className="flex gap-2">
             <Button disabled={save.isPending} onClick={() => {
-              const parsed = usageSchema.safeParse(cleanTextPayload(payload));
+              const parsed = usageSettingsSchema.safeParse({ ...cleanTextPayload(payload), modePeriodes });
               if (!parsed.success) {
                 toast.error(parsed.error.issues[0]?.message ?? "Formulaire incomplet");
                 return;

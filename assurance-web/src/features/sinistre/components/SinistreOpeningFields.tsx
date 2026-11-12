@@ -18,7 +18,6 @@ const openingDocumentLabels: Record<OpeningDocument["type"], string> = {
 };
 
 export type OpeningFields = {
-  referenceCompagnie: string;
   numeroPv: string;
   modeReparation: ModeReparationSinistre | "";
   tauxResponsabilite: string;
@@ -44,18 +43,17 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
   const update = <K extends keyof OpeningFields>(key: K, next: OpeningFields[K]) => onChange({ ...value, [key]: next });
   return <div className="grid gap-5">
     <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Field label="Référence compagnie"><Input maxLength={100} value={value.referenceCompagnie} onChange={(event) => update("referenceCompagnie", event.target.value)} /></Field>
       <Field label="N° de procès-verbal"><Input maxLength={120} value={value.numeroPv} onChange={(event) => update("numeroPv", event.target.value)} /></Field>
       {automobile ? <>
-        <Field label="Mode de réparation *"><Select disabled={disabled} value={value.modeReparation} onValueChange={(next) => onChange({ ...value, modeReparation: next as ModeReparationSinistre, garageId: "" })}>
+        <Field label="Mode de réparation" required><Select disabled={disabled} value={value.modeReparation} onValueChange={(next) => onChange({ ...value, modeReparation: next as ModeReparationSinistre, garageId: "" })}>
           <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent><SelectItem value="NORMAL">Normal</SelectItem><SelectItem value="PEC">Prise en charge (PEC)</SelectItem><SelectItem value="RAPIDE">Rapide</SelectItem></SelectContent>
         </Select></Field>
-        <Field label={value.modeReparation === "PEC" ? "Garage conventionné *" : "Garage"}><Select disabled={disabled || garages.isPending || garages.isError} value={value.garageId || "NONE"} onValueChange={(next) => update("garageId", next === "NONE" ? "" : next)}>
+        <Field label={value.modeReparation === "PEC" ? "Garage conventionné" : "Garage"} required={value.modeReparation === "PEC"}><Select disabled={disabled || garages.isPending || garages.isError} value={value.garageId || "NONE"} onValueChange={(next) => update("garageId", next === "NONE" ? "" : next)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>
             {(garages.data ?? []).filter((item) => item.actif && (value.modeReparation !== "PEC" || item.conventionne)).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}
           </SelectContent></Select></Field>
       </> : null}
-      {responsabiliteCivile ? <Field label="Responsabilité RC *"><Select disabled={disabled} value={value.tauxResponsabilite} onValueChange={(next) => update("tauxResponsabilite", next)}>
+      {responsabiliteCivile ? <Field label="Responsabilité RC" required><Select disabled={disabled} value={value.tauxResponsabilite} onValueChange={(next) => update("tauxResponsabilite", next)}>
         <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent><SelectItem value="0">0 %</SelectItem><SelectItem value="50">50 %</SelectItem><SelectItem value="100">100 %</SelectItem></SelectContent>
       </Select></Field> : null}
       <Field label="Ville de l’expert"><SinistreVilleSelect disabled={disabled} cities={cities.data ?? []} value={value.expertVilleId} onValueChange={(expertVilleId) => onChange({ ...value, expertVilleId, expertId: "" })} /></Field>
@@ -68,7 +66,7 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
           <SelectTrigger id="opening-expert"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{(experts.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      {value.expertId ? <Field label="Date de mission initiale *"><DatePicker disabled={disabled} date={value.dateMission} onSelect={(date) => update("dateMission", date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : "")} /></Field> : null}
+      {value.expertId ? <Field label="Date de mission initiale" required><DatePicker disabled={disabled} date={value.dateMission} onSelect={(date) => update("dateMission", date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : "")} /></Field> : null}
     </fieldset>
     {experts.isError || garages.isError || cities.isError ? <p role="alert" className="text-sm text-destructive">{[experts.error, garages.error, cities.error].filter(Boolean).map((error) => error instanceof Error ? error.message : "Référentiel indisponible").join(" · ")}</p> : null}
     <div className="border-t pt-4">
@@ -96,6 +94,6 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
   </div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-1.5 text-sm"><Label asChild><span>{label}</span></Label>{children}</label>;
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return <label className="grid gap-1.5 text-sm"><Label asChild><span>{label}{required ? <span className="ml-1 text-red-500">*</span> : null}</span></Label>{children}</label>;
 }

@@ -120,6 +120,7 @@ class SinistreReadinessServiceTest {
                 .statut(status)
                 .nature(NatureSinistre.ACCIDENT)
                 .circonstances("Collision")
+                .referenceCompagnie("CIE-123")
                 .build();
         claim.setId(id);
         return claim;
@@ -140,12 +141,16 @@ class SinistreReadinessServiceTest {
     }
 
     @Test
-    void companyReferenceIsRequiredOnlyForTransmissionNotDeclaration() {
+    void companyReferenceIsRequiredForDeclarationAndTransmission() {
         Sinistre claim = claim(16L, StatutSinistre.DECLARE);
+        claim.setReferenceCompagnie("   ");
         when(guarantees.findForDetailOrderByConfiguredDisplay(16L)).thenReturn(List.of(acceptedGuarantee("100")));
-        assertThat(service.blockers(claim, StatutSinistre.DECLARE)).isEmpty();
+        assertThat(service.blockers(claim, StatutSinistre.DECLARE))
+                .contains("Renseignez la reference compagnie avant de declarer le sinistre");
         assertThat(service.blockers(claim, StatutSinistre.TRANSMIS_COMPAGNIE))
-                .contains("Renseignez la reference compagnie avant transmission");
+                .contains("Renseignez la reference compagnie avant de declarer le sinistre");
+        claim.setReferenceCompagnie("CIE-456");
+        assertThat(service.blockers(claim, StatutSinistre.DECLARE)).isEmpty();
     }
 
     private SinistreGarantie acceptedGuarantee(String amount) {

@@ -50,6 +50,9 @@ public class SinistreQualificationService {
 
     public static java.util.List<String> declarationBlockers(Sinistre sinistre) {
         java.util.List<String> blockers = new java.util.ArrayList<>();
+        if (sinistre.getReferenceCompagnie() == null || sinistre.getReferenceCompagnie().trim().isEmpty()) {
+            blockers.add("Renseignez la reference compagnie avant de declarer le sinistre");
+        }
         if (isAutomobile(sinistre)) {
             if (sinistre.getTypeDommage() == null) {
                 blockers.add("Renseignez le type de dommage automobile");

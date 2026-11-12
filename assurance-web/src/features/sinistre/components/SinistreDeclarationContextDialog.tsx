@@ -166,7 +166,7 @@ export function SinistreDeclarationContextDialog({
         <div className="grid gap-5 py-1">
           <div className="grid gap-4 sm:grid-cols-2">
           <div className="grid gap-2">
-            <Label>Branche *</Label>
+            <Label>Branche <span className="text-red-500">*</span></Label>
             <Select value={effectiveBrancheId}
               onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); setTypeDommage(""); }}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
@@ -175,7 +175,7 @@ export function SinistreDeclarationContextDialog({
             {branches.isError ? <p role="alert" className="text-sm text-destructive">Chargement des branches impossible.</p> : null}
           </div>
           {automobile ? <div className="grid gap-2">
-            <Label htmlFor="opening-damage">Dommages *</Label>
+            <Label htmlFor="opening-damage">Dommages <span className="text-red-500">*</span></Label>
             <Select value={typeDommage} onValueChange={(value) => setTypeDommage(value as TypeDommageSinistre)}>
               <SelectTrigger id="opening-damage"><SelectValue placeholder="Sélectionner les dommages" /></SelectTrigger>
               <SelectContent>{(Object.entries(damageLabels) as [TypeDommageSinistre, string][]).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
@@ -183,7 +183,7 @@ export function SinistreDeclarationContextDialog({
           </div> : null}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="claim-contract-search">Police, assuré ou immatriculation *</Label>
+            <Label htmlFor="claim-contract-search">Police, assuré ou immatriculation <span className="text-red-500">*</span></Label>
             {contract ? (
               <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/35 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -258,7 +258,7 @@ export function SinistreDeclarationContextDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <Label>Date du sinistre *</Label>
+              <Label>Date du sinistre <span className="text-red-500">*</span></Label>
               <DatePicker
                 date={dateSinistre}
                 maxDate={new Date()}
@@ -269,7 +269,7 @@ export function SinistreDeclarationContextDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label>Nature de l’événement *</Label>
+              <Label>Nature de l’événement <span className="text-red-500">*</span></Label>
               <Select value={nature} onValueChange={(value) => setNature(value as NatureSinistre)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -309,7 +309,7 @@ export function SinistreDeclarationContextDialog({
               </div>
               {automobile ? (
                 <div className="grid gap-2">
-                  <Label>Véhicule concerné *</Label>
+                  <Label>Véhicule concerné <span className="text-red-500">*</span></Label>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {coverage.data.vehicules.map((vehicle) => {
                       const selected = vehicle.id === vehiculeId;

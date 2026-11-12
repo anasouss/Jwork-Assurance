@@ -91,7 +91,7 @@ export function SinistreIntervenantDialog({
           <DialogDescription className="sr-only">Coordonnées de l’intervenant</DialogDescription>
         </DialogHeader>
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
-          <Field label="Code *">
+          <Field label="Code" required>
             <Input
               value={form.code}
               maxLength={40}
@@ -100,7 +100,7 @@ export function SinistreIntervenantDialog({
               }
             />
           </Field>
-          <Field label={kind === "EXPERT" ? "Nom *" : "Raison sociale *"}>
+          <Field label={kind === "EXPERT" ? "Nom" : "Raison sociale"} required>
             <Input
               value={form.nom}
               maxLength={180}
@@ -170,14 +170,16 @@ export function SinistreIntervenantDialog({
 
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
       {children}
     </div>
   );

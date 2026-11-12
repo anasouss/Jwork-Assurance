@@ -37,7 +37,8 @@ class SinistreResponseMapperTest {
             mock(SinistreCouvertureRepository.class), guarantees, mock(SinistrePartieRepository.class),
             mock(SinistreDocumentRepository.class), missions, mock(ProvisionSinistreRepository.class),
             mock(SinistreOperationRepository.class), mock(SinistreDocumentRequirementService.class),
-            mock(SinistreEvenementRepository.class), readiness, mock(SinistreSuiviService.class));
+            mock(SinistreEvenementRepository.class), readiness, mock(SinistreSuiviService.class),
+            new SinistreWorkflowService());
 
     @Test
     void detailAndSummaryShareOriginalSnapshotsAndDeterministicFirstExpert() {

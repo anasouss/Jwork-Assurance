@@ -82,10 +82,26 @@ class SinistreQualificationServiceTest {
                 ModeReparationSinistre.RAPIDE, null, null)).isInstanceOf(BadRequestException.class);
     }
 
+    @Test
+    void declarationRequiresNonBlankCompanyReferenceForEveryBranch() {
+        Sinistre claim = automobile();
+        service.apply(claim, TypeDommageSinistre.MATERIEL, ModeReparationSinistre.NORMAL, null, null);
+        for (String branch : new String[]{"AUTOMOBILE", "ASSISTANCE"}) {
+            claim.setCouverture(SinistreCouverture.builder().brancheCode(branch).build());
+            for (String reference : new String[]{null, "", "   "}) {
+                claim.setReferenceCompagnie(reference);
+                assertThat(SinistreQualificationService.declarationBlockers(claim))
+                        .containsExactly("Renseignez la reference compagnie avant de declarer le sinistre");
+            }
+            claim.setReferenceCompagnie(" CIE-123 ");
+            assertThat(SinistreQualificationService.declarationBlockers(claim)).isEmpty();
+        }
+    }
+
     private Sinistre automobile() {
         Agence agency = new Agence();
         agency.setId(1L);
-        return Sinistre.builder().agence(agency)
+        return Sinistre.builder().agence(agency).referenceCompagnie("CIE-123")
                 .couverture(SinistreCouverture.builder().brancheCode("AUTOMOBILE").build()).build();
     }
 }

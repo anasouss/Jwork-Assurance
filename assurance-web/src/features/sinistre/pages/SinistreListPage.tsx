@@ -7,6 +7,7 @@ import {
   Eye,
   FilePlus2,
   MoreHorizontal,
+  Pencil,
   Search,
   Trash2,
   X,
@@ -78,6 +79,7 @@ type PortfolioScope = { clientId: string; contratId: string; brancheId: string }
 
 export default function SinistreListPage({ mode = "consultation" }: { mode?: "consultation" | "registre" }) {
   const isRegister = mode === "registre";
+  const columnCount = isRegister ? 14 : 10;
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [initial] = useState(() => readState(params));
@@ -164,6 +166,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
   });
 
   function apply(next: Filters) {
+    setExpandedId(null);
     setApplied(next);
     setPage(0);
     setParams(writeState(next, 0, scope), { replace: true });
@@ -174,6 +177,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
     apply(next);
   }
   function changePage(next: number) {
+    setExpandedId(null);
     setPage(next);
     setParams(writeState(applied, next, scope), { replace: true });
   }
@@ -310,64 +314,74 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
       {list.isError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 text-sm text-destructive"><span>{list.error instanceof Error ? list.error.message : "Chargement des dossiers impossible."}</span><Button variant="outline" onClick={() => list.refetch()}>Réessayer</Button></div> : null}
       <section aria-label="Résultats des sinistres" className="min-w-0 border">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1600px]">
+            <Table className={isRegister ? "min-w-[1600px]" : "min-w-[1100px]"}>
               <TableHeader className="bg-sky-700 text-white [&_th]:text-white">
                 <TableRow className="hover:bg-sky-700">
-                  <TableHead>N° sinistre</TableHead>
-                  <TableHead>Réf. compagnie</TableHead>
+                  {isRegister ? <TableHead>N° sinistre</TableHead> : null}
+                  <TableHead>{isRegister ? "Réf. compagnie" : "Référence Cie"}</TableHead>
                   <TableHead>Assuré</TableHead>
-                  <TableHead>Police</TableHead>
+                  <TableHead>{isRegister ? "Police" : "Police N°"}</TableHead>
                   <TableHead>Véhicule</TableHead>
-                  <TableHead>Date sinistre</TableHead>
-                  <TableHead>Déclaration</TableHead>
-                  <TableHead>Compagnie</TableHead>
-                  <TableHead>Garanties impliquées</TableHead>
-                  <TableHead>Réparation</TableHead>
+                  <TableHead>{isRegister ? "Date sinistre" : "Sinistre du"}</TableHead>
+                  <TableHead>{isRegister ? "Déclaration" : "Déclaré le"}</TableHead>
+                  {isRegister ? <TableHead>Compagnie</TableHead> : null}
+                  <TableHead>{isRegister ? "Garanties impliquées" : "Garanties"}</TableHead>
+                  <TableHead>{isRegister ? "Réparation" : "Mode de réparation"}</TableHead>
                   <TableHead>Premier expert</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Suivi</TableHead>
+                  {isRegister ? <><TableHead>Statut</TableHead><TableHead>Suivi</TableHead></> : null}
                   <TableHead className="w-20 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {list.isLoading ? (
-                  <TableRowsSkeleton rows={7} colSpan={14} />
+                  <TableRowsSkeleton rows={7} colSpan={columnCount} />
                 ) : null}
                 {(list.data?.items ?? []).map((item) => (
-                  <Fragment key={item.id}><TableRow>
-                    <TableCell>
+                  <Fragment key={item.id}><TableRow
+                    className={!isRegister ? "cursor-pointer" : undefined}
+                    data-state={!isRegister && expandedId === item.id ? "selected" : undefined}
+                    onClick={!isRegister ? (event) => {
+                      if ((event.target as HTMLElement).closest("button, a")) return;
+                      setExpandedId(expandedId === item.id ? null : item.id);
+                    } : undefined}>
+                    {isRegister ? <TableCell>
                       <Link
                         className="font-medium text-sky-700 hover:underline dark:text-sky-400"
                         to={`/app/sinistre/dossiers/${item.id}`}
                       >
                         {item.numeroSinistre}
                       </Link>
-                    </TableCell>
-                    <TableCell>{item.referenceCompagnie || "-"}</TableCell>
-                    <TableCell>{item.assure || "-"}</TableCell>
+                    </TableCell> : null}
+                    <TableCell>{isRegister ? item.referenceCompagnie || "-" : <button
+                      type="button" aria-expanded={expandedId === item.id} aria-controls={`claim-tracking-${item.id}`}
+                      aria-label={`Suivi du sinistre ${item.referenceCompagnie || item.numeroSinistre}`}
+                      className="flex items-center gap-2 text-left font-medium text-sky-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400"
+                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
+                      <ChevronDown aria-hidden="true" className={`size-4 shrink-0 ${expandedId === item.id ? "rotate-180" : ""}`} />
+                      {item.referenceCompagnie || "-"}
+                    </button>}</TableCell>
+                    <TableCell className="max-w-56 whitespace-normal">{item.assure || "-"}</TableCell>
                     <TableCell>{item.numeroPolice || "-"}</TableCell>
                     <TableCell>{item.immatriculation || "-"}</TableCell>
                     <TableCell>{formatDate(item.dateSinistre)}</TableCell>
                     <TableCell>{formatDate(item.dateDeclaration)}</TableCell>
-                    <TableCell>{item.compagnie || "-"}</TableCell>
+                    {isRegister ? <TableCell>{item.compagnie || "-"}</TableCell> : null}
                     <TableCell className="max-w-56 whitespace-normal">{item.garantiesImpliquees?.join(", ") || "-"}</TableCell>
                     <TableCell>{item.modeReparation ? repairLabels[item.modeReparation] : "-"}</TableCell>
-                    <TableCell>{item.premierExpert || "-"}</TableCell>
-                    <TableCell>
+                    <TableCell className="max-w-48 whitespace-normal">{item.premierExpert || "-"}</TableCell>
+                    {isRegister ? <><TableCell>
                       <SinistreStatusBadge statut={item.statut} />
                     </TableCell>
                     <TableCell>
-                      {isRegister ? <span className="font-medium">{suiviLabels[item.etapeSuivi]}</span> : <button type="button" aria-expanded={expandedId === item.id} aria-controls={`claim-tracking-${item.id}`} className="mb-1 flex items-center gap-2 text-left text-sm font-medium text-sky-700 hover:underline dark:text-sky-400" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
-                        <ChevronDown className={`size-4 shrink-0 ${expandedId === item.id ? "rotate-180" : ""}`} />{suiviLabels[item.etapeSuivi] || "Suivi opérationnel"}
-                      </button>}
+                      <span className="font-medium">{suiviLabels[item.etapeSuivi]}</span>
                       <div>{item.prochaineAction || "-"}</div>
                       <div className="text-xs text-muted-foreground">
                         {[item.gestionnaire, item.dateEcheanceAction ? formatDate(item.dateEcheanceAction) : null]
                           .filter(Boolean)
                           .join(" · ") || "-"}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </TableCell></> : null}
+                    <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -382,9 +396,17 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                           <DropdownMenuItem asChild>
                             <Link to={`/app/sinistre/dossiers/${item.id}`}>
                               <Eye className="size-4" />
-                              Ouvrir le dossier
+                              Consulter le dossier
                             </Link>
                           </DropdownMenuItem>
+                          {canManage && !isRegister && item.editable ? (
+                            <DropdownMenuItem asChild>
+                              <Link to={`/app/sinistre/dossiers/${item.id}#modifier`}>
+                                <Pencil className="size-4" />
+                                Modifier le dossier
+                              </Link>
+                            </DropdownMenuItem>
+                          ) : null}
                           {canManage && !isRegister && canCancelClaim(item.statut) ? (
                             <>
                               <DropdownMenuSeparator />
@@ -407,12 +429,12 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
-                  </TableRow>{expandedId === item.id ? <TableRow><TableCell colSpan={14} className="whitespace-normal bg-muted/20 px-4 py-3"><div id={`claim-tracking-${item.id}`}><ExpandedTracking id={item.id} /></div></TableCell></TableRow> : null}</Fragment>
+                  </TableRow>{!isRegister && expandedId === item.id ? <TableRow><TableCell colSpan={columnCount} className="whitespace-normal bg-muted/20 px-4 py-3"><div id={`claim-tracking-${item.id}`}><ExpandedTracking id={item.id} /></div></TableCell></TableRow> : null}</Fragment>
                 ))}
                 {!list.isLoading && !list.isError && (list.data?.items.length ?? 0) === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={14}
+                      colSpan={columnCount}
                       className="py-10 text-center text-muted-foreground"
                     >
                       Aucun dossier ne correspond aux critères.

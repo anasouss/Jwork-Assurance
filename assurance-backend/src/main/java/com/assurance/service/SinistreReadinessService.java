@@ -69,9 +69,6 @@ public class SinistreReadinessService {
         }
 
         if (target == StatutSinistre.TRANSMIS_COMPAGNIE) {
-            if (!hasText(sinistre.getReferenceCompagnie())) {
-                blockers.add("Renseignez la reference compagnie avant transmission");
-            }
             documentRequirementService.applicable(
                     sinistre.getAgence().getId(),
                     sinistre.getNature()

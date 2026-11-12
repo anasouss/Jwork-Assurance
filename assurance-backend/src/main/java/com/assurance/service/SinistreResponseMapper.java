@@ -44,6 +44,7 @@ public class SinistreResponseMapper {
     private final SinistreEvenementRepository evenementRepository;
     private final SinistreReadinessService readinessService;
     private final SinistreSuiviService suiviService;
+    private final SinistreWorkflowService workflowService;
 
     public SinistreSummaryResponse toSummary(Sinistre sinistre) {
         SinistreCouverture couverture = resolveCouverture(sinistre);
@@ -57,6 +58,7 @@ public class SinistreResponseMapper {
                 .numeroSinistre(sinistre.getNumeroSinistre())
                 .referenceCompagnie(sinistre.getReferenceCompagnie())
                 .statut(sinistre.getStatut())
+                .editable(workflowService.isEditable(sinistre))
                 .etapeSuivi(sinistre.getEtapeSuivi())
                 .typeDommage(sinistre.getTypeDommage())
                 .modeReparation(sinistre.getModeReparation())
@@ -121,6 +123,7 @@ public class SinistreResponseMapper {
                 .numeroSinistre(sinistre.getNumeroSinistre())
                 .referenceCompagnie(sinistre.getReferenceCompagnie())
                 .statut(sinistre.getStatut())
+                .editable(workflowService.isEditable(sinistre))
                 .etapeSuivi(sinistre.getEtapeSuivi())
                 .typeDommage(sinistre.getTypeDommage())
                 .modeReparation(sinistre.getModeReparation())

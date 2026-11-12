@@ -145,6 +145,7 @@ export type PagedResponse<T> = { items: T[]; page: PageMetadata };
 
 export type SinistreSummary = {
   id: string;
+  editable?: boolean;
   numeroSinistre: string;
   referenceCompagnie?: string | null;
   etapeSuivi: EtapeSuiviSinistre;

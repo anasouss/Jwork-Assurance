@@ -29,6 +29,7 @@ public class SinistreDetailResponse {
     private String numeroSinistre;
     private String referenceCompagnie;
     private StatutSinistre statut;
+    private boolean editable;
     private com.assurance.enums.EtapeSuiviSinistre etapeSuivi;
     private com.assurance.enums.TypeDommageSinistre typeDommage;
     private com.assurance.enums.ModeReparationSinistre modeReparation;

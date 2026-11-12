@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,7 +33,7 @@ const VALID_NATURES = new Set<NatureSinistre>([
   "ACCIDENT", "VOL", "INCENDIE", "BRIS_DE_GLACE", "DOMMAGE_VEHICULE", "CORPOREL", "ASSISTANCE", "AUTRE",
 ]);
 const emptyOpeningFields: OpeningFields = {
-  referenceCompagnie: "", numeroPv: "", modeReparation: "",
+  numeroPv: "", modeReparation: "",
   tauxResponsabilite: "", garageId: "", expertVilleId: "", expertId: "", dateMission: "",
 };
 
@@ -58,6 +59,9 @@ export default function SinistreDeclarationPage() {
   const [opening, setOpening] = useState(emptyOpeningFields);
   const [documents, setDocuments] = useState<OpeningDocument[]>([]);
   const [expertDialogOpen, setExpertDialogOpen] = useState(false);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [referenceCompagnie, setReferenceCompagnie] = useState("");
+  const [referenceError, setReferenceError] = useState("");
 
   useEffect(() => {
     if (!hasContext) setContextOpen(true);
@@ -66,6 +70,9 @@ export default function SinistreDeclarationPage() {
   useEffect(() => {
     setOpening(emptyOpeningFields);
     setDocuments([]);
+    setReferenceCompagnie("");
+    setReferenceError("");
+    setConfirmationOpen(false);
   }, [contratId, requestedVehicleId]);
 
   const coverage = useQuery({
@@ -140,7 +147,7 @@ export default function SinistreDeclarationPage() {
         circonstances: circonstances.trim() || undefined,
         garantieIds: guaranteeIds,
         declarer,
-        referenceCompagnie: opening.referenceCompagnie.trim() || undefined,
+        referenceCompagnie: referenceCompagnie.trim() || undefined,
         numeroPv: opening.numeroPv.trim() || undefined,
         ...(automobile ? {
           typeDommage: typeDommage || undefined,
@@ -169,7 +176,7 @@ export default function SinistreDeclarationPage() {
 
   const busy = create.isPending || createExpert.isPending;
 
-  function submit(declarer: boolean) {
+  function submit(declarer: boolean, confirmed = false) {
     if (busy || expertDialogOpen) return;
     if (!hasContext || !coverage.data || (automobile && !selectedVehicle)) {
       toast.error("Le contexte de couverture est incomplet");
@@ -214,6 +221,15 @@ export default function SinistreDeclarationPage() {
     }
     if (declarer && (!circonstances.trim() || guaranteeIds.length === 0)) {
       toast.error("Les circonstances et une garantie impliquée sont obligatoires pour déclarer");
+      return;
+    }
+    if (declarer && !confirmed) {
+      setReferenceError("");
+      setConfirmationOpen(true);
+      return;
+    }
+    if (declarer && !referenceCompagnie.trim()) {
+      setReferenceError("La référence compagnie est obligatoire.");
       return;
     }
     create.mutate(declarer);
@@ -287,12 +303,12 @@ export default function SinistreDeclarationPage() {
 
           <Section title="Circonstances de l’événement" icon={MapPin}>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Field label="Date de déclaration *"><DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={(date) => setDateDeclaration(toIso(date))} /></Field>
+              <Field label="Date de déclaration" required><DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={(date) => setDateDeclaration(toIso(date))} /></Field>
               <Field label="Heure du sinistre"><TimePicker value={heureSinistre} onChange={setHeureSinistre} /></Field>
               <Field label="Ville"><SinistreVilleSelect cities={cities.data ?? []} value={villeId} onValueChange={setVilleId} /></Field>
               <Field label="Lieu précis"><Input value={lieu} maxLength={500} onChange={(event) => setLieu(event.target.value)} /></Field>
               <div className="md:col-span-2 lg:col-span-4">
-                <Field label="Circonstances *"><Textarea value={circonstances} rows={5} maxLength={4000}
+                <Field label="Circonstances" required><Textarea value={circonstances} rows={5} maxLength={4000}
                   placeholder="Décrivez les faits, les dommages constatés et les parties impliquées."
                   onChange={(event) => setCirconstances(event.target.value)} /></Field>
               </div>
@@ -333,6 +349,30 @@ export default function SinistreDeclarationPage() {
         cities={cities.data ?? []} initialVilleId={opening.expertVilleId} saving={createExpert.isPending}
         onOpenChange={setExpertDialogOpen}
         onSubmit={(request) => { if (canCreateExpert && !busy) createExpert.mutate(request); }} />
+      <Dialog open={confirmationOpen} onOpenChange={(open) => { if (!busy) setConfirmationOpen(open); }}>
+        <DialogContent className="sm:max-w-md" showCloseButton={!busy}>
+          <DialogHeader>
+            <DialogTitle>Enregistrer l’ouverture</DialogTitle>
+            <DialogDescription className="sr-only">Référence compagnie du sinistre</DialogDescription>
+          </DialogHeader>
+          <form noValidate className="grid gap-5" onSubmit={(event) => { event.preventDefault(); submit(true, true); }}>
+            <div className="grid gap-1.5">
+              <Label htmlFor="opening-company-reference">Référence compagnie <span className="text-red-500">*</span></Label>
+              <Input id="opening-company-reference" autoFocus required maxLength={100} disabled={busy}
+                value={referenceCompagnie} aria-invalid={Boolean(referenceError)}
+                aria-describedby={referenceError ? "opening-company-reference-error" : undefined}
+                onChange={(event) => { setReferenceCompagnie(event.target.value); setReferenceError(""); }} />
+              {referenceError ? <p id="opening-company-reference-error" role="alert" className="text-sm text-destructive">{referenceError}</p> : null}
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmationOpen(false)}>Annuler</Button>
+              <Button type="submit" disabled={busy}>
+                {create.isPending ? <LoaderCircle className="size-4 animate-spin" /> : null} Confirmer l’ouverture
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -388,8 +428,8 @@ function GuaranteeTable({ guarantees, selectedIds, onToggle }: {
   </Table></div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="grid gap-1.5"><Label>{label}</Label>{children}</div>;
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+  return <div className="grid gap-1.5"><Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>{children}</div>;
 }
 
 const decimalFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

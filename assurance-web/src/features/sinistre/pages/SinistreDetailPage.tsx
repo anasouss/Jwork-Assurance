@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -18,7 +18,7 @@ import {
   Trash2,
   UserRoundSearch,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -304,10 +304,7 @@ export default function SinistreDetailPage() {
       </div>
     );
   const dossier = detail.data;
-  const locked =
-    dossier.statut === "CLOTURE" ||
-    dossier.statut === "ANNULE" ||
-    dossier.statut === "REJETE";
+  const locked = dossier.editable !== true;
   const cancelledIds = new Set(
     dossier.operations
       .filter((item) => item.type === "ANNULATION" && item.operationAnnuleeId)
@@ -1224,6 +1221,13 @@ function GeneralSection({
   saving: boolean;
   onSave: (request: object) => void;
 }) {
+  const location = useLocation();
+  const sectionRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (location.hash !== "#modifier" || !editable) return;
+    sectionRef.current?.scrollIntoView({ block: "start" });
+    sectionRef.current?.querySelector<HTMLInputElement>("input:not(:disabled)")?.focus({ preventScroll: true });
+  }, [location.hash, location.key, editable, dossier.id]);
   const [form, setForm] = useState({
     referenceCompagnie: "",
     villeId: "",
@@ -1269,13 +1273,13 @@ function GeneralSection({
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-      <section className="rounded-md border bg-card p-4">
+      <section id="modifier" ref={sectionRef} className="scroll-mt-24 rounded-md border bg-card p-4">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-semibold">Informations du sinistre</h2>
           {editable ? (
             <Button
               size="sm"
-              disabled={saving || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
+              disabled={saving || (dossier.statut !== "BROUILLON" && !form.referenceCompagnie.trim()) || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
               onClick={() =>
                 onSave({
                   referenceCompagnie:
@@ -1375,9 +1379,10 @@ function GeneralSection({
               />
             </Field>
           </div>
-          <Field label="Référence compagnie">
+          <Field label="Référence compagnie" required={dossier.statut !== "BROUILLON"}>
             <Input
               disabled={!editable}
+              maxLength={100}
               value={form.referenceCompagnie}
               onChange={(event) =>
                 update("referenceCompagnie", event.target.value)
@@ -1817,14 +1822,16 @@ function WorkflowReadiness({ dossier }: { dossier: SinistreDetail }) {
 }
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
       {children}
     </div>
   );

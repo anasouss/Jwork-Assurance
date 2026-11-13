@@ -79,8 +79,6 @@ public class AmendmentActivity {
                 .put("Saisie avec primes", request.getSaisiePrimeNette())
                 .put("Mode de règlement", request.getModeReglement() == null ? null
                         : ContractActivity.paymentMode(request.getModeReglement().name()))
-                .put("Bon de commande", request.getNumeroBonCommande())
-                .put("Montant du bulletin", request.getMontantBulletin())
                 .put("Véhicules sélectionnés", items(request.getVehiculeIds()).stream().map(id -> vehicle(contract, id))
                         .sorted().collect(Collectors.joining(", ")))
                 .put("Remorques sélectionnées", items(request.getRemorqueIds()).stream().map(id -> trailer(contract, id))

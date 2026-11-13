@@ -11,12 +11,12 @@ import type {
 } from "../types";
 
 export function conventionPaymentDefaults(contract: Pick<ContratSummary, "typeContrat" | "modeReglement">, request?: AvenantRequest): {
-  mode: AvenantRequest["modeReglement"]; numeroBonCommande: string; montantBulletin: string;
+  mode: AvenantRequest["modeReglement"];
 } {
-  if (contract.typeContrat !== "CONVENTION") return { mode: undefined, numeroBonCommande: "", montantBulletin: "" };
+  if (contract.typeContrat !== "CONVENTION") return { mode: undefined };
   const inherited = contract.modeReglement?.trim().toLowerCase();
   const mode = request?.modeReglement ?? (inherited === "bureau" || inherited === "facture" ? inherited : undefined);
-  return { mode, numeroBonCommande: request?.numeroBonCommande ?? "", montantBulletin: request?.montantBulletin == null ? "" : String(request.montantBulletin) };
+  return { mode };
 }
 
 export type AmendmentTarget = {

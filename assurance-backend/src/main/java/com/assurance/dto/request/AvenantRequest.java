@@ -29,8 +29,11 @@ public class AvenantRequest {
     private com.assurance.enums.ModeReglementConvention modeReglement;
 
     @Size(max = 120)
+    @Deprecated
     private String numeroBonCommande;
 
+    /** Legacy drafts only. Amendment billing uses the receipt TTC, not this input. */
+    @Deprecated
     private java.math.BigDecimal montantBulletin;
 
     @Valid

@@ -158,23 +158,18 @@ class ContratDraftCleanupTest {
     }
 
     @Test
-    void conventionAmendmentInvoiceRequiresItsOwnOrderAndAmount() {
+    void conventionAmendmentInvoiceNeedsOnlyModeAndDoesNotReuseTheOriginalBulletin() {
         var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("facture")
                 .numeroBonCommande("OLD-ORDER").montantBulletin(new java.math.BigDecimal("9000")).build();
         var request = new AvenantRequest();
         var preview = com.assurance.dto.response.QuittanceResponse.builder().primeTotale(new java.math.BigDecimal("100")).build();
-        assertThatThrownBy(() -> ConventionPaymentPolicy.apply(original, new com.assurance.entity.MouvementContrat(), request, preview))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("bon de commande");
-        request.setNumeroBonCommande("NEW-ORDER");
-        assertThatThrownBy(() -> ConventionPaymentPolicy.apply(original, new com.assurance.entity.MouvementContrat(), request, preview))
-                .isInstanceOf(BadRequestException.class).hasMessageContaining("bulletin");
-        request.setMontantBulletin(new java.math.BigDecimal("100.00"));
         var movement = new com.assurance.entity.MouvementContrat();
         ConventionPaymentPolicy.apply(original, movement, request, preview);
         assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.FACTURE);
-        assertThat(movement.getNumeroBonCommande()).isEqualTo("NEW-ORDER");
-        assertThat(movement.getMontantBulletin()).isEqualByComparingTo("100.00");
+        assertThat(movement.getNumeroBonCommande()).isNull();
+        assertThat(movement.getMontantBulletin()).isNull();
         assertThat(original.getNumeroBonCommande()).isEqualTo("OLD-ORDER");
+        assertThat(original.getMontantBulletin()).isEqualByComparingTo("9000");
     }
 
     @Test
@@ -194,7 +189,7 @@ class ContratDraftCleanupTest {
     }
 
     @Test
-    void zeroAndRefundAmendmentsDoNotRequirePaymentDetails() {
+    void zeroAmendmentsNeedNoPaymentModeAndRefundsNeedOnlyTheMode() {
         var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("facture").build();
         for (var preview : List.of(
                 com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.ZERO).build(),
@@ -202,20 +197,24 @@ class ContratDraftCleanupTest {
                 com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.TEN.negate()).build())) {
             var movement = new com.assurance.entity.MouvementContrat();
             ConventionPaymentPolicy.apply(original, movement, new AvenantRequest(), preview);
-            assertThat(preview.getRequiresConventionPayment()).isFalse();
-            assertThat(movement.getModeReglementConvention()).isNull();
+            boolean hasPremium = preview.getPrimeTotale().signum() != 0;
+            assertThat(preview.getRequiresConventionPayment()).isEqualTo(hasPremium);
+            assertThat(movement.getModeReglementConvention()).isEqualTo(hasPremium
+                    ? com.assurance.enums.ModeReglementConvention.FACTURE : null);
+            assertThat(movement.getNumeroBonCommande()).isNull();
+            assertThat(movement.getMontantBulletin()).isNull();
         }
     }
 
     @Test
-    void assistanceOnlyChargeStillRequiresAConventionPaymentChoice() {
+    void separateAssistanceDoesNotChangeTheInsuranceAmendmentPremium() {
         var original = Contrat.builder().typeContrat(TypeContrat.CONVENTION).modeReglement("bureau").build();
         var preview = com.assurance.dto.response.QuittanceResponse.builder().primeTotale(java.math.BigDecimal.ZERO)
                 .assistances(List.of(com.assurance.dto.response.AssistanceContratResponse.builder().primeTotale(java.math.BigDecimal.TEN).build())).build();
         var movement = new com.assurance.entity.MouvementContrat();
         ConventionPaymentPolicy.apply(original, movement, new AvenantRequest(), preview);
-        assertThat(preview.getRequiresConventionPayment()).isTrue();
-        assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.BUREAU);
+        assertThat(preview.getRequiresConventionPayment()).isFalse();
+        assertThat(movement.getModeReglementConvention()).isNull();
     }
 
     @Test

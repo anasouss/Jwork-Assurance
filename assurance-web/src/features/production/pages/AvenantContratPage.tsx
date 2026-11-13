@@ -77,8 +77,6 @@ export default function AvenantContratPage() {
   const [dateEcheance, setDateEcheance] = useState<string>();
   const [libelleReleve, setLibelleReleve] = useState("");
   const [modeReglement, setModeReglement] = useState<AvenantRequest["modeReglement"]>();
-  const [numeroBonCommande, setNumeroBonCommande] = useState("");
-  const [montantBulletin, setMontantBulletin] = useState("");
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>([]);
   const [precisionDrafts, setPrecisionDrafts] = useState<Record<string, PrecisionDraft>>({});
   const [duplicataAttestationDrafts, setDuplicataAttestationDrafts] = useState<Record<string, DuplicataAttestationDraft>>({});
@@ -357,8 +355,6 @@ export default function AvenantContratPage() {
     const request = validatedMovementId ? rectificationQuery.data : draftQuery.data?.request;
     const payment = conventionPaymentDefaults(contrat, request ?? undefined);
     setModeReglement(payment.mode);
-    setNumeroBonCommande(payment.numeroBonCommande);
-    setMontantBulletin(payment.montantBulletin);
     if (!request) {
       if (isVehicleTargetCreationCode(movementCode)) {
         setVehicules([{ ...DEFAULT_VEHICLE }]);
@@ -529,8 +525,6 @@ export default function AvenantContratPage() {
       codeTypeMouvement: movementCode,
       libelleReleve: libelleReleve.trim() || undefined,
       modeReglement: contrat?.typeContrat === "CONVENTION" ? modeReglement : undefined,
-      numeroBonCommande: contrat?.typeContrat === "CONVENTION" && modeReglement === "facture" ? numeroBonCommande.trim() || undefined : undefined,
-      montantBulletin: contrat?.typeContrat === "CONVENTION" && modeReglement === "facture" ? numberValue(montantBulletin) : undefined,
       dateEffet,
       dateEcheance: contrat?.dateEcheance || dateEcheance || undefined,
       quittances: supportsManualQuittance ? quittanceLines : undefined,
@@ -861,8 +855,6 @@ export default function AvenantContratPage() {
     quittanceLines,
     saisiePrimeNette,
     modeReglement,
-    numeroBonCommande,
-    montantBulletin,
   ]);
 
   useEffect(() => {
@@ -902,9 +894,6 @@ export default function AvenantContratPage() {
   const save = () => {
     if (contrat?.typeContrat === "CONVENTION" && preview?.requiresConventionPayment) {
       if (!modeReglement) { toast.error("Sélectionnez le mode de règlement de l'avenant"); return; }
-      if (modeReglement === "facture" && ((preview.typeImpactMouvement !== "RETOUR_PRIME" && !numeroBonCommande.trim()) || !(Number(numberValue(montantBulletin)) > 0))) {
-        toast.error("Renseignez le montant du bulletin et, pour une prime à payer, le bon de commande"); return;
-      }
     }
     const request = buildRequest();
     if (request) saveMutation.mutate(request);
@@ -1123,17 +1112,10 @@ export default function AvenantContratPage() {
           </Field>
           {contrat?.typeContrat === "CONVENTION" && preview?.requiresConventionPayment !== false && <>
             <Field label="Mode de règlement de l'avenant">
-              <Select value={modeReglement ?? ""} onValueChange={value => {
-                setModeReglement(value as AvenantRequest["modeReglement"]);
-                if (value !== "facture") { setNumeroBonCommande(""); setMontantBulletin(""); }
-              }}><SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>
+              <Select value={modeReglement ?? ""} onValueChange={value => setModeReglement(value as AvenantRequest["modeReglement"])}><SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>
                 <SelectItem value="bureau">Règlement bureau</SelectItem><SelectItem value="facture">Règlement facture</SelectItem>
               </SelectContent></Select>
             </Field>
-            {modeReglement === "facture" && <>
-              <Field label="N° bon de commande de l'avenant"><Input maxLength={120} value={numeroBonCommande} onChange={event => setNumeroBonCommande(event.target.value)} /></Field>
-              <Field label={preview?.typeImpactMouvement === "RETOUR_PRIME" ? "Montant du bulletin à déduire" : "Montant du bulletin de l'avenant"}><Input inputMode="decimal" value={montantBulletin} onChange={event => setMontantBulletin(event.target.value)} /></Field>
-            </>}
           </>}
         </CardContent>
       </Card>

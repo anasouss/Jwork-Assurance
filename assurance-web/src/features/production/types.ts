@@ -294,8 +294,6 @@ export type MouvementContratRequest = {
 export type AvenantRequest = {
   codeTypeMouvement: string;
   modeReglement?: "bureau" | "facture";
-  numeroBonCommande?: string;
-  montantBulletin?: number;
   libelleReleve?: string;
   saisiePrimeNette?: boolean;
   quittances?: QuittanceInput[];

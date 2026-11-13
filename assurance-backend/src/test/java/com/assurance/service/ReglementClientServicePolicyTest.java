@@ -105,9 +105,15 @@ class ReglementClientServicePolicyTest {
         var start = java.time.LocalDate.of(2026, 1, 1);
         var end = java.time.LocalDate.of(2026, 12, 31);
         var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION)
-                .modeReglement("facture").dateEffet(start).dateEcheance(end).build();
+                .modeReglement("facture").dateEffet(start).dateEcheance(end)
+                .convention(com.assurance.entity.Convention.builder()
+                        .typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE).echeance("01/01")
+                        .fractionnement(com.assurance.enums.Fractionnement.SEMESTRIEL).build()).build();
         var movement = com.assurance.entity.MouvementContrat.builder().contrat(contract)
                 .statut(com.assurance.enums.StatutMouvementContrat.VALIDE)
+                .dateEffet(start).dateEcheance(end)
+                .typeMouvement(com.assurance.entity.TypeMouvementContrat.builder()
+                        .categorie(com.assurance.enums.CategorieMouvementContrat.AVENANT).build())
                 .montantBulletin(new BigDecimal("1840.00"))
                 .modeReglementConvention(com.assurance.enums.ModeReglementConvention.FACTURE).build();
         contract.setId(10L);
@@ -117,8 +123,6 @@ class ReglementClientServicePolicyTest {
                 .actif(true).statut(com.assurance.enums.StatutElementFacturable.QUITTANCE)
                 .dateDebut(start).dateFin(end).primeNette(new BigDecimal("80.00")).primeTotale(new BigDecimal("100.00")).build();
         element.setId(20L);
-        when(conventionElementRepository.findByContratIdInAndActifTrueOrderByDateDebutAscIdAsc(List.of(10L)))
-                .thenReturn(List.of(element));
         var base = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract).periodeDebut(start).periodeFin(end).build();
         var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(contract).mouvement(movement)
                 .sourceKey("MOUVEMENT-50").periodeDebut(start).periodeFin(java.time.LocalDate.of(2026, 6, 30)).build();
@@ -131,9 +135,9 @@ class ReglementClientServicePolicyTest {
         assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(baseAmount, "ttc")).isEqualByComparingTo("0.00");
         BigDecimal firstTtc = ReflectionTestUtils.invokeMethod(firstAmount, "ttc");
         BigDecimal secondTtc = ReflectionTestUtils.invokeMethod(secondAmount, "ttc");
-        assertThat(firstTtc).isEqualByComparingTo("920.00");
-        assertThat(secondTtc).isEqualByComparingTo("920.00");
-        assertThat(firstTtc.add(secondTtc)).isEqualByComparingTo("1840.00");
+        assertThat(firstTtc).isEqualByComparingTo("100.00");
+        assertThat(secondTtc).isEqualByComparingTo("0.00");
+        assertThat(firstTtc.add(secondTtc)).isEqualByComparingTo(element.getPrimeTotale());
         movement.setModeReglementConvention(com.assurance.enums.ModeReglementConvention.BUREAU);
         Object bureauAmount = ReflectionTestUtils.invokeMethod(conventionBilling, "allocate", element, first, schedules);
         assertThat((BigDecimal) ReflectionTestUtils.invokeMethod(bureauAmount, "ttc")).isEqualByComparingTo("0.00");
@@ -303,7 +307,7 @@ class ReglementClientServicePolicyTest {
     }
 
     @Test
-    void negativeMovementCapturesItsOwnBulletinRatherThanReusingTheOriginalContractAmount() {
+    void negativeMovementNeedsNoBulletinAndDoesNotChangeTheOriginalContractAmount() {
         var contract = Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION).modeReglement("facture")
                 .montantBulletin(new BigDecimal("1840.00")).build();
         var response = com.assurance.dto.response.QuittanceResponse.builder().typeImpactMouvement("RETOUR_PRIME")
@@ -314,7 +318,7 @@ class ReglementClientServicePolicyTest {
         var movement = com.assurance.entity.MouvementContrat.builder().contrat(contract).build();
         ConventionPaymentPolicy.apply(contract, movement, request, response);
         assertThat(response.getRequiresConventionPayment()).isTrue();
-        assertThat(movement.getMontantBulletin()).isEqualByComparingTo("200.00");
+        assertThat(movement.getMontantBulletin()).isNull();
         assertThat(movement.getModeReglementConvention()).isEqualTo(com.assurance.enums.ModeReglementConvention.FACTURE);
         assertThat(contract.getMontantBulletin()).isEqualByComparingTo("1840.00");
     }

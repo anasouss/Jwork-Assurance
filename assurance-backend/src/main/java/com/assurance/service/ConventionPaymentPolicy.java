@@ -33,6 +33,11 @@ public final class ConventionPaymentPolicy {
         return mode == ModeReglementConvention.FACTURE;
     }
 
+    public static boolean isAmendment(MouvementContrat movement) {
+        return movement != null && movement.getTypeMouvement() != null
+                && movement.getTypeMouvement().getCategorie() == com.assurance.enums.CategorieMouvementContrat.AVENANT;
+    }
+
     public static QuittanceResponse preview(Contrat contract, QuittanceResponse response) {
         BigDecimal premium = "RETOUR_PRIME".equals(response.getTypeImpactMouvement())
                 ? zero(response.getPrimeTotale()).abs().negate() : zero(response.getPrimeTotale());
@@ -44,29 +49,16 @@ public final class ConventionPaymentPolicy {
     public static void apply(Contrat contract, MouvementContrat movement, AvenantRequest request, QuittanceResponse response) {
         preview(contract, response);
         if (contract.getTypeContrat() != TypeContrat.CONVENTION) {
-            if (request.getModeReglement() != null || request.getNumeroBonCommande() != null || request.getMontantBulletin() != null) {
+            if (request.getModeReglement() != null) {
                 throw new BadRequestException("Le mode de reglement de l'avenant concerne uniquement les conventions");
             }
             return;
         }
+        movement.setNumeroBonCommande(null);
+        movement.setMontantBulletin(null);
         if (!Boolean.TRUE.equals(response.getRequiresConventionPayment())) return;
         ModeReglementConvention mode = request.getModeReglement() == null ? inheritedMode(contract) : request.getModeReglement();
         if (mode == null) throw new BadRequestException("Selectionnez le mode de reglement de l'avenant");
-        if (mode == ModeReglementConvention.FACTURE) {
-            String order = request.getNumeroBonCommande() == null ? "" : request.getNumeroBonCommande().trim();
-            boolean credit = "RETOUR_PRIME".equals(response.getTypeImpactMouvement())
-                    || zero(response.getPrimeTotale()).signum() < 0;
-            if ((!credit && order.isEmpty()) || order.length() > 120) throw new BadRequestException("Le numero de bon de commande de l'avenant est obligatoire (120 caracteres maximum)");
-            BigDecimal amount = request.getMontantBulletin();
-            if (amount == null || amount.signum() <= 0 || amount.scale() > 2 || amount.precision() - amount.scale() > 12) {
-                throw new BadRequestException("Renseignez un montant de bulletin positif pour cet avenant, avec deux decimales maximum");
-            }
-            movement.setNumeroBonCommande(order.isEmpty() ? null : order);
-            movement.setMontantBulletin(amount);
-        } else {
-            movement.setNumeroBonCommande(null);
-            movement.setMontantBulletin(null);
-        }
         movement.setModeReglementConvention(mode);
     }
 

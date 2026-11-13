@@ -2820,8 +2820,6 @@ public class ContratService {
         request.setNotes(mouvement.getNotes());
         request.setLibelleReleve(mouvement.getLibelleReleve());
         request.setModeReglement(mouvement.getModeReglementConvention());
-        request.setNumeroBonCommande(mouvement.getNumeroBonCommande());
-        request.setMontantBulletin(mouvement.getMontantBulletin());
         request.setSaisiePrimeNette(mouvement.getSaisiePrimeNette() != null
                 ? mouvement.getSaisiePrimeNette() : mouvement.getContrat().getSaisiePrimeNette());
         if (mouvement.getContrat().getTypeContrat() == TypeContrat.PARTICULIER

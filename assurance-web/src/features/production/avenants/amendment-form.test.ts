@@ -31,20 +31,20 @@ describe("saved vehicle summary formatting", () => {
 describe("amendment form adapters", () => {
   it("inherits only the convention payment mode, not the original purchase order or full bulletin amount", () => {
     expect(conventionPaymentDefaults({ typeContrat: "CONVENTION", modeReglement: " facture " })).toEqual({
-      mode: "facture", numeroBonCommande: "", montantBulletin: "",
+      mode: "facture",
     });
   });
 
-  it("restores amendment-specific billing information when reopening or rectifying", () => {
+  it("restores only the amendment payment mode when reopening or rectifying", () => {
     expect(conventionPaymentDefaults({ typeContrat: "CONVENTION", modeReglement: "bureau" }, {
-      codeTypeMouvement: "CHV_M", modeReglement: "facture", numeroBonCommande: "BC-AV-1", montantBulletin: 1250.5,
-    })).toEqual({ mode: "facture", numeroBonCommande: "BC-AV-1", montantBulletin: "1250.5" });
+      codeTypeMouvement: "CHV_M", modeReglement: "facture",
+    })).toEqual({ mode: "facture" });
   });
 
   it("does not invent a missing payment mode or apply convention fields to mono or fleet", () => {
     expect(conventionPaymentDefaults({ typeContrat: "CONVENTION", modeReglement: null }).mode).toBeUndefined();
     expect(conventionPaymentDefaults({ typeContrat: "PARTICULIER", modeReglement: "facture" })).toEqual({
-      mode: undefined, numeroBonCommande: "", montantBulletin: "",
+      mode: undefined,
     });
     expect(conventionPaymentDefaults({ typeContrat: "FLOTTE", modeReglement: "facture" }).mode).toBeUndefined();
   });

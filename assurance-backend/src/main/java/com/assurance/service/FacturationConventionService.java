@@ -134,7 +134,7 @@ public class FacturationConventionService {
                 lines.add(invoiceLine(element, schedule, amount));
             }
             String blocked = lines.isEmpty() ? "Aucune source facturable"
-                    : lines.stream().anyMatch(line -> line.montantAPayer() == null) ? "Montant bulletin manquant" : null;
+                    : lines.stream().anyMatch(line -> line.montantAPayer() == null) ? "Montant facturable manquant" : null;
             rows.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(),
                     payer.group() == null ? payer.client().getId() : payer.group().getId(),
                     payer.group() == null ? "CLIENT" : "GROUPE", payer.name(), blocked, lines));
@@ -157,7 +157,7 @@ public class FacturationConventionService {
                     .getOrDefault(schedule.getContrat().getId(), List.of())) {
                 if (!matchesSource(element, schedule) || !isBillable(element)
                         || !ConventionPaymentPolicy.isInvoice(element)) continue;
-                if (elementBulletin(element) == null) throw new BadRequestException("Montant bulletin manquant pour le dossier "
+                if (elementBulletin(element) == null) throw new BadRequestException("Montant facturable manquant pour le dossier "
                         + schedule.getContrat().getNumeroDossier());
                 Amount amount = allocate(element, schedule, schedules);
                 if (amount.ttc().signum() == 0) continue;
@@ -214,15 +214,15 @@ public class FacturationConventionService {
 
     private Long sourceMovementId(MouvementContrat movement) {
         if (movement == null) return null;
-        boolean amendment = movement.getTypeMouvement() != null
-                && movement.getTypeMouvement().getCategorie() == com.assurance.enums.CategorieMouvementContrat.AVENANT;
+        boolean amendment = ConventionPaymentPolicy.isAmendment(movement);
         return movement.getModeReglementConvention() != null || amendment ? movement.getId() : null;
     }
 
     BigDecimal elementBulletin(ElementFacturable element) {
         MouvementContrat movement = element.getMouvementContrat();
-        if (movement != null && movement.getModeReglementConvention() == null
-                && movement.getTypeMouvement().getCategorie() == com.assurance.enums.CategorieMouvementContrat.AVENANT) return null;
+        if (ConventionPaymentPolicy.isAmendment(movement)) {
+            return element.getPrimeTotale() == null ? null : money(element.getPrimeTotale());
+        }
         BigDecimal total = movement != null && movement.getModeReglementConvention() != null
                 ? movement.getMontantBulletin() : element.getContrat().getMontantBulletin();
         if (total == null || total.signum() <= 0) return null;
@@ -554,7 +554,8 @@ public class FacturationConventionService {
                 expectedBySource.put("CONTRAT", contractPeriods);
             }
             movements.forEach((source, movement) -> expectedBySource.put(source,
-                    buildPeriods(movement.getDateEffet(), movement.getDateEcheance(), contract.getConvention())));
+                    buildPeriods(movement.getDateEffet(), ConventionPaymentPolicy.isAmendment(movement)
+                            ? movement.getDateEffet() : movement.getDateEcheance(), contract.getConvention())));
             Map<String, EcheanceFacturationConvention> existing = echeanceRepository
                     .findByContratIdOrderByNumeroPeriodeAsc(contract.getId()).stream()
                     .collect(Collectors.toMap(item -> item.getSourceKey() + ":" + periodKey(item), Function.identity()));
@@ -666,7 +667,8 @@ public class FacturationConventionService {
                 .contratId(contract.getId())
                 .mouvementId(item.getMouvement() == null ? null : item.getMouvement().getId())
                 .numeroMouvement(item.getMouvement() == null ? null : item.getMouvement().getNumeroMouvement())
-                .numeroBonCommande(item.getMouvement() == null ? contract.getNumeroBonCommande() : item.getMouvement().getNumeroBonCommande())
+                .numeroBonCommande(ConventionPaymentPolicy.isAmendment(item.getMouvement()) ? null
+                        : item.getMouvement() == null ? contract.getNumeroBonCommande() : item.getMouvement().getNumeroBonCommande())
                 .documentId(item.getDocumentClient() == null ? null : item.getDocumentClient().getId())
                 .payeurId(payer.group() == null ? payer.client().getId() : payer.group().getId())
                 .payeurType(payer.group() == null ? "CLIENT" : "GROUPE")
@@ -692,7 +694,7 @@ public class FacturationConventionService {
                 .montantTtc(amount.ttc())
                 .montantBulletin(issuedAmount != null ? issuedAmount.bulletin()
                         : missingBulletin ? null : sourceElements.stream().map(this::elementBulletin).reduce(ZERO, BigDecimal::add))
-                .blocage(issuedAmount == null && missingBulletin ? "Source ou montant bulletin manquant pour ce mouvement" : null)
+                .blocage(issuedAmount == null && missingBulletin ? "Source ou montant facturable manquant pour ce mouvement" : null)
                 .build();
     }
 
@@ -716,6 +718,15 @@ public class FacturationConventionService {
         LocalDate sourceEnd = element.getDateFin() == null
                 ? element.getContrat().getDateEcheance()
                 : element.getDateFin();
+        if (ConventionPaymentPolicy.isAmendment(movement)) {
+            LocalDate effectiveDate = movement.getDateEffet() == null ? sourceStart : movement.getDateEffet();
+            Period period = buildPeriods(effectiveDate, effectiveDate, element.getContrat().getConvention()).get(0);
+            if (!period.start().equals(target.getPeriodeDebut()) || !period.end().equals(target.getPeriodeFin())) return Amount.ZERO;
+            BigDecimal total = elementBulletin(element);
+            if (total == null) return Amount.ZERO;
+            return new Amount(money(element.getPrimeNette()), money(zero(element.getTaxe()).add(zero(element.getTaxeParafiscale()))),
+                    money(zero(element.getAccessoire()).add(zero(element.getCnpac()))), total);
+        }
         List<EcheanceFacturationConvention> overlaps = schedules.stream()
                 .filter(item -> Objects.equals(item.getSourceKey(), target.getSourceKey()))
                 .filter(item -> overlaps(sourceStart, sourceEnd, item.getPeriodeDebut(), item.getPeriodeFin()))

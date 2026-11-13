@@ -10,7 +10,6 @@ export type SinistreListParams = {
   brancheId?: string;
   statut?: StatutSinistre;
   etapeSuivi?: EtapeSuiviSinistre;
-  nature?: NatureSinistre;
   dateDu?: string;
   dateAu?: string;
   page?: number;
@@ -50,17 +49,11 @@ export type MissionExpertiseRequest = {
 export type SinistreOpeningRequest = {
   contratId: string;
   vehiculeId?: string;
-  nature: NatureSinistre;
   dateSinistre: string;
-  heureSinistre?: string;
   dateDeclaration: string;
-  villeId?: string;
-  lieu?: string;
-  circonstances?: string;
   garantieIds: string[];
   declarer: boolean;
   referenceCompagnie?: string;
-  numeroPv?: string;
   tauxResponsabilite?: number;
   typeDommage?: TypeDommageSinistre;
   modeReparation?: ModeReparationSinistre;
@@ -81,16 +74,6 @@ export type StatutSinistre =
   | "REJETE"
   | "ANNULE"
   | "ROUVERT";
-
-export type NatureSinistre =
-  | "ACCIDENT"
-  | "VOL"
-  | "INCENDIE"
-  | "BRIS_DE_GLACE"
-  | "DOMMAGE_VEHICULE"
-  | "CORPOREL"
-  | "ASSISTANCE"
-  | "AUTRE";
 
 export type DecisionCouverture =
   | "A_ETUDIER"
@@ -157,7 +140,6 @@ export type SinistreSummary = {
   premierExpert?: string | null;
   garantiesImpliquees?: string[];
   statut: StatutSinistre;
-  nature: NatureSinistre;
   dateSinistre: string;
   dateDeclaration: string;
   numeroPolice?: string | null;
@@ -250,14 +232,8 @@ export type SinistreDetail = Omit<SinistreSummary,
   | "provisionCourante" | "totalRegle" | "totalRecours" | "updatedAt"
 > & {
   version: number;
-  heureSinistre?: string | null;
   dateTransmission?: string | null;
   dateCloture?: string | null;
-  villeId?: string | null;
-  ville?: string | null;
-  lieu?: string | null;
-  circonstances?: string | null;
-  numeroPv?: string | null;
   tauxResponsabilite?: number | null;
   notes?: string | null;
   gestionnaireId?: string | null;
@@ -444,7 +420,6 @@ export type SinistreTreasuryAccount = {
 export type SinistreDuplicate = {
   id: string;
   numeroSinistre: string;
-  nature: NatureSinistre;
   statut: StatutSinistre;
   dateSinistre: string;
 };

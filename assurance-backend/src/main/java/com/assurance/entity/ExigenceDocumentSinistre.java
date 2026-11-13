@@ -1,6 +1,5 @@
 package com.assurance.entity;
 
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.TypeDocumentSinistre;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,7 +19,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "exigences_documents_sinistre", indexes = @Index(
         name = "idx_exigence_document_sinistre",
-        columnList = "agence_id,nature,actif,ordre"
+        columnList = "agence_id,actif,ordre"
 ))
 @Getter
 @Setter
@@ -32,10 +31,6 @@ public class ExigenceDocumentSinistre extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agence_id")
     private Agence agence;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 40)
-    private NatureSinistre nature;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "type_document", nullable = false, length = 40)

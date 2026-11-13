@@ -19,7 +19,6 @@ import com.assurance.dto.response.SinistreGestionnaireResponse;
 import com.assurance.dto.response.SinistreDoublonResponse;
 import com.assurance.dto.response.SinistreSummaryResponse;
 import com.assurance.dto.response.CompteTresorerieResponse;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.security.TenantContext;
 import com.assurance.service.SinistreCouvertureService;
@@ -116,7 +115,6 @@ public class SinistreController {
             @RequestParam(required = false) Long contratId,
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) StatutSinistre statut,
-            @RequestParam(required = false) NatureSinistre nature,
             @RequestParam(required = false) com.assurance.enums.EtapeSuiviSinistre etapeSuivi,
             @RequestParam(required = false) LocalDate dateDu,
             @RequestParam(required = false) LocalDate dateAu,
@@ -130,7 +128,6 @@ public class SinistreController {
                 contratId,
                 brancheId,
                 statut,
-                nature,
                 etapeSuivi,
                 dateDu,
                 dateAu,

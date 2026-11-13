@@ -172,10 +172,6 @@ public class QuittancePrimePdfService {
                 if (showCompany) add(detail, row.company(row.element, assistance.get(row.element.getId())), normal, false);
                 if (!sharedPolicyAndPeriod) {
                     String policyIdentity = row.policyNumbers(assistance);
-                    if (multiPayer) {
-                        Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);
-                        policyIdentity += "\n" + value(subscriber == null ? null : subscriber.getNomAffichage());
-                    }
                     add(detail, policyIdentity, normal, TextAlignment.CENTER);
                     add(detail, date(row.element.getDateDebut()), normal, TextAlignment.CENTER);
                     add(detail, date(row.element.getDateFin()), normal, TextAlignment.CENTER);
@@ -398,28 +394,14 @@ public class QuittancePrimePdfService {
             document.add(identity);
             return;
         }
-        Map<Client, List<PrimeRow>> bySubscriber = new LinkedHashMap<>();
-        for (PrimeRow row : rows) {
-            Client subscriber = party(row.element.getContrat(), RoleClientContrat.SOUSCRIPTEUR);
-            bySubscriber.computeIfAbsent(subscriber, ignored -> new ArrayList<>()).add(row);
-        }
-        parties.add(new Paragraph(bySubscriber.size() == 1 ? "SOUSCRIPTEUR" : "SOUSCRIPTEURS")
+        parties.add(new Paragraph("SOUSCRIPTEUR")
                 .setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginBottom(6));
-        bySubscriber.forEach((subscriber, sourceRows) -> {
-            addField(parties, "Nom", subscriber == null ? null : subscriber.getNomAffichage(), normal, bold);
-            addField(parties, "Adresse", subscriber == null ? null : subscriber.getAdresse(), normal, bold);
-            addField(parties, "Ville", subscriber == null || subscriber.getVille() == null
-                    ? null : subscriber.getVille().getNom(), normal, bold);
-            if (bySubscriber.size() > 1) {
-                addField(parties, policyLabel(sourceRows), String.join(" · ", sourceRows.stream()
-                        .map(row -> row.policyNumbers(assistance)).distinct().toList()), normal, bold);
-            }
-            String insured = String.join(" · ", sourceRows.stream()
-                    .map(row -> party(row.element.getContrat(), RoleClientContrat.PROPRIETAIRE))
-                    .filter(client -> client != null && !sameClient(client, subscriber))
-                    .map(Client::getNomAffichage).filter(name -> name != null && !name.isBlank()).distinct().toList());
-            if (!insured.isBlank()) addField(parties, "Assuré", insured, normal, bold);
-        });
+        addField(parties, "Nom", payment.getPayeurNom(), normal, bold);
+        Client payer = payment.getClientPayeur();
+        if (payer != null) {
+            addField(parties, "Adresse", payer.getAdresse(), normal, bold);
+            addField(parties, "Ville", payer.getVille() == null ? null : payer.getVille().getNom(), normal, bold);
+        }
         identity.addCell(parties);
         document.add(identity);
     }
@@ -434,11 +416,6 @@ public class QuittancePrimePdfService {
         return contract.getClients().stream().filter(link -> link.getRole() == role && link.getClient() != null)
                 .min(Comparator.comparing(link -> !Boolean.TRUE.equals(link.getPrincipalPourRole())))
                 .map(ContratClient::getClient).orElse(null);
-    }
-
-    private static boolean sameClient(Client first, Client second) {
-        return first == second || (first != null && second != null && first.getId() != null
-                && first.getId().equals(second.getId()));
     }
 
     private List<PrimeRow> rows(ReglementClient payment, List<InstrumentReglementClient> instruments) {

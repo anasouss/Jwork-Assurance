@@ -12,7 +12,6 @@ import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.MouvementGarantie;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.Utilisateur;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.EtapeSuiviSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.dto.request.TransitionSinistreRequest;
@@ -108,10 +107,8 @@ class SinistreServiceTest {
         doAnswer(call -> call.getArgument(0, Supplier.class).get()).when(activity).perform(any(), any());
         request = new CreateSinistreRequest();
         request.setContratId(2L);
-        request.setNature(NatureSinistre.ACCIDENT);
         request.setDateSinistre(LocalDate.now().minusDays(1));
         request.setDateDeclaration(LocalDate.now());
-        request.setCirconstances("Collision");
         request.setGarantieIds(List.of(9L));
         request.setDeclarer(true);
     }

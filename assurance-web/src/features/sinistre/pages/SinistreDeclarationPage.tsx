@@ -1,39 +1,31 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, LoaderCircle, MapPin, Pencil, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CalendarDays, LoaderCircle, Pencil, ShieldCheck } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/store/auth-store";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
-import { TimePicker } from "@/components/ui/time-picker";
 import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
-import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import { SinistreOpeningFields, type OpeningFields } from "../components/SinistreOpeningFields";
-import { natureLabels } from "../format";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
 import { parseOpeningDamage } from "../opening-context";
 import { damageLabels } from "../workflow";
-import type { CoverageGuarantee, Intervenant, NatureSinistre, OpeningDocument } from "../types";
+import type { CoverageGuarantee, Intervenant, OpeningDocument } from "../types";
 
 const GUARANTEE_GROUPS = [
   { type: "VEHICULE", label: "Garanties du risque" },
   { type: "PERSONNE", label: "Garanties de personnes" },
 ] as const;
-const VALID_NATURES = new Set<NatureSinistre>([
-  "ACCIDENT", "VOL", "INCENDIE", "BRIS_DE_GLACE", "DOMMAGE_VEHICULE", "CORPOREL", "ASSISTANCE", "AUTRE",
-]);
 const emptyOpeningFields: OpeningFields = {
-  numeroPv: "", modeReparation: "",
+  modeReparation: "",
   tauxResponsabilite: "", garageId: "", expertVilleId: "", expertId: "", dateMission: "",
 };
 
@@ -46,15 +38,9 @@ export default function SinistreDeclarationPage() {
   const contratId = params.get("contratId") ?? "";
   const dateSinistre = params.get("dateSinistre") ?? "";
   const requestedVehicleId = params.get("vehiculeId") ?? "";
-  const natureParam = params.get("nature") as NatureSinistre | null;
-  const nature = natureParam && VALID_NATURES.has(natureParam) ? natureParam : null;
-  const hasContext = Boolean(contratId && dateSinistre && nature);
+  const dateDeclaration = params.get("dateDeclaration") ?? "";
+  const hasContext = Boolean(contratId && dateSinistre && dateDeclaration);
   const [contextOpen, setContextOpen] = useState(!hasContext);
-  const [dateDeclaration, setDateDeclaration] = useState(todayIso());
-  const [heureSinistre, setHeureSinistre] = useState("");
-  const [villeId, setVilleId] = useState("");
-  const [lieu, setLieu] = useState("");
-  const [circonstances, setCirconstances] = useState("");
   const [guaranteeIds, setGuaranteeIds] = useState<string[]>([]);
   const [opening, setOpening] = useState(emptyOpeningFields);
   const [documents, setDocuments] = useState<OpeningDocument[]>([]);
@@ -134,21 +120,14 @@ export default function SinistreDeclarationPage() {
   });
   const create = useMutation({
     mutationFn: (declarer: boolean) => {
-      if (!nature) throw new Error("La nature du sinistre est obligatoire");
       return sinistreApi.open({
         contratId,
         vehiculeId: selectedVehicle?.id,
-        nature,
         dateSinistre,
-        heureSinistre: heureSinistre || undefined,
         dateDeclaration,
-        villeId: villeId || undefined,
-        lieu: lieu.trim() || undefined,
-        circonstances: circonstances.trim() || undefined,
         garantieIds: guaranteeIds,
         declarer,
         referenceCompagnie: referenceCompagnie.trim() || undefined,
-        numeroPv: opening.numeroPv.trim() || undefined,
         ...(automobile ? {
           typeDommage: typeDommage || undefined,
           modeReparation: opening.modeReparation || undefined,
@@ -219,8 +198,8 @@ export default function SinistreDeclarationPage() {
       toast.error("Pièces trop volumineuses : 30 Mo par fichier, 31 Mo au total");
       return;
     }
-    if (declarer && (!circonstances.trim() || guaranteeIds.length === 0)) {
-      toast.error("Les circonstances et une garantie impliquée sont obligatoires pour déclarer");
+    if (declarer && guaranteeIds.length === 0) {
+      toast.error("Une garantie impliquée est obligatoire pour déclarer");
       return;
     }
     if (declarer && !confirmed) {
@@ -269,20 +248,20 @@ export default function SinistreDeclarationPage() {
         </AlertDescription></Alert>
       ) : null}
 
-      {coverage.data && nature ? (
+      {coverage.data && hasContext ? (
         <>
           <section className="overflow-hidden rounded-md border bg-card">
             <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
               <ContextItem label="Police" value={coverage.data.numeroPolice || coverage.data.numeroDossier || "-"} />
               <ContextItem label="Assuré" value={coverage.data.assure} />
               <ContextItem label="Branche" value={coverage.data.brancheLibelle || coverage.data.brancheCode || "-"} />
-              <ContextItem label={automobile ? "Véhicule" : "Événement"} value={automobile
+              <ContextItem label={automobile ? "Véhicule" : "Compagnie"} value={automobile
                 ? selectedVehicle?.immatriculation || "Véhicule non sélectionné"
-                : natureLabels[nature]} />
+                : coverage.data.compagnie || "-"} />
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t bg-muted/20 px-4 py-3 text-sm">
               <span className="flex items-center gap-2"><CalendarDays className="size-4 text-muted-foreground" /> Sinistre du <strong>{formatIsoDate(dateSinistre)}</strong></span>
-              <strong>{natureLabels[nature]}</strong>
+              <span>Déclaré le <strong>{formatIsoDate(dateDeclaration)}</strong></span>
               {automobile && typeDommage ? <span>Dommages : <strong>{damageLabels[typeDommage]}</strong></span> : null}
               <span className="text-muted-foreground">{coverage.data.compagnie} · mouvement {coverage.data.numeroMouvement}</span>
             </div>
@@ -294,26 +273,12 @@ export default function SinistreDeclarationPage() {
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                 {duplicates.data!.map((item) => (
                   <Link key={item.id} className="underline underline-offset-2" to={`/app/sinistre/dossiers/${item.id}`}>
-                    {item.numeroSinistre} · {natureLabels[item.nature]}
+                    {item.numeroSinistre}
                   </Link>
                 ))}
               </div>
             </div>
           ) : null}
-
-          <Section title="Circonstances de l’événement" icon={MapPin}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Field label="Date de déclaration" required><DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={(date) => setDateDeclaration(toIso(date))} /></Field>
-              <Field label="Heure du sinistre"><TimePicker value={heureSinistre} onChange={setHeureSinistre} /></Field>
-              <Field label="Ville"><SinistreVilleSelect cities={cities.data ?? []} value={villeId} onValueChange={setVilleId} /></Field>
-              <Field label="Lieu précis"><Input value={lieu} maxLength={500} onChange={(event) => setLieu(event.target.value)} /></Field>
-              <div className="md:col-span-2 lg:col-span-4">
-                <Field label="Circonstances" required><Textarea value={circonstances} rows={5} maxLength={4000}
-                  placeholder="Décrivez les faits, les dommages constatés et les parties impliquées."
-                  onChange={(event) => setCirconstances(event.target.value)} /></Field>
-              </div>
-            </div>
-          </Section>
 
           <Section title="Garanties impliquées" icon={ShieldCheck}>
             <GuaranteeTable guarantees={guarantees} selectedIds={guaranteeIds} onToggle={(id, checked) =>
@@ -341,7 +306,7 @@ export default function SinistreDeclarationPage() {
         onOpenChange={setContextOpen}
         initialContract={initialContract}
         initialDateSinistre={dateSinistre}
-        initialNature={nature ?? undefined}
+        initialDateDeclaration={dateDeclaration}
         initialVehicleId={selectedVehicle?.id}
         initialTypeDommage={typeDommage}
       />
@@ -428,21 +393,12 @@ function GuaranteeTable({ guarantees, selectedIds, onToggle }: {
   </Table></div>;
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return <div className="grid gap-1.5"><Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>{children}</div>;
-}
-
 const decimalFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 function formatDecimal(value?: number | null) {
   return value == null ? "-" : decimalFormatter.format(value).replace(/[\u00a0\u202f]/g, " ");
 }
 function formatRate(value?: number | null) {
   return value == null ? "-" : `${formatDecimal(value)} %`;
-}
-function todayIso() { return toIso(new Date()); }
-function toIso(date?: Date) {
-  if (!date) return "";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 function formatIsoDate(value: string) {
   const [year, month, day] = value.split("-");

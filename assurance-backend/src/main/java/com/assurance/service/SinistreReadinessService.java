@@ -56,9 +56,6 @@ public class SinistreReadinessService {
 
         if (target == StatutSinistre.DECLARE || target == StatutSinistre.TRANSMIS_COMPAGNIE) {
             blockers.addAll(SinistreQualificationService.declarationBlockers(sinistre));
-            if (!hasText(sinistre.getCirconstances())) {
-                blockers.add("Renseignez les circonstances du sinistre");
-            }
             if (involved.isEmpty()) {
                 blockers.add("Sélectionnez au moins une garantie impliquée");
             }
@@ -70,8 +67,7 @@ public class SinistreReadinessService {
 
         if (target == StatutSinistre.TRANSMIS_COMPAGNIE) {
             documentRequirementService.applicable(
-                    sinistre.getAgence().getId(),
-                    sinistre.getNature()
+                    sinistre.getAgence().getId()
             ).stream()
                     .filter(requirement -> requirement.isObligatoire())
                     .filter(requirement -> context.documents().stream().noneMatch(document ->

@@ -18,7 +18,6 @@ public interface SinistreRepository extends JpaRepository<Sinistre, Long>, JpaSp
             "contrat",
             "client",
             "vehicule",
-            "ville",
             "compagnieAssurance",
             "gestionnaire",
             "mouvementCouverture",

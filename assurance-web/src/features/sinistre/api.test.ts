@@ -30,7 +30,7 @@ describe("claims API contracts", () => {
     const constat = new File(["constat"], "constat.pdf", { type: "application/pdf" });
     const pv = new File(["pv"], "pv.pdf", { type: "application/pdf" });
     const request: SinistreOpeningRequest = {
-      contratId: "9007199254740993", nature: "ACCIDENT", dateSinistre: "2026-11-01",
+      contratId: "9007199254740993", dateSinistre: "2026-11-01",
       dateDeclaration: "2026-11-02", garantieIds: ["72"], tauxResponsabilite: 0,
       typeDommage: "MIXTE", modeReparation: "PEC", garageId: "35",
       expertInitial: { expertId: "38", phase: "AVANT", dateMission: "2026-11-03", statut: "MANDATEE" },
@@ -60,7 +60,7 @@ describe("claims API contracts", () => {
   });
 
   it("also opens a draft without making separate file requests", async () => {
-    await sinistreApi.open({ contratId: "1", nature: "VOL", dateSinistre: "2026-11-01", dateDeclaration: "2026-11-02", garantieIds: [], declarer: false }, []);
+    await sinistreApi.open({ contratId: "1", dateSinistre: "2026-11-01", dateDeclaration: "2026-11-02", garantieIds: [], declarer: false }, []);
     const form = vi.mocked(apiUpload).mock.calls[0][1];
     expect(form.getAll("files")).toEqual([]);
     expect(JSON.parse(await (form.get("documents") as Blob).text())).toEqual([]);
@@ -79,7 +79,7 @@ describe("claims API contracts", () => {
   it("exports all matching rows with precisely the applied list filters", async () => {
     const filters: SinistreListParams = {
       query: "12345-A-6", clientId: "7", contratId: "8", brancheId: "9",
-      statut: "DECLARE", etapeSuivi: "OUVERTURE", nature: "ACCIDENT",
+      statut: "DECLARE", etapeSuivi: "OUVERTURE",
       dateDu: "2026-11-01", dateAu: "2026-11-12", page: 3, size: 25,
     };
     await sinistreApi.list(filters);

@@ -17,7 +17,6 @@ import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreCouverture;
 import com.assurance.entity.SinistreGarantie;
 import com.assurance.entity.Utilisateur;
-import com.assurance.entity.Ville;
 import com.assurance.enums.DecisionCouvertureSinistre;
 import com.assurance.enums.EtapeSuiviSinistre;
 import com.assurance.enums.StatutSinistre;
@@ -30,7 +29,6 @@ import com.assurance.repository.SinistreGarantieRepository;
 import com.assurance.repository.SinistreOperationRepository;
 import com.assurance.repository.SinistreRepository;
 import com.assurance.repository.UtilisateurRepository;
-import com.assurance.repository.VilleRepository;
 import jakarta.persistence.criteria.JoinType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -58,7 +56,6 @@ public class SinistreService {
     private final SinistreOperationRepository operationRepository;
     private final MissionExpertiseRepository missionRepository;
     private final UtilisateurRepository utilisateurRepository;
-    private final VilleRepository villeRepository;
     private final SinistreCouvertureService couvertureService;
     private final SinistreNumeroService numeroService;
     private final SinistreWorkflowService workflowService;
@@ -97,7 +94,6 @@ public class SinistreService {
                 .map(item -> SinistreDoublonResponse.builder()
                         .id(item.getId())
                         .numeroSinistre(item.getNumeroSinistre())
-                        .nature(item.getNature())
                         .statut(item.getStatut())
                         .dateSinistre(item.getDateSinistre())
                         .build())
@@ -143,7 +139,7 @@ public class SinistreService {
         validateSelectedGuarantees(couverture.garanties(), garantiesImpliquees);
         boolean declarer = Boolean.TRUE.equals(request.getDeclarer());
         if (declarer) {
-            assertDeclarationReady(request.getCirconstances(), garantiesImpliquees);
+            assertDeclarationReady(garantiesImpliquees);
             boolean rc = couverture.garanties().stream().anyMatch(item -> garantiesImpliquees.contains(item.getGarantie().getId())
                     && Boolean.TRUE.equals(item.getGarantie().getResponsabiliteCivile()));
             if (rc && request.getTauxResponsabilite() == null) {
@@ -161,13 +157,8 @@ public class SinistreService {
                 .gestionnaire(acteur)
                 .numeroSinistre(numeroService.next(agenceId, request.getDateDeclaration().getYear()))
                 .statut(declarer ? StatutSinistre.DECLARE : StatutSinistre.BROUILLON)
-                .nature(request.getNature())
                 .dateSinistre(request.getDateSinistre())
-                .heureSinistre(request.getHeureSinistre())
                 .dateDeclaration(request.getDateDeclaration())
-                .ville(resolveVille(request.getVilleId()))
-                .lieu(trimToNull(request.getLieu()))
-                .circonstances(trimToNull(request.getCirconstances()))
                 .build());
 
         SinistreCouverture snapshot = couvertureRepository.save(toCoverageSnapshot(sinistre, couverture));
@@ -180,7 +171,6 @@ public class SinistreService {
                 ))
                 .toList());
         sinistre.setReferenceCompagnie(trimToNull(request.getReferenceCompagnie()));
-        sinistre.setNumeroPv(trimToNull(request.getNumeroPv()));
         qualificationService.apply(sinistre, request.getTypeDommage(), request.getModeReparation(),
                 request.getGarageId(), request.getTauxResponsabilite());
         if (declarer) {
@@ -211,26 +201,25 @@ public class SinistreService {
             Long contratId,
             Long brancheId,
             StatutSinistre statut,
-            com.assurance.enums.NatureSinistre nature,
             LocalDate dateDu,
             LocalDate dateAu,
             int page,
             int size
     ) {
-        return list(agenceId, query, clientId, contratId, brancheId, statut, nature, null, dateDu, dateAu, page, size);
+        return list(agenceId, query, clientId, contratId, brancheId, statut, null, dateDu, dateAu, page, size);
     }
 
     @Transactional(readOnly = true)
     public PagedResponse<SinistreSummaryResponse> list(
             Long agenceId, String query, Long clientId, Long contratId, Long brancheId,
-            StatutSinistre statut, com.assurance.enums.NatureSinistre nature,
+            StatutSinistre statut,
             com.assurance.enums.EtapeSuiviSinistre etapeSuivi, LocalDate dateDu, LocalDate dateAu,
             int page, int size
     ) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         Page<Sinistre> result = sinistreRepository.findAll(
-                specification(agenceId, query, clientId, contratId, brancheId, statut, nature, etapeSuivi, dateDu, dateAu),
+                specification(agenceId, query, clientId, contratId, brancheId, statut, etapeSuivi, dateDu, dateAu),
                 PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "updatedAt")
                         .and(Sort.by(Sort.Direction.DESC, "id")))
         );
@@ -243,11 +232,11 @@ public class SinistreService {
     @Transactional(readOnly = true)
     public List<SinistreSummaryResponse> registre(
             Long agenceId, String query, Long clientId, Long contratId, Long brancheId,
-            StatutSinistre statut, com.assurance.enums.NatureSinistre nature,
+            StatutSinistre statut,
             com.assurance.enums.EtapeSuiviSinistre etapeSuivi, LocalDate dateDu, LocalDate dateAu
     ) {
         return sinistreRepository.findAll(
-                        specification(agenceId, query, clientId, contratId, brancheId, statut, nature,
+                        specification(agenceId, query, clientId, contratId, brancheId, statut,
                                 etapeSuivi, dateDu, dateAu),
                         Sort.by(Sort.Direction.DESC, "updatedAt").and(Sort.by(Sort.Direction.DESC, "id")))
                 .stream().map(responseMapper::toSummary).toList();
@@ -267,10 +256,6 @@ public class SinistreService {
         }
         var before = ClaimActivity.snapshot(responseMapper.toDetail(sinistre));
         sinistre.setReferenceCompagnie(trimToNull(request.getReferenceCompagnie()));
-        sinistre.setVille(resolveVille(request.getVilleId()));
-        sinistre.setLieu(trimToNull(request.getLieu()));
-        sinistre.setCirconstances(trimToNull(request.getCirconstances()));
-        sinistre.setNumeroPv(trimToNull(request.getNumeroPv()));
         qualificationService.apply(sinistre, request.getTypeDommage(), request.getModeReparation(),
                 request.getGarageId(), request.getTauxResponsabilite());
         sinistre.setNotes(trimToNull(request.getNotes()));
@@ -455,10 +440,7 @@ public class SinistreService {
         }
     }
 
-    private void assertDeclarationReady(String circonstances, Set<Long> garanties) {
-        if (!hasText(circonstances)) {
-            throw new BadRequestException("Les circonstances sont obligatoires pour déclarer le sinistre");
-        }
+    private void assertDeclarationReady(Set<Long> garanties) {
         if (garanties.isEmpty()) {
             throw new BadRequestException("Sélectionnez au moins une garantie impliquée");
         }
@@ -495,14 +477,6 @@ public class SinistreService {
         return gestionnaire;
     }
 
-    private Ville resolveVille(Long villeId) {
-        if (villeId == null) {
-            return null;
-        }
-        return villeRepository.findById(villeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ville", villeId));
-    }
-
     private Specification<Sinistre> specification(
             Long agenceId,
             String query,
@@ -510,7 +484,6 @@ public class SinistreService {
             Long contratId,
             Long brancheId,
             StatutSinistre statut,
-            com.assurance.enums.NatureSinistre nature,
             com.assurance.enums.EtapeSuiviSinistre etapeSuivi,
             LocalDate dateDu,
             LocalDate dateAu
@@ -532,9 +505,6 @@ public class SinistreService {
             }
             if (statut != null) {
                 predicates.add(builder.equal(root.get("statut"), statut));
-            }
-            if (nature != null) {
-                predicates.add(builder.equal(root.get("nature"), nature));
             }
             if (etapeSuivi != null) {
                 predicates.add(builder.equal(root.get("etapeSuivi"), etapeSuivi));

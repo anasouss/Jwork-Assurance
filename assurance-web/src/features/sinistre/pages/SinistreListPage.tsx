@@ -54,13 +54,12 @@ import {
 } from "@/components/ui/table";
 import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
-import { formatDate, natureLabels, statusLabels } from "../format";
+import { formatDate, statusLabels } from "../format";
 import { repairLabels, suiviLabels } from "../workflow";
 import { SinistreTracking } from "../components/SinistreTracking";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 import type {
-  NatureSinistre,
   EtapeSuiviSinistre,
   SinistreSummary,
   StatutSinistre,
@@ -70,7 +69,6 @@ const PAGE_SIZE = 25;
 type Filters = {
   query: string;
   statut: string;
-  nature: string;
   etapeSuivi: string;
   dateDu: string;
   dateAu: string;
@@ -111,10 +109,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
         applied.statut === "ALL"
           ? undefined
           : (applied.statut as StatutSinistre),
-      nature:
-        applied.nature === "ALL"
-          ? undefined
-          : (applied.nature as NatureSinistre),
       dateDu: applied.dateDu || undefined,
       dateAu: applied.dateAu || undefined,
       etapeSuivi: applied.etapeSuivi === "ALL" ? undefined : applied.etapeSuivi as EtapeSuiviSinistre,
@@ -246,26 +240,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                 <SelectContent>
                   <SelectItem value="ALL">Tous les statuts</SelectItem>
                   {Object.entries(statusLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Nature">
-              <Select
-                value={filters.nature}
-                onValueChange={(nature) =>
-                  setFilters((current) => ({ ...current, nature }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Toutes les natures</SelectItem>
-                  {Object.entries(natureLabels).map(([value, label]) => (
                     <SelectItem key={value} value={value}>
                       {label}
                     </SelectItem>
@@ -538,7 +512,7 @@ function Field({
   );
 }
 function emptyFilters(): Filters {
-  return { query: "", statut: "ALL", nature: "ALL", etapeSuivi: "ALL", dateDu: "", dateAu: "" };
+  return { query: "", statut: "ALL", etapeSuivi: "ALL", dateDu: "", dateAu: "" };
 }
 function readState(params: URLSearchParams) {
   return {
@@ -551,7 +525,6 @@ function readState(params: URLSearchParams) {
     filters: {
       query: params.get("q") || "",
       statut: params.get("statut") || "ALL",
-      nature: params.get("nature") || "ALL",
       etapeSuivi: params.get("etapeSuivi") || "ALL",
       dateDu: params.get("dateDu") || "",
       dateAu: params.get("dateAu") || "",
@@ -565,7 +538,6 @@ function writeState(filters: Filters, page: number, scope: PortfolioScope) {
   if (scope.brancheId) params.set("brancheId", scope.brancheId);
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (filters.statut !== "ALL") params.set("statut", filters.statut);
-  if (filters.nature !== "ALL") params.set("nature", filters.nature);
   if (filters.etapeSuivi !== "ALL") params.set("etapeSuivi", filters.etapeSuivi);
   if (filters.dateDu) params.set("dateDu", filters.dateDu);
   if (filters.dateAu) params.set("dateAu", filters.dateAu);

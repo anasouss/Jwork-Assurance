@@ -2,7 +2,6 @@ package com.assurance.service;
 
 import com.assurance.dto.response.SinistreSummaryResponse;
 import com.assurance.enums.EtapeSuiviSinistre;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.BorderStyle;
@@ -41,13 +40,12 @@ public class SinistreRegistreService {
             Long contratId,
             Long brancheId,
             StatutSinistre statut,
-            NatureSinistre nature,
             EtapeSuiviSinistre etapeSuivi,
             LocalDate dateDu,
             LocalDate dateAu
     ) {
         List<SinistreSummaryResponse> claims = sinistreService.registre(
-                agenceId, query, clientId, contratId, brancheId, statut, nature, etapeSuivi, dateDu, dateAu
+                agenceId, query, clientId, contratId, brancheId, statut, etapeSuivi, dateDu, dateAu
         );
         return workbook(claims);
     }

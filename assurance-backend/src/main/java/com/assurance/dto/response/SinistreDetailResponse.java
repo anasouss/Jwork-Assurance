@@ -2,7 +2,6 @@ package com.assurance.dto.response;
 
 import com.assurance.enums.DecisionCouvertureSinistre;
 import com.assurance.enums.ModeReglementSinistre;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutDocumentSinistre;
 import com.assurance.enums.StatutMissionExpertise;
 import com.assurance.enums.StatutSinistre;
@@ -18,7 +17,6 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -37,17 +35,10 @@ public class SinistreDetailResponse {
     private String garage;
     private String premierExpert;
     private List<String> garantiesImpliquees;
-    private NatureSinistre nature;
     private LocalDate dateSinistre;
-    private LocalTime heureSinistre;
     private LocalDate dateDeclaration;
     private LocalDate dateTransmission;
     private LocalDate dateCloture;
-    private Long villeId;
-    private String ville;
-    private String lieu;
-    private String circonstances;
-    private String numeroPv;
     private BigDecimal tauxResponsabilite;
     private String notes;
     private Long gestionnaireId;

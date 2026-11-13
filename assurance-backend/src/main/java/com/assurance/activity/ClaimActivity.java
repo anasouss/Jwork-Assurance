@@ -33,10 +33,9 @@ public final class ClaimActivity {
                 .put("Référence compagnie", claim.getReferenceCompagnie()).put("Statut", label(claim.getStatut()))
                 .put("Étape de suivi", label(claim.getEtapeSuivi())).put("Type de dommage", label(claim.getTypeDommage()))
                 .put("Mode de réparation", label(claim.getModeReparation())).put("Garage de réparation", claim.getGarage())
-                .put("Nature", label(claim.getNature())).put("Date du sinistre", claim.getDateSinistre()).put("Heure", claim.getHeureSinistre())
+                .put("Date du sinistre", claim.getDateSinistre())
                 .put("Date de déclaration", claim.getDateDeclaration()).put("Transmission", claim.getDateTransmission()).put("Clôture", claim.getDateCloture())
-                .put("Ville", claim.getVille()).put("Lieu", claim.getLieu()).put("Circonstances", claim.getCirconstances())
-                .put("Numéro de PV", claim.getNumeroPv()).put("Responsabilité (%)", claim.getTauxResponsabilite()).put("Notes", claim.getNotes())
+                .put("Responsabilité (%)", claim.getTauxResponsabilite()).put("Notes", claim.getNotes())
                 .put("Gestionnaire", claim.getGestionnaire()).put("Prochaine action", claim.getProchaineAction()).put("Échéance de l'action", claim.getDateEcheanceAction()));
         add(references, ActivityRecordType.UTILISATEUR, claim.getGestionnaireId(), claim.getGestionnaire());
         var coverage = claim.getCouverture();
@@ -170,13 +169,7 @@ public final class ClaimActivity {
             case "REJETE" -> "Rejeté";
             case "ANNULE" -> "Annulé";
             case "ROUVERT" -> "Rouvert";
-            case "ACCIDENT" -> "Accident";
-            case "VOL" -> "Vol";
-            case "INCENDIE" -> "Incendie";
-            case "BRIS_DE_GLACE" -> "Bris de glace";
-            case "DOMMAGE_VEHICULE" -> "Dommage au véhicule";
             case "CORPOREL" -> "Corporel";
-            case "ASSISTANCE" -> "Assistance";
             case "AUTRE" -> "Autre";
             case "CONDUCTEUR" -> "Conducteur";
             case "ADVERSAIRE" -> "Adversaire";

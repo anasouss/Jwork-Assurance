@@ -1,7 +1,6 @@
 package com.assurance.service;
 
 import com.assurance.entity.ExigenceDocumentSinistre;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.TypeDocumentSinistre;
 import com.assurance.repository.ExigenceDocumentSinistreRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,9 +19,9 @@ public class SinistreDocumentRequirementService {
     private final ExigenceDocumentSinistreRepository repository;
 
     @Transactional(readOnly = true)
-    public List<ExigenceDocumentSinistre> applicable(Long agenceId, NatureSinistre nature) {
+    public List<ExigenceDocumentSinistre> applicable(Long agenceId) {
         Map<TypeDocumentSinistre, ExigenceDocumentSinistre> effective = new LinkedHashMap<>();
-        repository.findApplicable(agenceId, nature).stream()
+        repository.findApplicable(agenceId).stream()
                 .sorted(Comparator
                         .comparingInt(this::specificity)
                         .thenComparingInt(ExigenceDocumentSinistre::getOrdre)
@@ -35,7 +34,6 @@ public class SinistreDocumentRequirementService {
     }
 
     private int specificity(ExigenceDocumentSinistre requirement) {
-        int score = requirement.getAgence() == null ? 0 : 2;
-        return requirement.getNature() == null ? score : score + 1;
+        return requirement.getAgence() == null ? 0 : 1;
     }
 }

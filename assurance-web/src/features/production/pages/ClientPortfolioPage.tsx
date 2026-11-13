@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { comptaApi } from "@/features/compta/api";
 import type { ClientDocument, CompanyPortfolioAccountingSummary } from "@/features/compta/types";
 import { sinistreApi, sinistreKeys } from "@/features/sinistre/api";
-import { natureLabels, statusLabels } from "@/features/sinistre/format";
+import { statusLabels } from "@/features/sinistre/format";
 import type { SinistreSummary } from "@/features/sinistre/types";
 import { useAuthStore } from "@/store/auth-store";
 import { ClientDocuments } from "@/features/crm/components/ClientDocuments";
@@ -585,8 +585,8 @@ function ClaimsSection({ allowed, loading, error, rows, totalElements, claimsUrl
                   <p className="text-xs text-muted-foreground">{claim.numeroPolice || claim.numeroDossier || "Sans police"}</p>
                 </div>
                 <div>
-                  <p className="text-sm">{natureLabels[claim.nature]}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(claim.dateSinistre)}</p>
+                  <p className="text-sm">Sinistre du {formatDate(claim.dateSinistre)}</p>
+                  <p className="text-xs text-muted-foreground">Déclaré le {formatDate(claim.dateDeclaration)}</p>
                 </div>
                 <Badge variant="outline" className="w-fit">{statusLabels[claim.statut]}</Badge>
                 <ArrowRight className="size-4 text-muted-foreground" />
@@ -735,7 +735,7 @@ function ClaimsDocumentsSection({ rows, loading, error, allowed, claimsUrl }: { 
               <span className="min-w-0">
                 <span className="block truncate font-medium">{claim.numeroSinistre}</span>
                 <span className="block truncate text-xs text-muted-foreground">
-                  {natureLabels[claim.nature]} · {formatDate(claim.dateSinistre)}
+                  Sinistre du {formatDate(claim.dateSinistre)}
                 </span>
               </span>
               <ArrowRight className="size-4 shrink-0" />

@@ -65,10 +65,9 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { downloadBlob } from "@/lib/download";
-import { referenceApi } from "@/features/production/api/references";
 import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
-import { formatDate, formatMoney, natureLabels, statusLabels } from "../format";
+import { formatDate, formatMoney, statusLabels } from "../format";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
 import {
   SinistreTransitionDialog,
@@ -83,7 +82,6 @@ import {
   documentTypeLabels,
 } from "../components/SinistreDocumentDialog";
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
-import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import { SinistreTracking } from "../components/SinistreTracking";
 import { damageLabels, repairLabels, suiviLabels } from "../workflow";
 import type {
@@ -122,11 +120,6 @@ export default function SinistreDetailPage() {
     queryKey: sinistreKeys.detail(sinistreId),
     queryFn: () => sinistreApi.get(sinistreId),
     enabled: Boolean(sinistreId),
-  });
-  const cities = useQuery({
-    queryKey: ["referentiel", "villes", "sinistre"],
-    queryFn: () => referenceApi.list("villes"),
-    staleTime: 60_000,
   });
   const experts = useQuery({
     queryKey: sinistreKeys.experts(false),
@@ -331,7 +324,7 @@ export default function SinistreDetailPage() {
             <SinistreStatusBadge statut={dossier.statut} />
           </div>
           <p className="text-sm text-muted-foreground">
-            {natureLabels[dossier.nature]} du {formatDate(dossier.dateSinistre)}{" "}
+            Sinistre du {formatDate(dossier.dateSinistre)}{" "}
             · {dossier.couverture.assure}
           </p>
         </div>
@@ -353,7 +346,6 @@ export default function SinistreDetailPage() {
         <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
           <GeneralSection
             dossier={dossier}
-            cities={cities.data ?? []}
             managers={managers.data ?? []}
             garages={garages.data ?? []}
             responsibilityVisible={
@@ -1204,7 +1196,6 @@ function DocumentStage({
 
 function GeneralSection({
   dossier,
-  cities,
   managers,
   garages,
   responsibilityVisible,
@@ -1213,7 +1204,6 @@ function GeneralSection({
   onSave,
 }: {
   dossier: SinistreDetail;
-  cities: Array<{ id: string; libelle: string }>;
   managers: Array<{ id: string; nom: string }>;
   garages: Intervenant[];
   responsibilityVisible: boolean;
@@ -1230,10 +1220,6 @@ function GeneralSection({
   }, [location.hash, location.key, editable, dossier.id]);
   const [form, setForm] = useState({
     referenceCompagnie: "",
-    villeId: "",
-    lieu: "",
-    circonstances: "",
-    numeroPv: "",
     responsabilite: "NON_DETERMINEE",
     notes: "",
     gestionnaireId: "",
@@ -1252,10 +1238,6 @@ function GeneralSection({
     () =>
       setForm({
         referenceCompagnie: dossier.referenceCompagnie || "",
-        villeId: dossier.villeId || "",
-        lieu: dossier.lieu || "",
-        circonstances: dossier.circonstances || "",
-        numeroPv: dossier.numeroPv || "",
         responsabilite:
           dossier.tauxResponsabilite == null
             ? "NON_DETERMINEE"
@@ -1284,10 +1266,6 @@ function GeneralSection({
                 onSave({
                   referenceCompagnie:
                     form.referenceCompagnie.trim() || undefined,
-                  villeId: form.villeId || undefined,
-                  lieu: form.lieu.trim() || undefined,
-                  circonstances: form.circonstances.trim() || undefined,
-                  numeroPv: form.numeroPv.trim() || undefined,
                   ...(responsibilityVisible
                     ? {
                         tauxResponsabilite:
@@ -1352,33 +1330,6 @@ function GeneralSection({
               <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{dossier.garageId && !garages.some((item) => item.id === dossier.garageId) ? <SelectItem value={dossier.garageId}>{dossier.garage || "Garage actuel"}</SelectItem> : null}{garages.filter((item) => form.modeReparation !== "PEC" || item.conventionne || item.id === dossier.garageId).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}</SelectItem>)}</SelectContent>
             </Select></Field>
           </> : null}
-          <Field label="Ville">
-            <SinistreVilleSelect
-              cities={cities}
-              disabled={!editable}
-              value={form.villeId}
-              onValueChange={(value) => update("villeId", value)}
-            />
-          </Field>
-          <Field label="Lieu">
-            <Input
-              disabled={!editable}
-              value={form.lieu}
-              onChange={(event) => update("lieu", event.target.value)}
-            />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Circonstances">
-              <Textarea
-                disabled={!editable}
-                rows={3}
-                value={form.circonstances}
-                onChange={(event) =>
-                  update("circonstances", event.target.value)
-                }
-              />
-            </Field>
-          </div>
           <Field label="Référence compagnie" required={dossier.statut !== "BROUILLON"}>
             <Input
               disabled={!editable}
@@ -1387,13 +1338,6 @@ function GeneralSection({
               onChange={(event) =>
                 update("referenceCompagnie", event.target.value)
               }
-            />
-          </Field>
-          <Field label="N° de procès-verbal (PV)">
-            <Input
-              disabled={!editable}
-              value={form.numeroPv}
-              onChange={(event) => update("numeroPv", event.target.value)}
             />
           </Field>
           {responsibilityVisible ? (

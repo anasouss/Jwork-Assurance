@@ -6,7 +6,6 @@ import com.assurance.entity.ExigenceDocumentSinistre;
 import com.assurance.entity.Sinistre;
 import com.assurance.entity.SinistreGarantie;
 import com.assurance.enums.DecisionCouvertureSinistre;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.TypeDocumentSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.enums.TypeOperationSinistre;
@@ -100,7 +99,7 @@ class SinistreReadinessServiceTest {
         when(guarantees.findForDetailOrderByConfiguredDisplay(12L))
                 .thenReturn(List.of(acceptedGuarantee("1000.00")));
         when(documents.findBySinistreIdOrderByCreatedAtDesc(12L)).thenReturn(List.of());
-        when(documentRequirements.applicable(1L, NatureSinistre.ACCIDENT)).thenReturn(List.of(
+        when(documentRequirements.applicable(1L)).thenReturn(List.of(
                 ExigenceDocumentSinistre.builder()
                         .typeDocument(TypeDocumentSinistre.DECLARATION)
                         .libelle("Déclaration de sinistre")
@@ -118,8 +117,6 @@ class SinistreReadinessServiceTest {
         Sinistre claim = Sinistre.builder()
                 .agence(agency)
                 .statut(status)
-                .nature(NatureSinistre.ACCIDENT)
-                .circonstances("Collision")
                 .referenceCompagnie("CIE-123")
                 .build();
         claim.setId(id);

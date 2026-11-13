@@ -1,6 +1,5 @@
 package com.assurance.dto.response;
 
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import lombok.Builder;
 import lombok.Data;
@@ -25,7 +24,6 @@ public class SinistreSummaryResponse {
     private String garage;
     private String premierExpert;
     private java.util.List<String> garantiesImpliquees;
-    private NatureSinistre nature;
     private LocalDate dateSinistre;
     private LocalDate dateDeclaration;
     private String numeroPolice;

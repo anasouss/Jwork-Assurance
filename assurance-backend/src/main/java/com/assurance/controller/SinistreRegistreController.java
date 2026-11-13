@@ -1,7 +1,6 @@
 package com.assurance.controller;
 
 import com.assurance.enums.EtapeSuiviSinistre;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.security.TenantContext;
 import com.assurance.service.SinistreRegistreService;
@@ -32,7 +31,6 @@ public class SinistreRegistreController {
             @RequestParam(required = false) Long contratId,
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) StatutSinistre statut,
-            @RequestParam(required = false) NatureSinistre nature,
             @RequestParam(required = false) EtapeSuiviSinistre etapeSuivi,
             @RequestParam(required = false) LocalDate dateDu,
             @RequestParam(required = false) LocalDate dateAu
@@ -41,6 +39,6 @@ public class SinistreRegistreController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=registre-sinistres.xlsx")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(registreService.export(TenantContext.getCurrentAgence(), query, clientId, contratId,
-                        brancheId, statut, nature, etapeSuivi, dateDu, dateAu));
+                        brancheId, statut, etapeSuivi, dateDu, dateAu));
     }
 }

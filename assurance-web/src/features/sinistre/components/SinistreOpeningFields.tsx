@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Paperclip, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
-import { Input } from "@/components/ui/input";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +17,6 @@ const openingDocumentLabels: Record<OpeningDocument["type"], string> = {
 };
 
 export type OpeningFields = {
-  numeroPv: string;
   modeReparation: ModeReparationSinistre | "";
   tauxResponsabilite: string;
   garageId: string;
@@ -43,7 +41,6 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
   const update = <K extends keyof OpeningFields>(key: K, next: OpeningFields[K]) => onChange({ ...value, [key]: next });
   return <div className="grid gap-5">
     <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Field label="N° de procès-verbal"><Input maxLength={120} value={value.numeroPv} onChange={(event) => update("numeroPv", event.target.value)} /></Field>
       {automobile ? <>
         <Field label="Mode de réparation" required><Select disabled={disabled} value={value.modeReparation} onValueChange={(next) => onChange({ ...value, modeReparation: next as ModeReparationSinistre, garageId: "" })}>
           <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent><SelectItem value="NORMAL">Normal</SelectItem><SelectItem value="PEC">Prise en charge (PEC)</SelectItem><SelectItem value="RAPIDE">Rapide</SelectItem></SelectContent>

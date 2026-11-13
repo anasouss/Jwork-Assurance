@@ -33,19 +33,16 @@ import {
 import { referenceApi } from "@/features/production/api/references";
 import { cn } from "@/lib/utils";
 import { sinistreApi, sinistreKeys } from "../api";
-import { natureLabels } from "../format";
 import { damageLabels } from "../workflow";
 import { openingContextParams } from "../opening-context";
-import type { NatureSinistre, SinistreContractOption, TypeDommageSinistre } from "../types";
-
-const NATURES = Object.entries(natureLabels) as Array<[NatureSinistre, string]>;
+import type { SinistreContractOption, TypeDommageSinistre } from "../types";
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialContract?: SinistreContractOption;
   initialDateSinistre?: string;
-  initialNature?: NatureSinistre;
+  initialDateDeclaration?: string;
   initialVehicleId?: string;
   initialTypeDommage?: TypeDommageSinistre | "";
 };
@@ -55,7 +52,7 @@ export function SinistreDeclarationContextDialog({
   onOpenChange,
   initialContract,
   initialDateSinistre = "",
-  initialNature = "ACCIDENT",
+  initialDateDeclaration = "",
   initialVehicleId = "",
   initialTypeDommage = "",
 }: Props) {
@@ -65,7 +62,7 @@ export function SinistreDeclarationContextDialog({
   const deferredSearch = useDeferredValue(search.trim());
   const [contract, setContract] = useState<SinistreContractOption | null>(null);
   const [dateSinistre, setDateSinistre] = useState("");
-  const [nature, setNature] = useState<NatureSinistre>("ACCIDENT");
+  const [dateDeclaration, setDateDeclaration] = useState("");
   const [vehiculeId, setVehiculeId] = useState("");
   const [brancheId, setBrancheId] = useState("");
   const [typeDommage, setTypeDommage] = useState<TypeDommageSinistre | "">("");
@@ -82,13 +79,13 @@ export function SinistreDeclarationContextDialog({
       setSearch("");
       setContract(initialContract ?? null);
       setDateSinistre(initialDateSinistre);
-      setNature(initialNature);
+      setDateDeclaration(initialDateDeclaration || toIso(new Date()));
       setVehiculeId(initialVehicleId);
       setBrancheId("");
       setTypeDommage(initialTypeDommage);
     }
     wasOpen.current = open;
-  }, [initialContract, initialDateSinistre, initialNature, initialVehicleId, initialTypeDommage, open]);
+  }, [initialContract, initialDateSinistre, initialDateDeclaration, initialVehicleId, initialTypeDommage, open]);
 
   const automobile = (branches.data?.find((item) => item.id === effectiveBrancheId)?.code
     ?? contract?.brancheAssuranceCode) === "AUTOMOBILE";
@@ -131,12 +128,12 @@ export function SinistreDeclarationContextDialog({
   }
 
   function continueDeclaration() {
-    if (!contract || !dateSinistre || !coverage.data) return;
+    if (!canContinue || !contract || !coverage.data) return;
     if (automobile && !typeDommage) return;
     const params = openingContextParams({
       contratId: contract.id,
       dateSinistre,
-      nature,
+      dateDeclaration,
       vehiculeId,
       automobile,
       typeDommage,
@@ -149,6 +146,8 @@ export function SinistreDeclarationContextDialog({
   const canContinue = Boolean(
     contract &&
       dateSinistre &&
+      dateDeclaration && dateDeclaration >= dateSinistre && dateDeclaration <= toIso(new Date()) &&
+      dateSinistre <= toIso(new Date()) &&
       coverage.data &&
       !coverage.isFetching &&
       (!automobile || typeDommage) &&
@@ -269,17 +268,9 @@ export function SinistreDeclarationContextDialog({
               />
             </div>
             <div className="grid gap-2">
-              <Label>Nature de l’événement <span className="text-red-500">*</span></Label>
-              <Select value={nature} onValueChange={(value) => setNature(value as NatureSinistre)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {NATURES.map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Date de déclaration <span className="text-red-500">*</span></Label>
+              <DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={date => setDateDeclaration(toIso(date))} />
+              {dateDeclaration && dateSinistre && dateDeclaration < dateSinistre ? <p role="alert" className="text-sm text-destructive">La déclaration ne peut pas précéder le sinistre.</p> : null}
             </div>
           </div>
 

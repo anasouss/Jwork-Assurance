@@ -1,4 +1,4 @@
-import type { NatureSinistre, StatutSinistre } from "./types";
+import type { StatutSinistre } from "./types";
 
 export const STATUS_LABELS: Record<StatutSinistre, string> = {
   BROUILLON: "Brouillon",
@@ -15,19 +15,7 @@ export const STATUS_LABELS: Record<StatutSinistre, string> = {
   ROUVERT: "Rouvert",
 };
 
-export const NATURE_LABELS: Record<NatureSinistre, string> = {
-  ACCIDENT: "Accident",
-  VOL: "Vol",
-  INCENDIE: "Incendie",
-  BRIS_DE_GLACE: "Bris de glace",
-  DOMMAGE_VEHICULE: "Dommage au véhicule",
-  CORPOREL: "Corporel",
-  ASSISTANCE: "Assistance",
-  AUTRE: "Autre",
-};
-
 export const statusLabels = STATUS_LABELS;
-export const natureLabels = NATURE_LABELS;
 
 export function formatMoney(value?: number | null) {
   const formatted = new Intl.NumberFormat("fr-FR", {

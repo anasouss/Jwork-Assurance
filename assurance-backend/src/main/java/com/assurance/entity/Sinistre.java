@@ -1,6 +1,5 @@
 package com.assurance.entity;
 
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,7 +21,6 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalTime;
 
 @Entity
 @Table(name = "sinistres",
@@ -102,15 +100,8 @@ public class Sinistre extends AuditedEntity {
     @Column(name = "garage_nom_snapshot", length = 180)
     private String garageNomSnapshot;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 40)
-    private NatureSinistre nature;
-
     @Column(name = "date_sinistre", nullable = false)
     private LocalDate dateSinistre;
-
-    @Column(name = "heure_sinistre")
-    private LocalTime heureSinistre;
 
     @Column(name = "date_declaration", nullable = false)
     private LocalDate dateDeclaration;
@@ -120,19 +111,6 @@ public class Sinistre extends AuditedEntity {
 
     @Column(name = "date_cloture")
     private LocalDate dateCloture;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ville_id")
-    private Ville ville;
-
-    @Column(length = 500)
-    private String lieu;
-
-    @Column(length = 4000)
-    private String circonstances;
-
-    @Column(name = "numero_pv", length = 120)
-    private String numeroPv;
 
     @Column(name = "taux_responsabilite", precision = 7, scale = 4)
     private BigDecimal tauxResponsabilite;

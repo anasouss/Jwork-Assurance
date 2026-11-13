@@ -729,7 +729,7 @@ export const guideModules: GuideModule[] = [
         permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"],
         steps: [
           { title: "Lire les indicateurs", description: "Contrôlez Dossiers ouverts, Actions en retard, En expertise, En attente de règlement, Provisions ouvertes et Recours de l’année. Les montants sont ceux de l’agence active." },
-          { title: "Ouvrir un dossier récent", description: "Dans Dossiers récents, cliquez sur le N° sinistre. La ligne affiche aussi l’assuré, la nature, la date, la compagnie, la prochaine action et le statut." },
+          { title: "Ouvrir un dossier", description: "Dans Consultation et suivi, cliquez sur le N° sinistre pour consulter le dossier et son état d’avancement." },
           { title: "Afficher tous les dossiers", description: "Cliquez sur Voir les dossiers ou Tout afficher, puis utilisez les filtres de la liste.", action: "Voir les dossiers" },
           { title: "Démarrer une déclaration", description: "Cliquez sur Déclarer. Dans la fenêtre, recherchez et sélectionnez le contrat ou le contexte demandé avant de continuer vers le formulaire.", action: "Déclarer" },
           { title: "Ouvrir les répertoires", description: "Dans le menu latéral, ouvrez Experts ou Garages pour maintenir le répertoire concerné.", action: "Experts" },
@@ -747,9 +747,9 @@ export const guideModules: GuideModule[] = [
         route: "/app/sinistre/dossiers",
         permissions: ["sinistre:view", "sinistre:manage"],
         steps: [
-          { title: "Rechercher", description: "Saisissez N° sinistre, police ou assuré, puis filtrez par Statut, Nature et période Du/Au." },
+          { title: "Rechercher", description: "Saisissez N° sinistre, police ou assuré, puis filtrez par statut, étape de suivi et période Du/Au." },
           { title: "Limiter à un client", description: "Lorsque la liste a été ouverte depuis un portefeuille, le client est affiché en contexte. Utilisez Tout afficher pour retirer ce filtre." },
-          { title: "Lire la liste", description: "Contrôlez numéro, assuré, police, nature, date, compagnie, prochaine action, échéance et statut; triez les colonnes disponibles." },
+          { title: "Lire la liste", description: "Contrôlez la référence compagnie, l’assuré, la police, le véhicule, les dates, les garanties, le mode de réparation et le premier expert." },
           { title: "Consulter", description: "Cliquez sur le numéro ou l’action Consulter pour ouvrir le dossier complet." },
           { title: "Annuler", description: "Dans Actions, choisissez Annuler, renseignez le motif demandé et confirmez. Le dossier reste dans l’historique." },
           { title: "Supprimer définitivement", description: "Utilisez cette action uniquement lorsqu’elle est proposée et que le dossier peut légalement être supprimé; confirmez la fenêtre d’avertissement." },
@@ -765,18 +765,17 @@ export const guideModules: GuideModule[] = [
         permissions: ["sinistre:create"],
         prerequisites: ["Le contrat doit appartenir à l’agence et couvrir la date du sinistre."],
         steps: [
-          { title: "Sélectionner le contexte", description: "Cliquez sur Sélectionner une police, recherchez le contrat, choisissez la date du sinistre, la nature et, en automobile, le véhicule." },
-          { title: "Vérifier la couverture", description: "Contrôlez Police, Assuré, Branche, Véhicule/Événement, compagnie et mouvement. Utilisez Modifier le contexte si l’un de ces éléments est incorrect." },
+          { title: "Sélectionner le contexte", description: "Cliquez sur Sélectionner une police, recherchez le contrat, choisissez les dates du sinistre et de déclaration et, en automobile, les dommages et le véhicule." },
+          { title: "Vérifier la couverture", description: "Contrôlez Police, Assuré, Branche, Véhicule, compagnie et mouvement. Utilisez Modifier le contexte si l’un de ces éléments est incorrect." },
           { title: "Contrôler les doublons", description: "Si un dossier existe déjà pour cette police, ce risque et cette date, ouvrez le lien proposé avant de continuer." },
-          { title: "Décrire les circonstances", description: "Renseignez Date de déclaration, Heure du sinistre, Ville, Lieu précis et Circonstances." },
           { title: "Choisir les garanties", description: "Dans Garanties impliquées, cochez uniquement les garanties effectives et concernées par l’événement." },
           { title: "Enregistrer en brouillon", description: "Cliquez sur Enregistrer en brouillon pour conserver un dossier incomplet sans le déclarer.", action: "Enregistrer en brouillon" },
-          { title: "Créer et déclarer", description: "Pour déclarer immédiatement, vérifiez la date de déclaration, les circonstances et au moins une garantie, puis cliquez sur Créer et déclarer.", action: "Créer et déclarer" },
+          { title: "Enregistrer l’ouverture", description: "Vérifiez les dates, les garanties impliquées et les intervenants, puis cliquez sur Enregistrer l’ouverture et renseignez la référence compagnie.", action: "Enregistrer l’ouverture" },
         ],
         errors: [
           { message: "Aucune garantie applicable", resolution: "Vérifiez le contrat, la date du sinistre et la période de couverture." },
-          { message: "Le contexte de couverture est incomplet", resolution: "Resélectionnez police, date, nature et véhicule éventuel dans Modifier le contexte." },
-          { message: "Les circonstances et une garantie impliquée sont obligatoires", resolution: "Complétez les circonstances et cochez au moins une garantie avant Créer et déclarer, ou enregistrez en brouillon." },
+          { message: "Le contexte de couverture est incomplet", resolution: "Resélectionnez la police, les dates et le véhicule éventuel dans Modifier le contexte." },
+          { message: "Une garantie impliquée est obligatoire pour déclarer", resolution: "Cochez au moins une garantie avant d’enregistrer l’ouverture, ou enregistrez en brouillon." },
         ],
       },
       {
@@ -788,7 +787,7 @@ export const guideModules: GuideModule[] = [
         permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"],
         steps: [
           { title: "Vérifier l’en-tête", description: "Contrôlez numéro de sinistre, statut, événement, contrat, client, véhicule et garanties impliquées." },
-          { title: "Mettre à jour le suivi", description: "Renseignez Ville, Lieu, Circonstances, Référence compagnie, N° PV, responsabilité, gestionnaire, échéance de l’action, prochaine action et notes internes." },
+          { title: "Mettre à jour le suivi", description: "Renseignez la référence compagnie, les dommages, le mode de réparation, le garage, la responsabilité, le gestionnaire, la prochaine action, son échéance et les notes internes." },
           { title: "Gérer les parties", description: "Dans Parties impliquées, ajoutez ou modifiez assuré, conducteur, tiers ou bénéficiaire avec leurs contacts, véhicule et assurance adverse." },
           { title: "Gérer les documents", description: "Ajoutez les pièces dans Ouverture du dossier, Expertise ou Règlement et recours selon leur étape. Supprimez uniquement une pièce erronée." },
           { title: "Créer une mission", description: "Dans Missions d’expertise, choisissez Expert, Garage, objet, dates et montants éventuels; suivez ensuite mission, rapport et statut." },

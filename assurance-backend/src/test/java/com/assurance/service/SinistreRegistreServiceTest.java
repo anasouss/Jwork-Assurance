@@ -3,7 +3,6 @@ package com.assurance.service;
 import com.assurance.dto.response.SinistreSummaryResponse;
 import com.assurance.enums.EtapeSuiviSinistre;
 import com.assurance.enums.ModeReparationSinistre;
-import com.assurance.enums.NatureSinistre;
 import com.assurance.enums.StatutSinistre;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -29,13 +28,13 @@ class SinistreRegistreServiceTest {
         LocalDate start = LocalDate.of(2026, 1, 1);
         LocalDate end = LocalDate.of(2026, 6, 30);
         when(claims.registre(7L, "123-A", 2L, 3L, 4L, StatutSinistre.DECLARE,
-                NatureSinistre.ACCIDENT, EtapeSuiviSinistre.INSTANCE_CLIENT, start, end)).thenReturn(List.of());
+                EtapeSuiviSinistre.INSTANCE_CLIENT, start, end)).thenReturn(List.of());
 
         assertThat(service.export(7L, "123-A", 2L, 3L, 4L, StatutSinistre.DECLARE,
-                NatureSinistre.ACCIDENT, EtapeSuiviSinistre.INSTANCE_CLIENT, start, end)).isNotEmpty();
+                EtapeSuiviSinistre.INSTANCE_CLIENT, start, end)).isNotEmpty();
 
         verify(claims).registre(7L, "123-A", 2L, 3L, 4L, StatutSinistre.DECLARE,
-                NatureSinistre.ACCIDENT, EtapeSuiviSinistre.INSTANCE_CLIENT, start, end);
+                EtapeSuiviSinistre.INSTANCE_CLIENT, start, end);
     }
 
     @Test

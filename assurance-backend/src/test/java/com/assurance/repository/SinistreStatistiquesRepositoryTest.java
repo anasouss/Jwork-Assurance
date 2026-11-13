@@ -107,7 +107,7 @@ class SinistreStatistiquesRepositoryTest {
         return em.persist(Sinistre.builder().agence(owner).contrat(contract).mouvementCouverture(movement)
                 .client(client).compagnieAssurance(company).numeroSinistre(number).statut(status)
                 .etapeSuivi(status == StatutSinistre.CLOTURE ? EtapeSuiviSinistre.CLOTURE : EtapeSuiviSinistre.OUVERTURE)
-                .nature(NatureSinistre.ACCIDENT).dateSinistre(date).dateDeclaration(date).build());
+                .dateSinistre(date).dateDeclaration(date).build());
     }
 
     private SinistreOperation operation(Sinistre claim, TypeOperationSinistre type, String amount) {

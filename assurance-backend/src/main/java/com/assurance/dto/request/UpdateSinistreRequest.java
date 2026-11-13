@@ -14,17 +14,6 @@ public class UpdateSinistreRequest {
     @Size(max = 100)
     private String referenceCompagnie;
 
-    private Long villeId;
-
-    @Size(max = 500)
-    private String lieu;
-
-    @Size(max = 4000)
-    private String circonstances;
-
-    @Size(max = 120)
-    private String numeroPv;
-
     @DecimalMin("0")
     @DecimalMax("100")
     private BigDecimal tauxResponsabilite;

@@ -153,42 +153,45 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeConventionSummary(Document document, DocumentClient source, PdfFont bold) {
-        document.add(new Paragraph(source.getConventionFacturee()).setFont(bold).setTextAlignment(TextAlignment.CENTER));
-        Table table = new Table(new float[]{4, 1}).useAllAvailableWidth();
-        addHeader(table, "LIBELLÉ", bold);
-        addHeader(table, "MONTANT (MAD)", bold);
-        String label = source.getLignes().stream().map(LigneDocumentClient::getLibelleDocument)
-                .filter(java.util.Objects::nonNull).distinct().collect(Collectors.joining("\n"));
-        addValue(table, (label.isBlank() ? "Production convention" : label) + "\nPériode du "
-                + LONG_DATE_FORMAT.format(source.getPeriodeDebut()) + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()), TextAlignment.LEFT, null);
+        Table table = new Table(UnitValue.createPercentArray(new float[]{44, 36, 20}))
+                .useAllAvailableWidth().setFixedLayout();
+        addHeader(table, "DÉSIGNATION", bold);
+        addHeader(table, "PÉRIODE FACTURÉE", bold);
+        addHeader(table, "MONTANT", bold);
+        addValue(table, "Primes d'assurance", TextAlignment.LEFT, null);
+        addValue(table, "Du " + LONG_DATE_FORMAT.format(source.getPeriodeDebut())
+                + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()), TextAlignment.CENTER, null);
         addValue(table, amount(source.getTotalDocument()), TextAlignment.RIGHT, bold);
         document.add(table);
     }
 
     private void writeConventionAnnex(Document document, DocumentClient source, PdfFont bold) {
-        document.add(new com.itextpdf.layout.element.AreaBreak(PageSize.A4.rotate()));
-        Table table = new Table(new float[]{10, 11, 12, 9, 14, 11, 9, 9, 10, 10}).useAllAvailableWidth()
-                .setFontSize(7).setKeepTogether(false);
-        table.addHeaderCell(new Cell(1, 10).setBorder(Border.NO_BORDER).setPaddingBottom(10)
+        document.add(new com.itextpdf.layout.element.AreaBreak(PageSize.A4));
+        float[] widths = {10, 7, 12, 17, 12, 11, 11, 10, 10};
+        float availableWidth = PageSize.A4.getWidth() - document.getLeftMargin() - document.getRightMargin();
+        PdfFont regular = document.getProperty(Property.FONT);
+        Table table = new Table(UnitValue.createPercentArray(widths)).useAllAvailableWidth()
+                .setFixedLayout().setFontSize(7).setKeepTogether(false);
+        table.addHeaderCell(new Cell(1, 9).setBorder(Border.NO_BORDER).setPaddingBottom(10)
                 .add(new Paragraph(source.getConventionFacturee() + "\nAnnexe de la facture N° " + source.getNumero()
                         + " - du " + LONG_DATE_FORMAT.format(source.getPeriodeDebut()) + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()))
-                        .setFont(bold).setFontSize(11).setTextAlignment(TextAlignment.CENTER)));
-        for (String label : java.util.List.of("Quittance N°", "Police N°", "Cie", "Mouvement", "Assuré", "Véhicule",
-                "Date d'effet", "Date d'expiration", "Montant bulletin", "Montant à payer")) addHeader(table, label, bold);
+                        .setFont(bold).setFontSize(10).setTextAlignment(TextAlignment.CENTER)));
+        for (String label : java.util.List.of("Police N°", "Cie", "Mouvement", "Assuré", "Véhicule",
+                "Date\nd'effet", "Date\nd'expiration", "Montant\nbulletin", "Montant\nà payer")) addHeader(table, label, bold, 7, 3);
         source.getLignes().stream().sorted(Comparator.comparing(LigneDocumentClient::getOrdre)).forEach(line -> {
-            addValue(table, fallback(line.getNumeroQuittance()), TextAlignment.LEFT, null);
-            addValue(table, fallback(line.getNumeroPolice()), TextAlignment.LEFT, null);
-            addValue(table, fallback(line.getCompagnie()), TextAlignment.LEFT, null);
-            addValue(table, fallback(line.getMouvement()), TextAlignment.LEFT, null);
-            addValue(table, fallback(line.getAssureConvention()), TextAlignment.LEFT, null);
-            addValue(table, fallback(line.getVehiculeConvention()), TextAlignment.LEFT, null);
-            addValue(table, line.getDateOperation() == null ? "-" : LONG_DATE_FORMAT.format(line.getDateOperation()), TextAlignment.CENTER, null);
-            addValue(table, line.getDateEcheance() == null ? "-" : LONG_DATE_FORMAT.format(line.getDateEcheance()), TextAlignment.CENTER, null);
-            addValue(table, amount(line.getMontantBulletinConvention()), TextAlignment.RIGHT, null);
-            addValue(table, amount(line.getMontantTtc()), TextAlignment.RIGHT, bold);
+            addSingleLineValue(table, fallback(line.getNumeroPolice()), regular, 7, 3, availableWidth * widths[0] / 100, TextAlignment.LEFT);
+            addValue(table, fallback(line.getCompagnie()), TextAlignment.LEFT, null, 7, 3);
+            addValue(table, fallback(line.getMouvement()), TextAlignment.LEFT, null, 7, 3);
+            addValue(table, fallback(line.getAssureConvention()), TextAlignment.LEFT, null, 7, 3);
+            addSingleLineValue(table, fallback(line.getVehiculeConvention()), regular, 7, 3, availableWidth * widths[4] / 100);
+            addSingleLineValue(table, line.getDateOperation() == null ? "-" : LONG_DATE_FORMAT.format(line.getDateOperation()), regular, 7, 3, availableWidth * widths[5] / 100);
+            addSingleLineValue(table, line.getDateEcheance() == null ? "-" : LONG_DATE_FORMAT.format(line.getDateEcheance()), regular, 7, 3, availableWidth * widths[6] / 100);
+            addSingleLineValue(table, amount(line.getMontantBulletinConvention()), regular, 7, 3, availableWidth * widths[7] / 100, TextAlignment.RIGHT);
+            addSingleLineValue(table, amount(line.getMontantTtc()), bold, 7, 3, availableWidth * widths[8] / 100, TextAlignment.RIGHT);
         });
-        table.addCell(new Cell(1, 9).add(new Paragraph("TOTAL À PAYER (MAD)").setFont(bold)).setTextAlignment(TextAlignment.RIGHT));
-        addValue(table, amount(source.getTotalDocument()), TextAlignment.RIGHT, bold);
+        table.addCell(new Cell(1, 8).add(new Paragraph("TOTAL À PAYER").setFont(bold).setFontSize(7).setMargin(0))
+                .setBorder(BODY_BORDER).setPadding(3).setTextAlignment(TextAlignment.RIGHT));
+        addSingleLineValue(table, amount(source.getTotalDocument()), bold, 7, 3, availableWidth * widths[8] / 100, TextAlignment.RIGHT);
         document.add(table);
     }
 
@@ -236,8 +239,9 @@ public class ReleveClientPdfRenderer {
                 .setWidth(UnitValue.createPercentValue(46))
                 .setHorizontalAlignment(HorizontalAlignment.RIGHT)
                 .setMarginBottom(14);
+        boolean conventionInvoice = source.getConventionFacturee() != null && !source.getConventionFacturee().isBlank();
         recipient.addCell(new Cell()
-                .add(new Paragraph(value(source.getPayeurNom()))
+                .add(new Paragraph(value(conventionInvoice ? source.getConventionFacturee() : source.getPayeurNom()))
                 .setFont(bold)
                 .setFontSize(9.5f)
                 .setFontColor(ColorConstants.BLACK)
@@ -246,6 +250,10 @@ public class ReleveClientPdfRenderer {
                 .setBorder(TABLE_BORDER)
                 .setBackgroundColor(LIGHT_BLUE)
                 .setPadding(4));
+        if (conventionInvoice) {
+            document.add(recipient);
+            return;
+        }
         Cell recipientDetails = new Cell()
                 .add(new Paragraph(address(source.getPayeurAdresse()).toUpperCase(Locale.FRENCH))
                         .setFontSize(8.5f)
@@ -647,6 +655,11 @@ public class ReleveClientPdfRenderer {
     }
 
     private void addSingleLineValue(Table table, String text, PdfFont font, float fontSize, float cellPadding, float cellWidth) {
+        addSingleLineValue(table, text, font, fontSize, cellPadding, cellWidth, TextAlignment.CENTER);
+    }
+
+    private void addSingleLineValue(Table table, String text, PdfFont font, float fontSize, float cellPadding,
+            float cellWidth, TextAlignment alignment) {
         // Fit policy numbers, dates and amounts before layout to keep each value on one line.
         float availableWidth = Math.max(1, cellWidth - 2 * cellPadding - 1.2f);
         float textWidth = font.getWidth(text, fontSize);
@@ -660,7 +673,7 @@ public class ReleveClientPdfRenderer {
         table.addCell(new Cell()
                 .add(paragraph)
                 .setKeepTogether(true)
-                .setTextAlignment(TextAlignment.CENTER)
+                .setTextAlignment(alignment)
                 .setVerticalAlignment(VerticalAlignment.MIDDLE)
                 .setBorder(BODY_BORDER)
                 .setPadding(cellPadding));

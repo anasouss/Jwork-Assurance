@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Banknote, Download, Eye, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Ban, Banknote, Download, Eye, MoreHorizontal, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +40,7 @@ export default function ConventionCollectionsPage() {
   const canDelete = canViewDocuments && permissions.includes("quittance:manage");
   const canCancel = canViewDocuments && (permissions.includes("quittance:create") || permissions.includes("quittance:manage"));
   const [documentAction, setDocumentAction] = useState<{ id: string; action: "delete" | "cancel" }>();
+  const [openingPdf, setOpeningPdf] = useState(false);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [filters, setFilters] = useState(emptyFilters);
@@ -104,8 +106,29 @@ export default function ConventionCollectionsPage() {
     const next = new URLSearchParams(params); next.delete("documentId"); next.delete("reglementId");
     setParams(next, { replace: true });
   }
-  function showDocument(id: string) {
-    const next = new URLSearchParams(params); next.set("documentId", id); setParams(next, { replace: true });
+  async function showDocument(id: string) {
+    if (openingPdf || !canViewDocuments) return;
+    const preview = window.open("about:blank", "_blank");
+    if (!preview) {
+      toast.error("Autorisez les fenêtres contextuelles pour ouvrir le PDF");
+      return;
+    }
+    preview.opener = null;
+    setOpeningPdf(true);
+    try {
+      const blob = await comptaApi.clientDocumentPdf(id);
+      const url = URL.createObjectURL(blob);
+      if (preview.closed) URL.revokeObjectURL(url);
+      else {
+        preview.location.href = url;
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch (error) {
+      preview.close();
+      toast.error(error instanceof Error ? error.message : "Ouverture du PDF impossible");
+    } finally {
+      setOpeningPdf(false);
+    }
   }
 
   if (!canView) return <AccessDenied />;
@@ -198,17 +221,25 @@ export default function ConventionCollectionsPage() {
                       disabled={row.soldeOuvert <= 0 || !compatible || invoices.isFetching} onCheckedChange={checked => setSelected(current => {
                         const next = { ...current }; if (checked) next[id] = row; else delete next[id]; return next;
                       })} />}</td>
-                    <td className="px-3 py-3 font-medium">{canViewDocuments ? <button type="button" className="text-sky-700 hover:underline dark:text-sky-300" onClick={() => showDocument(id)}>{row.source.reference}</button> : row.source.reference}</td>
+                    <td className="px-3 py-3 font-medium">{canViewDocuments ? <button type="button" className="text-sky-700 hover:underline disabled:opacity-50 dark:text-sky-300" title="Ouvrir la facture PDF dans un nouvel onglet" disabled={openingPdf} onClick={() => void showDocument(id)}>{row.source.reference}</button> : row.source.reference}</td>
                     <td className="max-w-64 break-words px-3 py-3">{row.source.payeurNom || "-"}</td>
                     <td className="whitespace-nowrap px-3 py-3">{date(row.source.dateEffet)}</td>
                     <td className="whitespace-nowrap px-3 py-3">{date(row.source.dateEcheance)}</td>
                     {[row.source.montantTtc, row.montantConfirme, row.montantEnAttente, row.soldeOuvert].map((amount, index) => <td key={index} className="px-3 py-3 text-right tabular-nums">{formatAccountingAmount(amount)}</td>)}
                     <td className="px-3 py-3"><Badge variant={variants[row.statut]}>{labels[row.statut]}</Badge></td>
-                    <td className="px-3 py-3"><div className="flex justify-end gap-1">
-                      {canViewDocuments && <Button variant="ghost" size="icon" title="Détail de la facture" aria-label={`Détail ${row.source.reference}`} onClick={() => showDocument(id)}><Eye className="size-4" /></Button>}
-                      {canCreate && <Button variant="ghost" size="icon" title="Encaisser la facture" aria-label={`Encaisser ${row.source.reference}`} disabled={row.soldeOuvert <= 0 || invoices.isFetching || selectedRows.length > 0} onClick={() => collect([row])}><Banknote className="size-4" /></Button>}
-                      {canCancel && <Button variant="ghost" size="icon" title="Annuler la facture" aria-label={`Annuler ${row.source.reference}`} onClick={() => setDocumentAction({ id, action: "cancel" })}><Ban className="size-4" /></Button>}
-                      {canDelete && <Button variant="ghost" size="icon" className="text-destructive" title="Supprimer définitivement" aria-label={`Supprimer ${row.source.reference}`} onClick={() => setDocumentAction({ id, action: "delete" })}><Trash2 className="size-4" /></Button>}
+                    <td className="px-3 py-3"><div className="flex justify-end">
+                      {(canViewDocuments || canCreate) && <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Actions" aria-label={`Actions pour ${row.source.reference}`}><MoreHorizontal className="size-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-56">
+                          {canViewDocuments && <DropdownMenuItem disabled={openingPdf} onSelect={() => void showDocument(id)}><Eye className="size-4" />Voir la facture PDF</DropdownMenuItem>}
+                          {canCreate && <DropdownMenuItem disabled={row.soldeOuvert <= 0 || invoices.isFetching || selectedRows.length > 0} onSelect={() => collect([row])}><Banknote className="size-4" />Encaisser la facture</DropdownMenuItem>}
+                          {(canCancel || canDelete) && <DropdownMenuSeparator />}
+                          {canCancel && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "cancel" })}><Ban className="size-4" />Annuler la facture</DropdownMenuItem>}
+                          {canDelete && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "delete" })}><Trash2 className="size-4" />Supprimer définitivement</DropdownMenuItem>}
+                        </DropdownMenuContent>
+                      </DropdownMenu>}
                     </div></td>
                   </tr>;
                 })}

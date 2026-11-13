@@ -3,7 +3,7 @@ import { Link, NavLink } from "react-router-dom";
 import { useAuthStore } from "@/store/auth-store";
 
 export const conventionActions = [
-  { title: "Consultation et édition des états de production", shortTitle: "États de production", href: "/app/compta/conventions/production", icon: ListChecks, permission: "quittance:view" },
+  { title: "Consultation de la production", shortTitle: "États de production", href: "/app/compta/conventions/production", icon: ListChecks, permission: "quittance:view" },
   { title: "Établissement des factures", shortTitle: "Factures", href: "/app/compta/conventions/factures", icon: FilePlus2, permission: "quittance:view" },
   { title: "Encaissement des factures", shortTitle: "Encaissements", href: "/app/compta/conventions/encaissements", icon: WalletCards, permission: "reglement-client:view" },
 ];

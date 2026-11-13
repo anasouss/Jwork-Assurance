@@ -24,12 +24,14 @@ export default function ConventionProductionPage() {
   const canView = useAuthStore(state => state.user?.permissions.includes("quittance:view") ?? false);
   const [filters, setFilters] = useState(initialFilters);
   const [applied, setApplied] = useState(filters);
+  const [hasSearched, setHasSearched] = useState(false);
   const [page, setPage] = useState(0);
   const options = useQuery({ queryKey: ["compta", "convention-billing-options", new Date().getFullYear()],
     queryFn: () => comptaApi.conventionBillingOptions(new Date().getFullYear()), enabled: canView });
   const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies, enabled: canView });
   const result = useQuery({ queryKey: ["compta", "convention-production", applied, page],
-    queryFn: () => comptaApi.conventionProduction({ ...applied, page, size: 25 }), enabled: canView });
+    queryFn: () => comptaApi.conventionProduction({ ...applied, page, size: 25 }), enabled: canView && hasSearched });
+  const data = hasSearched ? result.data : undefined;
   const exportFile = useMutation({ mutationFn: () => comptaApi.exportConventionProduction(applied),
     onSuccess: blob => downloadBlob(blob, `production-conventions-${applied.dateDu}-${applied.dateAu}.xlsx`),
     onError: error => toast.error(error.message) });
@@ -50,6 +52,7 @@ export default function ConventionProductionPage() {
     }
     setApplied({ ...filters, compagnieId: companyId });
     setPage(0);
+    setHasSearched(true);
   }
 
   if (!canView) return <AccessDenied />;
@@ -97,9 +100,9 @@ export default function ConventionProductionPage() {
       <div className="flex flex-wrap items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
         <Button onClick={apply} size="icon" title="Rechercher" aria-label="Rechercher"><Search className="size-4" /></Button>
         <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => {
-          const next = initialFilters(); setFilters(next); setApplied(next); setPage(0);
+          const next = initialFilters(); setFilters(next); setApplied(next); setPage(0); setHasSearched(false);
         }}><RotateCcw className="size-4" /></Button>
-        <Button variant="outline" disabled={exportFile.isPending || result.isError || !result.data?.rows.length}
+        <Button variant="outline" disabled={!hasSearched || exportFile.isPending || result.isFetching || result.isError || !data?.rows.length}
           onClick={() => exportFile.mutate()}><Download className="size-4" />Exporter Excel</Button>
       </div>
       {(options.isError || companies.isError) && <p className="text-sm text-destructive sm:col-span-2 xl:col-span-4">Impossible de charger les filtres.</p>}
@@ -115,10 +118,11 @@ export default function ConventionProductionPage() {
           {["Prime nette", "Taxes", "TTC"].map(label => <th key={label} className="px-3 py-3 text-right">{label}</th>)}
           <th className="px-3 py-3">Mode</th><th className="px-3 py-3 text-right">Montant client</th>
         </tr></thead>
-        <tbody className="divide-y">{result.isLoading ? <TableRowsSkeleton colSpan={columns} rows={8} />
+        <tbody className="divide-y">{!hasSearched ? <tr><td colSpan={columns} className="p-10 text-center text-muted-foreground">Aucune recherche effectuée.</td></tr>
+          : result.isLoading ? <TableRowsSkeleton colSpan={columns} rows={8} />
           : result.isError ? <tr><td colSpan={columns} className="p-8 text-center text-destructive">{result.error.message}</td></tr>
-          : !result.data?.rows.length ? <tr><td colSpan={columns} className="p-10 text-center text-muted-foreground">Aucune production pour cette période.</td></tr>
-          : result.data.rows.map(row => <tr key={row.id} className="hover:bg-muted/30">
+          : !data?.rows.length ? <tr><td colSpan={columns} className="p-10 text-center text-muted-foreground">Aucune production pour cette période.</td></tr>
+          : data.rows.map(row => <tr key={row.id} className="hover:bg-muted/30">
             {showConvention && <td className="px-3 py-3">{row.convention || "-"}</td>}<td className="px-3 py-3">{row.numeroQuittance || "-"}</td>
             {showCompany && <td className="px-3 py-3">{row.compagnie || "-"}</td>}
             {[row.numeroPolice, row.mouvement, row.assure, row.vehicule, date(row.dateEffet), date(row.dateExpiration)].map((value, index) => <td key={index} className="px-3 py-3">{value || "-"}</td>)}
@@ -127,8 +131,8 @@ export default function ConventionProductionPage() {
             <td className="px-3 py-3 text-right font-semibold tabular-nums">{row.montantClient == null ? "-" : formatAccountingAmount(row.montantClient)}</td>
           </tr>)}</tbody>
       </table></div>
-      <ServerPagination className="border-t px-4 py-3" page={result.data?.page ?? page} totalPages={result.data?.totalPages ?? 0}
-        totalElements={result.data?.totalElements ?? 0} loading={result.isFetching} onPageChange={setPage} />
+      {hasSearched && <ServerPagination className="border-t px-4 py-3" page={data?.page ?? page} totalPages={data?.totalPages ?? 0}
+        totalElements={data?.totalElements ?? 0} loading={result.isFetching} onPageChange={setPage} />}
     </section>
   </div>;
 }

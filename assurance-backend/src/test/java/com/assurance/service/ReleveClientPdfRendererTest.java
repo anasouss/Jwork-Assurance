@@ -157,4 +157,64 @@ class ReleveClientPdfRendererTest {
             return output.toByteArray();
         }
     }
+
+    @Test
+    void conventionInvoiceUsesSavedConventionInsteadOfPersonalRecipientAndHidesReceiptNumbers() throws Exception {
+        DocumentClient source = conventionInvoice(1);
+        try (PDDocument pdf = PDDocument.load(renderer.render(source, false))) {
+            PDFTextStripper firstPage = new PDFTextStripper();
+            firstPage.setEndPage(1);
+            assertThat(firstPage.getText(pdf)).contains("AOSFOC", "DÉSIGNATION", "PÉRIODE FACTURÉE", "MONTANT")
+                    .doesNotContain("PAYEUR_CONFIDENTIEL", "ADRESSE_CONFIDENTIELLE", "ICE_CONFIDENTIEL");
+            assertThat(new PDFTextStripper().getText(pdf)).contains("Assuré", "ASSURE_1", "POL-1", "TOTAL À PAYER")
+                    .doesNotContain("CONTRAT-AN-", "Quittance N°", "(MAD)");
+            assertThat(pdf.getNumberOfPages()).isEqualTo(2);
+            for (var page : pdf.getPages()) {
+                assertThat(page.getMediaBox().getHeight()).isGreaterThan(page.getMediaBox().getWidth());
+                assertThat(page.getRotation()).isZero();
+            }
+        }
+    }
+
+    @Test
+    void longConventionAnnexStaysPortraitAndRepeatsHeaders() throws Exception {
+        try (PDDocument pdf = PDDocument.load(renderer.render(conventionInvoice(85), false))) {
+            assertThat(pdf.getNumberOfPages()).isGreaterThan(2);
+            assertThat(new PDFTextStripper().getText(pdf)).contains("POL-85", "8 500,00");
+            for (int index = 1; index < pdf.getNumberOfPages(); index++) {
+                var page = pdf.getPage(index);
+                assertThat(page.getMediaBox().getHeight()).isGreaterThan(page.getMediaBox().getWidth());
+                assertThat(page.getRotation()).isZero();
+                PDFTextStripper pageText = new PDFTextStripper();
+                pageText.setStartPage(index + 1);
+                pageText.setEndPage(index + 1);
+                assertThat(pageText.getText(pdf)).contains("Police N°", "Assuré");
+            }
+        }
+    }
+
+    private DocumentClient conventionInvoice(int count) {
+        DocumentClient source = statement(count);
+        source.setTypeDocument(com.assurance.enums.TypeDocumentClient.FACTURE);
+        source.setAgence(com.assurance.entity.Agence.builder().nom("Agence test").ville("Agadir").build());
+        source.setNumero("FAC-26-000012");
+        source.setConventionFacturee("AOSFOC");
+        source.setDateEmission(java.time.LocalDate.of(2026, 11, 13));
+        source.setPeriodeDebut(java.time.LocalDate.of(2026, 1, 1));
+        source.setPeriodeFin(java.time.LocalDate.of(2026, 3, 31));
+        source.setPayeurNom("PAYEUR_CONFIDENTIEL");
+        source.setPayeurAdresse("ADRESSE_CONFIDENTIELLE");
+        source.setPayeurIce("ICE_CONFIDENTIEL");
+        for (LigneDocumentClient line : source.getLignes()) {
+            line.setAssureConvention("ASSURE_" + line.getOrdre());
+            line.setNumeroQuittance("CONTRAT-AN-" + line.getOrdre());
+            line.setCompagnie("MATU");
+            line.setMouvement("Affaire nouvelle");
+            line.setVehiculeConvention("35027-A-48");
+            line.setDateOperation(source.getPeriodeDebut());
+            line.setDateEcheance(java.time.LocalDate.of(2026, 12, 31));
+            line.setMontantBulletinConvention(new BigDecimal("400.00"));
+        }
+        return source;
+    }
 }

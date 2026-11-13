@@ -16,7 +16,7 @@ import {
   Search,
   XCircle,
 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
@@ -542,7 +542,7 @@ export default function ReglementsEnregistresPage() {
               {hasAppliedFilters && loadingResults ? (
                 <TableRowsSkeleton colSpan={10} rows={8} />
               ) : showInstruments ? instrumentMatches.data?.rows.map(instrument => <tr key={instrument.id} className="hover:bg-muted/30">
-                <td className="px-4 py-3"><Link className="font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" to={`/app/compta/reglements/${instrument.reglementId}`}>{instrument.numeroReglement}</Link>
+                <td className="px-4 py-3"><button type="button" className="font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => setDetailPaymentId(instrument.reglementId)}>{instrument.numeroReglement}</button>
                   {instrument.statutReglement === "ANNULE" && <div className="mt-1"><PaymentStatusBadge value="ANNULE" /></div>}</td>
                 <td className="px-4 py-3">{formatDate(instrument.dateReglement)}</td>
                 <td className="max-w-64 px-4 py-3">{instrument.payeurNom}</td>
@@ -573,7 +573,7 @@ export default function ReglementsEnregistresPage() {
                           {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                         </Button>
                       ) : <span className="inline-block w-7" />}
-                      {payment.numero}
+                      <button type="button" className="text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => setDetailPaymentId(payment.id)}>{payment.numero}</button>
                     </div>
                   </td>
                   <td className="px-4 py-3">{formatDate(payment.dateReglement)}</td>

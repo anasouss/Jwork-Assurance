@@ -306,6 +306,31 @@ public class ReglementClientService {
             int page,
             int size
     ) {
+        return searchInvoiceReceivables(agenceId, payeurType, payeurId, brancheId, compagnieId,
+                compagnieAssistanceId, typeDate, dateDu, dateAu, search, sortBy, sortDirection,
+                page, size, false, null, false);
+    }
+
+    @Transactional(readOnly = true)
+    public CreanceClientPageResponse searchInvoiceReceivables(
+            Long agenceId,
+            String payeurType,
+            Long payeurId,
+            Long brancheId,
+            Long compagnieId,
+            Long compagnieAssistanceId,
+            String typeDate,
+            LocalDate dateDu,
+            LocalDate dateAu,
+            String search,
+            String sortBy,
+            String sortDirection,
+            int page,
+            int size,
+            boolean conventionsOnly,
+            Long conventionId,
+            boolean includeSettled
+    ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
         boolean filterByEntryDate = isEntryDateFilter(typeDate);
@@ -321,6 +346,9 @@ public class ReglementClientService {
                 payeurType,
                 payeurId,
                 normalizeSearch(search),
+                conventionsOnly || conventionId != null,
+                conventionId,
+                includeSettled,
                 PageRequest.of(
                         Math.max(page, 0),
                         Math.min(Math.max(size, 1), 100),
@@ -336,7 +364,7 @@ public class ReglementClientService {
                         toInvoiceSource(document),
                         amounts.getOrDefault(document.getId(), AllocationAmounts.empty())
                 ))
-                .filter(row -> row.getSoldeOuvert().signum() > 0
+                .filter(row -> includeSettled || row.getSoldeOuvert().signum() > 0
                         || row.getMontantEnAttente().signum() > 0)
                 .toList();
 

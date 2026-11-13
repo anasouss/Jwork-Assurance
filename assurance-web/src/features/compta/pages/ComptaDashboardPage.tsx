@@ -20,6 +20,7 @@ type ComptaAction = {
   icon: LucideIcon;
   href?: string;
   permission?: string;
+  permissions?: string[];
   primary?: boolean;
   disabled?: boolean;
 };
@@ -47,10 +48,10 @@ const groups: ComptaGroup[] = [
         permission: "quittance:view",
       },
       {
-        title: "Facturation conventions",
+        title: "Département conventions",
         icon: ReceiptText,
-        href: "/app/compta/facturation-conventions",
-        permission: "quittance:view",
+        href: "/app/compta/conventions",
+        permissions: ["quittance:view", "reglement-client:view"],
       },
       {
         title: "Règlements clients",
@@ -132,7 +133,8 @@ export default function ComptaDashboardPage() {
         <div className="mx-auto grid w-full max-w-7xl divide-y">
           {groups.map((group) => {
             const actions = group.actions.filter(
-              (action) => !action.permission || permissions.includes(action.permission)
+              (action) => (!action.permission || permissions.includes(action.permission))
+                && (!action.permissions || action.permissions.some(permission => permissions.includes(permission)))
             );
             if (!actions.length) return null;
 

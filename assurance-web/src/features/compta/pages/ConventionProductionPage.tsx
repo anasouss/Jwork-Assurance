@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, RotateCcw, Search } from "lucide-react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
+import { useAuthStore } from "@/store/auth-store";
+import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
 import { downloadBlob } from "@/lib/download";
 import { toast } from "@/lib/toast";
 import { toDateOnly } from "@/features/production/date";
@@ -20,14 +21,15 @@ function initialFilters(): ConventionProductionFilters {
 }
 
 export default function ConventionProductionPage() {
+  const canView = useAuthStore(state => state.user?.permissions.includes("quittance:view") ?? false);
   const [filters, setFilters] = useState(initialFilters);
   const [applied, setApplied] = useState(filters);
   const [page, setPage] = useState(0);
   const options = useQuery({ queryKey: ["compta", "convention-billing-options", new Date().getFullYear()],
-    queryFn: () => comptaApi.conventionBillingOptions(new Date().getFullYear()) });
-  const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies });
+    queryFn: () => comptaApi.conventionBillingOptions(new Date().getFullYear()), enabled: canView });
+  const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies, enabled: canView });
   const result = useQuery({ queryKey: ["compta", "convention-production", applied, page],
-    queryFn: () => comptaApi.conventionProduction({ ...applied, page, size: 25 }) });
+    queryFn: () => comptaApi.conventionProduction({ ...applied, page, size: 25 }), enabled: canView });
   const exportFile = useMutation({ mutationFn: () => comptaApi.exportConventionProduction(applied),
     onSuccess: blob => downloadBlob(blob, `production-conventions-${applied.dateDu}-${applied.dateAu}.xlsx`),
     onError: error => toast.error(error.message) });
@@ -44,12 +46,9 @@ export default function ConventionProductionPage() {
     setPage(0);
   }
 
+  if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div><div className="text-sm font-medium text-orange-700 dark:text-orange-400">Comptabilité · Conventions</div>
-        <h1 className="mt-1 text-xl font-semibold">Consultation de la production</h1></div>
-      <Button asChild variant="outline"><Link to="/app/compta/facturation-conventions">Facturation conventions</Link></Button>
-    </header>
+    <ConventionWorkspaceHeader title="Consultation et édition des états de production" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="grid gap-1.5"><Label>Convention</Label><Select value={filters.conventionId ?? "ALL"}
         onValueChange={value => setFilters(current => ({ ...current, conventionId: value === "ALL" ? undefined : value }))}>

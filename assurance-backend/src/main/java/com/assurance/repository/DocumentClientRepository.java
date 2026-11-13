@@ -86,7 +86,15 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             where d.agence.id = :agenceId
               and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
               and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
-              and coalesce((
+              and (:conventionsOnly = false or exists (
+                    select 1 from LigneDocumentClient conventionLine
+                    join conventionLine.echeanceFacturationConvention schedule
+                    where conventionLine.document = d
+                      and schedule.agence.id = :agenceId
+                      and schedule.contrat.agence.id = :agenceId
+                      and (:conventionId is null or schedule.contrat.convention.id = :conventionId)
+              ))
+              and (:includeSettled = true or coalesce((
                     select sum(paymentAllocation.montant)
                     from AffectationReglementClient paymentAllocation
                     where paymentAllocation.documentClient = d
@@ -98,7 +106,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
                       and exists (select 1 from LigneDocumentClient adjustedLine
                                   where adjustedLine.document = d and adjustedLine.elementFacturable = adjustment.elementFacturable)
-              ), 0) < d.totalDocument
+              ), 0) < d.totalDocument)
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
               and (:saisieDu is null or d.createdAt >= :saisieDu)
@@ -149,7 +157,15 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             where d.agence.id = :agenceId
               and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
               and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
-              and coalesce((
+              and (:conventionsOnly = false or exists (
+                    select 1 from LigneDocumentClient conventionLine
+                    join conventionLine.echeanceFacturationConvention schedule
+                    where conventionLine.document = d
+                      and schedule.agence.id = :agenceId
+                      and schedule.contrat.agence.id = :agenceId
+                      and (:conventionId is null or schedule.contrat.convention.id = :conventionId)
+              ))
+              and (:includeSettled = true or coalesce((
                     select sum(paymentAllocation.montant)
                     from AffectationReglementClient paymentAllocation
                     where paymentAllocation.documentClient = d
@@ -161,7 +177,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
                       and exists (select 1 from LigneDocumentClient adjustedLine
                                   where adjustedLine.document = d and adjustedLine.elementFacturable = adjustment.elementFacturable)
-              ), 0) < d.totalDocument
+              ), 0) < d.totalDocument)
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
               and (:saisieDu is null or d.createdAt >= :saisieDu)
@@ -219,8 +235,22 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("payeurType") String payeurType,
             @Param("payeurId") Long payeurId,
             @Param("search") String search,
+            @Param("conventionsOnly") boolean conventionsOnly,
+            @Param("conventionId") Long conventionId,
+            @Param("includeSettled") boolean includeSettled,
             Pageable pageable
     );
+
+    default Page<DocumentClient> searchOpenInvoices(
+            Long agenceId, LocalDate dateDu, LocalDate dateAu, LocalDateTime saisieDu,
+            LocalDateTime saisieAuExclusive, Long brancheId, Long compagnieId,
+            Long compagnieAssistanceId, String payeurType, Long payeurId, String search,
+            Pageable pageable
+    ) {
+        return searchOpenInvoices(agenceId, dateDu, dateAu, saisieDu, saisieAuExclusive,
+                brancheId, compagnieId, compagnieAssistanceId, payeurType, payeurId, search,
+                false, null, false, pageable);
+    }
 
     @EntityGraph(attributePaths = {
             "agence",

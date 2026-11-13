@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, RefreshCw, RotateCcw } from "lucide-react";
 import { toast } from "@/lib/toast";
@@ -14,10 +14,15 @@ import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { ConventionInvoiceLines } from "../components/ConventionInvoiceLines";
+import { AccessDenied } from "@/components/shared";
+import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
 import { ConventionBillingSources, payerKey, type ConventionBillingSource } from "../components/ConventionBillingSources";
 
 export default function FacturationConventionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
+  const canView = permissions.includes("quittance:view");
+  const canCollect = permissions.includes("reglement-client:view");
+  const navigate = useNavigate();
   const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
   const queryClient = useQueryClient();
   const [conventionId, setConventionId] = useState("");
@@ -31,11 +36,11 @@ export default function FacturationConventionsPage() {
   const options = useQuery({
     queryKey: ["compta", "convention-billing-options", year],
     queryFn: () => comptaApi.conventionBillingOptions(year),
-    enabled: validYear,
+    enabled: canView && validYear,
   });
   const convention = options.data?.find(item => item.id === conventionId);
   const period = convention?.periodes.find(item => String(item.numero) === periodNumber);
-  const readyScope = Boolean(validYear && period && !convention?.blocage);
+  const readyScope = Boolean(canView && validYear && period && !convention?.blocage);
   const scope = `${conventionId}:${year}:${periodNumber}`;
   const preparation = useQuery({
     queryKey: ["compta", "convention-billing-preparation", conventionId, year, periodNumber],
@@ -97,12 +102,15 @@ export default function FacturationConventionsPage() {
       setNotes("");
       setSelected(new Set());
       toast.success(`Facture ${document.numero} émise`, {
-        action: { label: "Ouvrir", onClick: () => window.open(`/app/compta/releves-factures?documentId=${document.id}`, "_blank", "noopener,noreferrer") },
+        action: { label: "Ouvrir", onClick: () => navigate(canCollect
+          ? `/app/compta/conventions/encaissements?documentId=${document.id}`
+          : `/app/compta/releves-factures?documentId=${document.id}`) },
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing-preparation"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "convention-invoice-receivables"] }),
       ]);
     },
     onError: error => {
@@ -139,14 +147,9 @@ export default function FacturationConventionsPage() {
     setSelected(new Set(rows.filter(row => !row.blocage && row.details.length && payerKey(row) === payerKey(first)).map(row => row.echeanceId)));
   }
 
+  if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <div className="text-sm font-medium text-orange-700 dark:text-orange-400">Comptabilité</div>
-        <h1 className="mt-1 text-xl font-semibold">Facturation conventions</h1>
-      </div>
-      <Button asChild variant="outline"><Link to="/app/compta/conventions/production">Consultation de la production</Link></Button>
-    </header>
+    <ConventionWorkspaceHeader title="Établissement des factures" />
 
     <section className="border-y bg-card p-4">
       <div className="flex flex-wrap items-end gap-3">
@@ -209,7 +212,7 @@ export default function FacturationConventionsPage() {
         emptyMessage={period ? "Aucune ligne à facturer pour cette convention et cette période." : "Sélectionnez une convention et une période."}
       />
       {period && !preparation.isPending && !preparation.isError && !rows.length && <div>
-        <Button asChild variant="outline"><Link to="/app/compta/releves-factures">Consulter les relevés et factures</Link></Button>
+        <Button asChild variant="outline"><Link to={canCollect ? "/app/compta/conventions/encaissements" : "/app/compta/releves-factures"}>Consulter les factures émises</Link></Button>
       </div>}
     </section>
 

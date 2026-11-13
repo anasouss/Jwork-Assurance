@@ -98,6 +98,24 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     ],
   },
   {
+    matches: startsWith("/app/compta/conventions/encaissements/nouveau"),
+    anyOf: ["reglement-client:create", "reglement-client:manage"],
+  },
+  {
+    matches: startsWith("/app/compta/conventions/encaissements"),
+    anyOf: ["reglement-client:view"],
+  },
+  {
+    matches: pathname => pathname.startsWith("/app/compta/conventions/production")
+      || pathname.startsWith("/app/compta/conventions/factures")
+      || pathname.startsWith("/app/compta/facturation-conventions"),
+    anyOf: ["quittance:view"],
+  },
+  {
+    matches: startsWith("/app/compta/conventions"),
+    anyOf: ["quittance:view", "reglement-client:view"],
+  },
+  {
     matches: startsWith("/app/compta/bordereaux-compagnies"),
     anyOf: [
       "bordereau-compagnie:view",

@@ -213,7 +213,23 @@ export const router = createBrowserRouter([
       },
       {
         path: "compta/facturation-conventions",
+        element: <Navigate to="/app/compta/conventions/factures" replace />,
+      },
+      {
+        path: "compta/conventions",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionDepartmentPage")),
+      },
+      {
+        path: "compta/conventions/factures",
         lazy: lazyRoute(() => import("@/features/compta/pages/FacturationConventionsPage")),
+      },
+      {
+        path: "compta/conventions/encaissements",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionCollectionsPage")),
+      },
+      {
+        path: "compta/conventions/encaissements/nouveau",
+        lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementClientPage")),
       },
       {
         path: "compta/conventions/production",

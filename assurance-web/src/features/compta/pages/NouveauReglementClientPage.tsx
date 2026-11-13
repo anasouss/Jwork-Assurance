@@ -34,7 +34,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import {
   AlertDialog,
@@ -118,13 +118,15 @@ export default function NouveauReglementClientPage() {
     || permissions.includes("reglement-client:manage");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const conventionCollection = location.pathname.startsWith("/app/compta/conventions/encaissements/");
   const queryClient = useQueryClient();
   const requestedMultiClientDeposit = searchParams.get("multi") === "1";
   const multiClientDeposit = requestedMultiClientDeposit;
   const selection = selectionFromParams(searchParams);
   const returnPath = multiClientDeposit
     ? multiClientSelectionPath(selection)
-    : "/app/compta/reglements";
+    : conventionCollection ? "/app/compta/conventions/encaissements" : "/app/compta/reglements";
   const hasSelection = selection.elementFacturableIds.length > 0
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
@@ -289,10 +291,13 @@ export default function NouveauReglementClientPage() {
         queryClient.invalidateQueries({ queryKey: ["compta", "client-payments"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-document-sources"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "convention-invoice-receivables"] }),
         queryClient.invalidateQueries({ queryKey: ["crm-client"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
-      navigate(`/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`, {
+      navigate(conventionCollection
+        ? `/app/compta/conventions/encaissements?reglementId=${payment.id}`
+        : `/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`, {
         replace: true,
       });
     },
@@ -370,7 +375,7 @@ export default function NouveauReglementClientPage() {
 
   function removeReceivable(row: ClientReceivable) {
     if (rows.length === 1) {
-      navigate("/app/compta/reglements", { replace: true });
+      navigate(returnPath, { replace: true });
       return;
     }
 
@@ -413,10 +418,10 @@ export default function NouveauReglementClientPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-orange-700 dark:text-orange-400">
-            Comptabilité
+            {conventionCollection ? "Département conventions" : "Comptabilité"}
           </div>
           <h1 className="mt-1 text-xl font-semibold">
-            Enregistrer un règlement
+            {conventionCollection ? "Encaisser les factures conventions" : "Enregistrer un règlement"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {receivables.isLoading
@@ -429,7 +434,7 @@ export default function NouveauReglementClientPage() {
         <Button asChild variant="outline">
           <Link to={returnPath}>
             <ArrowLeft className="size-4" />
-            Retour aux primes à encaisser
+            {conventionCollection ? "Retour aux factures conventions" : "Retour aux primes à encaisser"}
           </Link>
         </Button>
       </header>

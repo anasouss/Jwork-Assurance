@@ -572,6 +572,9 @@ export const comptaApi = {
   },
 
   async clientInvoiceReceivables(params: {
+    conventionsOnly?: boolean;
+    conventionId?: string;
+    includeSettled?: boolean;
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;
     brancheId?: string;

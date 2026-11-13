@@ -142,6 +142,9 @@ public class ReglementClientController {
     @GetMapping("/creances/factures")
     @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
     public ResponseEntity<ApiResponse<CreanceClientPageResponse>> invoiceReceivables(
+            @RequestParam(defaultValue = "false") boolean conventionsOnly,
+            @RequestParam(required = false) Long conventionId,
+            @RequestParam(defaultValue = "false") boolean includeSettled,
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
             @RequestParam(required = false) Long brancheId,
@@ -173,7 +176,10 @@ public class ReglementClientController {
                         sortBy,
                         sortDirection,
                         page,
-                        size
+                        size,
+                        conventionsOnly,
+                        conventionId,
+                        includeSettled
                 )
         ));
     }

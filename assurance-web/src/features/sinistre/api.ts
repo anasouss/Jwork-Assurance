@@ -13,6 +13,7 @@ import type {
   SinistreListParams,
   SinistreOpeningRequest,
   SinistreContractOption,
+  TypeRechercheContratSinistre,
   PagedResponse,
   SinistreDashboard,
   SinistreStatistics,
@@ -40,8 +41,8 @@ export const sinistreKeys = {
   detail: (id: string) => [...sinistreKeys.all, "detail", id] as const,
   coverage: (contractId: string, date: string) =>
     [...sinistreKeys.all, "coverage", contractId, date] as const,
-  contracts: (brancheId: string, query: string) =>
-    [...sinistreKeys.all, "contracts", brancheId, query] as const,
+  contracts: (brancheId: string, query: string, typeRecherche: TypeRechercheContratSinistre = "POLICE") =>
+    [...sinistreKeys.all, "contracts", brancheId, typeRecherche, query] as const,
   duplicates: (contractId: string, vehicleId: string | undefined, date: string) =>
     [...sinistreKeys.all, "duplicates", contractId, vehicleId, date] as const,
   experts: (includeInactive: boolean, villeId?: string) =>
@@ -73,9 +74,9 @@ export const sinistreApi = {
   async eligibleProviders(typePrestataire: ProviderKind, context: ProviderEligibilityContext) {
     return unwrap(await apiFetch<ApiResponse<Intervenant[]>>(`/api/v1/sinistres/prestataires/eligibles${buildQueryString({ typePrestataire, ...context })}`));
   },
-  async lookupContracts(brancheId: string, query: string) {
+  async lookupContracts(brancheId: string, query: string, typeRecherche: TypeRechercheContratSinistre = "POLICE") {
     return unwrap(await apiFetch<ApiResponse<SinistreContractOption[]>>(
-      `/api/v1/sinistres/contrats${buildQueryString({ brancheId, query })}`,
+      `/api/v1/sinistres/contrats${buildQueryString({ brancheId, query, typeRecherche })}`,
     ));
   },
   async treasuryAccounts() {

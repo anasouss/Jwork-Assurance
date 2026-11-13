@@ -15,6 +15,7 @@ export type SinistreListParams = {
   page?: number;
   size?: number;
 };
+export type TypeRechercheContratSinistre = "POLICE" | "IMMATRICULATION" | "ASSURE";
 export type SinistreContractOption = {
   id: string;
   numeroPolice?: string | null;

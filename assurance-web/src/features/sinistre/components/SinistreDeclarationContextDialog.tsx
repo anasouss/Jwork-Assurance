@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -35,7 +35,9 @@ import { cn } from "@/lib/utils";
 import { sinistreApi, sinistreKeys } from "../api";
 import { damageLabels } from "../workflow";
 import { openingContextParams } from "../opening-context";
-import type { SinistreContractOption, TypeDommageSinistre } from "../types";
+import type { SinistreContractOption, TypeDommageSinistre, TypeRechercheContratSinistre } from "../types";
+
+const searchLabels: Record<TypeRechercheContratSinistre, string> = { POLICE: "N° de police", IMMATRICULATION: "Immatriculation", ASSURE: "Assuré" };
 
 type Props = {
   open: boolean;
@@ -59,7 +61,9 @@ export function SinistreDeclarationContextDialog({
   const navigate = useNavigate();
   const wasOpen = useRef(false);
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search.trim());
+  const [searchType, setSearchType] = useState<TypeRechercheContratSinistre>("POLICE");
+  const [submittedSearch, setSubmittedSearch] = useState<{ brancheId: string; query: string; type: TypeRechercheContratSinistre } | null>(null);
+  const [searchError, setSearchError] = useState("");
   const [contract, setContract] = useState<SinistreContractOption | null>(null);
   const [dateSinistre, setDateSinistre] = useState("");
   const [dateDeclaration, setDateDeclaration] = useState("");
@@ -77,6 +81,9 @@ export function SinistreDeclarationContextDialog({
   useEffect(() => {
     if (open && !wasOpen.current) {
       setSearch("");
+      setSearchType("POLICE");
+      setSubmittedSearch(null);
+      setSearchError("");
       setContract(initialContract ?? null);
       setDateSinistre(initialDateSinistre);
       setDateDeclaration(initialDateDeclaration || toIso(new Date()));
@@ -91,11 +98,29 @@ export function SinistreDeclarationContextDialog({
     ?? contract?.brancheAssuranceCode) === "AUTOMOBILE";
 
   const contracts = useQuery({
-    queryKey: sinistreKeys.contracts(effectiveBrancheId, deferredSearch),
-    queryFn: () => sinistreApi.lookupContracts(effectiveBrancheId, deferredSearch),
-    enabled: open && Boolean(effectiveBrancheId) && (!automobile || Boolean(typeDommage)) && deferredSearch.length >= 2 && !contract,
+    queryKey: sinistreKeys.contracts(submittedSearch?.brancheId ?? "", submittedSearch?.query ?? "", submittedSearch?.type ?? searchType),
+    queryFn: () => sinistreApi.lookupContracts(submittedSearch!.brancheId, submittedSearch!.query, submittedSearch!.type),
+    enabled: open && !!submittedSearch && !contract,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
   });
   const contractItems = contracts.data ?? [];
+  const searchAllowed = !!effectiveBrancheId && (!automobile || !!typeDommage);
+  const searchComplete = search.trim().length >= (searchType === "ASSURE" ? 3 : 1);
+  function runSearch() {
+    if (!searchAllowed) return;
+    if (!searchComplete) {
+      setSearchError(searchType === "ASSURE" ? "Renseignez au moins 3 caractères du nom de l’assuré." : "Renseignez la référence complète.");
+      return;
+    }
+    setSearchError("");
+    if (submittedSearch?.brancheId === effectiveBrancheId && submittedSearch.type === searchType && submittedSearch.query === search.trim()) {
+      void contracts.refetch();
+    } else {
+      setSubmittedSearch({ brancheId: effectiveBrancheId, query: search.trim(), type: searchType });
+    }
+  }
   const coverage = useQuery({
     queryKey:
       contract && dateSinistre
@@ -124,6 +149,7 @@ export function SinistreDeclarationContextDialog({
   function selectContract(item: SinistreContractOption) {
     setContract(item);
     setSearch("");
+    setSubmittedSearch(null);
     const matchedIds = [...new Set(item.vehiculesCorrespondants?.map(vehicle => vehicle.id) ?? [])];
     setVehiculeId(matchedIds.length === 1 ? matchedIds[0] : "");
   }
@@ -131,6 +157,7 @@ export function SinistreDeclarationContextDialog({
   function resetContract() {
     setBrancheId(effectiveBrancheId);
     setContract(null);
+    setSubmittedSearch(null);
     setVehiculeId("");
   }
 
@@ -174,7 +201,7 @@ export function SinistreDeclarationContextDialog({
           <div className="grid gap-2">
             <Label>Branche <span className="text-red-500">*</span></Label>
             <Select value={effectiveBrancheId}
-              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); setTypeDommage(""); }}>
+              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); setSubmittedSearch(null); setSearchError(""); setTypeDommage(""); }}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
               <SelectContent>{(branches.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}</SelectContent>
             </Select>
@@ -212,19 +239,25 @@ export function SinistreDeclarationContextDialog({
                 </Button>
               </div>
             ) : (
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+              <div>
+                <div className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_40px]">
+                <Select value={searchType} onValueChange={value => { setSearchType(value as TypeRechercheContratSinistre); setSubmittedSearch(null); setSearchError(""); setSearch(""); }} disabled={!searchAllowed}>
+                  <SelectTrigger aria-label="Type de recherche"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(searchLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+                </Select>
                 <Input
                   id="claim-contract-search"
-                  className="pl-9"
                   autoFocus
-                  disabled={!effectiveBrancheId || (automobile && !typeDommage)}
+                  disabled={!searchAllowed}
                   value={search}
-                  placeholder="N° de police, assuré ou immatriculation"
+                  placeholder={searchLabels[searchType]}
                   maxLength={120}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => { setSearch(event.target.value); setSubmittedSearch(null); setSearchError(""); }}
+                  onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); runSearch(); } }}
                 />
-                {search.trim().length >= 2 ? (
+                <Button type="button" size="icon" title="Rechercher" aria-label="Rechercher" disabled={!searchAllowed || !searchComplete || contracts.isFetching} onClick={runSearch}><Search className="size-4" /></Button>
+                </div>
+                {searchError ? <p role="alert" className="mt-2 text-sm text-destructive">{searchError}</p> : null}
+                {submittedSearch ? (
                   <div className="mt-2 overflow-hidden rounded-md border bg-background">
                     {contracts.isFetching ? (
                       <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">

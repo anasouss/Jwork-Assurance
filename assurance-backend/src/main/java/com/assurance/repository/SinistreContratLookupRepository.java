@@ -20,23 +20,24 @@ public interface SinistreContratLookupRepository extends Repository<Contrat, Lon
               and c.prospection = false
               and c.statut <> com.assurance.enums.StatutContrat.DRAFT
               and (
-                lower(coalesce(c.numeroPolice, '')) like :pattern escape '!'
-                or exists (select cc.id from ContratClient cc where cc.contrat = c
+                (:typeRecherche = 'POLICE' and lower(trim(coalesce(c.numeroPolice, ''))) = :value)
+                or (:typeRecherche = 'ASSURE' and exists (select cc.id from ContratClient cc where cc.contrat = c
                     and cc.role in (com.assurance.enums.RoleClientContrat.PROPRIETAIRE, com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR)
-                    and (lower(coalesce(cc.client.raisonSociale, '')) like :pattern escape '!'
-                         or lower(concat(coalesce(cc.client.prenom, ''), ' ', coalesce(cc.client.nom, ''))) like :pattern escape '!'
-                         or lower(concat(coalesce(cc.client.nom, ''), ' ', coalesce(cc.client.prenom, ''))) like :pattern escape '!'))
-                or exists (select mv.id from MouvementVehicule mv where mv.mouvementContrat.contrat = c
+                    and (lower(coalesce(cc.client.raisonSociale, '')) like :value escape '!'
+                         or lower(concat(coalesce(cc.client.prenom, ''), ' ', coalesce(cc.client.nom, ''))) like :value escape '!'
+                         or lower(concat(coalesce(cc.client.nom, ''), ' ', coalesce(cc.client.prenom, ''))) like :value escape '!')))
+                or (:typeRecherche = 'IMMATRICULATION' and exists (select mv.id from MouvementVehicule mv where mv.mouvementContrat.contrat = c
                     and mv.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
-                    and (lower(coalesce(mv.immatriculation, '')) like :pattern escape '!'
-                         or lower(coalesce(mv.immatriculationProvisoire, '')) like :pattern escape '!'))
+                    and (lower(replace(replace(coalesce(mv.immatriculation, ''), ' ', ''), '-', '')) = :value
+                         or lower(replace(replace(coalesce(mv.immatriculationProvisoire, ''), ' ', ''), '-', '')) = :value)))
               )
             order by c.dateEffet desc, c.id desc
             """)
     List<Contrat> search(
             @Param("agenceId") Long agenceId,
             @Param("brancheId") Long brancheId,
-            @Param("pattern") String pattern,
+            @Param("typeRecherche") String typeRecherche,
+            @Param("value") String value,
             Pageable pageable
     );
 
@@ -48,13 +49,13 @@ public interface SinistreContratLookupRepository extends Repository<Contrat, Lon
             where c.agence.id = :agenceId
               and c.id in :contratIds
               and m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
-              and (lower(coalesce(mv.immatriculation, '')) like :pattern escape '!'
-                   or lower(coalesce(mv.immatriculationProvisoire, '')) like :pattern escape '!')
+              and (lower(replace(replace(coalesce(mv.immatriculation, ''), ' ', ''), '-', '')) = :value
+                   or lower(replace(replace(coalesce(mv.immatriculationProvisoire, ''), ' ', ''), '-', '')) = :value)
             order by mv.id desc
             """)
     List<com.assurance.entity.MouvementVehicule> matchingVehicles(
             @Param("agenceId") Long agenceId,
             @Param("contratIds") List<Long> contratIds,
-            @Param("pattern") String pattern
+            @Param("value") String value
     );
 }

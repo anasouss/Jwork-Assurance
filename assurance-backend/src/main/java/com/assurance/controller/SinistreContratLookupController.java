@@ -2,6 +2,7 @@ package com.assurance.controller;
 
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.SinistreContratLookupResponse;
+import com.assurance.enums.TypeRechercheContratSinistre;
 import com.assurance.security.TenantContext;
 import com.assurance.service.SinistreContratLookupService;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +26,9 @@ public class SinistreContratLookupController {
     @PreAuthorize("hasAnyAuthority('PERM_sinistre:create', 'PERM_sinistre:view', 'PERM_sinistre:manage')")
     public ResponseEntity<ApiResponse<List<SinistreContratLookupResponse>>> search(
             @RequestParam Long brancheId,
-            @RequestParam String query
+            @RequestParam String query,
+            @RequestParam(defaultValue = "POLICE") TypeRechercheContratSinistre typeRecherche
     ) {
-        return ResponseEntity.ok(ApiResponse.success(lookupService.search(TenantContext.getCurrentAgence(), brancheId, query)));
+        return ResponseEntity.ok(ApiResponse.success(lookupService.search(TenantContext.getCurrentAgence(), brancheId, query, typeRecherche)));
     }
 }

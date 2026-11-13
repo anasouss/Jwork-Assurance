@@ -122,7 +122,7 @@ public class LivraisonAttestationService {
         livraison = livraisonAttestationRepository.save(livraison);
         activityRecorder.record(StockActivity.deliveryCommand(livraison, Map.of(),
                 source == SourceLivraisonAttestation.RECEPTION_DIRECTE ? ActivityAction.VALIDATED : ActivityAction.CREATED,
-                source == SourceLivraisonAttestation.RECEPTION_DIRECTE ? "Reception directe d'attestations validee" : "Commande d'attestations creee",
+                source == SourceLivraisonAttestation.RECEPTION_DIRECTE ? "Réception directe d'attestations validée" : "Commande d'attestations créée",
                 "ATTESTATION_DELIVERY_CREATION"));
         return toResponse(livraison);
     }
@@ -163,7 +163,7 @@ public class LivraisonAttestationService {
         recalculer(livraison);
         livraison = livraisonAttestationRepository.save(livraison);
         activityRecorder.record(StockActivity.deliveryCommand(livraison, before, ActivityAction.SAVED,
-                "Reception de lots d'attestations enregistree", "ATTESTATION_LOTS_RECEIPT"));
+                "Réception de lots d'attestations enregistrée", "ATTESTATION_LOTS_RECEIPT"));
         return toResponse(livraison);
     }
 
@@ -183,7 +183,7 @@ public class LivraisonAttestationService {
         livraison = livraisonAttestationRepository.save(livraison);
         if (!com.assurance.activity.ActivityValues.changes(before, StockActivity.snapshot(livraison)).isEmpty()) {
             activityRecorder.record(StockActivity.deliveryCommand(livraison, before, ActivityAction.VALIDATED,
-                    "Livraison d'attestations validee", "ATTESTATION_DELIVERY_VALIDATION"));
+                    "Livraison d'attestations validée", "ATTESTATION_DELIVERY_VALIDATION"));
         }
         return toResponse(livraison);
     }

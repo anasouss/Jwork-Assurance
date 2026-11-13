@@ -74,7 +74,7 @@ public class ReglementCompagnieService {
     ) {
         return toResponse(activityRecorder.perform(() -> createRecord(agenceId, request), payment ->
                 CompanyPaymentActivity.command(payment, Map.of(), ActivityAction.CREATED,
-                        "Reglement compagnie enregistre", "COMPANY_PAYMENT_CREATION", null)));
+                        "Règlement compagnie enregistré", "COMPANY_PAYMENT_CREATION", null)));
     }
 
     private ReglementCompagnie createRecord(Long agenceId, CreerReglementCompagnieRequest request) {
@@ -175,7 +175,7 @@ public class ReglementCompagnieService {
         return activityRecorder.perform(() -> changeInstrumentStatusRecord(agenceId, instrument, request), response ->
                 CompanyPaymentActivity.command(instrument.getReglement(), before,
                         instrument.getStatut() == StatutInstrumentReglement.CONFIRME ? ActivityAction.CONFIRMED : ActivityAction.REJECTED,
-                        instrument.getStatut() == StatutInstrumentReglement.CONFIRME ? "Moyen de paiement compagnie confirme" : "Moyen de paiement compagnie rejete",
+                        instrument.getStatut() == StatutInstrumentReglement.CONFIRME ? "Moyen de paiement compagnie confirmé" : "Moyen de paiement compagnie rejeté",
                         "COMPANY_PAYMENT_INSTRUMENT_STATUS", instrument));
     }
 
@@ -212,7 +212,7 @@ public class ReglementCompagnieService {
         var before = CompanyPaymentActivity.snapshot(payment);
         return activityRecorder.perform(() -> cancelRecord(payment, request), response ->
                 CompanyPaymentActivity.command(payment, before, ActivityAction.CANCELLED,
-                        "Reglement compagnie annule", "COMPANY_PAYMENT_CANCELLATION", null));
+                        "Règlement compagnie annulé", "COMPANY_PAYMENT_CANCELLATION", null));
     }
 
     private ReglementCompagnieResponse cancelRecord(ReglementCompagnie payment, AnnulerBordereauCompagnieRequest request) {

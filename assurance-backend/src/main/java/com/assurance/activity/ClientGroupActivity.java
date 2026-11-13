@@ -42,11 +42,11 @@ public final class ClientGroupActivity {
         if (before != null) {
             if (!Objects.equals(before.getClientTeteId(), group.getClientTeteId())
                     && changes.stream().noneMatch(change -> change.label().equals("Tête de groupe"))) {
-                changes.add(new ActivityChange("Tête de groupe", null, "Selection actualisee"));
+                changes.add(new ActivityChange("Tête de groupe", null, "Sélection actualisée"));
             }
             if (!Objects.equals(before.getClientTresorerieId(), group.getClientTresorerieId())
                     && changes.stream().noneMatch(change -> change.label().equals("Responsable des paiements"))) {
-                changes.add(new ActivityChange("Responsable des paiements", null, "Selection actualisee"));
+                changes.add(new ActivityChange("Responsable des paiements", null, "Sélection actualisée"));
             }
         }
         Map<String, ActivityReference> references = new LinkedHashMap<>();

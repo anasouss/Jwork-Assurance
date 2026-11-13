@@ -31,11 +31,11 @@ public final class AdministrationActivity {
     }
 
     public static Map<String, String> userSnapshot(Utilisateur user) {
-        return new ActivityValues().put("Prenom", user.getPrenom()).put("Nom", user.getNom())
-                .put("Adresse e-mail", user.getEmail()).put("Telephone", user.getTelephone())
+        return new ActivityValues().put("Prénom", user.getPrenom()).put("Nom", user.getNom())
+                .put("Adresse e-mail", user.getEmail()).put("Téléphone", user.getTelephone())
                 .put("Actif", user.getActif())
                 .put("Agence", user.getAgence() == null ? "Plateforme" : reference(user.getAgence()).label())
-                .put("Role", user.getRole() == null ? null : reference(user.getRole()).label()).snapshot();
+                .put("Rôle", user.getRole() == null ? null : reference(user.getRole()).label()).snapshot();
     }
 
     public static ActivityCommand user(Utilisateur user, Map<String, String> before, ActivityAction action,
@@ -53,7 +53,7 @@ public final class AdministrationActivity {
                 .map(permission -> permission.getModule() + " - " + permission.getNom())
                 .sorted().collect(java.util.stream.Collectors.joining("\n"));
         return new ActivityValues().put("Code", role.getCode()).put("Nom", role.getNom())
-                .put("Description", role.getDescription()).put("Role systeme", role.getSystemRole())
+                .put("Description", role.getDescription()).put("Rôle système", role.getSystemRole())
                 .put("Agence", role.getAgence() == null ? "Plateforme" : reference(role.getAgence()).label())
                 .put("Autorisations", permissions).snapshot();
     }
@@ -67,14 +67,14 @@ public final class AdministrationActivity {
     public static Map<String, String> agencySnapshot(Agence agency) {
         return new ActivityValues().put("Code", agency.getCode()).put("Nom", agency.getNom())
                 .put("Adresse", agency.getAdresse()).put("Ville", agency.getVille())
-                .put("Telephone", agency.getTelephone()).put("Fax", agency.getFax()).put("Adresse e-mail", agency.getEmail())
+                .put("Téléphone", agency.getTelephone()).put("Fax", agency.getFax()).put("Adresse e-mail", agency.getEmail())
                 .put("Identifiant fiscal", agency.getIdentifiantFiscal()).put("Patente", agency.getPatente())
-                .put("ICE", agency.getIce()).put("Numero d'agrement", agency.getNumeroAgrement())
-                .put("Date d'agrement", agency.getDateAgrement()).put("Banque", agency.getBanque()).put("RIB", agency.getRib())
+                .put("ICE", agency.getIce()).put("Numéro d'agrément", agency.getNumeroAgrement())
+                .put("Date d'agrément", agency.getDateAgrement()).put("Banque", agency.getBanque()).put("RIB", agency.getRib())
                 .put("Statut", agency.getStatut() == null ? null : switch (agency.getStatut()) {
                     case ACTIVE -> "Active";
                     case SUSPENDED -> "Suspendue";
-                    case ARCHIVED -> "Archivee";
+                    case ARCHIVED -> "Archivée";
                 }).snapshot();
     }
 
@@ -86,7 +86,7 @@ public final class AdministrationActivity {
     public static ActivityCommand branding(Agence agency, boolean before, boolean after, boolean signature, ActivityAction action) {
         String label = signature ? "Signature" : "Logo";
         return new ActivityCommand(agency.getId(), ActivityModule.ADMINISTRATION, action,
-                label + " de l'agence " + (after ? (signature ? "enregistree" : "enregistre") : (signature ? "retiree" : "retire")),
+                label + " de l'agence " + (after ? (signature ? "enregistrée" : "enregistré") : (signature ? "retirée" : "retiré")),
                 signature ? "AGENCY_SIGNATURE" : "AGENCY_LOGO", reference(agency), List.of(),
                 ActivityValues.changes(new ActivityValues().put(label, before ? "Present" : null).snapshot(),
                         new ActivityValues().put(label, after ? "Present" : null).snapshot()));

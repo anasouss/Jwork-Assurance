@@ -81,7 +81,7 @@ public class TresorerieService {
         accessService.ensureCashOwnerAccess(account);
         accessService.synchronizeCentralCashAccess(account);
         activityRecorder.record(TreasuryActivity.accountCommand(account, java.util.Map.of(), ActivityAction.CREATED,
-                "Compte de tresorerie cree", "TREASURY_ACCOUNT_CREATION"));
+                "Compte de trésorerie créé", "TREASURY_ACCOUNT_CREATION"));
         return toResponse(account);
     }
 
@@ -127,7 +127,7 @@ public class TresorerieService {
         accessService.ensureCashOwnerAccess(account);
         accessService.synchronizeCentralCashAccess(account);
         activityRecorder.record(TreasuryActivity.accountCommand(account, before, ActivityAction.UPDATED,
-                "Compte de tresorerie modifie", "TREASURY_ACCOUNT_UPDATE"));
+                "Compte de trésorerie modifié", "TREASURY_ACCOUNT_UPDATE"));
         return toResponse(account);
     }
 
@@ -149,7 +149,7 @@ public class TresorerieService {
         account = compteRepository.save(account);
         accessService.synchronizeCentralCashAccess(account);
         activityRecorder.record(TreasuryActivity.accountCommand(account, before, ActivityAction.UPDATED,
-                Boolean.TRUE.equals(account.getActif()) ? "Compte de tresorerie active" : "Compte de tresorerie desactive",
+                Boolean.TRUE.equals(account.getActif()) ? "Compte de trésorerie activé" : "Compte de trésorerie désactivé",
                 "TREASURY_ACCOUNT_STATUS"));
         return toResponse(account);
     }
@@ -465,7 +465,7 @@ public class TresorerieService {
             boolean created = !beforeAccounts.containsKey(account.getId());
             activityRecorder.record(TreasuryActivity.accountCommand(account, beforeAccounts.get(account.getId()),
                     created ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                    created ? "Caisse individuelle creee avec l'utilisateur" : "Caisse individuelle synchronisee avec l'utilisateur",
+                    created ? "Caisse individuelle créée avec l'utilisateur" : "Caisse individuelle synchronisee avec l'utilisateur",
                     "TREASURY_PERSONAL_CASH_SYNC"));
         }
     }

@@ -368,7 +368,7 @@ public class FacturationConventionService {
     ) {
         return businessActivityRecorder.perform(() -> createInvoiceRecord(agenceId, request), result ->
                 InvoiceActivity.command(documentClientService.findDocument(agenceId, result.getId()), Map.of(),
-                        ActivityAction.ISSUED, "Facture de convention emise", "CONVENTION_INVOICE_ISSUANCE", List.of()));
+                        ActivityAction.ISSUED, "Facture de convention émise", "CONVENTION_INVOICE_ISSUANCE", List.of()));
     }
 
     private DocumentClientResponse createInvoiceRecord(Long agenceId, CreerFactureConventionRequest request) {

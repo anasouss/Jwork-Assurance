@@ -155,7 +155,7 @@ public class TresorerieAccessService {
         affectationRepository.saveAll(existing.values());
         ensureCashOwnerAccess(account);
         activityRecorder.record(new ActivityCommand(agenceId, ActivityModule.TRESORERIE, ActivityAction.UPDATED,
-                "Acces au compte bancaire modifies", "TREASURY_ACCOUNT_ACCESS", TreasuryActivity.reference(account),
+                "Accès au compte bancaire modifiés", "TREASURY_ACCOUNT_ACCESS", TreasuryActivity.reference(account),
                 existing.values().stream().map(row -> ActivityReference.of(ActivityRecordType.UTILISATEUR,
                         row.getUtilisateur().getId(), row.getUtilisateur().getFullName())).toList(),
                 ActivityValues.changes(before, TreasuryActivity.assignments(existing.values()))));

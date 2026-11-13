@@ -54,7 +54,7 @@ public final class AcquisitionActivity {
 
     private static void referenceChange(List<ActivityChange> changes, String label, Long before, Long after) {
         if (!Objects.equals(before, after) && changes.stream().noneMatch(change -> label.equals(change.label()))) {
-            changes.add(new ActivityChange(label, null, "Selection actualisee"));
+            changes.add(new ActivityChange(label, null, "Sélection actualisée"));
         }
     }
 

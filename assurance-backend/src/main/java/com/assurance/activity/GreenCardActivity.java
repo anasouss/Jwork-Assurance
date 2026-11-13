@@ -16,10 +16,10 @@ public final class GreenCardActivity {
     }
 
     public static Map<String, String> snapshot(CarteVerte card) {
-        ActivityValues values = new ActivityValues().put("Numero", card.getNumero())
+        ActivityValues values = new ActivityValues().put("Numéro", card.getNumero())
                 .put("Immatriculation", card.getImmatriculation()).put("Marque", card.getMarque())
                 .put("Compagnie", card.getCompagnieAssurance() == null ? null : card.getCompagnieAssurance().getNom())
-                .put("Date d'effet", card.getDateEffet()).put("Date d'echeance", card.getDateEcheance())
+                .put("Date d'effet", card.getDateEffet()).put("Date d'échéance", card.getDateEcheance())
                 .put("Montant", card.getMontant()).put("Actif", card.getActif());
         AssistanceActivity.billableValues(values, card.getElementFacturable());
         return values.snapshot();

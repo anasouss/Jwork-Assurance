@@ -31,44 +31,44 @@ public final class ReferenceCatalogueActivity {
 
     public static State state(Marque marque) {
         return state(ActivityRecordType.MARQUE, marque.getId(), marque.getLibelle(),
-                new ActivityValues().put("Libelle", marque.getLibelle()).put("Actif", marque.getActif()), List.of());
+                new ActivityValues().put("Libellé", marque.getLibelle()).put("Actif", marque.getActif()), List.of());
     }
 
     public static State state(Carrosserie carrosserie) {
         return state(ActivityRecordType.CARROSSERIE, carrosserie.getId(), carrosserie.getLibelle(),
-                new ActivityValues().put("Libelle", carrosserie.getLibelle()).put("Actif", carrosserie.getActif()), List.of());
+                new ActivityValues().put("Libellé", carrosserie.getLibelle()).put("Actif", carrosserie.getActif()), List.of());
     }
 
     public static State state(Carburant carburant) {
         return state(ActivityRecordType.CARBURANT, carburant.getId(), label(carburant.getCode(), carburant.getLibelle()),
-                new ActivityValues().put("Code", carburant.getCode()).put("Libelle", carburant.getLibelle())
+                new ActivityValues().put("Code", carburant.getCode()).put("Libellé", carburant.getLibelle())
                         .put("Actif", carburant.getActif()), List.of());
     }
 
     public static State state(SousClasse sousClasse) {
         return state(ActivityRecordType.SOUS_CLASSE, sousClasse.getId(), label(sousClasse.getCode(), sousClasse.getLibelle()),
-                new ActivityValues().put("Code", sousClasse.getCode()).put("Libelle", sousClasse.getLibelle())
-                        .put("Caracteristique moteur", sousClasse.getChampMoteur() == null ? null : switch (sousClasse.getChampMoteur()) {
-                            case CYLINDREE -> "Cylindree";
+                new ActivityValues().put("Code", sousClasse.getCode()).put("Libellé", sousClasse.getLibelle())
+                        .put("Caractéristique moteur", sousClasse.getChampMoteur() == null ? null : switch (sousClasse.getChampMoteur()) {
+                            case CYLINDREE -> "Cylindrée";
                             case PUISSANCE_FISCALE -> "Puissance fiscale";
                         }).put("Conducteur et permis requis", sousClasse.getConducteurPermisRequis())
-                        .put("Assistance autorisee", sousClasse.getAssistanceAutorisee()).put("Actif", sousClasse.getActif()), List.of());
+                        .put("Assistance autorisée", sousClasse.getAssistanceAutorisee()).put("Actif", sousClasse.getActif()), List.of());
     }
 
     public static State state(Usage usage) {
         var group = usage.getGroupeUsageAttestation();
         List<ActivityReference> references = group == null ? List.of() : List.of(groupReference(group));
         return state(ActivityRecordType.USAGE, usage.getId(), label(usage.getCode(), usage.getLibelle()),
-                new ActivityValues().put("Code", usage.getCode()).put("Libelle", usage.getLibelle()).put("Criteres", usage.getCriteria())
+                new ActivityValues().put("Code", usage.getCode()).put("Libellé", usage.getLibelle()).put("Critères", usage.getCriteria())
                         .put("Ferme uniquement", usage.getFermeUniquement())
-                        .put("Periodes autorisees", usage.getPeriodesAutorisees().stream().sorted()
+                        .put("Périodes autorisées", usage.getPeriodesAutorisees().stream().sorted()
                                 .map(com.assurance.enums.PeriodeCouverture::getLibelle)
                                 .collect(java.util.stream.Collectors.joining(", ")))
                         .put("Groupe d'attestations", group == null ? null : label(group.getCode(), group.getLibelle()))
                         .put("Consomme une attestation", usage.getConsommeAttestation()).put("Tarification par carburant", usage.getByCarburant())
                         .put("Tarification par puissance fiscale", usage.getByPuissanceFiscale()).put("Tarification par sous-classe", usage.getBySousClasse())
                         .put("Tarification par PTC", usage.getByPtc()).put("Tarification par prime", usage.getByPrime())
-                        .put("Tarification par categorie de transport", usage.getByCategorieTransport()).put("Garanties des personnes", usage.getGarantiesPersonne())
+                        .put("Tarification par catégorie de transport", usage.getByCategorieTransport()).put("Garanties des personnes", usage.getGarantiesPersonne())
                         .put("Majoration RC remorque (%)", usage.getTauxExtensionRemorque()).put("Actif", usage.getActif()), references);
     }
 
@@ -82,7 +82,7 @@ public final class ReferenceCatalogueActivity {
         return state(ActivityRecordType.TARIF_USAGE, tarif.getId(), "Tarif " + label(usage.getCode(), usage.getLibelle()),
                 new ActivityValues().put("Usage", label(usage.getCode(), usage.getLibelle()))
                         .put("Sous-classe", tarif.getSousClasse() == null ? null : label(tarif.getSousClasse().getCode(), tarif.getSousClasse().getLibelle()))
-                        .put("Categorie de transport", tarif.getCategorieTransport() == null ? null : label(tarif.getCategorieTransport().getCode(), tarif.getCategorieTransport().getLibelle()))
+                        .put("Catégorie de transport", tarif.getCategorieTransport() == null ? null : label(tarif.getCategorieTransport().getCode(), tarif.getCategorieTransport().getLibelle()))
                         .put("Carburants", tarif.getCarburants().stream().map(carburant -> label(carburant.getCode(), carburant.getLibelle()))
                                 .sorted().collect(Collectors.joining(", ")))
                         .put("Puissance fiscale minimum", tarif.getPuissanceFiscaleMin()).put("Puissance fiscale maximum", tarif.getPuissanceFiscaleMax())
@@ -94,7 +94,7 @@ public final class ReferenceCatalogueActivity {
 
     public static State state(CategorieTransport categorie) {
         return state(ActivityRecordType.CATEGORIE_TRANSPORT, categorie.getId(), label(categorie.getCode(), categorie.getLibelle()),
-                new ActivityValues().put("Code", categorie.getCode()).put("Libelle", categorie.getLibelle())
+                new ActivityValues().put("Code", categorie.getCode()).put("Libellé", categorie.getLibelle())
                         .put("Description", categorie.getDescription()).put("Actif", categorie.getActif()), List.of());
     }
 
@@ -105,8 +105,8 @@ public final class ReferenceCatalogueActivity {
         var group = categorie.getGroupeUsageAttestation();
         if (group != null) references.add(groupReference(group));
         return state(ActivityRecordType.CATEGORIE_CLIENT, categorie.getId(), label(categorie.getCode(), categorie.getLibelle()),
-                new ActivityValues().put("Code", categorie.getCode()).put("Libelle", categorie.getLibelle())
-                        .put("Usages autorises", categorie.getUsages().stream().map(usage -> label(usage.getCode(), usage.getLibelle()))
+                new ActivityValues().put("Code", categorie.getCode()).put("Libellé", categorie.getLibelle())
+                        .put("Usages autorisés", categorie.getUsages().stream().map(usage -> label(usage.getCode(), usage.getLibelle()))
                                 .sorted().collect(Collectors.joining(", ")))
                         .put("Groupe d'attestations", group == null ? null : label(group.getCode(), group.getLibelle()))
                         .put("Actif", categorie.getActif()), references);
@@ -116,15 +116,15 @@ public final class ReferenceCatalogueActivity {
         List<ActivityReference> references = group.getCompagniesRestreintes().stream()
                 .map(company -> ActivityReference.of(ActivityRecordType.COMPAGNIE, company.getId(), company.getNom())).toList();
         return state(ActivityRecordType.GROUPE_USAGE_ATTESTATION, group.getId(), label(group.getCode(), group.getLibelle()),
-                new ActivityValues().put("Code", group.getCode()).put("Libelle", group.getLibelle()).put("Couleur", group.getCouleur())
-                        .put("Compagnies autorisees", group.getCompagniesRestreintes().stream().map(company -> label(company.getCode(), company.getNom()))
+                new ActivityValues().put("Code", group.getCode()).put("Libellé", group.getLibelle()).put("Couleur", group.getCouleur())
+                        .put("Compagnies autorisées", group.getCompagniesRestreintes().stream().map(company -> label(company.getCode(), company.getNom()))
                                 .sorted().collect(Collectors.joining(", ")))
                         .put("Visible dans le stock", group.getVisibleStock()).put("Actif", group.getActif()), references);
     }
 
     public static State state(GroupeExclusionGarantie group) {
         return state(ActivityRecordType.GROUPE_EXCLUSION_GARANTIE, group.getId(), label(group.getCode(), group.getLibelle()),
-                new ActivityValues().put("Code", group.getCode()).put("Libelle", group.getLibelle())
+                new ActivityValues().put("Code", group.getCode()).put("Libellé", group.getLibelle())
                         .put("Type de garantie", guaranteeType(group.getTypeGarantie())).put("Actif", group.getActif()), List.of());
     }
 
@@ -141,26 +141,26 @@ public final class ReferenceCatalogueActivity {
                 .map(CompagnieGarantie::getCompagnieAssurance).toList();
         withoutProrata.forEach(company -> references.add(ActivityReference.of(ActivityRecordType.COMPAGNIE, company.getId(), company.getNom())));
         return state(ActivityRecordType.GARANTIE, garantie.getId(), label(garantie.getCode(), garantie.getLibelle()),
-                new ActivityValues().put("Code", garantie.getCode()).put("Libelle", garantie.getLibelle()).put("Description", garantie.getDescription())
+                new ActivityValues().put("Code", garantie.getCode()).put("Libellé", garantie.getLibelle()).put("Description", garantie.getDescription())
                         .put("Branche", branch == null ? null : label(branch.getCode(), branch.getLibelle()))
                         .put("Groupe d'exclusion", group == null ? null : label(group.getCode(), group.getLibelle()))
                         .put("Type de garantie", guaranteeType(garantie.getTypeGarantie())).put("Obligatoire", garantie.getObligatoire())
-                        .put("Responsabilite civile", garantie.getResponsabiliteCivile()).put("Defense et recours", garantie.getDefenseRecours())
-                        .put("Valeur venale requise", garantie.getRequiertValeurVenale()).put("Valeur a neuf requise", garantie.getRequiertValeurNeuf())
+                        .put("Responsabilité civile", garantie.getResponsabiliteCivile()).put("Défense et recours", garantie.getDefenseRecours())
+                        .put("Valeur vénale requise", garantie.getRequiertValeurVenale()).put("Valeur à neuf requise", garantie.getRequiertValeurNeuf())
                         .put("Valeur glace requise", garantie.getRequiertValeurGlace()).put("Franchise", garantie.getAvecFranchise())
                         .put("Franchise minimale", garantie.getAvecFranchiseMinimale()).put("Capital", garantie.getAvecCapital())
                         .put("Tarification multiple", garantie.getTarificationMultiple())
                         .put("Modes de tarification multiple", garantie.getModesTarificationMultiple().stream().map(ReferenceCatalogueActivity::mode).sorted().collect(Collectors.joining(", ")))
-                        .put("Modes autorises", garantie.getModesAutorises().stream().map(ReferenceCatalogueActivity::mode).sorted().collect(Collectors.joining(", ")))
-                        .put("Mode par defaut", mode(garantie.getModeParDefaut()))
-                        .put("Critere de selection tarifaire", garantie.getCritereSelectionTarif() == null ? null : switch (garantie.getCritereSelectionTarif()) {
+                        .put("Modes autorisés", garantie.getModesAutorises().stream().map(ReferenceCatalogueActivity::mode).sorted().collect(Collectors.joining(", ")))
+                        .put("Mode par défaut", mode(garantie.getModeParDefaut()))
+                        .put("Critère de sélection tarifaire", garantie.getCritereSelectionTarif() == null ? null : switch (garantie.getCritereSelectionTarif()) {
                             case TAUX_PRIME -> "Taux de prime";
                             case TAUX_FRANCHISE -> "Taux de franchise";
-                        }).put("Sources de valeur autorisees", garantie.getSourcesValeurAutorisees().stream()
+                        }).put("Sources de valeur autorisées", garantie.getSourcesValeurAutorisees().stream()
                                 .map(ReferenceCatalogueActivity::source).sorted().collect(Collectors.joining(", ")))
-                        .put("Source de valeur par defaut", source(garantie.getSourceValeurParDefaut()))
-                        .put("Prime de reference", base == null ? null : label(base.getCode(), base.getLibelle()))
-                        .put("Saisie manuelle autorisee", garantie.getSaisieManuelleAutorisee()).put("Verrouillee", garantie.getVerrouillee())
+                        .put("Source de valeur par défaut", source(garantie.getSourceValeurParDefaut()))
+                        .put("Prime de référence", base == null ? null : label(base.getCode(), base.getLibelle()))
+                        .put("Saisie manuelle autorisée", garantie.getSaisieManuelleAutorisee()).put("Verrouillée", garantie.getVerrouillee())
                         .put("Compagnies sans prorata", withoutProrata.stream().map(company -> label(company.getCode(), company.getNom()))
                                 .sorted().collect(Collectors.joining(", ")))
                         .put("Ordre d'affichage", garantie.getOrdreAffichage()).put("Actif", garantie.getActif()), references);
@@ -168,7 +168,7 @@ public final class ReferenceCatalogueActivity {
 
     private static String guaranteeType(TypeGarantie type) {
         return type == null ? null : switch (type) {
-            case VEHICULE -> "Vehicule";
+            case VEHICULE -> "Véhicule";
             case PERSONNE -> "Personne";
         };
     }
@@ -189,8 +189,8 @@ public final class ReferenceCatalogueActivity {
     private static String source(SourceValeurGarantie source) {
         return source == null ? null : switch (source) {
             case AUCUNE -> "Aucune";
-            case VENALE -> "Valeur venale";
-            case NEUF -> "Valeur a neuf";
+            case VENALE -> "Valeur vénale";
+            case NEUF -> "Valeur à neuf";
             case GLACE -> "Valeur glace";
             case MANUEL -> "Saisie manuelle";
         };
@@ -203,7 +203,7 @@ public final class ReferenceCatalogueActivity {
         if (after != null) references.addAll(after.references());
         List<ActivityChange> changes = new ArrayList<>(ActivityValues.changes(before == null ? null : before.values(), after == null ? null : after.values()));
         if (before != null && after != null && changes.isEmpty() && !referenceIds(before).equals(referenceIds(after))) {
-            changes.add(new ActivityChange("References associees", null, "Actualisees"));
+            changes.add(new ActivityChange("Références associees", null, "Actualisées"));
         }
         return new ActivityCommand(null, ActivityModule.REFERENTIELS, action, title, origin, current.subject(),
                 references.stream().distinct().toList(), changes);
@@ -224,7 +224,7 @@ public final class ReferenceCatalogueActivity {
             }
         }
         return new ActivityCommand(null, ActivityModule.REFERENTIELS, ActivityAction.SAVED,
-                "Majorations RC remorque enregistrees", "USAGE_TRAILER_RATES_SAVE",
+                "Majorations RC remorque enregistrées", "USAGE_TRAILER_RATES_SAVE",
                 new ActivityReference(ActivityRecordType.CONFIGURATION_USAGES, "TAUX_EXTENSION_REMORQUE", "Majorations RC remorque"),
                 references.stream().distinct().toList(), changes);
     }

@@ -49,7 +49,7 @@ public final class ContractActivity {
             for (String label : labels) {
                 if (!Objects.equals(oldRelationships.get(label), newRelationships.get(label))
                         && changes.stream().noneMatch(change -> change.label().equals(label))) {
-                    changes.add(new ActivityChange(label, null, "Selection actualisee"));
+                    changes.add(new ActivityChange(label, null, "Sélection actualisée"));
                 }
             }
         }
@@ -83,7 +83,7 @@ public final class ContractActivity {
                 : !hasText(items(before.getVehicules()).get(index).getImmatriculation())
                         && items(before.getVehicules()).get(index).getMarqueId() == null);
         var changes = changes(before, after);
-        String prefix = (trailer ? "Remorque " : "Vehicule ") + (index + 1) + " - ";
+        String prefix = (trailer ? "Remorque " : "Véhicule ") + (index + 1) + " - ";
         boolean targetChanged = changes.stream().anyMatch(change -> change.label().startsWith(prefix));
         ActivityAction action = created ? ActivityAction.CREATED : firstSave && targetChanged ? ActivityAction.SAVED
                 : targetChanged ? ActivityAction.UPDATED : ActivityAction.RECALCULATED;
@@ -101,17 +101,17 @@ public final class ContractActivity {
         // A full draft PUT can also persist edits outside the section that triggered it.
         boolean outsideSection = command.changes().stream().anyMatch(change -> switch (operation == null ? "" : operation) {
             case "CONTRACT_SUBSCRIBER_SAVED" -> !change.label().equals("Souscripteur");
-            case "CONTRACT_OWNER_SAVED" -> !change.label().equals("Proprietaire");
+            case "CONTRACT_OWNER_SAVED" -> !change.label().equals("Propriétaire");
             case "CONTRACT_TARIFF_GRID_SELECTED" -> !change.label().equals("Grille tarifaire");
-            case "CONTRACT_VEHICLE_SAVED" -> !change.label().startsWith("Vehicule ")
+            case "CONTRACT_VEHICLE_SAVED" -> !change.label().startsWith("Véhicule ")
                     && !change.label().startsWith("Quittance - ");
             case "CONTRACT_GUARANTEES_SAVED" -> !change.label().contains(") - ")
                     && !change.label().startsWith("Quittance - ")
-                    && !change.label().equals("Affectation et parametrage des garanties");
+                    && !change.label().equals("Affectation et paramétrage des garanties");
             case "CONTRACT_DETAILS_SAVED" -> change.label().contains(") - ")
-                    || change.label().equals("Affectation et parametrage des garanties")
+                    || change.label().equals("Affectation et paramétrage des garanties")
                     || change.label().startsWith("Assistance ")
-                    || change.label().equals("Souscripteur") || change.label().equals("Proprietaire");
+                    || change.label().equals("Souscripteur") || change.label().equals("Propriétaire");
             default -> false;
         });
         return outsideSection ? new ActivityCommand(command.agenceId(), command.module(), command.action(),
@@ -132,15 +132,15 @@ public final class ContractActivity {
         for (var guarantee : items(contract.getGaranties())) {
             String target = guarantee.getVehiculeId() != null
                     ? items(contract.getVehicules()).stream().filter(vehicle -> Objects.equals(vehicle.getVehiculeId(), guarantee.getVehiculeId()))
-                            .map(vehicle -> label(vehicle.getImmatriculation(), "Vehicule " + (items(contract.getVehicules()).indexOf(vehicle) + 1)))
-                            .findFirst().orElse("Vehicule")
+                            .map(vehicle -> label(vehicle.getImmatriculation(), "Véhicule " + (items(contract.getVehicules()).indexOf(vehicle) + 1)))
+                            .findFirst().orElse("Véhicule")
                     : guarantee.getRemorqueId() != null
                     ? items(contract.getRemorques()).stream().filter(trailer -> Objects.equals(trailer.getRemorqueId(), guarantee.getRemorqueId()))
                             .map(trailer -> label(trailer.getImmatriculation(), "Remorque " + (items(contract.getRemorques()).indexOf(trailer) + 1)))
                             .findFirst().orElse("Remorque")
                     : guarantee.getClientId() != null
                     ? items(contract.getClients()).stream().filter(client -> Objects.equals(client.getClientId(), guarantee.getClientId()))
-                            .map(client -> label(client.getNomAffichage(), "Personne assuree")).findFirst().orElse("Personne assuree")
+                            .map(client -> label(client.getNomAffichage(), "Personne assurée")).findFirst().orElse("Personne assurée")
                     : "Contrat";
             labels.put(guaranteeKey(contract, guarantee), label(guarantee.getLibelle(), "Garantie") + " (" + target + ") - ");
         }
@@ -158,7 +158,7 @@ public final class ContractActivity {
         values.put("Compagnie", contract.getCompagnieAssuranceId());
         values.put("Convention", contract.getConventionId());
         values.put("Grille tarifaire", contract.getGrilleTarifaireId());
-        values.put("Categorie client", contract.getCategorieClientId());
+        values.put("Catégorie client", contract.getCategorieClientId());
         values.put("Usage du contrat", contract.getUsageId());
         values.put("Contrat d'origine", contract.getContratOrigineId());
         values.put("Payeur", contract.getPayeurPrimeClientId());
@@ -169,11 +169,11 @@ public final class ContractActivity {
         }
         int index = 0;
         for (var vehicle : items(contract.getVehicules())) {
-            String prefix = "Vehicule " + (++index) + " - ";
+            String prefix = "Véhicule " + (++index) + " - ";
             values.put(prefix + "Usage", vehicle.getUsageId());
             values.put(prefix + "Marque", vehicle.getMarqueId());
             values.put(prefix + "Carrosserie", vehicle.getCarrosserieId());
-            values.put(prefix + "Categorie de transport", vehicle.getCategorieTransportId());
+            values.put(prefix + "Catégorie de transport", vehicle.getCategorieTransportId());
             values.put(prefix + "Marque remorque", vehicle.getMarqueRemorqueId());
         }
         index = 0;
@@ -183,7 +183,7 @@ public final class ContractActivity {
             values.put(prefix + "Marque", trailer.getMarqueId());
         }
         // Draft saves rebuild target and guarantee rows; only business selections matter.
-        values.put("Affectation et parametrage des garanties", items(contract.getGaranties()).stream()
+        values.put("Affectation et paramétrage des garanties", items(contract.getGaranties()).stream()
                 .map(guarantee -> guarantee.getGarantieId() + ":" + targetKey(contract, guarantee.getVehiculeId(), guarantee.getRemorqueId())
                         + ":" + guarantee.getClientId() + ":" + guarantee.getLigneGrilleTarifaireId() + ":" + guarantee.getFormuleGarantiePersonneId())
                 .sorted().toList());
@@ -215,9 +215,9 @@ public final class ContractActivity {
     private static String clientRole(String role) {
         return switch (role) {
             case "SOUSCRIPTEUR" -> "Souscripteur";
-            case "PROPRIETAIRE" -> "Proprietaire";
+            case "PROPRIETAIRE" -> "Propriétaire";
             case "CONDUCTEUR" -> "Conducteur";
-            case "BENEFICIAIRE" -> "Beneficiaire";
+            case "BENEFICIAIRE" -> "Bénéficiaire";
             case "PAYEUR" -> "Client payeur";
             case "CONTACT" -> "Contact";
             default -> role;
@@ -251,7 +251,7 @@ public final class ContractActivity {
         if (dossier != null && !dossier.isBlank()) return "Dossier " + dossier;
         if (police != null && !police.isBlank()) return "Police " + police;
         if (contrat != null && !contrat.isBlank()) return "Contrat " + contrat;
-        return "Contrat sans reference";
+        return "Contrat sans référence";
     }
 
     public static ActivityCommand genericMovementCommand(MouvementContrat movement, QuittanceResponse response, StatutContrat previousStatus) {
@@ -265,7 +265,7 @@ public final class ContractActivity {
                 client.getClient().getId(), client.getClient().getNomAffichage()));
         for (var vehicle : items(movement.getVehicules())) {
             if (vehicle.getVehicule() != null) references.add(ActivityReference.of(ActivityRecordType.VEHICULE,
-                    vehicle.getVehicule().getId(), label(vehicle.getImmatriculation(), "Vehicule du mouvement")));
+                    vehicle.getVehicule().getId(), label(vehicle.getImmatriculation(), "Véhicule du mouvement")));
         }
         for (var trailer : items(movement.getRemorques())) {
             if (trailer.getRemorque() != null) references.add(ActivityReference.of(ActivityRecordType.REMORQUE,
@@ -277,17 +277,17 @@ public final class ContractActivity {
                 response.getId(), label(response.getNumeroQuittance(), "Quittance du mouvement")));
         if (response.getElementFacturableId() != null) references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE,
                 response.getElementFacturableId(), movementLabel));
-        var values = new ActivityValues().put("Evenement", movementLabel).put("Numero du mouvement", movement.getNumeroMouvement())
-                .put("Date d'effet", movement.getDateEffet()).put("Date d'echeance", movement.getDateEcheance())
+        var values = new ActivityValues().put("Événement", movementLabel).put("Numéro du mouvement", movement.getNumeroMouvement())
+                .put("Date d'effet", movement.getDateEffet()).put("Date d'échéance", movement.getDateEcheance())
                 .put("Date de validation", movement.getDateValidation()).put("Prime nette", movement.getPrimeNette())
                 .put("Taxes", movement.getTaxe()).put("TPF", movement.getTaxeParafiscale())
                 .put("Accessoires", movement.getAccessoire()).put("CNPAC", movement.getCnpac()).put("Montant TTC", movement.getPrimeTotale())
-                .put("Libelle du releve", movement.getLibelleReleve()).put("Notes", movement.getNotes());
+                .put("Libellé du relevé", movement.getLibelleReleve()).put("Notes", movement.getNotes());
         List<ActivityChange> changes = new ArrayList<>(ActivityValues.changes(null, values.snapshot()));
         if (previousStatus != contract.getStatut()) changes.add(new ActivityChange("Statut du contrat",
                 contractStatus(previousStatus), contractStatus(contract.getStatut())));
         return new ActivityCommand(contract.getAgence().getId(), ActivityModule.PRODUCTION, ActivityAction.VALIDATED,
-                movementLabel + " - mouvement valide", "CONTRACT_GENERIC_MOVEMENT_CREATE",
+                movementLabel + " - mouvement validé", "CONTRACT_GENERIC_MOVEMENT_CREATE",
                 ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT, movement.getId(),
                         movementLabel + " - " + movement.getNumeroMouvement()), references.stream().distinct().toList(), changes);
     }
@@ -299,7 +299,7 @@ public final class ContractActivity {
         if (record.getUsageId() != null) references.add(ActivityReference.of(ActivityRecordType.USAGE,
                 record.getUsageId(), label(record.getUsageLibelle(), "Usage")));
         if (record.getCategorieClientId() != null) references.add(ActivityReference.of(ActivityRecordType.CATEGORIE_CLIENT,
-                record.getCategorieClientId(), label(record.getCategorieClientLibelle(), "Categorie client")));
+                record.getCategorieClientId(), label(record.getCategorieClientLibelle(), "Catégorie client")));
         if (record.getPayeurPrimeClientId() != null) references.add(ActivityReference.of(ActivityRecordType.CLIENT,
                 record.getPayeurPrimeClientId(), label(record.getPayeurPrimeNom(), "Payeur")));
         if (record.getGroupeFacturationId() != null) references.add(ActivityReference.of(ActivityRecordType.GROUPE_CLIENT,
@@ -320,11 +320,11 @@ public final class ContractActivity {
         }
         for (var vehicle : items(record.getVehicules())) {
             if (vehicle.getVehiculeId() != null) references.add(ActivityReference.of(ActivityRecordType.VEHICULE,
-                    vehicle.getVehiculeId(), label(vehicle.getImmatriculation(), "Vehicule")));
-            addReference(references, ActivityRecordType.USAGE, vehicle.getUsageId(), vehicle.getUsageLibelle(), "Usage du vehicule");
-            addReference(references, ActivityRecordType.MARQUE, vehicle.getMarqueId(), vehicle.getMarque(), "Marque du vehicule");
+                    vehicle.getVehiculeId(), label(vehicle.getImmatriculation(), "Véhicule")));
+            addReference(references, ActivityRecordType.USAGE, vehicle.getUsageId(), vehicle.getUsageLibelle(), "Usage du véhicule");
+            addReference(references, ActivityRecordType.MARQUE, vehicle.getMarqueId(), vehicle.getMarque(), "Marque du véhicule");
             addReference(references, ActivityRecordType.CARROSSERIE, vehicle.getCarrosserieId(), vehicle.getCarrosserie(), "Carrosserie");
-            addReference(references, ActivityRecordType.CATEGORIE_TRANSPORT, vehicle.getCategorieTransportId(), vehicle.getCategorieTransportLibelle(), "Categorie de transport");
+            addReference(references, ActivityRecordType.CATEGORIE_TRANSPORT, vehicle.getCategorieTransportId(), vehicle.getCategorieTransportLibelle(), "Catégorie de transport");
             addReference(references, ActivityRecordType.MARQUE, vehicle.getMarqueRemorqueId(), vehicle.getMarqueRemorque(), "Marque remorque");
         }
         for (var trailer : items(record.getRemorques())) {
@@ -346,14 +346,14 @@ public final class ContractActivity {
             addReference(references, ActivityRecordType.FORMULE_GARANTIE_PERSONNE, guarantee.getFormuleGarantiePersonneId(),
                     "Formule - " + label(guarantee.getFormule(), guarantee.getLibelle()), "Formule de garantie");
             if (guarantee.getClientId() != null && items(record.getClients()).stream().noneMatch(client -> guarantee.getClientId().equals(client.getClientId()))) {
-                references.add(ActivityReference.of(ActivityRecordType.CLIENT, guarantee.getClientId(), "Personne assuree"));
+                references.add(ActivityReference.of(ActivityRecordType.CLIENT, guarantee.getClientId(), "Personne assurée"));
             }
         }
         for (var assistance : items(record.getAssistances())) {
             if (assistance.getId() != null) references.add(ActivityReference.of(ActivityRecordType.ASSISTANCE,
-                    assistance.getId(), "Assistance - " + label(assistance.getNumeroContratOuQuittance(), label(assistance.getProduit(), "En preparation"))));
+                    assistance.getId(), "Assistance - " + label(assistance.getNumeroContratOuQuittance(), label(assistance.getProduit(), "En préparation"))));
             if (assistance.getElementFacturableId() != null) references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE,
-                    assistance.getElementFacturableId(), "Assistance - " + label(assistance.getProduit(), "Element facturable")));
+                    assistance.getElementFacturableId(), "Assistance - " + label(assistance.getProduit(), "Élément facturable")));
             if (assistance.getCompagnieAssistanceId() != null) references.add(ActivityReference.of(ActivityRecordType.COMPAGNIE_ASSISTANCE,
                     assistance.getCompagnieAssistanceId(), label(assistance.getCompagnieAssistanceLibelle(), "Compagnie d'assistance")));
             if (assistance.getProduitAssistanceId() != null) references.add(ActivityReference.of(ActivityRecordType.PRODUIT_ASSISTANCE,
@@ -364,9 +364,9 @@ public final class ContractActivity {
         if (record.getQuittanceGenerale() != null) {
             var receipt = record.getQuittanceGenerale();
             if (receipt.getId() != null) references.add(ActivityReference.of(ActivityRecordType.QUITTANCE,
-                    receipt.getId(), label(receipt.getNumeroQuittance(), "Quittance generale")));
+                    receipt.getId(), label(receipt.getNumeroQuittance(), "Quittance générale")));
             if (receipt.getElementFacturableId() != null) references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE,
-                    receipt.getElementFacturableId(), "Creance du contrat"));
+                    receipt.getElementFacturableId(), "Créance du contrat"));
         }
         return distinctReferences(references);
     }
@@ -388,7 +388,7 @@ public final class ContractActivity {
                 .put("Compagnie", contract.getCompagnieAssuranceNom())
                 .put("Convention", contract.getConventionIntitule())
                 .put("Grille tarifaire", contract.getGrilleTarifaireLibelle())
-                .put("Categorie client", contract.getCategorieClientLibelle())
+                .put("Catégorie client", contract.getCategorieClientLibelle())
                 .put("Usage du contrat", contract.getUsageLibelle())
                 .put("Contrat d'origine", contract.getContratOrigineReference())
                 .put("Statut", contractStatus(contract.getStatut()))
@@ -398,15 +398,15 @@ public final class ContractActivity {
                 .put("Brouillon", contract.getBrouillon())
                 .put("Prospection", contract.getProspection())
                 .put("Date d'effet", contract.getDateEffet())
-                .put("Date d'echeance", contract.getDateEcheance())
-                .put("Numero d'attestation", contract.getNumeroAttestation())
-                .put("Mode de reglement", paymentMode(contract.getModeReglement()))
+                .put("Date d'échéance", contract.getDateEcheance())
+                .put("Numéro d'attestation", contract.getNumeroAttestation())
+                .put("Mode de règlement", paymentMode(contract.getModeReglement()))
                 .put("Mode de paiement", contract.getModePaiement())
                 .put("Payeur", contract.getPayeurPrimeNom())
                 .put("Groupe de facturation", contract.getGroupeFacturationNom())
                 .put("Facturation", contract.getModeFacturation() == null ? null : switch (contract.getModeFacturation()) {
                     case DIRECTE -> "Directe";
-                    case CONSOLIDEE_GROUPE -> "Consolidee par groupe";
+                    case CONSOLIDEE_GROUPE -> "Consolidée par groupe";
                 })
                 .put("Fractionnement", contract.getFractionnement() == null ? null : switch (contract.getFractionnement()) {
                     case MENSUEL -> "Mensuel";
@@ -414,11 +414,11 @@ public final class ContractActivity {
                     case SEMESTRIEL -> "Semestriel";
                     case ANNUEL -> "Annuel";
                 })
-                .put("Echeance annuelle", contract.getEcheance())
+                .put("Échéance annuelle", contract.getEcheance())
                 .put("Renouvellement", contract.getTypeRenouvellement())
                 .put("Terme de renouvellement", contract.getModeTermeRenouvellement() == null ? null
                         : contract.getModeTermeRenouvellement() == com.assurance.enums.ModeTermeRenouvellement.CABINET ? "Cabinet" : "Compagnie")
-                .put("Renouvele", contract.getRenouvele())
+                .put("Renouvelé", contract.getRenouvele())
                 .put("Saisie des garanties", contract.getModeSaisieGaranties() == null ? null : switch (contract.getModeSaisieGaranties()) {
                     case MANUELLE -> "Manuelle";
                     case MANUELLE_AVEC_PRIME_NETTE -> "Manuelle avec primes";
@@ -426,13 +426,13 @@ public final class ContractActivity {
                 })
                 .put("Saisie avec primes", contract.getSaisiePrimeNette())
                 .put("Taux RC", contract.getTauxRc())
-                .put("CRM partage", contract.getCrmPartage())
-                .put("Valeur du CRM partage", contract.getCrmPartageValeur())
+                .put("CRM partagé", contract.getCrmPartage())
+                .put("Valeur du CRM partagé", contract.getCrmPartageValeur())
                 .put("Bon de commande", contract.getNumeroBonCommande())
                 .put("Montant du bulletin", contract.getMontantBulletin())
-                .put("Libelle du releve", contract.getLibelleReleve())
+                .put("Libellé du relevé", contract.getLibelleReleve())
                 .put("Notes", contract.getNotes())
-                .put("Reduction saharienne", contract.getReductionSaharienne());
+                .put("Réduction saharienne", contract.getReductionSaharienne());
         for (var role : com.assurance.enums.RoleClientContrat.values()) {
             String names = items(contract.getClients()).stream()
                     .filter(client -> role.name().equals(client.getRole())).map(ContratResponse.ClientLink::getNomAffichage)
@@ -441,35 +441,35 @@ public final class ContractActivity {
         }
         int index = 0;
         for (var vehicle : items(contract.getVehicules())) {
-            String prefix = "Vehicule " + (++index) + " - ";
+            String prefix = "Véhicule " + (++index) + " - ";
             values.put(prefix + "Immatriculation", vehicle.getImmatriculation())
                     .put(prefix + "Marque", vehicle.getMarque())
                     .put(prefix + "Usage", vehicle.getUsageLibelle())
                     .put(prefix + "Carrosserie", vehicle.getCarrosserie())
-                    .put(prefix + "Categorie de transport", vehicle.getCategorieTransportLibelle())
+                    .put(prefix + "Catégorie de transport", vehicle.getCategorieTransportLibelle())
                     .put(prefix + "Sous-classe", vehicle.getSousClasse())
                     .put(prefix + "PTC", vehicle.getPtc())
                     .put(prefix + "Carburant", vehicle.getCarburant())
                     .put(prefix + "Puissance fiscale", vehicle.getPuissanceFiscale())
-                    .put(prefix + "Cylindree", vehicle.getCylindree())
+                    .put(prefix + "Cylindrée", vehicle.getCylindree())
                     .put(prefix + "Places", vehicle.getNombrePlaces())
                     .put(prefix + "Mise en circulation", vehicle.getDatePremiereCirculation())
-                    .put(prefix + "Validite carte grise", vehicle.getDateExpirationCarteGrise())
+                    .put(prefix + "Validité carte grise", vehicle.getDateExpirationCarteGrise())
                     .put(prefix + "Attestation", vehicle.getNumeroAttestation())
                     .put(prefix + "Date d'effet", vehicle.getDateEffet())
-                    .put(prefix + "Date d'echeance", vehicle.getDateEcheance())
+                    .put(prefix + "Date d'échéance", vehicle.getDateEcheance())
                     .put(prefix + "CRM", vehicle.getCrm())
                     .put(prefix + "Coefficient prorata", vehicle.getCoefficientProrata())
-                    .put(prefix + "Valeur a neuf", vehicle.getValeurNeuf())
-                    .put(prefix + "Valeur venale", vehicle.getValeurVenale())
+                    .put(prefix + "Valeur à neuf", vehicle.getValeurNeuf())
+                    .put(prefix + "Valeur vénale", vehicle.getValeurVenale())
                     .put(prefix + "Valeur glace", vehicle.getValeurGlace())
-                    .put(prefix + "Remorque attachee", vehicle.getRemorque())
-                    .put(prefix + "Numero de remorque", vehicle.getNumeroRemorque())
+                    .put(prefix + "Remorque attachée", vehicle.getRemorque())
+                    .put(prefix + "Numéro de remorque", vehicle.getNumeroRemorque())
                     .put(prefix + "Marque remorque", vehicle.getMarqueRemorque())
-                    .put(prefix + "Credit", vehicle.getOrganismeCredit())
-                    .put(prefix + "Organisme de credit", vehicle.getNomOrganismeCredit())
-                    .put(prefix + "Montant du credit", vehicle.getMontantCredit())
-                    .put(prefix + "Fin du credit", vehicle.getDateFinCredit());
+                    .put(prefix + "Crédit", vehicle.getOrganismeCredit())
+                    .put(prefix + "Organisme de crédit", vehicle.getNomOrganismeCredit())
+                    .put(prefix + "Montant du crédit", vehicle.getMontantCredit())
+                    .put(prefix + "Fin du crédit", vehicle.getDateFinCredit());
         }
         index = 0;
         for (var trailer : items(contract.getRemorques())) {
@@ -480,29 +480,29 @@ public final class ContractActivity {
                     .put(prefix + "PTC", trailer.getPtc())
                     .put(prefix + "Mise en circulation", trailer.getDateMiseEnCirculation())
                     .put(prefix + "Date d'effet", trailer.getDateEffet())
-                    .put(prefix + "Date d'echeance", trailer.getDateEcheance())
+                    .put(prefix + "Date d'échéance", trailer.getDateEcheance())
                     .put(prefix + "CRM", trailer.getCrm())
                     .put(prefix + "Coefficient prorata", trailer.getCoefficientProrata())
                     .put(prefix + "Attestation", trailer.getNumeroAttestation())
-                    .put(prefix + "Valeur assuree", trailer.getValeurAssuree());
+                    .put(prefix + "Valeur assurée", trailer.getValeurAssuree());
         }
         for (var guarantee : items(contract.getGaranties())) {
             String prefix = guaranteeLabels.get(guaranteeKey(contract, guarantee));
             values.put(prefix + "Couverture", label(guarantee.getCode(), guarantee.getLibelle()))
                     .put(prefix + "Mode de tarification", AmendmentActivity.guaranteeMode(guarantee.getModeSelectionne()))
-                    .put(prefix + "Base assuree", AmendmentActivity.valueSource(guarantee.getSourceValeurSelectionnee()))
+                    .put(prefix + "Base assurée", AmendmentActivity.valueSource(guarantee.getSourceValeurSelectionnee()))
                     .put(prefix + "Capital", guarantee.getCapital())
-                    .put(prefix + "Valeur assuree", guarantee.getValeurAssuree())
+                    .put(prefix + "Valeur assurée", guarantee.getValeurAssuree())
                     .put(prefix + "Formule", guarantee.getFormule())
                     .put(prefix + "Prime", guarantee.getPrime())
                     .put(prefix + "Taux", guarantee.getTaux())
                     .put(prefix + "Franchise", guarantee.getTauxFranchise())
                     .put(prefix + "Franchise minimale", guarantee.getFranchiseMinimale())
-                    .put(prefix + "Deces", guarantee.getMontantDeces())
-                    .put(prefix + "Invalidite", guarantee.getMontantInvalidite())
-                    .put(prefix + "Frais medicaux", guarantee.getMontantFraisMedicaux())
+                    .put(prefix + "Décès", guarantee.getMontantDeces())
+                    .put(prefix + "Invalidité", guarantee.getMontantInvalidite())
+                    .put(prefix + "Frais médicaux", guarantee.getMontantFraisMedicaux())
                     .put(prefix + "Hospitalisation", guarantee.getMontantFraisHospitalisation())
-                    .put(prefix + "Frais funeraires", guarantee.getMontantFraisFuneraires())
+                    .put(prefix + "Frais funéraires", guarantee.getMontantFraisFuneraires())
                     .put(prefix + "Chirurgie", guarantee.getMontantFraisChirurgie())
                     .put(prefix + "Accessoire", guarantee.getAccessoire());
         }
@@ -510,16 +510,16 @@ public final class ContractActivity {
         index = 0;
         for (var assistance : items(contract.getAssistances())) {
             String prefix = "Assistance " + (++index) + " - ";
-            values.put(prefix + "Reference", assistance.getNumeroContratOuQuittance())
-                    .put(prefix + "Vehicule", assistance.getVehiculeImmatriculation())
+            values.put(prefix + "Référence", assistance.getNumeroContratOuQuittance())
+                    .put(prefix + "Véhicule", assistance.getVehiculeImmatriculation())
                     .put(prefix + "Compagnie", assistance.getCompagnieAssistanceLibelle())
                     .put(prefix + "Produit", assistance.getProduit())
                     .put(prefix + "Souscription", assistance.getDateSouscription())
                     .put(prefix + "Date d'effet", assistance.getDateEffet())
-                    .put(prefix + "Date d'echeance", assistance.getDateEcheance())
+                    .put(prefix + "Date d'échéance", assistance.getDateEcheance())
                     .put(prefix + "Prime nette", assistance.getPrimeNette())
                     .put(prefix + "Montant TTC", assistance.getPrimeTotale())
-                    .put(prefix + "Libelle du releve", assistance.getLibelleReleve());
+                    .put(prefix + "Libellé du relevé", assistance.getLibelleReleve());
         }
         return values.snapshot();
     }
@@ -528,7 +528,7 @@ public final class ContractActivity {
             com.assurance.dto.response.QuittanceResponse quittance, String prefix) {
         if (quittance == null) return;
         values.put(prefix + "Date d'effet", quittance.getDateDebut())
-                .put(prefix + "Date d'echeance", quittance.getDateFin())
+                .put(prefix + "Date d'échéance", quittance.getDateFin())
                 .put(prefix + "Prime nette", quittance.getPrimeNette())
                 .put(prefix + "Taxes", quittance.getTaxe())
                 .put(prefix + "TPF", quittance.getTaxeParafiscale())
@@ -551,8 +551,8 @@ public final class ContractActivity {
     public static String paymentMode(String mode) {
         if (mode == null) return null;
         return switch (mode.toLowerCase(java.util.Locale.ROOT)) {
-            case "bureau" -> "Reglement au bureau";
-            case "facture" -> "Reglement sur facture";
+            case "bureau" -> "Règlement au bureau";
+            case "facture" -> "Règlement sur facture";
             default -> mode;
         };
     }
@@ -562,9 +562,9 @@ public final class ContractActivity {
             case DRAFT -> "Brouillon";
             case ACTIVE -> "Actif";
             case SUSPENDED -> "Suspendu";
-            case CANCELLED -> "Annule";
-            case EXPIRED -> "Expire";
-            case RENEWED -> "Renouvele";
+            case CANCELLED -> "Annulé";
+            case EXPIRED -> "Expiré";
+            case RENEWED -> "Renouvelé";
         };
     }
 

@@ -19,11 +19,11 @@ public final class CompanyPaymentActivity {
     }
 
     public static Map<String, String> snapshot(ReglementCompagnie payment) {
-        ActivityValues values = new ActivityValues().put("Numero", payment.getNumero())
-                .put("Compagnie", payment.getTiersCompagnie().getNom()).put("Date de reglement", payment.getDateReglement())
+        ActivityValues values = new ActivityValues().put("Numéro", payment.getNumero())
+                .put("Compagnie", payment.getTiersCompagnie().getNom()).put("Date de règlement", payment.getDateReglement())
                 .put("Statut", payment.getStatut() == null ? null : switch (payment.getStatut()) {
-                    case VALIDE -> "Enregistre";
-                    case ANNULE -> "Annule";
+                    case VALIDE -> "Enregistré";
+                    case ANNULE -> "Annulé";
                 })
                 .put("Montant total", payment.getMontantTotal()).put("Montant non affecte", payment.getMontantNonAffecte())
                 .put("Notes", payment.getNotes()).put("Date d'annulation", payment.getDateAnnulation())
@@ -31,27 +31,27 @@ public final class CompanyPaymentActivity {
         int index = 0;
         for (var instrument : payment.getInstruments().stream().sorted(Comparator.comparing(InstrumentReglementCompagnie::getId)).toList()) {
             String prefix = "Moyen " + (++index) + " - ";
-            values.put(prefix + "Mode", mode(instrument.getMode())).put(prefix + "Reference", instrument.getReferenceInstrument())
+            values.put(prefix + "Mode", mode(instrument.getMode())).put(prefix + "Référence", instrument.getReferenceInstrument())
                     .put(prefix + "Montant", instrument.getMontant()).put(prefix + "Date", instrument.getDateInstrument())
-                    .put(prefix + "Echeance", instrument.getDateEcheance()).put(prefix + "Banque beneficiaire", instrument.getBanqueBeneficiaire())
+                    .put(prefix + "Échéance", instrument.getDateEcheance()).put(prefix + "Banque bénéficiaire", instrument.getBanqueBeneficiaire())
                     .put(prefix + "Compte", TreasuryActivity.accountLabel(instrument.getCompteTresorerie()))
                     .put(prefix + "Statut", instrument.getStatut() == null ? null : switch (instrument.getStatut()) {
                         case EN_ATTENTE -> "En attente";
                         case REMIS_EN_BANQUE -> "Remis en banque";
-                        case CONFIRME -> "Confirme";
-                        case REJETE -> "Rejete";
-                        case REMPLACE -> "Remplace";
+                        case CONFIRME -> "Confirmé";
+                        case REJETE -> "Rejeté";
+                        case REMPLACE -> "Remplacé";
                     })
                     .put(prefix + "Date de statut", instrument.getDateStatut()).put(prefix + "Motif", instrument.getMotifStatut())
-                    .put(prefix + "Moyen remplace", instrument.getInstrumentRemplace() == null ? null : reference(instrument.getInstrumentRemplace()).label());
+                    .put(prefix + "Moyen remplacé", instrument.getInstrumentRemplace() == null ? null : reference(instrument.getInstrumentRemplace()).label());
             int allocationIndex = 0;
             for (var allocation : instrument.getAffectations().stream().sorted(Comparator.comparing(row -> row.getBordereau().getId())).toList()) {
                 String allocationPrefix = prefix + "Affectation " + (++allocationIndex) + " - ";
                 values.put(allocationPrefix + "Bordereau", allocation.getBordereau().getNumero()).put(allocationPrefix + "Montant", allocation.getMontant())
                         .put(allocationPrefix + "Statut", allocation.getStatut() == null ? null : switch (allocation.getStatut()) {
                             case EN_ATTENTE -> "En attente";
-                            case CONFIRMEE -> "Confirmee";
-                            case ANNULEE -> "Annulee";
+                            case CONFIRMEE -> "Confirmée";
+                            case ANNULEE -> "Annulée";
                         });
             }
         }
@@ -78,7 +78,7 @@ public final class CompanyPaymentActivity {
     private static String mode(ModeReglementCompagnie mode) {
         return mode == null ? "Moyen de paiement compagnie" : switch (mode) {
             case VIREMENT -> "Virement";
-            case CHEQUE -> "Cheque";
+            case CHEQUE -> "Chèque";
             case EFFET -> "Effet";
             case COMPENSATION -> "Compensation";
         };

@@ -95,7 +95,7 @@ public class BusinessActivityRecorder {
     public void record(ActivityCommand command) {
         Long currentAgency = TenantContext.getCurrentAgence();
         if (currentAgency != null && !Objects.equals(currentAgency, command.agenceId())) {
-            throw new AccessDeniedException("Activite hors du perimetre de l'agence");
+            throw new AccessDeniedException("Activité hors du périmètre de l'agence");
         }
         if ((command.action() == ActivityAction.UPDATED || command.action() == ActivityAction.SAVED
                 || command.action() == ActivityAction.RECALCULATED) && command.changes().isEmpty()) {
@@ -107,7 +107,7 @@ public class BusinessActivityRecorder {
         }
         Long actorId = TenantContext.getCurrentUser();
         Utilisateur actor = actorId == null ? null : utilisateurRepository.findById(actorId)
-                .orElseThrow(() -> new IllegalStateException("Operateur de l'activite introuvable"));
+                .orElseThrow(() -> new IllegalStateException("Opérateur de l'activité introuvable"));
         persist(command, actor);
     }
 
@@ -118,7 +118,7 @@ public class BusinessActivityRecorder {
         Utilisateur actor = actorId == null ? null : utilisateurRepository.findById(actorId).orElse(null);
         if (command.agenceId() != null || command.module() != ActivityModule.ADMINISTRATION
                 || actor == null || actor.getAgence() != null || !"SUPER_ADMIN".equalsIgnoreCase(actor.getRoleCode())) {
-            throw new AccessDeniedException("Activite reservee a l'administration plateforme");
+            throw new AccessDeniedException("Activité réservée à l'administration plateforme");
         }
         if ((command.action() == ActivityAction.UPDATED || command.action() == ActivityAction.SAVED)
                 && command.changes().isEmpty()) return;
@@ -149,7 +149,7 @@ public class BusinessActivityRecorder {
         };
         if (command.agenceId() != null || command.module() != expectedModule || permissions.isEmpty()
                 || actor == null || permissions.stream().noneMatch(actor.getPermissions()::contains)) {
-            throw new AccessDeniedException("Activite de referentiel global non autorisee");
+            throw new AccessDeniedException("Activité de référentiel global non autorisée");
         }
         if ((command.action() == ActivityAction.UPDATED || command.action() == ActivityAction.SAVED
                 || command.action() == ActivityAction.RECALCULATED) && command.changes().isEmpty()) return;
@@ -161,7 +161,7 @@ public class BusinessActivityRecorder {
         repository.save(BusinessActivity.builder()
                 .agence(command.agenceId() == null ? null : agenceRepository.getReferenceById(command.agenceId()))
                 .actor(actor)
-                .actorName(actor == null ? "Systeme" : actor.getFullName())
+                .actorName(actor == null ? "Système" : actor.getFullName())
                 .occurredAt(LocalDateTime.now())
                 .module(command.module())
                 .action(command.action())
@@ -181,7 +181,7 @@ public class BusinessActivityRecorder {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("Impossible d'enregistrer l'activite metier", exception);
+            throw new IllegalStateException("Impossible d'enregistrer l'activité métier", exception);
         }
     }
 }

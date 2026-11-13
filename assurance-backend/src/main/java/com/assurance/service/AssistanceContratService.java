@@ -240,7 +240,7 @@ public class AssistanceContratService {
 
         activityRecorder.record(AssistanceActivity.linked(assistance, before, previousReferences,
                 replaced ? ActivityAction.REPLACED : before == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                replaced ? "Assistance liee remplacee" : before == null ? "Assistance ajoutee au contrat" : "Assistance liee modifiee",
+                replaced ? "Assistance liée remplacée" : before == null ? "Assistance ajoutée au contrat" : "Assistance liée modifiée",
                 "CONTRACT_ASSISTANCE_SAVE"));
 
         return toResponse(assistance, pricing.trimestres(), pricing.prorata());
@@ -396,7 +396,7 @@ public class AssistanceContratService {
         contrat.setAssistance(assistanceContratRepository.countByContratIdAndActifTrue(contrat.getId()) > 0);
         contratRepository.save(contrat);
         activityRecorder.record(AssistanceActivity.linked(assistance, before, previousReferences, ActivityAction.UPDATED,
-                "Assistance desactivee", "CONTRACT_ASSISTANCE_DEACTIVATE"));
+                "Assistance désactivée", "CONTRACT_ASSISTANCE_DEACTIVATE"));
     }
 
     private AssistanceContratResponse toResponse(AssistanceContrat assistance) {

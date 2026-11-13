@@ -130,7 +130,7 @@ public class HistoriqueFinancierRecalculService {
         var after = activitySnapshot(plans);
         var changes = new ArrayList<>(ActivityValues.changes(before.values(), after.values()));
         if (!activityTargetIds(before).equals(activityTargetIds(after))) {
-            changes.add(new ActivityChange("Attribution des montants aux vehicules et remorques", null, "Actualisee"));
+            changes.add(new ActivityChange("Attribution des montants aux véhicules et remorques", null, "Actualisée"));
         }
         businessActivityRecorder.record(new ActivityCommand(contrat.getAgence().getId(), ActivityModule.PRODUCTION,
                 ActivityAction.RECALCULATED, "Historique financier recalcule", "CONTRACT_FINANCIAL_HISTORY_RECALCULATE",

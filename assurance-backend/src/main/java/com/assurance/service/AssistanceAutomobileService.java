@@ -125,7 +125,7 @@ public class AssistanceAutomobileService {
     ) {
         return activityRecorder.perform(() -> createInternal(agenceId, request, null, null), response ->
                 AssistanceActivity.command(null, assistanceActivity.capture(agenceId, response.getContratId()),
-                        ActivityAction.CREATED, "Assistance automobile creee", "ASSISTANCE_AUTO_CREATE"));
+                        ActivityAction.CREATED, "Assistance automobile créée", "ASSISTANCE_AUTO_CREATE"));
     }
 
     @Transactional
@@ -204,7 +204,7 @@ public class AssistanceAutomobileService {
         var before = assistanceActivity.capture(agenceId, contratId);
         return activityRecorder.perform(() -> finalizeDraftRecord(agenceId, contratId, request), response ->
                 AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
-                        ActivityAction.VALIDATED, "Assistance automobile validee", "ASSISTANCE_AUTO_FINALIZE"));
+                        ActivityAction.VALIDATED, "Assistance automobile validée", "ASSISTANCE_AUTO_FINALIZE"));
     }
 
     private AssistanceAutomobileCreationResponse finalizeDraftRecord(Long agenceId, Long contratId,
@@ -336,7 +336,7 @@ public class AssistanceAutomobileService {
         var before = assistanceActivity.capture(agenceId, contratId);
         return activityRecorder.perform(() -> updateRecord(agenceId, contratId, request), response ->
                 AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
-                        ActivityAction.UPDATED, "Assistance automobile modifiee", "ASSISTANCE_AUTO_UPDATE"));
+                        ActivityAction.UPDATED, "Assistance automobile modifiée", "ASSISTANCE_AUTO_UPDATE"));
     }
 
     private AssistanceAutomobileCreationResponse updateRecord(Long agenceId, Long contratId,

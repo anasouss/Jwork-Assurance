@@ -48,7 +48,7 @@ public final class ClientActivity {
             for (String label : labels) {
                 if (!Objects.equals(before.relationships().get(label), after.relationships().get(label))
                         && changes.stream().noneMatch(change -> label.equals(change.label()))) {
-                    changes.add(new ActivityChange(label, null, "Selection actualisee"));
+                    changes.add(new ActivityChange(label, null, "Sélection actualisée"));
                 }
             }
         }
@@ -81,11 +81,11 @@ public final class ClientActivity {
                 .put("Prénom", client.getPrenom()).put("Nom", client.getNom())
                 .put("Raison sociale", client.getRaisonSociale())
                 .put("CIN", client.getCin()).put("Validité CIN", client.getCinValidite())
-                .put("Piece d'identite principale", client.getTypePieceIdentite())
+                .put("Pièce d'identité principale", client.getTypePieceIdentite())
                 .put("Client étranger", client.getClientEtranger())
                 .put("Pays de residence", client.getPaysResidence())
-                .put("Ville a l'etranger", client.getVilleEtrangere())
-                .put("Validite carte de residence", client.getCarteResidenceValidite())
+                .put("Ville à l'étranger", client.getVilleEtrangere())
+                .put("Validité carte de residence", client.getCarteResidenceValidite())
                 .put("Passeport", client.getPassport()).put("Validité passeport", client.getPassportValidite())
                 .put("Permis de conduire", client.getNumeroPermis())
                 .put("Délivrance du permis", client.getDateDelivrancePermis())

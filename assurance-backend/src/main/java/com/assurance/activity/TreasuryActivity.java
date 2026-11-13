@@ -28,7 +28,7 @@ public final class TreasuryActivity {
     }
 
     public static Map<String, String> snapshot(CompteTresorerie account) {
-        return new ActivityValues().put("Code", account.getCode()).put("Libelle", account.getLibelle())
+        return new ActivityValues().put("Code", account.getCode()).put("Libellé", account.getLibelle())
                 .put("Type de compte", account.getTypeCompte() == null ? null : switch (account.getTypeCompte()) {
                     case BANQUE -> "Banque";
                     case CAISSE -> "Caisse";
@@ -56,7 +56,7 @@ public final class TreasuryActivity {
         // Inactive omitted rows are equivalent to no access, regardless of historical join IDs.
         assignments.stream().filter(row -> Boolean.TRUE.equals(row.getActif()))
                 .sorted(Comparator.comparing(row -> row.getUtilisateur().getId()))
-                .forEach(row -> values.put("Acces - " + row.getUtilisateur().getFullName() + " (" + row.getUtilisateur().getEmail() + ")",
+                .forEach(row -> values.put("Accès - " + row.getUtilisateur().getFullName() + " (" + row.getUtilisateur().getEmail() + ")",
                         accessLevel(row.getNiveauAcces())));
         return values.snapshot();
     }
@@ -75,25 +75,25 @@ public final class TreasuryActivity {
     }
 
     public static Map<String, String> snapshot(OperationTresorerie operation) {
-        return new ActivityValues().put("Numero", operation.getNumero())
-                .put("Operation", operation.getTypeOperation() == null ? null : switch (operation.getTypeOperation()) {
+        return new ActivityValues().put("Numéro", operation.getNumero())
+                .put("Opération", operation.getTypeOperation() == null ? null : switch (operation.getTypeOperation()) {
                     case TRANSFERT -> "Transfert";
                     case AJUSTEMENT -> "Ajustement";
-                    case SINISTRE -> "Operation de sinistre";
+                    case SINISTRE -> "Opération de sinistre";
                     case ANNULATION_TRANSFERT -> "Annulation de transfert";
                     case ANNULATION_AJUSTEMENT -> "Annulation d'ajustement";
-                    case ANNULATION_SINISTRE -> "Annulation d'operation de sinistre";
+                    case ANNULATION_SINISTRE -> "Annulation d'opération de sinistre";
                 })
                 .put("Statut", operation.getStatut() == null ? null : switch (operation.getStatut()) {
-                    case CONFIRMEE -> "Confirmee";
-                    case ANNULEE -> "Annulee";
+                    case CONFIRMEE -> "Confirmée";
+                    case ANNULEE -> "Annulée";
                 })
                 .put("Compte source", accountLabel(operation.getCompteSource()))
                 .put("Compte destinataire", accountLabel(operation.getCompteDestination()))
                 .put("Sens de l'ajustement", direction(operation.getSensAjustement()))
-                .put("Montant", operation.getMontant()).put("Date d'operation", operation.getDateOperation())
-                .put("Date de valeur", operation.getDateValeur()).put("Reference", operation.getReference())
-                .put("Motif", operation.getMotif()).put("Operation annulee", operation.getOperationExtournee() == null
+                .put("Montant", operation.getMontant()).put("Date d'opération", operation.getDateOperation())
+                .put("Date de valeur", operation.getDateValeur()).put("Référence", operation.getReference())
+                .put("Motif", operation.getMotif()).put("Opération annulée", operation.getOperationExtournee() == null
                         ? null : operation.getOperationExtournee().getNumero())
                 .put("Date d'annulation", operation.getAnnuleeLe()).put("Motif d'annulation", operation.getMotifAnnulation()).snapshot();
     }
@@ -130,11 +130,11 @@ public final class TreasuryActivity {
             references.add(ActivityReference.of(ActivityRecordType.RELEVE_BANCAIRE, bankImport.getId(), bankImport.getNomFichier()));
         }
         if (movement.getMouvementExtourneId() != null) references.add(ActivityReference.of(ActivityRecordType.MOUVEMENT_TRESORERIE,
-                movement.getMouvementExtourneId(), "Ecriture d'origine - " + movement.getReference()));
+                movement.getMouvementExtourneId(), "Écriture d'origine - " + movement.getReference()));
         Map<String, String> after = new ActivityValues().put("Compte", accountLabel(movement.getCompteTresorerie()))
                 .put("Sens", direction(movement.getSens())).put("Montant", movement.getMontant())
-                .put("Date d'operation", movement.getDateOperation()).put("Date de valeur", movement.getDateValeur())
-                .put("Reference", movement.getReference()).put("Libelle", movement.getLibelle()).snapshot();
+                .put("Date d'opération", movement.getDateOperation()).put("Date de valeur", movement.getDateValeur())
+                .put("Référence", movement.getReference()).put("Libellé", movement.getLibelle()).snapshot();
         return command(movement.getAgence().getId(), ActivityAction.CONFIRMED, title, origin,
                 ActivityReference.of(ActivityRecordType.MOUVEMENT_TRESORERIE, movement.getId(), movement.getLibelle()), references, Map.of(), after);
     }
@@ -144,15 +144,15 @@ public final class TreasuryActivity {
                 .put("Caissier", session.getUtilisateur().getFullName())
                 .put("Statut", session.getStatut() == null ? null : switch (session.getStatut()) {
                     case OUVERTE -> "Ouverte";
-                    case CLOTUREE -> "Cloturee";
+                    case CLOTUREE -> "Clôturée";
                 })
-                .put("Ouverture", session.getOuverteLe()).put("Cloture", session.getFermeeLe())
-                .put("Solde theorique d'ouverture", session.getSoldeTheoriqueOuverture())
-                .put("Montant compte a l'ouverture", session.getMontantOuverture()).put("Ecart d'ouverture", session.getEcartOuverture())
+                .put("Ouverture", session.getOuverteLe()).put("Clôture", session.getFermeeLe())
+                .put("Solde théorique d'ouverture", session.getSoldeTheoriqueOuverture())
+                .put("Montant compté à l'ouverture", session.getMontantOuverture()).put("Écart d'ouverture", session.getEcartOuverture())
                 .put("Note d'ouverture", session.getNoteOuverture())
-                .put("Solde theorique de cloture", session.getSoldeTheoriqueCloture())
-                .put("Montant compte a la cloture", session.getMontantCompteCloture()).put("Ecart de cloture", session.getEcartCloture())
-                .put("Note de cloture", session.getNoteCloture()).snapshot();
+                .put("Solde théorique de clôture", session.getSoldeTheoriqueCloture())
+                .put("Montant compté à la clôture", session.getMontantCompteCloture()).put("Écart de clôture", session.getEcartCloture())
+                .put("Note de clôture", session.getNoteCloture()).snapshot();
     }
 
     public static ActivityCommand sessionCommand(SessionCaisse session, Map<String, String> before,
@@ -165,7 +165,7 @@ public final class TreasuryActivity {
 
     private static String direction(SensMouvementTresorerie direction) {
         return direction == null ? null : switch (direction) {
-            case ENTREE -> "Entree";
+            case ENTREE -> "Entrée";
             case SORTIE -> "Sortie";
         };
     }

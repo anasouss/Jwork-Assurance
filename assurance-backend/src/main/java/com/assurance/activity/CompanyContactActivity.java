@@ -18,10 +18,10 @@ public final class CompanyContactActivity {
     }
 
     public static Map<String, String> snapshot(ContactCompagnie contact) {
-        return new ActivityValues().put("Nom", contact.getNom()).put("Prenom", contact.getPrenom())
+        return new ActivityValues().put("Nom", contact.getNom()).put("Prénom", contact.getPrenom())
                 .put("Service", serviceLabel(contact.getService())).put("Fonction", contact.getFonction())
                 .put("Adresse e-mail", contact.getEmail()).put("Mobile", contact.getTelephoneMobile())
-                .put("Telephone fixe", contact.getTelephoneFixe()).put("Poste", contact.getPosteTelephonique())
+                .put("Téléphone fixe", contact.getTelephoneFixe()).put("Poste", contact.getPosteTelephonique())
                 .put("WhatsApp", contact.getWhatsapp()).put("Fax", contact.getFax())
                 .put("Principal", contact.getPrincipal()).put("Notes", contact.getNotes()).put("Actif", contact.getActif()).snapshot();
     }
@@ -33,7 +33,7 @@ public final class CompanyContactActivity {
             if (Objects.equals(contact.getId(), target.getId())) continue;
             ActivityReference reference = reference(contact);
             references.add(reference);
-            changes.add(new ActivityChange("Contact principal remplace - " + reference.label(), "Oui", "Non"));
+            changes.add(new ActivityChange("Contact principal remplacé - " + reference.label(), "Oui", "Non"));
         }
         return new PrincipalChanges(List.copyOf(references), List.copyOf(changes));
     }
@@ -53,7 +53,7 @@ public final class CompanyContactActivity {
         if (service == null) return null;
         return switch (service) {
             case PRODUCTION -> "Production";
-            case COMPTABILITE -> "Comptabilite";
+            case COMPTABILITE -> "Comptabilité";
             case SINISTRES -> "Sinistres";
             case RENOUVELLEMENTS -> "Renouvellements";
             case ATTESTATIONS_STOCK -> "Stock d'attestations";

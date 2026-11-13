@@ -132,7 +132,7 @@ public class SessionCaisseService {
         session.setNoteCloture(trimToNull(request.getNote()));
         session = sessionRepository.save(session);
         activityRecorder.record(TreasuryActivity.sessionCommand(session, before, ActivityAction.CLOSED,
-                "Session de caisse cloturee", "CASH_SESSION_CLOSE"));
+                "Session de caisse clôturée", "CASH_SESSION_CLOSE"));
         return toResponse(session);
     }
 

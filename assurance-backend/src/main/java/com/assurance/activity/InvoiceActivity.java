@@ -13,7 +13,7 @@ public final class InvoiceActivity {
     }
 
     public static String name(DocumentClient document) {
-        return document.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture" : "Releve";
+        return document.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture" : "Relevé";
     }
 
     public static ActivityReference reference(DocumentClient document) {
@@ -21,23 +21,23 @@ public final class InvoiceActivity {
     }
 
     public static Map<String, String> snapshot(DocumentClient document) {
-        ActivityValues values = new ActivityValues().put("Document", name(document)).put("Numero", document.getNumero())
+        ActivityValues values = new ActivityValues().put("Document", name(document)).put("Numéro", document.getNumero())
                 .put("Statut", document.getStatut() == null ? null : switch (document.getStatut()) {
-                    case EMIS -> "Emis";
-                    case REMPLACE -> "Remplace";
-                    case ANNULE -> "Annule";
+                    case EMIS -> "Émis";
+                    case REMPLACE -> "Remplacé";
+                    case ANNULE -> "Annulé";
                 })
                 .put("Payeur", document.getPayeurNom()).put("Identifiant du payeur", document.getPayeurIdentifiant())
                 .put("ICE", document.getPayeurIce()).put("Adresse", document.getPayeurAdresse())
-                .put("Date d'emission", document.getDateEmission())
-                .put("Periode du", document.getPeriodeDebut()).put("Periode au", document.getPeriodeFin())
-                .put("Date d'echeance", document.getDateEcheance()).put("Delai de paiement (jours)", document.getDelaiPaiementJours())
+                .put("Date d'émission", document.getDateEmission())
+                .put("Période du", document.getPeriodeDebut()).put("Période au", document.getPeriodeFin())
+                .put("Date d'échéance", document.getDateEcheance()).put("Délai de paiement (jours)", document.getDelaiPaiementJours())
                 .put("Condition de paiement", document.getOrigineDelaiPaiement() == null ? null : switch (document.getOrigineDelaiPaiement()) {
-                    case DEFAUT_60_JOURS -> "Delai par defaut";
+                    case DEFAUT_60_JOURS -> "Délai par défaut";
                     case CONDITION_CLIENT -> "Condition du client";
                     case CONDITION_GROUPE -> "Condition du groupe";
                 })
-                .put("Debit", document.getTotalDebit()).put("Credit", document.getTotalCredit())
+                .put("Débit", document.getTotalDebit()).put("Crédit", document.getTotalCredit())
                 .put("Montant du document", document.getTotalDocument()).put("Notes", document.getNotes())
                 .put("Version", document.getVersionDocument())
                 .put("Document d'origine", document.getDocumentOrigine() == null ? null : document.getDocumentOrigine().getNumero())
@@ -48,14 +48,14 @@ public final class InvoiceActivity {
             String prefix = "Ligne " + (++index) + " - ";
             values.put(prefix + "Dossier", line.getNumeroDossier()).put(prefix + "Police", line.getNumeroPolice())
                     .put(prefix + "Quittance", line.getNumeroQuittance()).put(prefix + "Mouvement", line.getMouvement())
-                    .put(prefix + "Libelle", line.getLibelleDocument()).put(prefix + "Compagnie", line.getCompagnie())
+                    .put(prefix + "Libellé", line.getLibelleDocument()).put(prefix + "Compagnie", line.getCompagnie())
                     .put(prefix + "Du", line.getDateOperation()).put(prefix + "Au", line.getDateEcheance())
                     .put(prefix + "Prime nette", line.getPrimeNette()).put(prefix + "Taxes", line.getTaxes())
                     .put(prefix + "Accessoires", line.getAccessoires()).put(prefix + "Montant TTC", line.getMontantTtc())
-                    .put(prefix + "Debit", line.getDebit()).put(prefix + "Credit", line.getCredit())
-                    .put(prefix + "Ecart de reglement", line.getEcartReglement());
+                    .put(prefix + "Débit", line.getDebit()).put(prefix + "Crédit", line.getCredit())
+                    .put(prefix + "Écart de règlement", line.getEcartReglement());
             if (line.getEcheanceFacturationConvention() != null) {
-                values.put(prefix + "Periode de convention", line.getEcheanceFacturationConvention().getNumeroPeriode());
+                values.put(prefix + "Période de convention", line.getEcheanceFacturationConvention().getNumeroPeriode());
             }
         }
         return values.snapshot();
@@ -72,7 +72,7 @@ public final class InvoiceActivity {
                     line.getQuittance().getId(), line.getNumeroQuittance() == null ? "Quittance" : line.getNumeroQuittance()));
             if (line.getElementFacturable() != null) {
                 var element = line.getElementFacturable();
-                String label = (line.getNumeroDossier() == null ? "Ecriture" : line.getNumeroDossier())
+                String label = (line.getNumeroDossier() == null ? "Écriture" : line.getNumeroDossier())
                         + (line.getMouvement() == null ? "" : " - " + line.getMouvement());
                 references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE, element.getId(), label));
                 if (element.getContrat() != null) references.add(ContractActivity.reference(element.getContrat()));
@@ -81,7 +81,7 @@ public final class InvoiceActivity {
             if (line.getEcheanceFacturationConvention() != null) {
                 var schedule = line.getEcheanceFacturationConvention();
                 references.add(ActivityReference.of(ActivityRecordType.ECHEANCE_FACTURATION_CONVENTION,
-                        schedule.getId(), "Periode " + schedule.getNumeroPeriode() + " - " + line.getNumeroDossier()));
+                        schedule.getId(), "Période " + schedule.getNumeroPeriode() + " - " + line.getNumeroDossier()));
             }
         }
         if (additionalReferences != null) references.addAll(additionalReferences);

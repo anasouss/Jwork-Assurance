@@ -14,8 +14,8 @@ public final class TariffAdjustmentActivity {
 
     public static ActivityCommand command(AjustementTarifUsage batch, List<LigneAjustementTarifUsage> lines) {
         boolean reset = batch.getTypeOperation() == TypeOperationTarifUsage.REINITIALISATION;
-        ActivityValues values = new ActivityValues().put("Operation", reset ? "Reinitialisation" : "Ajustement")
-                .put("Debut d'application", batch.getDateDebut()).put("Fin d'application", batch.getDateFin())
+        ActivityValues values = new ActivityValues().put("Opération", reset ? "Réinitialisation" : "Ajustement")
+                .put("Début d'application", batch.getDateDebut()).put("Fin d'application", batch.getDateFin())
                 .put("Mode de calcul", batch.getTypeCalcul() == null ? null : switch (batch.getTypeCalcul()) {
                     case POURCENTAGE -> "Pourcentage";
                     case MONTANT_FIXE -> "Montant fixe";
@@ -35,9 +35,9 @@ public final class TariffAdjustmentActivity {
             references.add(ActivityReference.of(ActivityRecordType.TARIF_USAGE, line.getTarifUsage().getId(), label));
         }
         return new ActivityCommand(null, ActivityModule.REFERENTIELS, ActivityAction.CREATED,
-                reset ? "Reinitialisation des tarifs enregistree" : "Ajustement des tarifs enregistre", "USAGE_TARIFF_ADJUSTMENT",
+                reset ? "Réinitialisation des tarifs enregistrée" : "Ajustement des tarifs enregistré", "USAGE_TARIFF_ADJUSTMENT",
                 ActivityReference.of(ActivityRecordType.AJUSTEMENT_TARIF_USAGE, batch.getId(),
-                        (reset ? "Reinitialisation" : "Ajustement") + " du " + batch.getDateDebut().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))),
+                        (reset ? "Réinitialisation" : "Ajustement") + " du " + batch.getDateDebut().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))),
                 references, ActivityValues.changes(null, values.snapshot()));
     }
 }

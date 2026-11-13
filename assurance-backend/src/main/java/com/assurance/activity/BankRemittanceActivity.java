@@ -19,41 +19,41 @@ public final class BankRemittanceActivity {
     public static Map<String, String> snapshot(BordereauRemise slip) {
         ActivityValues values = new ActivityValues().put("Bordereau", slip.getNumero())
                 .put("Type", slip.getType() == null ? null : switch (slip.getType()) {
-                    case CHEQUE -> "Remise de cheques";
+                    case CHEQUE -> "Remise de chèques";
                     case EFFET -> "Remise d'effets";
-                    case VERSEMENT_ESPECES -> "Versement d'especes";
+                    case VERSEMENT_ESPECES -> "Versement d'espèces";
                 })
                 .put("Statut", slip.getStatut() == null ? null : switch (slip.getStatut()) {
                     case BROUILLON -> "Provisoire";
-                    case DEPOSE -> "Remis a la banque";
-                    case PARTIELLEMENT_TRAITE -> "Partiellement traite";
-                    case CLOTURE -> "Cloture";
-                    case ANNULE -> "Annule";
+                    case DEPOSE -> "Remis à la banque";
+                    case PARTIELLEMENT_TRAITE -> "Partiellement traité";
+                    case CLOTURE -> "Clôture";
+                    case ANNULE -> "Annulé";
                 })
                 .put("Date du bordereau", slip.getDateBordereau()).put("Date de remise", slip.getDateDepot())
                 .put("Compte destinataire", account(slip.getCompteDestination())).put("Compte source", account(slip.getCompteSource()))
-                .put("Montant total", slip.getMontantTotal()).put("Reference bancaire", slip.getReferenceBancaire()).put("Notes", slip.getNotes());
+                .put("Montant total", slip.getMontantTotal()).put("Référence bancaire", slip.getReferenceBancaire()).put("Notes", slip.getNotes());
         int index = 0;
         for (var line : slip.getLignes().stream().sorted(Comparator.comparing(l -> l.getInstrument().getId())).toList()) {
             String prefix = "Moyen " + (++index) + " - ";
-            values.put(prefix + "Reference", PaymentActivity.reference(line.getInstrument()).label())
-                    .put(prefix + "Reglement", line.getInstrument().getReglement().getNumero())
+            values.put(prefix + "Référence", PaymentActivity.reference(line.getInstrument()).label())
+                    .put(prefix + "Règlement", line.getInstrument().getReglement().getNumero())
                     .put(prefix + "Payeur", line.getInstrument().getReglement().getPayeurNom())
                     .put(prefix + "Montant", line.getMontant()).put(prefix + "Date de traitement", line.getDateTraitement())
                     .put(prefix + "Motif de rejet", line.getMotifRejet())
                     .put(prefix + "Statut", line.getStatut() == null ? null : switch (line.getStatut()) {
-                        case PREPAREE -> "Prepare";
-                        case REMISE -> "Remis a la banque";
+                        case PREPAREE -> "Préparé";
+                        case REMISE -> "Remis à la banque";
                         case ENCAISSEE -> "Encaisse";
-                        case REJETEE -> "Rejete";
+                        case REJETEE -> "Rejeté";
                     });
         }
         index = 0;
         for (var line : slip.getLignesEspeces().stream().sorted(Comparator.comparing(l -> l.getMouvementTresorerie().getId())).toList()) {
-            String prefix = "Especes " + (++index) + " - ";
+            String prefix = "Espèces " + (++index) + " - ";
             var movement = line.getMouvementTresorerie();
             values.put(prefix + "Caisse", account(movement.getCompteTresorerie()))
-                    .put(prefix + "Journee", movement.getDateOperation()).put(prefix + "Reference", movement.getReference())
+                    .put(prefix + "Journée", movement.getDateOperation()).put(prefix + "Référence", movement.getReference())
                     .put(prefix + "Montant", line.getMontant());
         }
         return values.snapshot();
@@ -72,7 +72,7 @@ public final class BankRemittanceActivity {
             var movement = line.getMouvementTresorerie();
             addAccount(references, movement.getCompteTresorerie());
             references.add(ActivityReference.of(ActivityRecordType.MOUVEMENT_TRESORERIE, movement.getId(),
-                    movement.getLibelle() == null ? "Encaissement en especes" : movement.getLibelle()));
+                    movement.getLibelle() == null ? "Encaissement en espèces" : movement.getLibelle()));
             if (movement.getInstrumentReglement() != null) {
                 references.add(PaymentActivity.reference(movement.getInstrumentReglement()));
                 references.add(PaymentActivity.reference(movement.getInstrumentReglement().getReglement()));

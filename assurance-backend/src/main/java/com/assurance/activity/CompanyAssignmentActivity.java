@@ -29,7 +29,7 @@ public final class CompanyAssignmentActivity {
             String label = quittance.getElementFacturable().getLibelle();
             references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE,
                     quittance.getElementFacturable().getId(), label == null || label.isBlank()
-                            ? "Element facturable du dossier " + contract.getNumeroDossier() : label));
+                            ? "Élément facturable du dossier " + contract.getNumeroDossier() : label));
         }
         return references;
     }
@@ -45,20 +45,20 @@ public final class CompanyAssignmentActivity {
                             .thenComparing(line -> line.getCategorieQuittance() == null ? "" : line.getCategorieQuittance().name()))
                     .toList();
             if (lines.isEmpty()) continue;
-            values.put(prefix + "Reference", quittanceReference(quittance).label()).put(prefix + "Dossier", quittance.getContrat().getNumeroDossier())
+            values.put(prefix + "Référence", quittanceReference(quittance).label()).put(prefix + "Dossier", quittance.getContrat().getNumeroDossier())
                     .put(prefix + "Police", quittance.getContrat().getNumeroPolice());
             int lineIndex = 0;
             for (var line : lines) {
                 String item = prefix + "Affectation " + (++lineIndex) + " - ";
-                values.put(item + "Numero compagnie", line.getNumeroQuittanceCompagnie()).put(item + "Compagnie", line.getTiersCompagnie().getNom())
+                values.put(item + "Numéro compagnie", line.getNumeroQuittanceCompagnie()).put(item + "Compagnie", line.getTiersCompagnie().getNom())
                         .put(item + "Source", line.getSource() == null ? null : switch (line.getSource()) {
                             case AUTOMATIQUE -> "Automatique";
                             case MANUEL -> "Saisie manuelle";
                             case IMPORT -> "Import Excel";
                         })
-                        .put(item + "Date d'effet", line.getDateEffet()).put(item + "Date d'echeance", line.getDateEcheance())
-                        .put(item + "Acte", line.getActeSource()).put(item + "Categorie source", line.getCategorieSource())
-                        .put(item + "Categorie", line.getCategorieQuittance()).put(item + "Statut compagnie", line.getStatutSource())
+                        .put(item + "Date d'effet", line.getDateEffet()).put(item + "Date d'échéance", line.getDateEcheance())
+                        .put(item + "Acte", line.getActeSource()).put(item + "Catégorie source", line.getCategorieSource())
+                        .put(item + "Catégorie", line.getCategorieQuittance()).put(item + "Statut compagnie", line.getStatutSource())
                         .put(item + "Fichier source", filename(line.getFichierSource()))
                         .put(item + "Prime nette", line.getPrimeNette()).put(item + "Taxes", line.getMontantTaxes())
                         .put(item + "Accessoires", line.getAccessoires()).put(item + "Montant TTC", line.getMontantTtc())
@@ -105,7 +105,7 @@ public final class CompanyAssignmentActivity {
                 })
                 .put("Ventilation", rule.getModeVentilation() == null ? null : switch (rule.getModeVentilation()) {
                     case GLOBALE -> "Globale";
-                    case PAR_CATEGORIE -> "Par categorie";
+                    case PAR_CATEGORIE -> "Par catégorie";
                 })
                 .put("Calcul de commission", rule.getModeCalculCommission() == null ? null : switch (rule.getModeCalculCommission()) {
                     case TAUX_NET -> "Taux net";
@@ -113,17 +113,17 @@ public final class CompanyAssignmentActivity {
                 })
                 .put("Commission automobile (%)", rule.getTauxCommissionAutomobile()).put("Commission EVCAT (%)", rule.getTauxCommissionEvcat())
                 .put("Commission corporel (%)", rule.getTauxCommissionCorporel()).put("Commission assistance (%)", rule.getTauxCommissionAssistance())
-                .put("TVA incluse (%)", rule.getTauxTvaIncluseCommission()).put("Retenue par defaut", rule.getRetenueParDefaut())
+                .put("TVA incluse (%)", rule.getTauxTvaIncluseCommission()).put("Retenue par défaut", rule.getRetenueParDefaut())
                 .put("Taux de retenue (%)", rule.getTauxRetenue()).put("Seuil d'avertissement", rule.getSeuilAvertissementEcart())
-                .put("Marge manquante maximale", rule.getMargeManquanteMaximale()).put("Marge de depassement maximale", rule.getMargeDepassementMaximale())
+                .put("Marge manquante maximale", rule.getMargeManquanteMaximale()).put("Marge de dépassement maximale", rule.getMargeDepassementMaximale())
                 .put("Valable du", rule.getDateDebut()).put("Valable au", rule.getDateFin()).put("Actif", rule.getActif())
-                .put("Excel - Feuille", rule.getExcelFeuille()).put("Excel - Ligne d'entete", rule.getExcelLigneEntete())
+                .put("Excel - Feuille", rule.getExcelFeuille()).put("Excel - Ligne d'en-tête", rule.getExcelLigneEntete())
                 .put("Excel - Police", rule.getExcelColonneNumeroPolice()).put("Excel - Quittance", rule.getExcelColonneNumeroQuittance())
-                .put("Excel - Effet", rule.getExcelColonneDateEffet()).put("Excel - Echeance", rule.getExcelColonneDateEcheance())
+                .put("Excel - Effet", rule.getExcelColonneDateEffet()).put("Excel - Échéance", rule.getExcelColonneDateEcheance())
                 .put("Excel - Prime nette", rule.getExcelColonnePrimeNette()).put("Excel - Taxes", rule.getExcelColonneTaxes())
                 .put("Excel - Accessoires", rule.getExcelColonneAccessoires()).put("Excel - TTC", rule.getExcelColonneMontantTtc())
                 .put("Excel - Commission nette", rule.getExcelColonneCommissionNette()).put("Excel - Net compagnie", rule.getExcelColonneNetCompagnie())
-                .put("Excel - Acte", rule.getExcelColonneActe()).put("Excel - Categorie", rule.getExcelColonneCategorie())
+                .put("Excel - Acte", rule.getExcelColonneActe()).put("Excel - Catégorie", rule.getExcelColonneCategorie())
                 .put("Excel - Statut", rule.getExcelColonneStatut()).snapshot();
     }
 
@@ -133,9 +133,9 @@ public final class CompanyAssignmentActivity {
         if (oldReferences != null) references.addAll(oldReferences);
         return new ActivityCommand(rule.getAgence().getId(), ActivityModule.COMPTABILITE_COMPAGNIE, action,
                 switch (action) {
-                    case CREATED -> "Regle d'affectation compagnie creee";
-                    case DELETED -> "Regle d'affectation compagnie supprimee";
-                    default -> "Regle d'affectation compagnie modifiee";
+                    case CREATED -> "Règle d'affectation compagnie créée";
+                    case DELETED -> "Règle d'affectation compagnie supprimée";
+                    default -> "Règle d'affectation compagnie modifiée";
                 }, "COMPANY_ASSIGNMENT_RULE",
                 ActivityReference.of(ActivityRecordType.REGLE_AFFECTATION_QUITTANCE, rule.getId(),
                         rule.getTiersCompagnie().getNom() + " - " + rule.getBrancheAssurance().getLibelle()),

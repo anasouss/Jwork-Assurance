@@ -152,7 +152,7 @@ public class OperationTresorerieService {
                 null
         ));
         activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
-                "Transfert de tresorerie confirme", "TREASURY_TRANSFER", null));
+                "Transfert de trésorerie confirmé", "TREASURY_TRANSFER", null));
         return toResponse(operation);
     }
 
@@ -205,7 +205,7 @@ public class OperationTresorerieService {
                 null
         ));
         activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
-                "Versement d'especes transfere en banque", "TREASURY_CASH_DEPOSIT_TRANSFER", null));
+                "Versement d'espèces transféré en banque", "TREASURY_CASH_DEPOSIT_TRANSFER", null));
         return toResponse(operation);
     }
 
@@ -242,7 +242,7 @@ public class OperationTresorerieService {
                 null
         ));
         activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
-                "Ajustement de tresorerie confirme", "TREASURY_ADJUSTMENT", null));
+                "Ajustement de trésorerie confirmé", "TREASURY_ADJUSTMENT", null));
         return toResponse(operation);
     }
 
@@ -291,7 +291,7 @@ public class OperationTresorerieService {
                 null
         ));
         activityRecorder.record(TreasuryActivity.operationCommand(operation, java.util.Map.of(), ActivityAction.CONFIRMED,
-                "Operation de sinistre comptabilisee en tresorerie", "TREASURY_CLAIM_MOVEMENT", null));
+                "Opération de sinistre comptabilisée en trésorerie", "TREASURY_CLAIM_MOVEMENT", null));
         return operation;
     }
 
@@ -356,7 +356,7 @@ public class OperationTresorerieService {
         original.setMotifAnnulation(request.getMotif().trim());
         operationRepository.save(original);
         activityRecorder.record(TreasuryActivity.operationCommand(original, before, ActivityAction.CANCELLED,
-                "Operation de tresorerie annulee", "TREASURY_OPERATION_CANCELLATION", reversal));
+                "Opération de trésorerie annulée", "TREASURY_OPERATION_CANCELLATION", reversal));
         return toResponse(reversal);
     }
 

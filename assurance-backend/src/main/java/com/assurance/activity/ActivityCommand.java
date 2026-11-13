@@ -18,10 +18,10 @@ public record ActivityCommand(
         Objects.requireNonNull(action);
         Objects.requireNonNull(subject);
         if (title == null || title.isBlank() || title.length() > 240) {
-            throw new IllegalArgumentException("Titre d'activite invalide");
+            throw new IllegalArgumentException("Titre d'activité invalide");
         }
         if (origin == null || origin.isBlank() || origin.length() > 100) {
-            throw new IllegalArgumentException("Origine d'activite invalide");
+            throw new IllegalArgumentException("Origine d'activité invalide");
         }
         references = references == null ? List.of() : List.copyOf(references);
         changes = changes == null ? List.of() : changes.stream().filter(ActivityChange::changed).toList();

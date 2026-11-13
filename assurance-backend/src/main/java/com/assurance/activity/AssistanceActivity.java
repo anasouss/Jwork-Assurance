@@ -37,38 +37,38 @@ public class AssistanceActivity {
         List<ActivityReference> references = new ArrayList<>();
         parts.put("contract", new Part("Contrat", new ActivityValues()
                 .put("Dossier", contract.getNumeroDossier()).put("Police", contract.getNumeroPolice())
-                .put("Date d'effet", contract.getDateEffet()).put("Date d'echeance", contract.getDateEcheance())
-                .put("Echeance", contract.getEcheance()).put("Periodicite", contract.getPeriodicite())
+                .put("Date d'effet", contract.getDateEffet()).put("Date d'échéance", contract.getDateEcheance())
+                .put("Échéance", contract.getEcheance()).put("Périodicité", contract.getPeriodicite())
                 .put("Brouillon", contract.getBrouillon()).put("Statut", contract.getStatut() == null ? null : switch (contract.getStatut()) {
                     case DRAFT -> "Brouillon";
                     case ACTIVE -> "Actif";
                     case SUSPENDED -> "Suspendu";
-                    case CANCELLED -> "Annule";
-                    case EXPIRED -> "Expire";
-                    case RENEWED -> "Renouvele";
+                    case CANCELLED -> "Annulé";
+                    case EXPIRED -> "Expiré";
+                    case RENEWED -> "Renouvelé";
                 })
-                .put("Categorie client", contract.getCategorieClient() == null ? null : contract.getCategorieClient().getLibelle())
+                .put("Catégorie client", contract.getCategorieClient() == null ? null : contract.getCategorieClient().getLibelle())
                 .put("Payeur", contract.getPayeurPrime() == null ? null : ClientActivity.reference(contract.getPayeurPrime()).label())
                 .put("Type de payeur", contract.getTypePayeurPrime() == null ? null : switch (contract.getTypePayeurPrime()) {
                     case SOUSCRIPTEUR -> "Souscripteur";
-                    case TRESORERIE_GROUPE -> "Tresorerie du groupe";
+                    case TRESORERIE_GROUPE -> "Trésorerie du groupe";
                     case MEMBRE_GROUPE -> "Membre du groupe";
-                    case TIERS_MANDATE -> "Tiers mandate";
+                    case TIERS_MANDATE -> "Tiers mandaté";
                 }).snapshot()));
         if (contract.getPayeurPrime() != null) references.add(ClientActivity.reference(contract.getPayeurPrime()));
         if (contract.getContratOrigine() != null) references.add(ContractActivity.reference(contract.getContratOrigine()));
         for (var link : contract.getClients()) {
             String role = switch (link.getRole()) {
                 case SOUSCRIPTEUR -> "Souscripteur";
-                case PROPRIETAIRE -> "Proprietaire";
+                case PROPRIETAIRE -> "Propriétaire";
                 case CONDUCTEUR -> "Conducteur";
-                case BENEFICIAIRE -> "Assure";
+                case BENEFICIAIRE -> "Assuré";
                 case PAYEUR -> "Payeur";
                 case CONTACT -> "Contact";
             };
             ActivityReference client = ClientActivity.reference(link.getClient());
             var clientValues = new LinkedHashMap<>(ClientActivity.snapshot(link.getClient()));
-            clientValues.putAll(new ActivityValues().put("Principal pour ce role", link.getPrincipalPourRole()).snapshot());
+            clientValues.putAll(new ActivityValues().put("Principal pour ce rôle", link.getPrincipalPourRole()).snapshot());
             parts.put("client:" + link.getRole() + ":" + client.id(),
                     new Part(role + " - " + client.label(), Collections.unmodifiableMap(clientValues)));
             references.add(client);
@@ -88,10 +88,10 @@ public class AssistanceActivity {
                     .put("Usage", vehicle.getUsage() == null ? null : vehicle.getUsage().getCode() + " - " + vehicle.getUsage().getLibelle())
                     .put("Marque", vehicle.getMarque() == null ? null : vehicle.getMarque().getLibelle())
                     .put("Carrosserie", vehicle.getCarrosserie() == null ? null : vehicle.getCarrosserie().getLibelle())
-                    .put("Categorie transport", vehicle.getCategorieTransport() == null ? null : vehicle.getCategorieTransport().getLibelle())
-                    .put("Premiere circulation", vehicle.getDatePremiereCirculation()).put("Expiration carte grise", vehicle.getDateExpirationCarteGrise())
+                    .put("Catégorie transport", vehicle.getCategorieTransport() == null ? null : vehicle.getCategorieTransport().getLibelle())
+                    .put("Première circulation", vehicle.getDatePremiereCirculation()).put("Expiration carte grise", vehicle.getDateExpirationCarteGrise())
                     .put("Nombre de places", vehicle.getNombrePlaces()).put("Date d'effet", vehicle.getDateEffet())
-                    .put("Date d'echeance", vehicle.getDateEcheance()).put("Actif", vehicle.getActif()).snapshot()));
+                    .put("Date d'échéance", vehicle.getDateEcheance()).put("Actif", vehicle.getActif()).snapshot()));
             references.add(ref);
         }
         for (AssistanceContrat assistance : assistances.findByContratIdAndContratAgenceIdOrderByCreatedAtDesc(contractId, agencyId)) {
@@ -103,9 +103,9 @@ public class AssistanceActivity {
             ActivityReference insured = ClientActivity.reference(line.getAssure());
             parts.put("price:" + line.getAssistanceContrat().getId() + ":" + insured.id(),
                     new Part("Tarification - " + insured.label(), new ActivityValues()
-                            .put("Age retenu", line.getAge()).put("Tarif", tariffLabel(line.getTarifProduitAssistance()))
-                            .put("Coefficient de duree", line.getCoefficientDuree()).put("Base HT", line.getMontantBaseHt())
-                            .put("Base TTC", line.getMontantBaseTtc()).put("Reduction", line.getMontantReduction())
+                            .put("Âge retenu", line.getAge()).put("Tarif", tariffLabel(line.getTarifProduitAssistance()))
+                            .put("Coefficient de durée", line.getCoefficientDuree()).put("Base HT", line.getMontantBaseHt())
+                            .put("Base TTC", line.getMontantBaseTtc()).put("Réduction", line.getMontantReduction())
                             .put("Prime nette", line.getPrimeNette()).put("Montant TTC", line.getPrimeTotale()).snapshot()));
             references.add(insured);
         }
@@ -116,16 +116,16 @@ public class AssistanceActivity {
         String number = assistance.getNumeroContratOuQuittance();
         String label = number == null || number.isBlank() ? assistance.getProduit() : number;
         return ActivityReference.of(ActivityRecordType.ASSISTANCE, assistance.getId(),
-                label == null || label.isBlank() ? "Assistance en preparation" : "Assistance - " + label);
+                label == null || label.isBlank() ? "Assistance en préparation" : "Assistance - " + label);
     }
 
     public static ActivityReference vehicleReference(Vehicule vehicle) {
         return ActivityReference.of(ActivityRecordType.VEHICULE, vehicle.getId(),
-                vehicle.getImmatriculation() == null || vehicle.getImmatriculation().isBlank() ? "Vehicule" : vehicle.getImmatriculation());
+                vehicle.getImmatriculation() == null || vehicle.getImmatriculation().isBlank() ? "Véhicule" : vehicle.getImmatriculation());
     }
 
     public static Map<String, String> snapshot(AssistanceContrat assistance) {
-        ActivityValues values = new ActivityValues().put("Reference", assistance.getNumeroContratOuQuittance())
+        ActivityValues values = new ActivityValues().put("Référence", assistance.getNumeroContratOuQuittance())
                 .put("Nature", assistance.getTypeQuittance() == null ? null : switch (assistance.getTypeQuittance()) {
                     case "AN", "AFFAIRE_NOUVELLE" -> "Affaire nouvelle";
                     case "REN", "RENOUVELLEMENT" -> "Renouvellement";
@@ -133,15 +133,15 @@ public class AssistanceActivity {
                 })
                 .put("Compagnie", assistance.getCompagnieAssistance() == null ? null : assistance.getCompagnieAssistance().getNom())
                 .put("Produit", assistance.getProduit()).put("Tarif", tariffLabel(assistance.getTarifProduitAssistance()))
-                .put("Vehicule", assistance.getVehicule() == null ? null : vehicleReference(assistance.getVehicule()).label())
+                .put("Véhicule", assistance.getVehicule() == null ? null : vehicleReference(assistance.getVehicule()).label())
                 .put("Mouvement", movementLabel(assistance.getMouvementContrat()))
                 .put("Souscription", assistance.getDateSouscription()).put("Date d'effet", assistance.getDateEffet())
-                .put("Date d'echeance", assistance.getDateEcheance()).put("Echeance", assistance.getEcheanceCode())
-                .put("Duree", assistance.getDuree()).put("Unite", "MOIS".equals(assistance.getUnite()) ? "Mois"
+                .put("Date d'échéance", assistance.getDateEcheance()).put("Échéance", assistance.getEcheanceCode())
+                .put("Durée", assistance.getDuree()).put("Unité", "MOIS".equals(assistance.getUnite()) ? "Mois"
                         : "TRIMESTRE".equals(assistance.getUnite()) ? "Trimestre" : assistance.getUnite())
-                .put("Code promotionnel", assistance.getCodePromo()).put("Reduction", assistance.getMontantReduction())
+                .put("Code promotionnel", assistance.getCodePromo()).put("Réduction", assistance.getMontantReduction())
                 .put("Prime nette", assistance.getPrimeNette()).put("Montant TTC", assistance.getPrimeTotale())
-                .put("Libelle du releve", assistance.getLibelleReleve()).put("Actif", assistance.getActif());
+                .put("Libellé du relevé", assistance.getLibelleReleve()).put("Actif", assistance.getActif());
         billableValues(values, assistance.getElementFacturable());
         return values.snapshot();
     }
@@ -151,10 +151,10 @@ public class AssistanceActivity {
         values.put("Facturation active", element.getActif())
                 .put("Statut de facturation", element.getStatut() == null ? null : switch (element.getStatut()) {
                     case BROUILLON -> "Brouillon";
-                    case A_QUITTANCER -> "A quittancer";
+                    case A_QUITTANCER -> "À quittancer";
                     case QUITTANCE_PARTIELLE -> "Partiellement quittance";
                     case QUITTANCE -> "Quittance";
-                    case ANNULE -> "Annule";
+                    case ANNULE -> "Annulé";
                 })
                 .put("Taxes", element.getTaxe()).put("TPF", element.getTaxeParafiscale())
                 .put("Accessoires", element.getAccessoire()).put("CNPAC", element.getCnpac());
@@ -180,7 +180,7 @@ public class AssistanceActivity {
         if (movement != null) references.add(ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT, movement.getId(), movementLabel(movement)));
         if (vehicle != null) references.add(vehicleReference(vehicle));
         if (element != null) references.add(ActivityReference.of(ActivityRecordType.ELEMENT_FACTURABLE, element.getId(),
-                element.getLibelle() == null || element.getLibelle().isBlank() ? "Element facturable" : element.getLibelle()));
+                element.getLibelle() == null || element.getLibelle().isBlank() ? "Élément facturable" : element.getLibelle()));
         return references;
     }
 
@@ -231,8 +231,8 @@ public class AssistanceActivity {
                 + (tariff.getDateFin() == null ? "" : " au " + tariff.getDateFin().format(format))
                 + (tariff.getDureeMois() == null ? "" : " - " + tariff.getDureeMois() + " mois")
                 + (tariff.getAgeMin() == null ? "" : tariff.getAgeMax() == null
-                        ? " - a partir de " + tariff.getAgeMin() + " ans"
-                        : " - " + tariff.getAgeMin() + " a " + tariff.getAgeMax() + " ans");
+                        ? " - à partir de " + tariff.getAgeMin() + " ans"
+                        : " - " + tariff.getAgeMin() + " à " + tariff.getAgeMax() + " ans");
     }
 
     private record Part(String label, Map<String, String> values) {

@@ -136,7 +136,7 @@ public class QuittancePrimeSelectionService {
             receipt.setCheminStockage(key);
             receipts.saveAndFlush(receipt);
             var values = new ActivityValues().put("Quittance de prime", number)
-                    .put("Date d'emission", receipt.getDateEmission()).put("Payeur", payment.getPayeurNom());
+                    .put("Date d'émission", receipt.getDateEmission()).put("Payeur", payment.getPayeurNom());
             List<ActivityReference> sources = new ArrayList<>();
             int index = 0;
             for (var policy : policies) {
@@ -159,11 +159,11 @@ public class QuittancePrimeSelectionService {
                     default -> throw new IllegalStateException("Source de quittance de prime inconnue");
                 };
                 sources.add(new ActivityReference(sourceType, policy.key().substring(2),
-                        description.isBlank() ? "Police du reglement" : description.length() > 500 ? description.substring(0, 497) + "..." : description));
+                        description.isBlank() ? "Police du règlement" : description.length() > 500 ? description.substring(0, 497) + "..." : description));
             }
             businessActivityRecorder.record(receiptCommand(payment,
                     ActivityReference.of(ActivityRecordType.QUITTANCE_PRIME, receipt.getId(), "Quittance de prime " + number),
-                    ActivityAction.ISSUED, "Quittance de prime emise", "PREMIUM_RECEIPT_ISSUANCE",
+                    ActivityAction.ISSUED, "Quittance de prime émise", "PREMIUM_RECEIPT_ISSUANCE",
                     Map.of(), values.snapshot(), sources));
             return new QuittancePrimeClientService.Receipt(number, pdf);
         } catch (IOException | RuntimeException error) {
@@ -220,8 +220,8 @@ public class QuittancePrimeSelectionService {
             receipts.flush();
         }
         businessActivityRecorder.record(receiptCommand(payment, reference, ActivityAction.DELETED,
-                "Archive de quittance de prime supprimee", "PREMIUM_RECEIPT_ARCHIVE_DELETION",
-                new ActivityValues().put("Quittance de prime", number).put("Date d'emission", emissionDate).snapshot(),
+                "Archive de quittance de prime supprimée", "PREMIUM_RECEIPT_ARCHIVE_DELETION",
+                new ActivityValues().put("Quittance de prime", number).put("Date d'émission", emissionDate).snapshot(),
                 Map.of(), List.of()));
         Long userId = TenantContext.getCurrentUser();
         Runnable completeDeletion = () -> {

@@ -77,7 +77,7 @@ public class SinistreService {
         suiviService.transition(agenceId, utilisateurId, id, request);
         var detail = responseMapper.toDetail(sinistre);
         activityRecorder.record(ClaimActivity.withReason(ClaimActivity.command(sinistre, before, detail,
-                ActivityAction.UPDATED, "Suivi du sinistre modifie", "CLAIM_WORKFLOW_TRANSITION"), request.getMotif()));
+                ActivityAction.UPDATED, "Suivi du sinistre modifié", "CLAIM_WORKFLOW_TRANSITION"), request.getMotif()));
         return detail;
     }
 
@@ -125,7 +125,7 @@ public class SinistreService {
         return activityRecorder.perform(() -> createRecord(agenceId, utilisateurId, request), detail ->
                 ClaimActivity.command(resolve(agenceId, detail.getId()), null, detail,
                         detail.getStatut() == StatutSinistre.DECLARE ? ActivityAction.VALIDATED : ActivityAction.CREATED,
-                        detail.getStatut() == StatutSinistre.DECLARE ? "Sinistre cree et declare" : "Brouillon de sinistre cree", "CLAIM_CREATION"));
+                        detail.getStatut() == StatutSinistre.DECLARE ? "Sinistre créé et déclaré" : "Brouillon de sinistre créé", "CLAIM_CREATION"));
     }
 
     private SinistreDetailResponse createRecord(Long agenceId, Long utilisateurId, CreateSinistreRequest request) {
@@ -307,7 +307,7 @@ public class SinistreService {
         );
         var detail = responseMapper.toDetail(sinistre);
         activityRecorder.record(ClaimActivity.command(sinistre, before, detail, ActivityAction.UPDATED,
-                "Informations du sinistre modifiees", "CLAIM_GENERAL_INFORMATION"));
+                "Informations du sinistre modifiées", "CLAIM_GENERAL_INFORMATION"));
         return detail;
     }
 

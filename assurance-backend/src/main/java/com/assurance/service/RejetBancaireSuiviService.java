@@ -241,7 +241,7 @@ public class RejetBancaireSuiviService {
         if (line != null) references.add(ActivityReference.of(ActivityRecordType.BORDEREAU_BANCAIRE,
                 line.getBordereau().getId(), line.getBordereau().getNumero()));
         businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.TRESORERIE, ActivityAction.CREATED,
-                "Rejet bancaire enregistre", "BANK_REJECTION_REGISTRATION",
+                "Rejet bancaire enregistré", "BANK_REJECTION_REGISTRATION",
                 ActivityReference.of(ActivityRecordType.REJET_BANCAIRE, rejet.getId(), rejet.getNumero()), references,
                 ActivityValues.changes(Map.of(), new ActivityValues().put("Rejet", rejet.getNumero())
                         .put("Date du rejet", rejet.getDateRejet()).put("Motif", rejet.getMotif()).put("Montant", rejet.getMontant()).snapshot())));
@@ -270,10 +270,10 @@ public class RejetBancaireSuiviService {
         if (event.getRejet() != null) references.add(ActivityReference.of(ActivityRecordType.REJET_BANCAIRE,
                 event.getRejet().getId(), event.getRejet().getNumero()));
         businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.TRESORERIE, ActivityAction.SAVED,
-                "Suivi de rejet bancaire enregistre", "BANK_REJECTION_FOLLOW_UP", PaymentActivity.reference(instrument), references,
+                "Suivi de rejet bancaire enregistré", "BANK_REJECTION_FOLLOW_UP", PaymentActivity.reference(instrument), references,
                 ActivityValues.changes(new ActivityValues().put("Statut de suivi", PaymentActivity.rejectionStatus(current.statutSuivi())).snapshot(),
                         new ActivityValues().put("Statut de suivi", PaymentActivity.rejectionStatus(event.getStatutSuivi()))
-                                .put("Date de l'operation", event.getDateOperation()).put("Motif", event.getMotif()).snapshot())));
+                                .put("Date de l'opération", event.getDateOperation()).put("Motif", event.getMotif()).snapshot())));
     }
 
     @Transactional

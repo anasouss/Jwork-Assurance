@@ -78,7 +78,7 @@ public class BanqueService {
                 .build();
         Banque saved = banqueRepository.save(bank);
         activityRecorder.record(BankReferenceActivity.command(saved, null, ActivityAction.CREATED,
-                "Banque ajoutee au referentiel de l'agence", "BANK_REFERENCE_CREATE"));
+                "Banque ajoutée au référentiel de l'agence", "BANK_REFERENCE_CREATE"));
         return toResponse(saved);
     }
 
@@ -97,7 +97,7 @@ public class BanqueService {
         bank.setOrdre(safeOrder(request.getOrdre()));
         Banque saved = banqueRepository.save(bank);
         activityRecorder.record(BankReferenceActivity.command(saved, before, ActivityAction.UPDATED,
-                "Reference bancaire modifiee", "BANK_REFERENCE_UPDATE"));
+                "Référence bancaire modifiée", "BANK_REFERENCE_UPDATE"));
         return toResponse(saved);
     }
 

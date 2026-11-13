@@ -217,7 +217,7 @@ public class BordereauRemiseService {
     public BordereauRemiseResponse create(Long agenceId, CreerBordereauRemiseRequest request) {
         BordereauRemise slip = businessActivityRecorder.perform(() -> createRecord(agenceId, request), result ->
                 BankRemittanceActivity.command(result, Map.of(), ActivityAction.CREATED,
-                        "Bordereau bancaire provisoire cree", "BANK_REMITTANCE_DRAFT_CREATION", List.of()));
+                        "Bordereau bancaire provisoire créé", "BANK_REMITTANCE_DRAFT_CREATION", List.of()));
         return toResponse(slip, true);
     }
 
@@ -287,7 +287,7 @@ public class BordereauRemiseService {
         var before = BankRemittanceActivity.snapshot(slip);
         return toResponse(businessActivityRecorder.perform(() -> depositRecord(agenceId, slip, request), result ->
                 BankRemittanceActivity.command(result, before, ActivityAction.REMITTED,
-                        "Bordereau remis a la banque", "BANK_REMITTANCE_DEPOSIT", List.of())), true);
+                        "Bordereau remis à la banque", "BANK_REMITTANCE_DEPOSIT", List.of())), true);
     }
 
     private BordereauRemise depositRecord(Long agenceId, BordereauRemise slip, DeposerBordereauRemiseRequest request) {
@@ -341,7 +341,7 @@ public class BordereauRemiseService {
             );
             return findForUpdate(agenceId, bordereauId);
         }, result -> BankRemittanceActivity.command(result, before, ActivityAction.CONFIRMED,
-                "Encaissement confirme sur le bordereau", "BANK_REMITTANCE_LINE_COLLECTION",
+                "Encaissement confirmé sur le bordereau", "BANK_REMITTANCE_LINE_COLLECTION",
                 List.of(PaymentActivity.reference(line.getInstrument())))), true);
     }
 
@@ -369,7 +369,7 @@ public class BordereauRemiseService {
             );
             return findForUpdate(agenceId, bordereauId);
         }, result -> BankRemittanceActivity.command(result, before, ActivityAction.REJECTED,
-                "Rejet bancaire enregistre sur le bordereau", "BANK_REMITTANCE_LINE_REJECTION",
+                "Rejet bancaire enregistré sur le bordereau", "BANK_REMITTANCE_LINE_REJECTION",
                 List.of(PaymentActivity.reference(line.getInstrument())))), true);
     }
 
@@ -380,7 +380,7 @@ public class BordereauRemiseService {
             throw new BadRequestException("Seul un bordereau provisoire peut être supprimé définitivement");
         }
         var command = BankRemittanceActivity.command(slip, BankRemittanceActivity.snapshot(slip), ActivityAction.DELETED,
-                "Bordereau bancaire provisoire supprime", "BANK_REMITTANCE_DRAFT_DELETION", List.of());
+                "Bordereau bancaire provisoire supprimé", "BANK_REMITTANCE_DRAFT_DELETION", List.of());
         bordereauRepository.delete(slip);
         bordereauRepository.flush();
         businessActivityRecorder.record(command);
@@ -404,7 +404,7 @@ public class BordereauRemiseService {
         recalculateInstrumentTotal(slip);
         BordereauRemise saved = bordereauRepository.saveAndFlush(slip);
         businessActivityRecorder.record(BankRemittanceActivity.command(saved, before, ActivityAction.UNASSIGNED,
-                "Moyen de paiement retire du bordereau provisoire", "BANK_REMITTANCE_REMOVE_INSTRUMENT", List.of(removed)));
+                "Moyen de paiement retiré du bordereau provisoire", "BANK_REMITTANCE_REMOVE_INSTRUMENT", List.of(removed)));
         return toResponse(saved, true);
     }
 

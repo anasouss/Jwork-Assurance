@@ -64,7 +64,7 @@ public class RegleFiscaleService {
         validateNoOverlap(rule);
         RegleFiscale saved = regleFiscaleRepository.save(rule);
         activityRecorder.recordGlobalReference(FiscalRuleActivity.command(saved, null, List.of(), ActivityAction.CREATED,
-                "Regle fiscale creee", "FISCAL_RULE_CREATE"));
+                "Règle fiscale créée", "FISCAL_RULE_CREATE"));
         return RegleFiscaleResponse.from(saved);
     }
 
@@ -87,7 +87,7 @@ public class RegleFiscaleService {
         validateNoOverlap(rule);
         RegleFiscale saved = regleFiscaleRepository.save(rule);
         activityRecorder.recordGlobalReference(FiscalRuleActivity.command(saved, before, previousReferences, ActivityAction.UPDATED,
-                "Regle fiscale modifiee", "FISCAL_RULE_UPDATE"));
+                "Règle fiscale modifiée", "FISCAL_RULE_UPDATE"));
         return RegleFiscaleResponse.from(saved);
     }
 
@@ -99,7 +99,7 @@ public class RegleFiscaleService {
         rule.setActif(false);
         regleFiscaleRepository.save(rule);
         activityRecorder.recordGlobalReference(FiscalRuleActivity.command(rule, before, previousReferences, ActivityAction.UPDATED,
-                "Regle fiscale desactivee", "FISCAL_RULE_DEACTIVATE"));
+                "Règle fiscale désactivée", "FISCAL_RULE_DEACTIVATE"));
     }
 
     private RegleFiscale get(Long id) {

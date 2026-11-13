@@ -17,7 +17,7 @@ public final class GridCatalogueActivity {
     public static CompanyCatalogueActivity.State state(GrilleTarifaire grid) {
         return new CompanyCatalogueActivity.State(grid.getAgence() == null ? null : grid.getAgence().getId(),
                 ActivityReference.of(ActivityRecordType.GRILLE_TARIFAIRE, grid.getId(), grid.getLibelle()),
-                new ActivityValues().put("Libelle", grid.getLibelle()).put("Description", grid.getDescription())
+                new ActivityValues().put("Libellé", grid.getLibelle()).put("Description", grid.getDescription())
                         .put("Compagnie", grid.getCompagnieAssurance().getNom()).put("Actif", grid.getActif()).snapshot(),
                 List.of(ActivityReference.of(ActivityRecordType.COMPAGNIE, grid.getCompagnieAssurance().getId(), grid.getCompagnieAssurance().getNom())), null);
     }
@@ -32,7 +32,7 @@ public final class GridCatalogueActivity {
         return new CompanyCatalogueActivity.State(grid.agencyId(), ActivityReference.of(ActivityRecordType.LIGNE_GRILLE_TARIFAIRE,
                 row.getId(), "Ligne " + row.getGarantie().getCode() + (row.getLibelleOption() == null ? "" : " - " + row.getLibelleOption())),
                 new ActivityValues().put("Garantie", row.getGarantie().getCode() + " - " + row.getGarantie().getLibelle()).put("Usage", usageLabel(row.getUsage()))
-                        .put("Categorie transport", row.getCategorieTransport() == null ? null : row.getCategorieTransport().getLibelle())
+                        .put("Catégorie transport", row.getCategorieTransport() == null ? null : row.getCategorieTransport().getLibelle())
                         .put("Puissance fiscale minimum", row.getPuissanceFiscaleMin()).put("Puissance fiscale maximum", row.getPuissanceFiscaleMax())
                         .put("Places minimum", row.getNombrePlacesMin()).put("Places maximum", row.getNombrePlacesMax())
                         .put("PTC minimum", row.getPtcMin()).put("PTC maximum", row.getPtcMax())
@@ -53,9 +53,9 @@ public final class GridCatalogueActivity {
         return new CompanyCatalogueActivity.State(grid.agencyId(), ActivityReference.of(ActivityRecordType.FORMULE_GARANTIE_PERSONNE,
                 formula.getId(), formula.getGarantie().getCode() + " - " + formula.getFormule()),
                 new ActivityValues().put("Garantie", formula.getGarantie().getCode() + " - " + formula.getGarantie().getLibelle()).put("Usage", usageLabel(formula.getUsage()))
-                        .put("Formule", formula.getFormule()).put("Deces", formula.getMontantDeces()).put("Invalidite", formula.getMontantInvalidite())
-                        .put("Frais medicaux", formula.getMontantFraisMedicaux()).put("Hospitalisation", formula.getMontantFraisHospitalisation())
-                        .put("Frais funeraires", formula.getMontantFraisFuneraires()).put("Chirurgie", formula.getMontantFraisChirurgie())
+                        .put("Formule", formula.getFormule()).put("Décès", formula.getMontantDeces()).put("Invalidité", formula.getMontantInvalidite())
+                        .put("Frais médicaux", formula.getMontantFraisMedicaux()).put("Hospitalisation", formula.getMontantFraisHospitalisation())
+                        .put("Frais funéraires", formula.getMontantFraisFuneraires()).put("Chirurgie", formula.getMontantFraisChirurgie())
                         .put("Prime nette", formula.getPrimeNette()).put("Accessoires", formula.getAccessoire())
                         .put("Ordre d'affichage", formula.getOrdreAffichage()).put("Actif", formula.getActif()).snapshot(),
                 context(grid, formula.getGarantie().getId(), formula.getGarantie().getLibelle(), formula.getUsage()), null);
@@ -105,7 +105,7 @@ public final class GridCatalogueActivity {
         }
         references.removeIf(reference -> reference.type() == ActivityRecordType.GRILLE_TARIFAIRE && reference.id().equals(after.grid().subject().id()));
         return new ActivityCommand(after.grid().agencyId(), ActivityModule.COMPAGNIES, ActivityAction.SAVED,
-                "Configuration tarifaire de l'usage enregistree", "GRID_USAGE_CONFIGURATION", after.grid().subject(),
+                "Configuration tarifaire de l'usage enregistrée", "GRID_USAGE_CONFIGURATION", after.grid().subject(),
                 references.stream().distinct().toList(), changes);
     }
 
@@ -117,7 +117,7 @@ public final class GridCatalogueActivity {
         }
         if (before != null && after != null && differences.isEmpty()
                 && !CompanyCatalogueActivity.referenceIdentities(before).equals(CompanyCatalogueActivity.referenceIdentities(after))) {
-            changes.add(new ActivityChange(label + " - References associees", null, "Actualisees"));
+            changes.add(new ActivityChange(label + " - Références associees", null, "Actualisées"));
         }
     }
 

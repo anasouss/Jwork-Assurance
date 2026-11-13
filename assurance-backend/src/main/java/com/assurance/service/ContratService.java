@@ -185,7 +185,7 @@ public class ContratService {
         }
         return businessActivityRecorder.perform(() -> createRenewalDraftRecord(source, modeTerme), result ->
                 ContractActivity.command(null, result, ActivityAction.CREATED,
-                        "Brouillon de renouvellement cree", "RENEWAL_DRAFT_CREATION"));
+                        "Brouillon de renouvellement créé", "RENEWAL_DRAFT_CREATION"));
     }
 
     private ContratResponse createRenewalDraftRecord(Contrat source, ModeTermeRenouvellement modeTerme) {
@@ -235,7 +235,7 @@ public class ContratService {
         ContratResponse before = toResponse(draft);
         return businessActivityRecorder.perform(() -> finalizeRenewalDraftRecord(draft, source, modeTerme), result ->
                 ContractActivity.command(before, result, ActivityAction.RENEWED,
-                        "Renouvellement valide", "RENEWAL_VALIDATION"));
+                        "Renouvellement validé", "RENEWAL_VALIDATION"));
     }
 
     private ContratResponse finalizeRenewalDraftRecord(Contrat draft, Contrat source, ModeTermeRenouvellement modeTerme) {
@@ -3167,12 +3167,12 @@ public class ContratService {
             return toResponse(contrat);
         }, after -> {
             var changes = new ArrayList<>(ContractActivity.changes(before, after));
-            changes.add(new ActivityChange("Mouvement supprime", movementReference.label(), null));
+            changes.add(new ActivityChange("Mouvement supprimé", movementReference.label(), null));
             var references = new ArrayList<>(ContractActivity.references(before, after).stream()
                     .filter(reference -> reference.type() != ActivityRecordType.MOUVEMENT_CONTRAT).toList());
             references.add(ContractActivity.reference(contrat));
             return new ActivityCommand(contrat.getAgence().getId(), ActivityModule.PRODUCTION, ActivityAction.DELETED,
-                    "Mouvement de contrat supprime", "CONTRACT_MOVEMENT_DELETION", movementReference,
+                    "Mouvement de contrat supprimé", "CONTRACT_MOVEMENT_DELETION", movementReference,
                     references, changes);
         });
     }
@@ -3520,7 +3520,7 @@ public class ContratService {
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> createAmendmentRecord(agenceId, contratId, request), result ->
                 amendmentCommand(contrat, before, result, ActivityAction.VALIDATED,
-                        "Avenant valide", "AMENDMENT_VALIDATION", null, Map.of()));
+                        "Avenant validé", "AMENDMENT_VALIDATION", null, Map.of()));
     }
 
     private QuittanceResponse createAmendmentRecord(Long agenceId, Long contratId, AvenantRequest request) {

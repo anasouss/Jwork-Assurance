@@ -184,14 +184,14 @@ public class ReglementClientService {
         var before = paymentPolicyValues(paymentPolicy(agenceId));
         return businessActivityRecorder.perform(() -> updatePaymentPolicyRecord(agenceId, creditNonAffecteMaximum, ecartReglementMaximum),
                 result -> new ActivityCommand(agenceId, ActivityModule.COMPTABILITE_CLIENT, ActivityAction.UPDATED,
-                        "Parametres des reglements clients modifies", "CLIENT_PAYMENT_POLICY_UPDATE",
-                        new ActivityReference(ActivityRecordType.PARAMETRE, "CLIENT_PAYMENT_POLICY", "Parametres des reglements clients"),
+                        "Paramètres des règlements clients modifiés", "CLIENT_PAYMENT_POLICY_UPDATE",
+                        new ActivityReference(ActivityRecordType.PARAMETRE, "CLIENT_PAYMENT_POLICY", "Paramètres des règlements clients"),
                         List.of(), ActivityValues.changes(before, paymentPolicyValues(result))));
     }
 
     private Map<String, String> paymentPolicyValues(ReglementClientPolicyResponse policy) {
-        return new ActivityValues().put("Credit non affecte maximal", policy.getCreditNonAffecteMaximum())
-                .put("Ecart de reglement maximal", policy.getEcartReglementMaximum()).snapshot();
+        return new ActivityValues().put("Crédit non affecté maximal", policy.getCreditNonAffecteMaximum())
+                .put("Écart de règlement maximal", policy.getEcartReglementMaximum()).snapshot();
     }
 
     private ReglementClientPolicyResponse updatePaymentPolicyRecord(Long agenceId, BigDecimal creditNonAffecteMaximum,
@@ -494,9 +494,9 @@ public class ReglementClientService {
         Map<String, String> before = PaymentActivity.snapshot(payment);
         return businessActivityRecorder.perform(() -> createInvoiceFromPaymentRecord(agenceId, payment), result -> {
             businessActivityRecorder.record(PaymentActivity.command(payment, before, ActivityAction.UPDATED,
-                    "Affectations transferees sur la facture", "PAYMENT_ALLOCATION_INVOICING", null));
+                    "Affectations transférées sur la facture", "PAYMENT_ALLOCATION_INVOICING", null));
             return InvoiceActivity.command(documentClientService.findDocument(agenceId, result.getId()), Map.of(),
-                    ActivityAction.ISSUED, "Facture emise depuis un reglement", "CLIENT_INVOICE_FROM_PAYMENT",
+                    ActivityAction.ISSUED, "Facture émise depuis un règlement", "CLIENT_INVOICE_FROM_PAYMENT",
                     List.of(PaymentActivity.reference(payment)));
         });
     }
@@ -682,7 +682,7 @@ public class ReglementClientService {
         }
         return businessActivityRecorder.perform(() -> savePayment(agenceId, userId, request, null), result ->
                 PaymentActivity.command(findPayment(agenceId, result.getId()), Map.of(), ActivityAction.CREATED,
-                        "Reglement client enregistre", "CLIENT_PAYMENT_CREATION", null));
+                        "Règlement client enregistré", "CLIENT_PAYMENT_CREATION", null));
     }
 
     @Transactional
@@ -696,7 +696,7 @@ public class ReglementClientService {
         validateReceipt(receipt, true);
         return businessActivityRecorder.perform(() -> savePayment(agenceId, userId, request, receipt), result ->
                 PaymentActivity.command(findPayment(agenceId, result.getId()), Map.of(), ActivityAction.CREATED,
-                        "Versement multi-clients enregistre", "MULTI_CLIENT_DEPOSIT_CREATION", null));
+                        "Versement multi-clients enregistré", "MULTI_CLIENT_DEPOSIT_CREATION", null));
     }
 
     @Transactional(readOnly = true)
@@ -1008,7 +1008,7 @@ public class ReglementClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Instrument de règlement", instrumentId));
         boolean confirmation = request.getStatut() == StatutInstrumentReglement.CONFIRME;
         return instrumentActivity(instrument, confirmation ? ActivityAction.CONFIRMED : ActivityAction.REJECTED,
-                confirmation ? "Moyen de paiement encaisse" : "Moyen de paiement rejete",
+                confirmation ? "Moyen de paiement encaissé" : "Moyen de paiement rejeté",
                 confirmation ? "PAYMENT_INSTRUMENT_CONFIRMATION" : "PAYMENT_INSTRUMENT_REJECTION",
                 () -> changeInstrumentStatusRecord(agenceId, instrument, request));
     }
@@ -1070,7 +1070,7 @@ public class ReglementClientService {
         Map<String, String> before = PaymentActivity.snapshot(payment);
         return businessActivityRecorder.perform(() -> cancelPaymentRecord(agenceId, payment, request), result ->
                 PaymentActivity.command(payment, before, ActivityAction.CANCELLED,
-                        "Reglement client annule", "CLIENT_PAYMENT_CANCELLATION", null));
+                        "Règlement client annulé", "CLIENT_PAYMENT_CANCELLATION", null));
     }
 
     private ReglementClientResponse cancelPaymentRecord(Long agenceId, ReglementClient payment,
@@ -1137,7 +1137,7 @@ public class ReglementClientService {
         Map<String, String> before = PaymentActivity.snapshot(replaced.getReglement());
         return businessActivityRecorder.perform(() -> replaceInstrumentRecord(agenceId, replaced, request), result ->
                 PaymentActivity.command(replaced.getReglement(), before, ActivityAction.REPLACED,
-                        "Moyen de paiement remplace", "PAYMENT_INSTRUMENT_REPLACEMENT", PaymentActivity.reference(replaced)));
+                        "Moyen de paiement remplacé", "PAYMENT_INSTRUMENT_REPLACEMENT", PaymentActivity.reference(replaced)));
     }
 
     private ReglementClientResponse replaceInstrumentRecord(Long agenceId, InstrumentReglementClient replaced,
@@ -1362,7 +1362,7 @@ public class ReglementClientService {
                         instrumentId
                 ));
         return instrumentActivity(instrument, ActivityAction.SAVED,
-                "Moyen de paiement prepare pour une nouvelle remise", "PAYMENT_INSTRUMENT_REPRESENTATION",
+                "Moyen de paiement préparé pour une nouvelle remise", "PAYMENT_INSTRUMENT_REPRESENTATION",
                 () -> representInstrumentRecord(agenceId, instrument, request));
     }
 
@@ -1826,7 +1826,7 @@ public class ReglementClientService {
                         instrumentId
                 ));
         return instrumentActivity(instrument, ActivityAction.CONFIRMED,
-                "Moyen de paiement encaisse par rapprochement bancaire", "PAYMENT_CONFIRMATION_FROM_BANK_STATEMENT",
+                "Moyen de paiement encaissé par rapprochement bancaire", "PAYMENT_CONFIRMATION_FROM_BANK_STATEMENT",
                 () -> confirmFromBankStatementRecord(agenceId, instrument, accountId, operationDate, bankStatementLine));
     }
 
@@ -2029,7 +2029,7 @@ public class ReglementClientService {
                         instrumentId
                 ));
         return instrumentActivity(instrument, ActivityAction.CONFIRMED,
-                "Moyen de paiement encaisse depuis un bordereau", "PAYMENT_CONFIRMATION_FROM_REMITTANCE",
+                "Moyen de paiement encaissé depuis un bordereau", "PAYMENT_CONFIRMATION_FROM_REMITTANCE",
                 () -> confirmFromRemittanceRecord(agenceId, instrument, accountId, operationDate));
     }
 
@@ -2072,7 +2072,7 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
-        instrumentActivity(instrument, ActivityAction.REJECTED, "Moyen de paiement rejete depuis un bordereau",
+        instrumentActivity(instrument, ActivityAction.REJECTED, "Moyen de paiement rejeté depuis un bordereau",
                 "PAYMENT_REJECTION_FROM_REMITTANCE", () -> {
                     rejectFromRemittanceRecord(instrument, reason, operationDate);
                     return instrument;

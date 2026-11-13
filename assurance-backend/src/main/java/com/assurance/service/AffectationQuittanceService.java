@@ -516,7 +516,7 @@ public class AffectationQuittanceService {
 
         activityRecorder.record(CompanyAssignmentActivity.command(List.of(quittance), before, entities,
                 before.isEmpty() ? ActivityAction.ALLOCATED : ActivityAction.UPDATED,
-                before.isEmpty() ? "Quittance affectee a la compagnie" : "Affectation compagnie modifiee", "COMPANY_QUITTANCE_ASSIGNMENT"));
+                before.isEmpty() ? "Quittance affectée à la compagnie" : "Affectation compagnie modifiée", "COMPANY_QUITTANCE_ASSIGNMENT"));
 
         String souscripteur = resolveSouscripteurs(Set.of(quittance.getContrat().getId()))
                 .get(quittance.getContrat().getId());
@@ -573,7 +573,7 @@ public class AffectationQuittanceService {
         affectationRepository.flush();
         affectationRepository.saveAll(entities);
         activityRecorder.record(CompanyAssignmentActivity.command(quittances, before, entities, ActivityAction.SAVED,
-                "Affectation groupee de " + quittances.size() + " quittances enregistree", "COMPANY_QUITTANCE_BATCH_ASSIGNMENT"));
+                "Affectation groupée de " + quittances.size() + " quittances enregistrée", "COMPANY_QUITTANCE_BATCH_ASSIGNMENT"));
         return buildBatchResponse(quittances, entities, expected, batchRule);
     }
 
@@ -583,7 +583,7 @@ public class AffectationQuittanceService {
         var before = affectationRepository.findByAgenceIdAndQuittanceIdIn(agenceId, List.of(quittanceId));
         affectationRepository.deleteByQuittanceId(quittanceId);
         if (!before.isEmpty()) activityRecorder.record(CompanyAssignmentActivity.command(List.of(quittance), before, List.of(),
-                ActivityAction.UNASSIGNED, "Affectation compagnie retiree", "COMPANY_QUITTANCE_ASSIGNMENT_REMOVAL"));
+                ActivityAction.UNASSIGNED, "Affectation compagnie retirée", "COMPANY_QUITTANCE_ASSIGNMENT_REMOVAL"));
     }
 
     @Transactional(readOnly = true)

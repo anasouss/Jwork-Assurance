@@ -98,7 +98,7 @@ public class ContactCompagnieService {
         var displaced = ensureSinglePrincipal(contact);
         ContactCompagnie saved = contactRepository.save(contact);
         activityRecorder.record(CompanyContactActivity.command(saved, null, displaced, ActivityAction.CREATED,
-                "Contact compagnie ajoute", "COMPANY_CONTACT_CREATE"));
+                "Contact compagnie ajouté", "COMPANY_CONTACT_CREATE"));
         return toResponse(saved);
     }
 
@@ -113,7 +113,7 @@ public class ContactCompagnieService {
         var displaced = ensureSinglePrincipal(contact);
         ContactCompagnie saved = contactRepository.save(contact);
         activityRecorder.record(CompanyContactActivity.command(saved, before, displaced, ActivityAction.UPDATED,
-                "Contact compagnie modifie", "COMPANY_CONTACT_UPDATE"));
+                "Contact compagnie modifié", "COMPANY_CONTACT_UPDATE"));
         return toResponse(saved);
     }
 
@@ -129,7 +129,7 @@ public class ContactCompagnieService {
         }
         ContactCompagnie saved = contactRepository.save(contact);
         activityRecorder.record(CompanyContactActivity.command(saved, before, CompanyContactActivity.PrincipalChanges.none(),
-                ActivityAction.UPDATED, Boolean.TRUE.equals(saved.getActif()) ? "Contact compagnie reactive" : "Contact compagnie desactive",
+                ActivityAction.UPDATED, Boolean.TRUE.equals(saved.getActif()) ? "Contact compagnie réactivé" : "Contact compagnie désactivé",
                 "COMPANY_CONTACT_STATUS"));
         return toResponse(saved);
     }

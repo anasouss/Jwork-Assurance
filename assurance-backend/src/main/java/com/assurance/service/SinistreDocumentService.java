@@ -80,7 +80,7 @@ public class SinistreDocumentService {
             MultipartFile file
     ) {
         Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
-        return recordChange(sinistre, ActivityAction.CREATED, "Document ajoute au sinistre", "CLAIM_DOCUMENT_UPLOAD", null, () -> {
+        return recordChange(sinistre, ActivityAction.CREATED, "Document ajouté au sinistre", "CLAIM_DOCUMENT_UPLOAD", null, () -> {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
             validateFile(file);
@@ -164,7 +164,7 @@ public class SinistreDocumentService {
         }
         Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
         return recordChange(sinistre, statut == StatutDocumentSinistre.VALIDE ? ActivityAction.VALIDATED : ActivityAction.REJECTED,
-                statut == StatutDocumentSinistre.VALIDE ? "Document du sinistre valide" : "Document du sinistre rejete",
+                statut == StatutDocumentSinistre.VALIDE ? "Document du sinistre validé" : "Document du sinistre rejeté",
                 "CLAIM_DOCUMENT_REVIEW", documentId, () -> {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
@@ -193,7 +193,7 @@ public class SinistreDocumentService {
             Long documentId
     ) {
         Sinistre sinistre = sinistreService.resolveForUpdate(agenceId, sinistreId);
-        return recordChange(sinistre, ActivityAction.DELETED, "Document du sinistre supprime", "CLAIM_DOCUMENT_DELETION", documentId, () -> {
+        return recordChange(sinistre, ActivityAction.DELETED, "Document du sinistre supprimé", "CLAIM_DOCUMENT_DELETION", documentId, () -> {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
             SinistreDocument document = resolve(documentId, sinistreId);

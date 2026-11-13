@@ -18,7 +18,7 @@ public final class PaymentActivity {
 
     public static ActivityReference reference(ReglementClient payment) {
         return ActivityReference.of(ActivityRecordType.REGLEMENT_CLIENT, payment.getId(),
-                text(payment.getNumero(), "Reglement client"));
+                text(payment.getNumero(), "Règlement client"));
     }
 
     public static ActivityReference reference(InstrumentReglementClient instrument) {
@@ -39,8 +39,8 @@ public final class PaymentActivity {
         index = 0;
         for (var adjustment : payment.getEcarts().stream()
                 .sorted(Comparator.comparing(e -> e.getElementFacturable().getId())).toList()) {
-            String prefix = "Ecart " + (++index) + " - ";
-            values.put(prefix + "Ecriture", sourceLabel(adjustment.getElementFacturable()))
+            String prefix = "Écart " + (++index) + " - ";
+            values.put(prefix + "Écriture", sourceLabel(adjustment.getElementFacturable()))
                     .put(prefix + "Document", adjustment.getDocumentClient() == null ? null : adjustment.getDocumentClient().getNumero())
                     .put(prefix + "Montant", adjustment.getMontant()).put(prefix + "Motif", adjustment.getMotif());
         }
@@ -54,45 +54,45 @@ public final class PaymentActivity {
     }
 
     private static ActivityValues header(ReglementClient payment) {
-        return new ActivityValues().put("Reglement", payment.getNumero()).put("Date du reglement", payment.getDateReglement())
+        return new ActivityValues().put("Règlement", payment.getNumero()).put("Date du règlement", payment.getDateReglement())
                 .put("Payeur", payment.getPayeurNom()).put("Multi-clients", payment.getMultiPayeur())
-                .put("Deposant", payment.getDeposantNom()).put("Montant total", payment.getMontantTotal())
+                .put("Déposant", payment.getDeposantNom()).put("Montant total", payment.getMontantTotal())
                 .put("Montant non affecte", payment.getMontantNonAffecte())
-                .put("Statut du reglement", payment.getStatut() == null ? null : switch (payment.getStatut()) {
-                    case VALIDE -> "Enregistre";
-                    case ANNULE -> "Annule";
+                .put("Statut du règlement", payment.getStatut() == null ? null : switch (payment.getStatut()) {
+                    case VALIDE -> "Enregistré";
+                    case ANNULE -> "Annulé";
                 });
     }
 
     private static void instrumentValues(ActivityValues values, InstrumentReglementClient instrument, String prefix) {
         values.put(prefix + "Mode", mode(instrument.getMode()))
-                .put(prefix + "Reference", instrument.getReferenceInstrument()).put(prefix + "Montant", instrument.getMontant())
-                .put(prefix + "Reception", instrument.getDateInstrument()).put(prefix + "Echeance", instrument.getDateEcheance())
-                .put(prefix + "Banque emettrice", instrument.getBanqueEmettriceReference() == null ? null : instrument.getBanqueEmettriceReference().getLibelle())
-                .put(prefix + "Compte de tresorerie", instrument.getCompteTresorerie() == null ? null
+                .put(prefix + "Référence", instrument.getReferenceInstrument()).put(prefix + "Montant", instrument.getMontant())
+                .put(prefix + "Réception", instrument.getDateInstrument()).put(prefix + "Échéance", instrument.getDateEcheance())
+                .put(prefix + "Banque émettrice", instrument.getBanqueEmettriceReference() == null ? null : instrument.getBanqueEmettriceReference().getLibelle())
+                .put(prefix + "Compte de trésorerie", instrument.getCompteTresorerie() == null ? null
                         : instrument.getCompteTresorerie().getCode() + " - " + instrument.getCompteTresorerie().getLibelle())
-                .put(prefix + "Reglement au bureau", instrument.getReglementBureau())
+                .put(prefix + "Règlement au bureau", instrument.getReglementBureau())
                 .put(prefix + "Statut", instrument.getStatut() == null ? null : switch (instrument.getStatut()) {
                     case EN_ATTENTE -> "En attente d'encaissement";
                     case REMIS_EN_BANQUE -> "Remis en banque";
                     case CONFIRME -> "Encaisse";
-                    case REJETE -> "Rejete";
-                    case REMPLACE -> "Remplace";
+                    case REJETE -> "Rejeté";
+                    case REMPLACE -> "Remplacé";
                 })
                 .put(prefix + "Date de traitement", instrument.getDateStatut()).put(prefix + "Motif", instrument.getMotifStatut())
                 .put(prefix + "Date de rejet", instrument.getDateRejet()).put(prefix + "Motif de rejet", instrument.getMotifRejet())
                 .put(prefix + "Suivi du rejet", rejectionStatus(instrument.getSuiviRejet()))
-                .put(prefix + "Moyen remplace", instrument.getInstrumentRemplace() == null ? null : reference(instrument.getInstrumentRemplace()).label());
+                .put(prefix + "Moyen remplacé", instrument.getInstrumentRemplace() == null ? null : reference(instrument.getInstrumentRemplace()).label());
         int index = 0;
         for (var allocation : instrument.getAffectations().stream().sorted(Comparator.comparing(PaymentActivity::allocationKey)).toList()) {
             String allocationPrefix = prefix + "Affectation " + (++index) + " - ";
-            values.put(allocationPrefix + "Ecriture", allocation.getElementFacturable() == null ? null : sourceLabel(allocation.getElementFacturable()))
+            values.put(allocationPrefix + "Écriture", allocation.getElementFacturable() == null ? null : sourceLabel(allocation.getElementFacturable()))
                     .put(allocationPrefix + "Document", allocation.getDocumentClient() == null ? null : allocation.getDocumentClient().getNumero())
                     .put(allocationPrefix + "Payeur", allocation.getPayeurNomSnapshot()).put(allocationPrefix + "Montant", allocation.getMontant())
                     .put(allocationPrefix + "Statut", allocation.getStatut() == null ? null : switch (allocation.getStatut()) {
                         case EN_ATTENTE -> "En attente";
-                        case CONFIRMEE -> "Confirmee";
-                        case ANNULEE -> "Annulee";
+                        case CONFIRMEE -> "Confirmée";
+                        case ANNULEE -> "Annulée";
                     });
         }
     }
@@ -168,7 +168,7 @@ public final class PaymentActivity {
     }
 
     private static String sourceLabel(ElementFacturable source) {
-        return (source.getContrat() == null ? "Ecriture" : ContractActivity.reference(source.getContrat()).label())
+        return (source.getContrat() == null ? "Écriture" : ContractActivity.reference(source.getContrat()).label())
                 + (source.getReferenceSource() == null ? "" : " - " + source.getReferenceSource())
                 + (source.getLibelle() == null ? "" : " - " + source.getLibelle());
     }
@@ -188,8 +188,8 @@ public final class PaymentActivity {
         if (status == null) return null;
         return switch (status) {
             case INSTANCE -> "En instance";
-            case REPRESENTE -> "Represente";
-            case REGLE_CV -> "Regle C/V";
+            case REPRESENTE -> "Représenté";
+            case REGLE_CV -> "Réglé C/V";
             case CONTENTIEUX -> "Contentieux";
         };
     }
@@ -197,8 +197,8 @@ public final class PaymentActivity {
     public static String mode(ModeReglementClient mode) {
         if (mode == null) return "Moyen de paiement";
         return switch (mode) {
-            case ESPECES -> "Especes";
-            case CHEQUE -> "Cheque";
+            case ESPECES -> "Espèces";
+            case CHEQUE -> "Chèque";
             case EFFET -> "Effet";
             case VIREMENT -> "Virement";
             case VERSEMENT_BANCAIRE -> "Versement bancaire";

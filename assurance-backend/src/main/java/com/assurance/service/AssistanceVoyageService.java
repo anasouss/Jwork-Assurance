@@ -131,7 +131,7 @@ public class AssistanceVoyageService {
     public AssistanceVoyageCreationResponse create(Long agenceId, CreateAssistanceVoyageRequest request) {
         return activityRecorder.perform(() -> createInternal(agenceId, request, null, null), response ->
                 AssistanceActivity.command(null, assistanceActivity.capture(agenceId, response.getContratId()),
-                        ActivityAction.CREATED, "Assistance voyage creee", "ASSISTANCE_TRAVEL_CREATE"));
+                        ActivityAction.CREATED, "Assistance voyage créée", "ASSISTANCE_TRAVEL_CREATE"));
     }
 
     @Transactional
@@ -204,7 +204,7 @@ public class AssistanceVoyageService {
         var before = assistanceActivity.capture(agenceId, contratId);
         return activityRecorder.perform(() -> finalizeDraftRecord(agenceId, contratId, request), response ->
                 AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
-                        ActivityAction.VALIDATED, "Assistance voyage validee", "ASSISTANCE_TRAVEL_FINALIZE"));
+                        ActivityAction.VALIDATED, "Assistance voyage validée", "ASSISTANCE_TRAVEL_FINALIZE"));
     }
 
     private AssistanceVoyageCreationResponse finalizeDraftRecord(Long agenceId, Long contratId,
@@ -502,7 +502,7 @@ public class AssistanceVoyageService {
         var before = assistanceActivity.capture(agenceId, contratId);
         return activityRecorder.perform(() -> updateRecord(agenceId, contratId, request), response ->
                 AssistanceActivity.command(before, assistanceActivity.capture(agenceId, response.getContratId()),
-                        ActivityAction.UPDATED, "Assistance voyage modifiee", "ASSISTANCE_TRAVEL_UPDATE"));
+                        ActivityAction.UPDATED, "Assistance voyage modifiée", "ASSISTANCE_TRAVEL_UPDATE"));
     }
 
     private AssistanceVoyageCreationResponse updateRecord(Long agenceId, Long contratId, CreateAssistanceVoyageRequest request) {

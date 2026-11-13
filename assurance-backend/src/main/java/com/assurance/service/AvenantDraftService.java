@@ -123,7 +123,7 @@ public class AvenantDraftService {
                 .ifPresent(draft -> {
                     AvenantRequest request = read(draft.getPayloadJson());
                     var command = amendmentActivity.draftCommand(draft, amendmentActivity.snapshot(request, contrat), Map.of(),
-                            ActivityAction.DELETED, "Brouillon d'avenant supprime", "AMENDMENT_DRAFT_DELETION", request);
+                            ActivityAction.DELETED, "Brouillon d'avenant supprimé", "AMENDMENT_DRAFT_DELETION", request);
                     avenantDraftRepository.delete(draft);
                     businessActivityRecorder.record(command);
                 });

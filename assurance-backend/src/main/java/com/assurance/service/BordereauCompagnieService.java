@@ -239,7 +239,7 @@ public class BordereauCompagnieService {
                 .build();
         replaceLines(bordereau, request.getAffectationIds());
         return toResponse(
-                saveActivity(bordereau, Map.of(), ActivityAction.CREATED, "Bordereau compagnie cree en brouillon", "COMPANY_BORDEREAU_CREATION"),
+                saveActivity(bordereau, Map.of(), ActivityAction.CREATED, "Bordereau compagnie créé en brouillon", "COMPANY_BORDEREAU_CREATION"),
                 AllocationAmounts.empty(),
                 true
         );
@@ -264,7 +264,7 @@ public class BordereauCompagnieService {
         bordereau.setNotes(trimToNull(request.getNotes()));
         replaceLines(bordereau, request.getAffectationIds());
         return toResponse(
-                saveActivity(bordereau, before, ActivityAction.UPDATED, "Bordereau compagnie modifie", "COMPANY_BORDEREAU_UPDATE", oldReferences),
+                saveActivity(bordereau, before, ActivityAction.UPDATED, "Bordereau compagnie modifié", "COMPANY_BORDEREAU_UPDATE", oldReferences),
                 AllocationAmounts.empty(),
                 true
         );
@@ -283,7 +283,7 @@ public class BordereauCompagnieService {
         bordereau.setDateValidation(LocalDateTime.now());
         bordereau.setValidePar(currentUser());
         return toResponse(
-                saveActivity(bordereau, before, ActivityAction.VALIDATED, "Bordereau compagnie valide", "COMPANY_BORDEREAU_VALIDATION"),
+                saveActivity(bordereau, before, ActivityAction.VALIDATED, "Bordereau compagnie validé", "COMPANY_BORDEREAU_VALIDATION"),
                 AllocationAmounts.empty(),
                 true
         );
@@ -347,7 +347,7 @@ public class BordereauCompagnieService {
         bordereau.setDateAccuseReception(request.getDateAccuseReception());
         bordereau.setReferenceAccuseReception(trimToNull(request.getReferenceAccuseReception()));
         return toResponse(
-                saveActivity(bordereau, before, ActivityAction.RECONCILED, "Rapprochement compagnie enregistre", "COMPANY_BORDEREAU_RECONCILIATION"),
+                saveActivity(bordereau, before, ActivityAction.RECONCILED, "Rapprochement compagnie enregistré", "COMPANY_BORDEREAU_RECONCILIATION"),
                 loadAllocationAmounts(List.of(id)).getOrDefault(id, AllocationAmounts.empty()),
                 true
         );
@@ -376,7 +376,7 @@ public class BordereauCompagnieService {
         bordereau.setDateAnnulation(LocalDateTime.now());
         bordereau.setMotifAnnulation(request.getMotif().trim());
         return toResponse(saveActivity(bordereau, before, ActivityAction.CANCELLED,
-                "Bordereau compagnie annule", "COMPANY_BORDEREAU_CANCELLATION"), amounts, true);
+                "Bordereau compagnie annulé", "COMPANY_BORDEREAU_CANCELLATION"), amounts, true);
     }
 
     private BordereauCompagnie saveActivity(BordereauCompagnie slip, Map<String, String> before,

@@ -224,7 +224,7 @@ public class AttestationStockService {
 
     @Transactional
     public AttestationStockSettingsResponse updateSettings(Long agenceId, UpdateAttestationStockSettingsRequest request) {
-        var before = new ActivityValues().put("Controle du stock", controleActif(agenceId)).snapshot();
+        var before = new ActivityValues().put("Contrôle du stock", controleActif(agenceId)).snapshot();
         boolean controleActif = Boolean.TRUE.equals(request.getControleStockActif());
         parametreApplicationService.setBoolean(
                 agenceId,
@@ -234,10 +234,10 @@ public class AttestationStockService {
         );
         var response = settings(agenceId);
         activityRecorder.record(new ActivityCommand(agenceId, ActivityModule.STOCK_ATTESTATIONS, ActivityAction.UPDATED,
-                "Controle du stock d'attestations modifie", "ATTESTATION_STOCK_CONTROL",
-                new ActivityReference(ActivityRecordType.PARAMETRE, PARAM_CONTROLE_STOCK_ATTESTATION, "Controle du stock d'attestations"),
+                "Contrôle du stock d'attestations modifié", "ATTESTATION_STOCK_CONTROL",
+                new ActivityReference(ActivityRecordType.PARAMETRE, PARAM_CONTROLE_STOCK_ATTESTATION, "Contrôle du stock d'attestations"),
                 List.of(), ActivityValues.changes(before,
-                        new ActivityValues().put("Controle du stock", response.getControleStockActif()).snapshot())));
+                        new ActivityValues().put("Contrôle du stock", response.getControleStockActif()).snapshot())));
         return response;
     }
 
@@ -349,7 +349,7 @@ public class AttestationStockService {
         );
         recalculerSeuil(attestation);
         activityRecorder.record(StockActivity.command(attestation, before, List.of(), ActivityAction.CANCELLED,
-                "Attestation " + attestation.getNumero() + " annulee", "ATTESTATION_CANCELLATION"));
+                "Attestation " + attestation.getNumero() + " annulée", "ATTESTATION_CANCELLATION"));
         return toItemResponse(attestation);
     }
 
@@ -433,7 +433,7 @@ public class AttestationStockService {
         enregistrerMouvement(attestation, TypeMouvementStockAttestation.UTILISATION, contrat, mouvement, null, numeroNormalise);
         recalculerSeuil(attestation);
         activityRecorder.record(StockActivity.command(attestation, before, List.of(), ActivityAction.ASSIGNED,
-                "Attestation affectee au contrat", "ATTESTATION_CONTRACT_CONSUMPTION"));
+                "Attestation affectée au contrat", "ATTESTATION_CONTRACT_CONSUMPTION"));
     }
 
     @Transactional

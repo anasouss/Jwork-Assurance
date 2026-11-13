@@ -686,7 +686,7 @@ public class DocumentClientService {
         invoiceRequest.setNotes(request.getNotes());
         return businessActivityRecorder.perform(() -> create(agenceId, invoiceRequest, false, false, null), result ->
                 InvoiceActivity.command(findDocument(agenceId, result.getId()), Map.of(), ActivityAction.ISSUED,
-                        "Facture emise depuis un releve", "CLIENT_INVOICE_FROM_STATEMENT", List.of(InvoiceActivity.reference(statement))));
+                        "Facture émise depuis un relevé", "CLIENT_INVOICE_FROM_STATEMENT", List.of(InvoiceActivity.reference(statement))));
     }
 
     @Transactional
@@ -711,7 +711,7 @@ public class DocumentClientService {
                 useProposedDueDate, documentOrigine), result -> {
             DocumentClient document = findDocument(agenceId, result.getId());
             return InvoiceActivity.command(document, Map.of(), ActivityAction.ISSUED,
-                    document.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture emise" : "Releve emis",
+                    document.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture émise" : "Relevé émis",
                     allowActiveDirectPayments ? "CLIENT_INVOICE_FROM_DIRECT_PAYMENT" : "CLIENT_DOCUMENT_ISSUANCE", List.of());
         });
     }
@@ -910,7 +910,7 @@ public class DocumentClientService {
             return createRecord(agenceId, replacementRequest, false, false, original);
         }, result -> {
             ActivityCommand command = InvoiceActivity.command(findDocument(agenceId, result.getId()), before,
-                    ActivityAction.REPLACED, original.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture corrigee" : "Releve corrige",
+                    ActivityAction.REPLACED, original.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture corrigee" : "Relevé corrigé",
                     "CLIENT_DOCUMENT_REVISION", List.of(InvoiceActivity.reference(original)));
             var changes = new ArrayList<>(command.changes());
             changes.add(new ActivityChange("Motif de correction", null, request.getMotif().trim()));
@@ -938,7 +938,7 @@ public class DocumentClientService {
         releaseConventionSchedules(document);
         DocumentClient saved = documentClientRepository.save(document);
         businessActivityRecorder.record(InvoiceActivity.command(saved, before, ActivityAction.CANCELLED,
-                saved.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture annulee" : "Releve annule",
+                saved.getTypeDocument() == TypeDocumentClient.FACTURE ? "Facture annulée" : "Relevé annulé",
                 "CLIENT_DOCUMENT_CANCELLATION", List.of()));
         return toResponse(saved, true);
     }

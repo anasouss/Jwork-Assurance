@@ -26,41 +26,41 @@ public final class CompanyCatalogueActivity {
 
     public static State state(CompagnieAssurance company) {
         return new State(null, insuranceCompany(company), new ActivityValues().put("Code", company.getCode()).put("Nom", company.getNom())
-                .put("Nom abrege", company.getNomAbrege())
+                .put("Nom abrégé", company.getNomAbrege())
                 .put("Adresse", company.getAdresse()).put("Ville", company.getVille()).put("E-mail", company.getEmail())
-                .put("Telephone", company.getTelephone()).put("RC", company.getRc()).put("ICE", company.getIce())
-                .put("Prefixe attestation", company.getPrefixeAttestation()).put("Prefixe carte verte", company.getPrefixeCarteVerte())
-                .put("Prefixe dossier", company.getPrefixeDossier()).put("Ordre d'affichage", company.getOrdreAffichage())
+                .put("Téléphone", company.getTelephone()).put("RC", company.getRc()).put("ICE", company.getIce())
+                .put("Préfixe attestation", company.getPrefixeAttestation()).put("Préfixe carte verte", company.getPrefixeCarteVerte())
+                .put("Préfixe dossier", company.getPrefixeDossier()).put("Ordre d'affichage", company.getOrdreAffichage())
                 .put("Actif", company.getActif()).snapshot(), List.of(), null);
     }
 
     public static State state(CompagnieAssistance company) {
         return new State(null, assistanceCompany(company), new ActivityValues().put("Code", company.getCode()).put("Nom", company.getNom())
-                .put("Nom abrege", company.getNomAbrege())
-                .put("E-mail", company.getEmail()).put("Telephone", company.getTelephone()).put("Actif", company.getActif()).snapshot(), List.of(), null);
+                .put("Nom abrégé", company.getNomAbrege())
+                .put("E-mail", company.getEmail()).put("Téléphone", company.getTelephone()).put("Actif", company.getActif()).snapshot(), List.of(), null);
     }
 
     public static State state(AgenceCompagnieAssurance configuration) {
         return new State(configuration.getAgence().getId(), ActivityReference.of(ActivityRecordType.AGENCE_COMPAGNIE_ASSURANCE,
-                configuration.getId(), "Code intermediaire - " + configuration.getCompagnieAssurance().getNom()),
-                new ActivityValues().put("Code intermediaire", configuration.getCodeIntermediaire()).snapshot(),
+                configuration.getId(), "Code intermédiaire - " + configuration.getCompagnieAssurance().getNom()),
+                new ActivityValues().put("Code intermédiaire", configuration.getCodeIntermediaire()).snapshot(),
                 List.of(insuranceCompany(configuration.getCompagnieAssurance())), null);
     }
 
     public static State state(AgenceCompagnieAssistance configuration) {
         return new State(configuration.getAgence().getId(), ActivityReference.of(ActivityRecordType.AGENCE_COMPAGNIE_ASSISTANCE,
-                configuration.getId(), "Code intermediaire - " + configuration.getCompagnieAssistance().getNom()),
-                new ActivityValues().put("Code intermediaire", configuration.getCodeIntermediaire()).snapshot(),
+                configuration.getId(), "Code intermédiaire - " + configuration.getCompagnieAssistance().getNom()),
+                new ActivityValues().put("Code intermédiaire", configuration.getCodeIntermediaire()).snapshot(),
                 List.of(assistanceCompany(configuration.getCompagnieAssistance())), null);
     }
 
     public static State state(ProduitAssistance product) {
         List<ActivityReference> references = productReferences(product);
         String benefits = product.getPrestations() == null ? null : Jsoup.parseBodyFragment(product.getPrestations()).body().text();
-        return new State(null, productReference(product), new ActivityValues().put("Libelle", product.getLibelle()).put("Type", product.getType())
+        return new State(null, productReference(product), new ActivityValues().put("Libellé", product.getLibelle()).put("Type", product.getType())
                 .put("Compagnie", product.getCompagnieAssistance().getNom())
-                .put("Categorie client", product.getCategorieClient() == null ? null : product.getCategorieClient().getLibelle())
-                .put("Usages autorises", product.getUsages().stream().map(CompanyCatalogueActivity::usageLabel).sorted().collect(Collectors.joining("\n")))
+                .put("Catégorie client", product.getCategorieClient() == null ? null : product.getCategorieClient().getLibelle())
+                .put("Usages autorisés", product.getUsages().stream().map(CompanyCatalogueActivity::usageLabel).sorted().collect(Collectors.joining("\n")))
                 .put("Prestations", benefits).put("Actif", product.getActif()).snapshot(), references, product.getPrestations());
     }
 
@@ -89,9 +89,9 @@ public final class CompanyCatalogueActivity {
         ProduitAssistance product = rate.getProduitAssistance();
         return new State(null, ActivityReference.of(ActivityRecordType.TARIF_ASSISTANCE, rate.getId(),
                 "Tarif - " + product.getLibelle() + " - " + rate.getDateDebut().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))),
-                new ActivityValues().put("Produit", product.getLibelle()).put("Debut de validite", rate.getDateDebut())
-                        .put("Fin de validite", rate.getDateFin()).put("Age minimum", rate.getAgeMin()).put("Age maximum", rate.getAgeMax())
-                        .put("Duree en mois", rate.getDureeMois()).put("Montant HT", rate.getMontantHt())
+                new ActivityValues().put("Produit", product.getLibelle()).put("Début de validité", rate.getDateDebut())
+                        .put("Fin de validité", rate.getDateFin()).put("Âge minimum", rate.getAgeMin()).put("Âge maximum", rate.getAgeMax())
+                        .put("Durée en mois", rate.getDureeMois()).put("Montant HT", rate.getMontantHt())
                         .put("Montant TTC", rate.getMontantTtc()).put("Actif", rate.getActif()).snapshot(),
                 List.of(productReference(product), assistanceCompany(product.getCompagnieAssistance())), null);
     }
@@ -101,8 +101,8 @@ public final class CompanyCatalogueActivity {
         return new State(null, ActivityReference.of(ActivityRecordType.CODE_PROMO_ASSISTANCE, promotion.getId(),
                 "Promotion " + promotion.getCode() + " - " + product.getLibelle()),
                 new ActivityValues().put("Code", promotion.getCode()).put("Produit", product.getLibelle())
-                        .put("Reduction (%)", promotion.getTauxReduction()).put("Debut de validite", promotion.getDateDebut())
-                        .put("Fin de validite", promotion.getDateFin()).put("Actif", promotion.getActif()).snapshot(),
+                        .put("Réduction (%)", promotion.getTauxReduction()).put("Début de validité", promotion.getDateDebut())
+                        .put("Fin de validité", promotion.getDateFin()).put("Actif", promotion.getActif()).snapshot(),
                 List.of(productReference(product), assistanceCompany(product.getCompagnieAssistance())), null);
     }
 
@@ -116,17 +116,17 @@ public final class CompanyCatalogueActivity {
         convention.getUsages().forEach(usage -> references.add(usageReference(usage)));
         return new State(convention.getAgence().getId(), ActivityReference.of(ActivityRecordType.CONVENTION, convention.getId(),
                 convention.getCode() + " - " + convention.getIntitule()),
-                new ActivityValues().put("Code", convention.getCode()).put("Intitule", convention.getIntitule())
-                        .put("Description", convention.getDescription()).put("Organisme conventionne", convention.getOrganismeConventionne())
+                new ActivityValues().put("Code", convention.getCode()).put("Intitulé", convention.getIntitule())
+                        .put("Description", convention.getDescription()).put("Organisme conventionné", convention.getOrganismeConventionne())
                         .put("Compagnie", convention.getCompagnieAssurance().getNom())
-                        .put("Categorie client", convention.getCategorieClient() == null ? null : convention.getCategorieClient().getLibelle())
+                        .put("Catégorie client", convention.getCategorieClient() == null ? null : convention.getCategorieClient().getLibelle())
                         .put("Grille tarifaire", convention.getGrilleTarifaire() == null ? null : convention.getGrilleTarifaire().getLibelle())
-                        .put("Usages autorises", convention.getUsages().stream().map(CompanyCatalogueActivity::usageLabel).sorted().collect(Collectors.joining("\n")))
-                        .put("Date d'effet", convention.getDateEffet()).put("Date d'echeance", convention.getDateEcheance())
-                        .put("Type d'echeance", convention.getTypeEcheance() == null ? null : switch (convention.getTypeEcheance()) {
-                            case DATE_A_DATE -> "Date a date";
-                            case A_ECHEANCE -> "A echeance";
-                        }).put("Echeance", convention.getEcheance())
+                        .put("Usages autorisés", convention.getUsages().stream().map(CompanyCatalogueActivity::usageLabel).sorted().collect(Collectors.joining("\n")))
+                        .put("Date d'effet", convention.getDateEffet()).put("Date d'échéance", convention.getDateEcheance())
+                        .put("Type d'échéance", convention.getTypeEcheance() == null ? null : switch (convention.getTypeEcheance()) {
+                            case DATE_A_DATE -> "Date à date";
+                            case A_ECHEANCE -> "À échéance";
+                        }).put("Échéance", convention.getEcheance())
                         .put("Fractionnement", convention.getFractionnement() == null ? null : switch (convention.getFractionnement()) {
                             case MENSUEL -> "Mensuel";
                             case TRIMESTRIEL -> "Trimestriel";
@@ -143,10 +143,10 @@ public final class CompanyCatalogueActivity {
         List<ActivityChange> changes = new ArrayList<>(ActivityValues.changes(before == null ? null : before.values(), after == null ? null : after.values()));
         if (before != null && after != null && !Objects.equals(before.presentation(), after.presentation())
                 && Objects.equals(before.values().get("Prestations"), after.values().get("Prestations"))) {
-            changes.add(new ActivityChange("Presentation des prestations", null, "Actualisee"));
+            changes.add(new ActivityChange("Presentation des prestations", null, "Actualisée"));
         }
         if (before != null && after != null && changes.isEmpty() && !referenceIdentities(before).equals(referenceIdentities(after))) {
-            changes.add(new ActivityChange("References associees", null, "Actualisees"));
+            changes.add(new ActivityChange("Références associees", null, "Actualisées"));
         }
         return new ActivityCommand(current.agencyId(), ActivityModule.COMPAGNIES, action, title, origin,
                 current.subject(), references.stream().distinct().toList(), changes);

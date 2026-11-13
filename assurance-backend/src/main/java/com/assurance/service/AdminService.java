@@ -95,7 +95,7 @@ public class AdminService {
                 .build();
         Utilisateur saved = utilisateurRepository.save(user);
         activityRecorder.recordPlatform(AdministrationActivity.user(saved, null, ActivityAction.CREATED,
-                "Administrateur plateforme cree", "PLATFORM_ADMIN_CREATE"));
+                "Administrateur plateforme créé", "PLATFORM_ADMIN_CREATE"));
         return AdminUtilisateurResponse.from(saved);
     }
 
@@ -126,7 +126,7 @@ public class AdminService {
             refreshSessionRepository.revokeAllByUserId(id);
         }
         activityRecorder.recordPlatform(AdministrationActivity.user(saved, before, ActivityAction.UPDATED,
-                "Administrateur plateforme modifie", "PLATFORM_ADMIN_UPDATE"));
+                "Administrateur plateforme modifié", "PLATFORM_ADMIN_UPDATE"));
         return AdminUtilisateurResponse.from(saved);
     }
 
@@ -141,7 +141,7 @@ public class AdminService {
         utilisateurRepository.save(user);
         refreshSessionRepository.revokeAllByUserId(id);
         activityRecorder.recordPlatform(AdministrationActivity.user(user, before, ActivityAction.UPDATED,
-                "Administrateur plateforme desactive", "PLATFORM_ADMIN_DEACTIVATE"));
+                "Administrateur plateforme désactivé", "PLATFORM_ADMIN_DEACTIVATE"));
     }
 
     @Transactional
@@ -222,7 +222,7 @@ public class AdminService {
                 .telephone(blankToNull(request.getTelephone()))
                 .actif(request.getActif() == null || request.getActif())
                 .build();
-        return saveAgencyUser(user, null, ActivityAction.CREATED, "Utilisateur cree", "USER_CREATE",
+        return saveAgencyUser(user, null, ActivityAction.CREATED, "Utilisateur créé", "USER_CREATE",
                 agence.getId());
     }
 
@@ -251,7 +251,7 @@ public class AdminService {
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        return saveAgencyUser(user, before, ActivityAction.UPDATED, "Utilisateur modifie", "USER_UPDATE", previousAgencyId);
+        return saveAgencyUser(user, before, ActivityAction.UPDATED, "Utilisateur modifié", "USER_UPDATE", previousAgencyId);
     }
 
     @Transactional
@@ -273,7 +273,7 @@ public class AdminService {
             refreshSessionRepository.revokeAllByUserId(id);
             return user;
         }, saved -> AdministrationActivity.user(saved, before, ActivityAction.UPDATED,
-                "Utilisateur desactive", "USER_DEACTIVATE"));
+                "Utilisateur désactivé", "USER_DEACTIVATE"));
     }
 
     @Transactional
@@ -355,7 +355,7 @@ public class AdminService {
                 .permissions(resolvePermissions(actor, request.getPermissionIds()))
                 .build();
         Role saved = roleRepository.save(role);
-        activityRecorder.record(AdministrationActivity.role(saved, null, ActivityAction.CREATED, "Role cree", "ROLE_CREATE"));
+        activityRecorder.record(AdministrationActivity.role(saved, null, ActivityAction.CREATED, "Rôle créé", "ROLE_CREATE"));
         return AdminRoleResponse.from(saved);
     }
 
@@ -383,7 +383,7 @@ public class AdminService {
         }
         role.setPermissions(resolvePermissions(actor, request.getPermissionIds()));
         Role saved = roleRepository.save(role);
-        ActivityCommand command = AdministrationActivity.role(saved, before, ActivityAction.UPDATED, "Role modifie", "ROLE_UPDATE");
+        ActivityCommand command = AdministrationActivity.role(saved, before, ActivityAction.UPDATED, "Rôle modifié", "ROLE_UPDATE");
         if (Objects.equals(previousAgencyId, saved.getAgence().getId())) activityRecorder.record(command);
         else activityRecorder.recordPlatform(AdministrationActivity.platform(command));
         return AdminRoleResponse.from(saved);
@@ -404,7 +404,7 @@ public class AdminService {
             throw new BadRequestException("Role utilise par des utilisateurs");
         }
         ActivityCommand command = AdministrationActivity.role(role, AdministrationActivity.roleSnapshot(role),
-                ActivityAction.DELETED, "Role supprime", "ROLE_DELETE");
+                ActivityAction.DELETED, "Rôle supprimé", "ROLE_DELETE");
         roleRepository.delete(role);
         activityRecorder.record(command);
     }
@@ -462,7 +462,7 @@ public class AdminService {
             acquisitionClientService.provisionDefaultOrigins(created.getId());
             return created;
         }, created -> {
-            ActivityCommand command = AdministrationActivity.agency(created, null, ActivityAction.CREATED, "Agence creee", "AGENCY_CREATE");
+            ActivityCommand command = AdministrationActivity.agency(created, null, ActivityAction.CREATED, "Agence créée", "AGENCY_CREATE");
             if (isSuperAdmin(actor) && actor.getAgence() == null) {
                 activityRecorder.recordPlatform(AdministrationActivity.platform(command));
                 return null;
@@ -500,7 +500,7 @@ public class AdminService {
         agence.setBanque(blankToNull(request.getBanque()));
         agence.setRib(blankToNull(request.getRib()));
         Agence saved = agenceRepository.save(agence);
-        activityRecorder.record(AdministrationActivity.agency(saved, before, ActivityAction.UPDATED, "Agence modifiee", "AGENCY_UPDATE"));
+        activityRecorder.record(AdministrationActivity.agency(saved, before, ActivityAction.UPDATED, "Agence modifiée", "AGENCY_UPDATE"));
         return AdminAgenceResponse.from(saved);
     }
 

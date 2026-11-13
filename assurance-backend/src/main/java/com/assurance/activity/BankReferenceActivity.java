@@ -12,7 +12,7 @@ public final class BankReferenceActivity {
 
     public static Map<String, String> snapshot(Banque bank) {
         return new ActivityValues().put("Code", bank.getCode()).put("Nom", bank.getLibelle())
-                .put("Autres denominations", bank.getAliases().stream().sorted().collect(Collectors.joining(", ")))
+                .put("Autres dénominations", bank.getAliases().stream().sorted().collect(Collectors.joining(", ")))
                 .put("Ordre d'affichage", bank.getOrdre()).put("Actif", bank.getActif()).snapshot();
     }
 

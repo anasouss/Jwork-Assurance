@@ -13,7 +13,7 @@ public final class FiscalRuleActivity {
     }
 
     public static Map<String, String> snapshot(RegleFiscale rule) {
-        return new ActivityValues().put("Code", rule.getCode()).put("Libelle", rule.getLibelle())
+        return new ActivityValues().put("Code", rule.getCode()).put("Libellé", rule.getLibelle())
                 .put("Nature", rule.getNature() == null ? null : switch (rule.getNature()) {
                     case TAXE_ASSURANCE -> "Taxe d'assurance";
                     case TPF -> "Taxe parafiscale";
@@ -21,22 +21,22 @@ public final class FiscalRuleActivity {
                     case CNPAC -> "CNPAC";
                 })
                 .put("Mode de calcul", rule.getModeCalcul() == null ? null : switch (rule.getModeCalcul()) {
-                    case TAUX -> "Taux decimal";
+                    case TAUX -> "Taux décimal";
                     case MONTANT_FIXE -> "Montant fixe";
                 }).put("Valeur", rule.getValeur())
                 .put("Base de calcul", rule.getBaseCalcul() == null ? null : switch (rule.getBaseCalcul()) {
                     case PRIME_GARANTIE -> "Prime de garantie";
-                    case PRIME_CATEGORIE -> "Prime de categorie";
-                    case UNITE_ASSUREE -> "Unite assuree";
+                    case PRIME_CATEGORIE -> "Prime de catégorie";
+                    case UNITE_ASSUREE -> "Unité assurée";
                 })
-                .put("Categorie de base", category(rule.getCategorieBase())).put("Categorie resultat", category(rule.getCategorieResultat()))
+                .put("Catégorie de base", category(rule.getCategorieBase())).put("Catégorie résultat", category(rule.getCategorieResultat()))
                 .put("Branche", rule.getBrancheAssurance() == null ? null : rule.getBrancheAssurance().getLibelle())
                 .put("Compagnie", rule.getCompagnieAssurance() == null ? null : rule.getCompagnieAssurance().getNom())
-                .put("Categorie client", rule.getCategorieClient() == null ? null : rule.getCategorieClient().getLibelle())
+                .put("Catégorie client", rule.getCategorieClient() == null ? null : rule.getCategorieClient().getLibelle())
                 .put("Garanties", rule.getGaranties().stream().map(guarantee -> guarantee.getCode() + " - " + guarantee.getLibelle())
                         .sorted().collect(Collectors.joining("\n")))
                 .put("Type de garantie", rule.getTypeGarantie() == null ? null : switch (rule.getTypeGarantie()) {
-                    case VEHICULE -> "Vehicule";
+                    case VEHICULE -> "Véhicule";
                     case PERSONNE -> "Personne";
                 })
                 .put("Usage", rule.getUsage() == null ? null : rule.getUsage().getCode() + " - " + rule.getUsage().getLibelle())
@@ -46,9 +46,9 @@ public final class FiscalRuleActivity {
                     case CONVENTION -> "Convention";
                     case FLOTTE -> "Flotte";
                 })
-                .put("Debut d'application", rule.getDateDebut()).put("Fin d'application", rule.getDateFin())
-                .put("Applicable", rule.getApplicable()).put("Priorite", rule.getPriorite()).put("Actif", rule.getActif())
-                .put("Description", rule.getDescription()).put("Reference reglementaire", rule.getReferenceReglementaire()).snapshot();
+                .put("Début d'application", rule.getDateDebut()).put("Fin d'application", rule.getDateFin())
+                .put("Applicable", rule.getApplicable()).put("Priorité", rule.getPriorite()).put("Actif", rule.getActif())
+                .put("Description", rule.getDescription()).put("Référence réglementaire", rule.getReferenceReglementaire()).snapshot();
     }
 
     public static List<ActivityReference> references(RegleFiscale rule) {

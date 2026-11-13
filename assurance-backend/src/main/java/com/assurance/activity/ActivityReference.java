@@ -5,12 +5,12 @@ import java.util.Objects;
 /** Immutable business identity; retained even when the source record is deleted. */
 public record ActivityReference(ActivityRecordType type, String id, String label) {
     public ActivityReference {
-        Objects.requireNonNull(type, "Le type de reference est obligatoire");
+        Objects.requireNonNull(type, "Le type de référence est obligatoire");
         if (id == null || id.isBlank() || id.length() > 80) {
-            throw new IllegalArgumentException("Identifiant de reference invalide");
+            throw new IllegalArgumentException("Identifiant de référence invalide");
         }
         if (label == null || label.isBlank() || label.length() > 500) {
-            throw new IllegalArgumentException("Libelle de reference invalide");
+            throw new IllegalArgumentException("Libellé de référence invalide");
         }
     }
 

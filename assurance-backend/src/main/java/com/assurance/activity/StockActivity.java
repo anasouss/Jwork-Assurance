@@ -14,18 +14,18 @@ public final class StockActivity {
     }
 
     public static Map<String, String> snapshot(AttestationStock stock) {
-        return new ActivityValues().put("Numero d'attestation", stock.getNumero())
+        return new ActivityValues().put("Numéro d'attestation", stock.getNumero())
                 .put("Compagnie", stock.getCompagnieAssurance().getNom())
                 .put("Groupe d'usage", stock.getGroupeUsageAttestation().getLibelle())
                 .put("Statut", stock.getStatut() == null ? null : switch (stock.getStatut()) {
                     case DISPONIBLE -> "Disponible";
-                    case RESERVEE -> "Reservee";
-                    case UTILISEE -> "Utilisee";
-                    case ANNULEE -> "Annulee";
-                    case DESACTIVEE -> "Desactivee";
+                    case RESERVEE -> "Réservée";
+                    case UTILISEE -> "Utilisée";
+                    case ANNULEE -> "Annulée";
+                    case DESACTIVEE -> "Désactivée";
                 })
                 .put("Dossier", stock.getNumeroDossier()).put("Police", stock.getNumeroPolice())
-                .put("Vehicule", stock.getVehicule() == null ? null : stock.getVehicule().getImmatriculation())
+                .put("Véhicule", stock.getVehicule() == null ? null : stock.getVehicule().getImmatriculation())
                 .put("Remorque", stock.getRemorque() == null ? null : stock.getRemorque().getImmatriculation())
                 .put("Date d'utilisation", stock.getDateUtilisation()).put("Date d'annulation", stock.getDateAnnulation())
                 .put("Motif d'annulation", stock.getMotifAnnulation()).snapshot();
@@ -40,7 +40,7 @@ public final class StockActivity {
         if (stock.getMouvementContrat() != null) references.add(ActivityReference.of(ActivityRecordType.MOUVEMENT_CONTRAT,
                 stock.getMouvementContrat().getId(), "Mouvement " + stock.getMouvementContrat().getNumeroMouvement()));
         if (stock.getVehicule() != null) references.add(ActivityReference.of(ActivityRecordType.VEHICULE,
-                stock.getVehicule().getId(), label(stock.getVehicule().getImmatriculation(), "Vehicule")));
+                stock.getVehicule().getId(), label(stock.getVehicule().getImmatriculation(), "Véhicule")));
         if (stock.getRemorque() != null) references.add(ActivityReference.of(ActivityRecordType.REMORQUE,
                 stock.getRemorque().getId(), label(stock.getRemorque().getImmatriculation(), "Remorque")));
         return references;
@@ -61,34 +61,34 @@ public final class StockActivity {
     }
 
     public static Map<String, String> snapshot(LivraisonAttestation delivery) {
-        ActivityValues values = new ActivityValues().put("Reference commande", delivery.getReferenceCommande())
+        ActivityValues values = new ActivityValues().put("Référence commande", delivery.getReferenceCommande())
                 .put("Compagnie", delivery.getCompagnieAssurance().getNom())
                 .put("Origine", delivery.getSource() == null ? null : switch (delivery.getSource()) {
                     case COMMANDE -> "Commande";
-                    case RECEPTION_DIRECTE -> "Reception directe";
+                    case RECEPTION_DIRECTE -> "Réception directe";
                 })
                 .put("Statut", delivery.getStatut() == null ? null : switch (delivery.getStatut()) {
-                    case DEMANDEE -> "Demandee";
-                    case REFUSEE -> "Refusee";
-                    case RECEPTION_PARTIELLE -> "Reception partielle";
-                    case RECEPTION_COMPLETE -> "Reception complete";
-                    case VALIDEE -> "Validee";
+                    case DEMANDEE -> "Demandée";
+                    case REFUSEE -> "Refusée";
+                    case RECEPTION_PARTIELLE -> "Réception partielle";
+                    case RECEPTION_COMPLETE -> "Réception complète";
+                    case VALIDEE -> "Validée";
                 })
-                .put("Date de demande", delivery.getDateDemande()).put("Date de reception", delivery.getDateReception())
-                .put("Reference BL", delivery.getReferenceBl()).put("Quantite demandee", delivery.getQuantiteDemandee())
-                .put("Quantite recue", delivery.getQuantiteRecue()).put("Commentaire", delivery.getCommentaireDecision());
+                .put("Date de demande", delivery.getDateDemande()).put("Date de réception", delivery.getDateReception())
+                .put("Référence BL", delivery.getReferenceBl()).put("Quantité demandée", delivery.getQuantiteDemandee())
+                .put("Quantité reçue", delivery.getQuantiteRecue()).put("Commentaire", delivery.getCommentaireDecision());
         int index = 0;
         for (var line : delivery.getLignes().stream().sorted(Comparator.comparing(row -> row.getGroupeUsageAttestation().getId())).toList()) {
             String prefix = "Demande " + (++index) + " - ";
             values.put(prefix + "Usage", line.getGroupeUsageAttestation().getLibelle())
-                    .put(prefix + "Quantite demandee", line.getQuantiteDemandee()).put(prefix + "Quantite recue", line.getQuantiteRecue());
+                    .put(prefix + "Quantité demandée", line.getQuantiteDemandee()).put(prefix + "Quantité reçue", line.getQuantiteRecue());
         }
         index = 0;
         for (var lot : delivery.getLots().stream().sorted(Comparator.comparing(row -> row.getId())).toList()) {
             String prefix = "Lot " + (++index) + " - ";
-            values.put(prefix + "Usage", lot.getGroupeUsageAttestation().getLibelle()).put(prefix + "Prefixe", lot.getPrefixe())
-                    .put(prefix + "Serie debut", lot.getNumeroDebut()).put(prefix + "Serie fin", lot.getNumeroFin())
-                    .put(prefix + "Quantite", lot.getQuantite());
+            values.put(prefix + "Usage", lot.getGroupeUsageAttestation().getLibelle()).put(prefix + "Préfixe", lot.getPrefixe())
+                    .put(prefix + "Série début", lot.getNumeroDebut()).put(prefix + "Série fin", lot.getNumeroFin())
+                    .put(prefix + "Quantité", lot.getQuantite());
         }
         return values.snapshot();
     }
@@ -112,7 +112,7 @@ public final class StockActivity {
     public static ActivityCommand thresholdCommand(SeuilStockAttestation threshold, Map<String, String> before, boolean created) {
         return new ActivityCommand(threshold.getAgence().getId(), ActivityModule.STOCK_ATTESTATIONS,
                 created ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                created ? "Seuil de stock cree" : "Seuil de stock modifie", "ATTESTATION_STOCK_THRESHOLD",
+                created ? "Seuil de stock créé" : "Seuil de stock modifié", "ATTESTATION_STOCK_THRESHOLD",
                 ActivityReference.of(ActivityRecordType.SEUIL_STOCK_ATTESTATION, threshold.getId(),
                         threshold.getCompagnieAssurance().getNom() + " - " + threshold.getGroupeUsageAttestation().getLibelle()),
                 List.of(ActivityReference.of(ActivityRecordType.COMPAGNIE, threshold.getCompagnieAssurance().getId(), threshold.getCompagnieAssurance().getNom())),

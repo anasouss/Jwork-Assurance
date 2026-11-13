@@ -13,39 +13,39 @@ public final class CompanyBordereauActivity {
     }
 
     public static Map<String, String> snapshot(BordereauCompagnie slip) {
-        ActivityValues values = new ActivityValues().put("Numero", slip.getNumero())
+        ActivityValues values = new ActivityValues().put("Numéro", slip.getNumero())
                 .put("Compagnie", slip.getTiersCompagnie().getNom())
                 .put("Base du bordereau", slip.getBaseBordereau() == null ? null : switch (slip.getBaseBordereau()) {
-                    case EMISSION -> "Emission";
+                    case EMISSION -> "Émission";
                     case ENCAISSEMENT -> "Encaissement";
                 })
                 .put("Statut", slip.getStatut() == null ? null : switch (slip.getStatut()) {
                     case BROUILLON -> "Brouillon";
-                    case VALIDE -> "Valide";
+                    case VALIDE -> "Validé";
                     case TRANSMIS -> "Transmis";
-                    case ANNULE -> "Annule";
+                    case ANNULE -> "Annulé";
                 })
                 .put("Rapprochement", slip.getStatutRapprochement() == null ? null : switch (slip.getStatutRapprochement()) {
-                    case A_RAPPROCHER -> "A rapprocher";
-                    case AVEC_ECART -> "Avec ecart";
-                    case RAPPROCHE -> "Rapproche";
+                    case A_RAPPROCHER -> "À rapprocher";
+                    case AVEC_ECART -> "Avec écart";
+                    case RAPPROCHE -> "Rapproché";
                 })
-                .put("Periode du", slip.getPeriodeDebut()).put("Periode au", slip.getPeriodeFin())
+                .put("Période du", slip.getPeriodeDebut()).put("Période au", slip.getPeriodeFin())
                 .put("Validation", slip.getDateValidation()).put("Transmission", slip.getDateTransmission())
-                .put("Canal de transmission", slip.getCanalTransmission()).put("Reference de transmission", slip.getReferenceTransmission())
-                .put("Accuse de reception", slip.getDateAccuseReception()).put("Reference de reception", slip.getReferenceAccuseReception())
+                .put("Canal de transmission", slip.getCanalTransmission()).put("Référence de transmission", slip.getReferenceTransmission())
+                .put("Accusé de réception", slip.getDateAccuseReception()).put("Référence de réception", slip.getReferenceAccuseReception())
                 .put("Prime nette", slip.getPrimeNette()).put("Taxes", slip.getMontantTaxes()).put("Accessoires", slip.getAccessoires())
                 .put("Montant TTC", slip.getMontantTtc()).put("Commission nette", slip.getCommissionNette())
                 .put("Retenue", slip.getMontantRetenue()).put("Net compagnie", slip.getNetCompagnie())
-                .put("Ecart de rapprochement", slip.getEcartRapprochement()).put("Note de rapprochement", slip.getNoteRapprochement())
+                .put("Écart de rapprochement", slip.getEcartRapprochement()).put("Note de rapprochement", slip.getNoteRapprochement())
                 .put("Notes", slip.getNotes()).put("Annulation", slip.getDateAnnulation()).put("Motif d'annulation", slip.getMotifAnnulation());
         int index = 0;
         for (var line : slip.getLignes().stream().sorted(Comparator.comparing(LigneBordereauCompagnie::getNumeroQuittanceCompagnie)
                 .thenComparing(LigneBordereauCompagnie::getDateEffet)).toList()) {
             String prefix = "Quittance " + (++index) + " - ";
-            values.put(prefix + "Numero compagnie", line.getNumeroQuittanceCompagnie()).put(prefix + "Dossier", line.getNumeroDossier())
+            values.put(prefix + "Numéro compagnie", line.getNumeroQuittanceCompagnie()).put(prefix + "Dossier", line.getNumeroDossier())
                     .put(prefix + "Police", line.getNumeroPolice()).put(prefix + "Mouvement", line.getMouvement())
-                    .put(prefix + "Date d'effet", line.getDateEffet()).put(prefix + "Date d'echeance", line.getDateEcheance())
+                    .put(prefix + "Date d'effet", line.getDateEffet()).put(prefix + "Date d'échéance", line.getDateEcheance())
                     .put(prefix + "Prime nette", line.getPrimeNette()).put(prefix + "Taxes", line.getMontantTaxes())
                     .put(prefix + "Accessoires", line.getAccessoires()).put(prefix + "Montant TTC", line.getMontantTtc())
                     .put(prefix + "Commission nette", line.getCommissionNette()).put(prefix + "Retenue", line.getMontantRetenue())

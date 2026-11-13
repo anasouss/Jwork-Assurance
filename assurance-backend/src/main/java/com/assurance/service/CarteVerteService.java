@@ -170,7 +170,7 @@ public class CarteVerteService {
 
         activityRecorder.record(GreenCardActivity.command(carte, before, previousReferences,
                 replaced ? ActivityAction.REPLACED : before == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                replaced ? "Carte verte remplacee" : before == null ? "Carte verte ajoutee" : "Carte verte modifiee",
+                replaced ? "Carte verte remplacee" : before == null ? "Carte verte ajoutée" : "Carte verte modifiée",
                 "GREEN_CARD_SAVE"));
 
         return toResponse(carte);
@@ -193,7 +193,7 @@ public class CarteVerteService {
         }
         carteVerteRepository.save(carte);
         activityRecorder.record(GreenCardActivity.command(carte, before, previousReferences, ActivityAction.UPDATED,
-                "Carte verte desactivee", "GREEN_CARD_DEACTIVATE"));
+                "Carte verte désactivée", "GREEN_CARD_DEACTIVATE"));
     }
 
     private Contrat resolveContrat(Long agenceId, Long contratId) {

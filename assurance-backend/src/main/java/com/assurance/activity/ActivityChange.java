@@ -6,7 +6,7 @@ import java.util.Objects;
 public record ActivityChange(String label, String beforeValue, String afterValue) {
     public ActivityChange {
         if (label == null || label.isBlank() || label.length() > 1000) {
-            throw new IllegalArgumentException("Libelle de changement invalide");
+            throw new IllegalArgumentException("Libellé de changement invalide");
         }
     }
 

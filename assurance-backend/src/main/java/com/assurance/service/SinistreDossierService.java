@@ -85,7 +85,7 @@ public class SinistreDossierService {
             UpdateSinistreGarantieRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.UPDATED, "Decision de couverture modifiee", "CLAIM_GUARANTEE_DECISION",
+        return recordChange(context, ActivityAction.UPDATED, "Décision de couverture modifiée", "CLAIM_GUARANTEE_DECISION",
                 ActivityRecordType.GARANTIE_SINISTRE, garantieId, () -> {
             assertEditable(context.sinistre());
             SinistreGarantie garantie = garantieRepository.findByIdAndSinistreId(garantieId, sinistreId)
@@ -119,7 +119,7 @@ public class SinistreDossierService {
             UpdateSinistreGarantiesRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.UPDATED, "Garanties du sinistre enregistrees", "CLAIM_GUARANTEE_DECISIONS", null, null, () -> {
+        return recordChange(context, ActivityAction.UPDATED, "Garanties du sinistre enregistrées", "CLAIM_GUARANTEE_DECISIONS", null, null, () -> {
             assertEditable(context.sinistre());
             Set<Long> ids = new HashSet<>();
             request.getGaranties().forEach(item -> {
@@ -178,7 +178,7 @@ public class SinistreDossierService {
         couvertureRepository.deleteBySinistreId(sinistreId);
         sinistreRepository.delete(sinistre);
         activityRecorder.record(ClaimActivity.command(sinistre, before, null, ActivityAction.DELETED,
-                "Dossier de sinistre supprime", "CLAIM_EARLY_DELETION"));
+                "Dossier de sinistre supprimé", "CLAIM_EARLY_DELETION"));
     }
 
     @Transactional
@@ -189,7 +189,7 @@ public class SinistreDossierService {
             AddSinistrePartieRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.CREATED, "Partie ajoutee au sinistre", "CLAIM_PARTY_ADDITION",
+        return recordChange(context, ActivityAction.CREATED, "Partie ajoutée au sinistre", "CLAIM_PARTY_ADDITION",
                 ActivityRecordType.PARTIE_SINISTRE, null, () -> {
             assertEditable(context.sinistre());
             partieRepository.save(SinistrePartie.builder()
@@ -223,7 +223,7 @@ public class SinistreDossierService {
             AddSinistrePartieRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.UPDATED, "Partie du sinistre modifiee", "CLAIM_PARTY_UPDATE",
+        return recordChange(context, ActivityAction.UPDATED, "Partie du sinistre modifiée", "CLAIM_PARTY_UPDATE",
                 ActivityRecordType.PARTIE_SINISTRE, partieId, () -> {
             assertEditable(context.sinistre());
             SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
@@ -256,7 +256,7 @@ public class SinistreDossierService {
             Long partieId
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.DELETED, "Partie retiree du sinistre", "CLAIM_PARTY_REMOVAL",
+        return recordChange(context, ActivityAction.DELETED, "Partie retirée du sinistre", "CLAIM_PARTY_REMOVAL",
                 ActivityRecordType.PARTIE_SINISTRE, partieId, () -> {
             assertEditable(context.sinistre());
             SinistrePartie partie = partieRepository.findByIdAndSinistreId(partieId, sinistreId)
@@ -286,7 +286,7 @@ public class SinistreDossierService {
             AddProvisionSinistreRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.CREATED, "Provision du sinistre enregistree", "CLAIM_PROVISION",
+        return recordChange(context, ActivityAction.CREATED, "Provision du sinistre enregistrée", "CLAIM_PROVISION",
                 ActivityRecordType.PROVISION_SINISTRE, null, () -> {
             assertEditable(context.sinistre());
             if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
@@ -320,7 +320,7 @@ public class SinistreDossierService {
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
         return recordChange(context, missionId == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                missionId == null ? "Mission d'expertise creee" : "Mission d'expertise modifiee", "CLAIM_EXPERT_MISSION",
+                missionId == null ? "Mission d'expertise créée" : "Mission d'expertise modifiée", "CLAIM_EXPERT_MISSION",
                 ActivityRecordType.MISSION_EXPERTISE, missionId, () -> {
             assertEditable(context.sinistre());
             validateNotBeforeSinistre(context.sinistre(), request.getDateMission(), "mission d'expertise");
@@ -377,7 +377,7 @@ public class SinistreDossierService {
             AddSinistreOperationRequest request
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.CREATED, "Operation financiere du sinistre enregistree", "CLAIM_FINANCIAL_OPERATION",
+        return recordChange(context, ActivityAction.CREATED, "Opération financière du sinistre enregistrée", "CLAIM_FINANCIAL_OPERATION",
                 ActivityRecordType.OPERATION_SINISTRE, null, () -> {
             assertEditable(context.sinistre());
             if (context.sinistre().getStatut() == StatutSinistre.BROUILLON) {
@@ -482,7 +482,7 @@ public class SinistreDossierService {
             String motif
     ) {
         Context context = context(agenceId, utilisateurId, sinistreId);
-        return recordChange(context, ActivityAction.CANCELLED, "Operation financiere du sinistre annulee", "CLAIM_FINANCIAL_OPERATION_CANCELLATION",
+        return recordChange(context, ActivityAction.CANCELLED, "Opération financière du sinistre annulée", "CLAIM_FINANCIAL_OPERATION_CANCELLATION",
                 ActivityRecordType.OPERATION_SINISTRE, operationId, () -> {
             assertEditable(context.sinistre());
             SinistreOperation operation = operationRepository.findByIdAndSinistreId(operationId, sinistreId)

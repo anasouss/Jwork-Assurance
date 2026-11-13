@@ -29,55 +29,55 @@ public final class ClaimActivity {
     public static Snapshot snapshot(SinistreDetailResponse claim) {
         Map<String, Part> parts = new LinkedHashMap<>();
         List<ActivityReference> references = new ArrayList<>();
-        part(parts, "header", "", new ActivityValues().put("Numero de sinistre", claim.getNumeroSinistre())
-                .put("Reference compagnie", claim.getReferenceCompagnie()).put("Statut", label(claim.getStatut()))
-                .put("Etape de suivi", label(claim.getEtapeSuivi())).put("Type de dommage", label(claim.getTypeDommage()))
-                .put("Mode de reparation", label(claim.getModeReparation())).put("Garage de reparation", claim.getGarage())
+        part(parts, "header", "", new ActivityValues().put("Numéro de sinistre", claim.getNumeroSinistre())
+                .put("Référence compagnie", claim.getReferenceCompagnie()).put("Statut", label(claim.getStatut()))
+                .put("Étape de suivi", label(claim.getEtapeSuivi())).put("Type de dommage", label(claim.getTypeDommage()))
+                .put("Mode de réparation", label(claim.getModeReparation())).put("Garage de réparation", claim.getGarage())
                 .put("Nature", label(claim.getNature())).put("Date du sinistre", claim.getDateSinistre()).put("Heure", claim.getHeureSinistre())
-                .put("Date de declaration", claim.getDateDeclaration()).put("Transmission", claim.getDateTransmission()).put("Cloture", claim.getDateCloture())
+                .put("Date de déclaration", claim.getDateDeclaration()).put("Transmission", claim.getDateTransmission()).put("Clôture", claim.getDateCloture())
                 .put("Ville", claim.getVille()).put("Lieu", claim.getLieu()).put("Circonstances", claim.getCirconstances())
-                .put("Numero de PV", claim.getNumeroPv()).put("Responsabilite (%)", claim.getTauxResponsabilite()).put("Notes", claim.getNotes())
-                .put("Gestionnaire", claim.getGestionnaire()).put("Prochaine action", claim.getProchaineAction()).put("Echeance de l'action", claim.getDateEcheanceAction()));
+                .put("Numéro de PV", claim.getNumeroPv()).put("Responsabilité (%)", claim.getTauxResponsabilite()).put("Notes", claim.getNotes())
+                .put("Gestionnaire", claim.getGestionnaire()).put("Prochaine action", claim.getProchaineAction()).put("Échéance de l'action", claim.getDateEcheanceAction()));
         add(references, ActivityRecordType.UTILISATEUR, claim.getGestionnaireId(), claim.getGestionnaire());
         var coverage = claim.getCouverture();
         if (coverage != null) {
             part(parts, "coverage", "Couverture", new ActivityValues().put("Dossier", coverage.getNumeroDossier()).put("Police", coverage.getNumeroPolice())
                     .put("Mouvement", coverage.getNumeroMouvement()).put("Branche", coverage.getBrancheLibelle()).put("Compagnie", coverage.getCompagnie())
-                    .put("Assure", coverage.getAssure()).put("Code client", coverage.getClientCode()).put("Date d'effet", coverage.getDateEffet())
-                    .put("Date d'echeance", coverage.getDateEcheance()).put("Immatriculation", coverage.getImmatriculation())
+                    .put("Assuré", coverage.getAssure()).put("Code client", coverage.getClientCode()).put("Date d'effet", coverage.getDateEffet())
+                    .put("Date d'échéance", coverage.getDateEcheance()).put("Immatriculation", coverage.getImmatriculation())
                     .put("Attestation", coverage.getNumeroAttestation()).put("Marque", coverage.getMarque()).put("Usage", coverage.getUsageLibelle()));
             add(references, ActivityRecordType.CONTRAT, coverage.getContratId(), coverage.getNumeroDossier());
             add(references, ActivityRecordType.MOUVEMENT_CONTRAT, coverage.getMouvementId(), "Mouvement " + coverage.getNumeroMouvement());
             add(references, ActivityRecordType.VEHICULE, coverage.getVehiculeId(), coverage.getImmatriculation());
         }
         var totals = claim.getTotaux();
-        if (totals != null) part(parts, "totals", "Situation financiere", new ActivityValues()
+        if (totals != null) part(parts, "totals", "Situation financière", new ActivityValues()
                 .put("Provision courante", totals.getProvisionCourante()).put("Montant indemnisable", totals.getTotalIndemnisable())
-                .put("Reglements", totals.getTotalRegle()).put("Frais", totals.getTotalFrais()).put("Recours", totals.getTotalRecours())
-                .put("Reste a regler", totals.getResteARegler()));
+                .put("Règlements", totals.getTotalRegle()).put("Frais", totals.getTotalFrais()).put("Recours", totals.getTotalRecours())
+                .put("Reste à régler", totals.getResteARegler()));
         for (var guarantee : items(claim.getGaranties())) {
             part(parts, "guarantee:" + guarantee.getId(), "Garantie " + guarantee.getCode(), new ActivityValues()
-                    .put("Libelle", guarantee.getLibelle()).put("Impliquee", guarantee.isImpliquee()).put("Capital", guarantee.getCapital())
+                    .put("Libellé", guarantee.getLibelle()).put("Impliquée", guarantee.isImpliquee()).put("Capital", guarantee.getCapital())
                     .put("Prime", guarantee.getPrime()).put("Taux", guarantee.getTaux()).put("Franchise (%)", guarantee.getTauxFranchise())
-                    .put("Franchise minimale", guarantee.getFranchiseMinimale()).put("Decision de couverture", label(guarantee.getDecisionCouverture()))
-                    .put("Franchise appliquee", guarantee.getFranchiseAppliquee()).put("Montant indemnisable", guarantee.getMontantIndemnisable()));
+                    .put("Franchise minimale", guarantee.getFranchiseMinimale()).put("Décision de couverture", label(guarantee.getDecisionCouverture()))
+                    .put("Franchise appliquée", guarantee.getFranchiseAppliquee()).put("Montant indemnisable", guarantee.getMontantIndemnisable()));
             add(references, ActivityRecordType.GARANTIE_SINISTRE, guarantee.getId(), guarantee.getLibelle());
             add(references, ActivityRecordType.GARANTIE, guarantee.getGarantieId(), guarantee.getLibelle());
         }
         int index = 0;
         for (var party : items(claim.getParties())) {
             part(parts, "party:" + party.getId(), "Partie " + (++index) + " - " + party.getNom(), new ActivityValues()
-                    .put("Qualite", label(party.getType())).put("Nom", party.getNom()).put("Telephone", party.getTelephone()).put("CIN", party.getCin())
+                    .put("Qualité", label(party.getType())).put("Nom", party.getNom()).put("Téléphone", party.getTelephone()).put("CIN", party.getCin())
                     .put("Permis", party.getNumeroPermis()).put("Immatriculation", party.getImmatriculation()).put("Compagnie adverse", party.getCompagnieAdverse())
                     .put("Police adverse", party.getNumeroPoliceAdverse()).put("Notes", party.getNotes()));
             add(references, ActivityRecordType.PARTIE_SINISTRE, party.getId(), party.getNom());
         }
         index = 0;
         for (var mission : items(claim.getMissionsExpertise())) {
-            part(parts, "mission:" + mission.getId(), "Mission " + (++index), new ActivityValues().put("Reference", mission.getReferenceMission())
+            part(parts, "mission:" + mission.getId(), "Mission " + (++index), new ActivityValues().put("Référence", mission.getReferenceMission())
                     .put("Phase", label(mission.getPhase()))
                     .put("Expert", mission.getExpert()).put("Garage", mission.getGarage()).put("Date de mission", mission.getDateMission())
-                    .put("Date du rapport", mission.getDateRapport()).put("Estimation", mission.getMontantEstime()).put("Montant accepte", mission.getMontantAccepte())
+                    .put("Date du rapport", mission.getDateRapport()).put("Estimation", mission.getMontantEstime()).put("Montant accepté", mission.getMontantAccepte())
                     .put("Statut", label(mission.getStatut())).put("Notes", mission.getNotes()));
             add(references, ActivityRecordType.MISSION_EXPERTISE, mission.getId(), mission.getReferenceMission() == null
                     ? "Mission d'expertise - " + mission.getExpert() : mission.getReferenceMission());
@@ -92,15 +92,15 @@ public final class ClaimActivity {
         }
         index = 0;
         for (var operation : items(claim.getOperations())) {
-            part(parts, "operation:" + operation.getId(), "Operation " + (++index), new ActivityValues().put("Type", label(operation.getType()))
-                    .put("Date", operation.getDateOperation()).put("Montant", operation.getMontant()).put("Reference", operation.getReference())
-                    .put("Compagnie", operation.getCompagnieAssurance()).put("Qualite de la contrepartie", label(operation.getTypeContrepartie()))
+            part(parts, "operation:" + operation.getId(), "Opération " + (++index), new ActivityValues().put("Type", label(operation.getType()))
+                    .put("Date", operation.getDateOperation()).put("Montant", operation.getMontant()).put("Référence", operation.getReference())
+                    .put("Compagnie", operation.getCompagnieAssurance()).put("Qualité de la contrepartie", label(operation.getTypeContrepartie()))
                     .put("Contrepartie", operation.getContrepartie()).put("Justification de contrepartie libre", operation.getJustificationContrepartieLibre())
-                    .put("Mode de reglement", label(operation.getModeReglement())).put("Circuit financier", label(operation.getCircuitFinancier()))
-                    .put("Compte de tresorerie", operation.getCompteTresorerie()).put("Operation de tresorerie", operation.getNumeroOperationTresorerie())
+                    .put("Mode de règlement", label(operation.getModeReglement())).put("Circuit financier", label(operation.getCircuitFinancier()))
+                    .put("Compte de trésorerie", operation.getCompteTresorerie()).put("Opération de trésorerie", operation.getNumeroOperationTresorerie())
                     .put("Notes", operation.getNotes()));
             add(references, ActivityRecordType.OPERATION_SINISTRE, operation.getId(), label(operation.getType()) + " du " + date(operation.getDateOperation()));
-            add(references, ActivityRecordType.OPERATION_SINISTRE, operation.getOperationAnnuleeId(), "Operation de sinistre annulee");
+            add(references, ActivityRecordType.OPERATION_SINISTRE, operation.getOperationAnnuleeId(), "Opération de sinistre annulée");
             add(references, ActivityRecordType.COMPAGNIE, operation.getCompagnieAssuranceId(), operation.getCompagnieAssurance());
             add(references, ActivityRecordType.COMPTE_TRESORERIE, operation.getCompteTresorerieId(), operation.getCompteTresorerie());
             add(references, ActivityRecordType.OPERATION_TRESORERIE, operation.getOperationTresorerieId(), operation.getNumeroOperationTresorerie());
@@ -119,7 +119,7 @@ public final class ClaimActivity {
         for (var document : items(claim.getDocuments())) {
             part(parts, "document:" + document.getId(), "Document " + (++index), new ActivityValues().put("Type", label(document.getType()))
                     .put("Statut", label(document.getStatut())).put("Fichier", filename(document.getNomFichier())).put("Date", document.getDateDocument())
-                    .put("Reference", document.getReference()).put("Montant", document.getMontant()).put("Emetteur", document.getEmetteur())
+                    .put("Référence", document.getReference()).put("Montant", document.getMontant()).put("Émetteur", document.getEmetteur())
                     .put("Garantie", document.getGarantie()).put("Mission", document.getMissionExpertise()).put("Garage", document.getGarage())
                     .put("Commentaire", document.getCommentaire()).put("Validation", document.getDateValidation()));
             add(references, ActivityRecordType.DOCUMENT_SINISTRE, document.getId(), filename(document.getNomFichier()));
@@ -159,22 +159,22 @@ public final class ClaimActivity {
         if (value == null) return null;
         return switch (value.name()) {
             case "BROUILLON" -> "Brouillon";
-            case "DECLARE" -> "Declare";
+            case "DECLARE" -> "Déclaré";
             case "DOSSIER_INCOMPLET" -> "Dossier incomplet";
-            case "TRANSMIS_COMPAGNIE" -> "Transmis a la compagnie";
+            case "TRANSMIS_COMPAGNIE" -> "Transmis à la compagnie";
             case "EXPERTISE" -> "Expertise";
-            case "EN_ATTENTE_REGLEMENT" -> "En attente de reglement";
-            case "PARTIELLEMENT_REGLE" -> "Partiellement regle";
-            case "REGLE" -> "Regle";
-            case "CLOTURE" -> "Cloture";
-            case "REJETE" -> "Rejete";
-            case "ANNULE" -> "Annule";
+            case "EN_ATTENTE_REGLEMENT" -> "En attente de règlement";
+            case "PARTIELLEMENT_REGLE" -> "Partiellement réglé";
+            case "REGLE" -> "Réglé";
+            case "CLOTURE" -> "Clôture";
+            case "REJETE" -> "Rejeté";
+            case "ANNULE" -> "Annulé";
             case "ROUVERT" -> "Rouvert";
             case "ACCIDENT" -> "Accident";
             case "VOL" -> "Vol";
             case "INCENDIE" -> "Incendie";
             case "BRIS_DE_GLACE" -> "Bris de glace";
-            case "DOMMAGE_VEHICULE" -> "Dommage au vehicule";
+            case "DOMMAGE_VEHICULE" -> "Dommage au véhicule";
             case "CORPOREL" -> "Corporel";
             case "ASSISTANCE" -> "Assistance";
             case "AUTRE" -> "Autre";
@@ -182,18 +182,18 @@ public final class ClaimActivity {
             case "ADVERSAIRE" -> "Adversaire";
             case "PASSAGER" -> "Passager";
             case "VICTIME" -> "Victime";
-            case "BENEFICIAIRE" -> "Beneficiaire";
-            case "A_ETUDIER" -> "A etudier";
-            case "ACCEPTEE" -> "Acceptee";
+            case "BENEFICIAIRE" -> "Bénéficiaire";
+            case "A_ETUDIER" -> "À étudier";
+            case "ACCEPTEE" -> "Acceptée";
             case "PARTIELLE" -> "Partielle";
-            case "REFUSEE" -> "Refusee";
-            case "A_MANDATER" -> "A mandater";
-            case "MANDATEE" -> "Mandatee";
+            case "REFUSEE" -> "Refusée";
+            case "A_MANDATER" -> "À mandater";
+            case "MANDATEE" -> "Mandatée";
             case "EN_COURS" -> "En cours";
-            case "RAPPORT_RECU" -> "Rapport recu";
-            case "VALIDEE" -> "Validee";
-            case "ANNULEE" -> "Annulee";
-            case "DECLARATION" -> "Declaration";
+            case "RAPPORT_RECU" -> "Rapport reçu";
+            case "VALIDEE" -> "Validée";
+            case "ANNULEE" -> "Annulée";
+            case "DECLARATION" -> "Déclaration";
             case "CONSTAT" -> "Constat";
             case "PV_POLICE" -> "PV de police";
             case "CARTE_GRISE" -> "Carte grise";
@@ -203,22 +203,22 @@ public final class ClaimActivity {
             case "RAPPORT_EXPERT" -> "Rapport d'expert";
             case "ACCORD" -> "Accord";
             case "FACTURE" -> "Facture";
-            case "REGLEMENT" -> "Reglement";
+            case "REGLEMENT" -> "Règlement";
             case "RECOURS" -> "Recours";
-            case "RECU" -> "Recu";
-            case "VALIDE" -> "Valide";
+            case "RECU" -> "Reçu";
+            case "VALIDE" -> "Validé";
             case "FRAIS" -> "Frais";
             case "ANNULATION" -> "Annulation";
             case "CLIENT" -> "Client";
-            case "PARTIE" -> "Partie impliquee";
+            case "PARTIE" -> "Partie impliquée";
             case "EXPERT" -> "Expert";
             case "GARAGE" -> "Garage";
             case "VIREMENT" -> "Virement";
-            case "CHEQUE" -> "Cheque";
-            case "ESPECES" -> "Especes";
+            case "CHEQUE" -> "Chèque";
+            case "ESPECES" -> "Espèces";
             case "COMPENSATION" -> "Compensation";
             case "DIRECT_COMPAGNIE" -> "Direct compagnie";
-            case "TRESORERIE_AGENCE" -> "Tresorerie de l'agence";
+            case "TRESORERIE_AGENCE" -> "Trésorerie de l'agence";
             default -> value.name();
         };
     }
@@ -239,7 +239,7 @@ public final class ClaimActivity {
         ActivityReference subject = candidates.stream().filter(reference -> reference.type() == type)
                 .filter(reference -> id != null ? reference.id().equals(id.toString())
                         : oldReferences.stream().noneMatch(old -> old.type() == type && old.id().equals(reference.id())))
-                .findFirst().orElseThrow(() -> new IllegalStateException("Objet du sinistre introuvable pour l'activite"));
+                .findFirst().orElseThrow(() -> new IllegalStateException("Objet du sinistre introuvable pour l'activité"));
         var references = new ArrayList<>(command.references());
         references.add(command.subject());
         references.removeIf(reference -> reference.type() == type && reference.id().equals(subject.id()));
@@ -269,10 +269,10 @@ public final class ClaimActivity {
 
     private static String labelForType(ActivityRecordType type) {
         return switch (type) {
-            case VEHICULE -> "Vehicule";
+            case VEHICULE -> "Véhicule";
             case MISSION_EXPERTISE -> "Mission d'expertise";
             case DOCUMENT_SINISTRE -> "Document du sinistre";
-            default -> "Reference du dossier";
+            default -> "Référence du dossier";
         };
     }
 
@@ -295,16 +295,16 @@ public final class ClaimActivity {
     }
 
     public static Map<String, String> intervenantSnapshot(SinistreIntervenantResponse person) {
-        return new ActivityValues().put("Code", person.getCode()).put("Nom", person.getNom()).put("Telephone", person.getTelephone())
+        return new ActivityValues().put("Code", person.getCode()).put("Nom", person.getNom()).put("Téléphone", person.getTelephone())
                 .put("E-mail", person.getEmail()).put("Adresse", person.getAdresse()).put("Ville", person.getVille())
-                .put("Conventionne", person.isConventionne()).put("Actif", person.isActif()).snapshot();
+                .put("Conventionné", person.isConventionne()).put("Actif", person.isActif()).snapshot();
     }
 
     public static ActivityCommand intervenantCommand(Long agencyId, SinistreIntervenantResponse person, Map<String, String> before,
             ActivityRecordType type, boolean created) {
         String title = type == ActivityRecordType.EXPERT_SINISTRE ? "Expert" : "Garage";
         return new ActivityCommand(agencyId, ActivityModule.SINISTRES, created ? ActivityAction.CREATED : ActivityAction.UPDATED,
-                title + (created ? " cree" : " modifie"), "CLAIM_INTERVENANT_CONFIGURATION",
+                title + (created ? " créé" : " modifié"), "CLAIM_INTERVENANT_CONFIGURATION",
                 ActivityReference.of(type, person.getId(), person.getCode() + " - " + person.getNom()), List.of(),
                 ActivityValues.changes(before, intervenantSnapshot(person)));
     }

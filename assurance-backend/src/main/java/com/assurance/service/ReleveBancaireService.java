@@ -194,7 +194,7 @@ public class ReleveBancaireService {
             }
             imported = importRepository.saveAndFlush(imported);
             activityRecorder.record(BankStatementActivity.command(imported, imported.getLignes(), Map.of(), ActivityAction.IMPORTED,
-                    "Releve bancaire importe", "BANK_STATEMENT_IMPORT"));
+                    "Relevé bancaire importé", "BANK_STATEMENT_IMPORT"));
             return detail(agenceId, imported.getId());
         } catch (IOException error) {
             deleteQuietly(storedFile);
@@ -371,7 +371,7 @@ public class ReleveBancaireService {
         entityManager.clear();
         activityRecorder.record(BankStatementActivity.command(findImport(agenceId, importId),
                 lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId), before, ActivityAction.SAVED,
-                "Correspondances bancaires enregistrees", "BANK_RECONCILIATION_SELECTION"));
+                "Correspondances bancaires enregistrées", "BANK_RECONCILIATION_SELECTION"));
         return detail(agenceId, importId);
     }
 
@@ -382,7 +382,7 @@ public class ReleveBancaireService {
         return activityRecorder.perform(() -> validateRecord(agenceId, importId), response ->
                 BankStatementActivity.command(findImport(agenceId, importId),
                         lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId), before, ActivityAction.RECONCILED,
-                        "Rapprochement bancaire valide", "BANK_RECONCILIATION_VALIDATION"));
+                        "Rapprochement bancaire validé", "BANK_RECONCILIATION_VALIDATION"));
     }
 
     private ImportReleveBancaireResponse validateRecord(Long agenceId, Long importId) {

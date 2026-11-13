@@ -19,6 +19,20 @@ import java.util.Optional;
 
 public interface DocumentClientRepository extends JpaRepository<DocumentClient, Long> {
 
+    @Query("""
+            select count(d) > 0 from DocumentClient d
+            where d.agence.id = :agenceId and d.id = :documentId
+              and (exists (select 1 from AffectationReglementClient a
+                   where a.documentClient = d or exists (
+                       select 1 from LigneDocumentClient l where l.document = d
+                         and l.elementFacturable = a.elementFacturable))
+                or exists (select 1 from EcartReglementClient e
+                   where e.documentClient = d or exists (
+                       select 1 from LigneDocumentClient l where l.document = d
+                         and l.elementFacturable = e.elementFacturable)))
+            """)
+    boolean hasPaymentHistory(@Param("agenceId") Long agenceId, @Param("documentId") Long documentId);
+
     @EntityGraph(attributePaths = {
             "clientPayeur",
             "groupePayeur",
@@ -86,6 +100,20 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             where d.agence.id = :agenceId
               and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
               and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              and (:periodeDu is null or d.periodeDebut >= :periodeDu)
+              and (:periodeAu is null or d.periodeFin <= :periodeAu)
+              and ((:categorieMouvement is null and :sensPrime is null) or exists (
+                    select 1 from LigneDocumentClient filteredLine
+                    left join filteredLine.elementFacturable filteredElement
+                    left join filteredElement.mouvementContrat filteredMovement
+                    left join filteredMovement.typeMouvement filteredType
+                    where filteredLine.document = d
+                      and (:categorieMouvement is null or filteredType.categorie = :categorieMouvement)
+                      and (:sensPrime is null
+                        or (:sensPrime = 'PRIME_A_PAYER' and filteredLine.montantTtc > 0)
+                        or (:sensPrime = 'RISTOURNE' and filteredLine.montantTtc < 0)
+                        or (:sensPrime = 'SANS_INCIDENCE' and filteredLine.montantTtc = 0))
+              ))
               and (:conventionsOnly = false or exists (
                     select 1 from LigneDocumentClient conventionLine
                     join conventionLine.echeanceFacturationConvention schedule
@@ -157,6 +185,20 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             where d.agence.id = :agenceId
               and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
               and d.statut = com.assurance.enums.StatutDocumentClient.EMIS
+              and (:periodeDu is null or d.periodeDebut >= :periodeDu)
+              and (:periodeAu is null or d.periodeFin <= :periodeAu)
+              and ((:categorieMouvement is null and :sensPrime is null) or exists (
+                    select 1 from LigneDocumentClient filteredLine
+                    left join filteredLine.elementFacturable filteredElement
+                    left join filteredElement.mouvementContrat filteredMovement
+                    left join filteredMovement.typeMouvement filteredType
+                    where filteredLine.document = d
+                      and (:categorieMouvement is null or filteredType.categorie = :categorieMouvement)
+                      and (:sensPrime is null
+                        or (:sensPrime = 'PRIME_A_PAYER' and filteredLine.montantTtc > 0)
+                        or (:sensPrime = 'RISTOURNE' and filteredLine.montantTtc < 0)
+                        or (:sensPrime = 'SANS_INCIDENCE' and filteredLine.montantTtc = 0))
+              ))
               and (:conventionsOnly = false or exists (
                     select 1 from LigneDocumentClient conventionLine
                     join conventionLine.echeanceFacturationConvention schedule
@@ -238,8 +280,23 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("conventionsOnly") boolean conventionsOnly,
             @Param("conventionId") Long conventionId,
             @Param("includeSettled") boolean includeSettled,
+            @Param("periodeDu") LocalDate periodeDu,
+            @Param("periodeAu") LocalDate periodeAu,
+            @Param("categorieMouvement") com.assurance.enums.CategorieMouvementContrat categorieMouvement,
+            @Param("sensPrime") String sensPrime,
             Pageable pageable
     );
+
+    default Page<DocumentClient> searchOpenInvoices(
+            Long agenceId, LocalDate dateDu, LocalDate dateAu, LocalDateTime saisieDu,
+            LocalDateTime saisieAuExclusive, Long brancheId, Long compagnieId,
+            Long compagnieAssistanceId, String payeurType, Long payeurId, String search,
+            boolean conventionsOnly, Long conventionId, boolean includeSettled, Pageable pageable
+    ) {
+        return searchOpenInvoices(agenceId, dateDu, dateAu, saisieDu, saisieAuExclusive, brancheId,
+                compagnieId, compagnieAssistanceId, payeurType, payeurId, search, conventionsOnly,
+                conventionId, includeSettled, null, null, null, null, pageable);
+    }
 
     default Page<DocumentClient> searchOpenInvoices(
             Long agenceId, LocalDate dateDu, LocalDate dateAu, LocalDateTime saisieDu,

@@ -949,6 +949,41 @@ public class DocumentClientService {
                 .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
     }
 
+    @Transactional
+    public void delete(Long agenceId, Long documentId, AnnulerDocumentClientRequest request) {
+        DocumentClient document = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
+        String blockingReason = deletionBlockingReason(document);
+        if (blockingReason != null) {
+            throw new BadRequestException(blockingReason);
+        }
+        var command = InvoiceActivity.command(document, Map.of(), ActivityAction.DELETED,
+                "Facture supprimée définitivement", "CLIENT_DOCUMENT_DELETION", List.of());
+        var changes = new ArrayList<>(command.changes().stream()
+                .map(change -> new ActivityChange(change.label(), change.afterValue(), null)).toList());
+        changes.add(new ActivityChange("Motif de suppression", null, request.getMotif().trim()));
+        businessActivityRecorder.record(new ActivityCommand(command.agenceId(), command.module(), command.action(),
+                command.title(), command.origin(), command.subject(), command.references(), changes));
+        releaseConventionSchedules(document);
+        documentClientRepository.delete(document);
+        documentClientRepository.flush();
+    }
+
+    private String deletionBlockingReason(DocumentClient document) {
+        if (document.getTypeDocument() != TypeDocumentClient.FACTURE
+                || document.getStatut() != StatutDocumentClient.EMIS) {
+            return "Seule une facture émise peut être supprimée définitivement";
+        }
+        if (document.getDocumentOrigine() != null || document.getDocumentRemplacement() != null
+                || document.getDateRemplacement() != null) {
+            return "Une facture liée à un remplacement ne peut pas être supprimée définitivement";
+        }
+        if (documentClientRepository.hasPaymentHistory(document.getAgence().getId(), document.getId())) {
+            return "Cette facture ou ses lignes ont un historique de règlement ou d'affectation. Utilisez l'annulation";
+        }
+        return null;
+    }
+
     @Transactional(readOnly = true)
     public Set<Long> findIssuedInvoiceElementIds(Collection<Long> elementIds) {
         if (elementIds.isEmpty()) {
@@ -1338,6 +1373,7 @@ public class DocumentClientService {
                                 && !elementsWithDirectPayment.contains(line.getElementFacturable().getId()))
                         .build())
                 .toList();
+        String deletionBlock = deletionBlockingReason(document);
         return DocumentClientResponse.builder()
                 .id(document.getId())
                 .typeDocument(document.getTypeDocument())
@@ -1377,6 +1413,8 @@ public class DocumentClientService {
                 .motifAnnulation(document.getMotifAnnulation())
                 .signatureDisponible(document.getAgence().getSignatureCheminStockage() != null
                         && !document.getAgence().getSignatureCheminStockage().isBlank())
+                .suppressionAutorisee(deletionBlock == null)
+                .motifBlocageSuppression(deletionBlock)
                 .lignes(lines)
                 .build();
     }
@@ -1408,7 +1446,8 @@ public class DocumentClientService {
 
     private void releaseConventionSchedules(DocumentClient document) {
         List<com.assurance.entity.EcheanceFacturationConvention> schedules =
-                echeanceFacturationConventionRepository.findByDocumentClientId(document.getId());
+                echeanceFacturationConventionRepository.findByAgenceIdAndDocumentClientId(
+                        document.getAgence().getId(), document.getId());
         schedules.forEach(schedule -> {
             schedule.setDocumentClient(null);
             schedule.setStatut(StatutEcheanceFacturationConvention.A_FACTURER);

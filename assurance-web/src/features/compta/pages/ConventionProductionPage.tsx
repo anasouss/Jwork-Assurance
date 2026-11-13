@@ -36,13 +36,19 @@ export default function ConventionProductionPage() {
   const showConvention = !applied.conventionId;
   const showCompany = !applied.compagnieId;
   const columns = 12 + Number(showConvention) + Number(showCompany);
+  const selectedConvention = options.data?.find(item => item.id === filters.conventionId);
+  const companyId = filters.conventionId ? selectedConvention?.compagnieId ?? undefined : filters.compagnieId;
 
   function apply() {
     if (!filters.dateDu || !filters.dateAu || filters.dateDu > filters.dateAu) {
       toast.error("Sélectionnez une période valide.");
       return;
     }
-    setApplied({ ...filters });
+    if (filters.conventionId && !selectedConvention?.compagnieId) {
+      toast.error("La compagnie liée à cette convention est indisponible.");
+      return;
+    }
+    setApplied({ ...filters, compagnieId: companyId });
     setPage(0);
   }
 
@@ -51,17 +57,35 @@ export default function ConventionProductionPage() {
     <ConventionWorkspaceHeader title="Consultation et édition des états de production" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="grid gap-1.5"><Label>Convention</Label><Select value={filters.conventionId ?? "ALL"}
-        onValueChange={value => setFilters(current => ({ ...current, conventionId: value === "ALL" ? undefined : value }))}>
+        disabled={options.isPending || options.isError}
+        onValueChange={value => {
+          const convention = options.data?.find(item => item.id === value);
+          setFilters(current => ({ ...current, conventionId: value === "ALL" ? undefined : value,
+            compagnieId: value === "ALL" ? undefined : convention?.compagnieId ?? undefined }));
+        }}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les conventions</SelectItem>
           {options.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent></Select></div>
-      <div className="grid gap-1.5"><Label>Compagnie</Label><Select value={filters.compagnieId ?? "ALL"}
+      <div className="grid gap-1.5"><Label>Compagnie</Label><Select value={companyId ?? "ALL"}
+        disabled={!!filters.conventionId || companies.isPending || companies.isError}
         onValueChange={value => setFilters(current => ({ ...current, compagnieId: value === "ALL" ? undefined : value }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
+          {selectedConvention?.compagnieId && !companies.data?.some(item => item.id === selectedConvention.compagnieId)
+            ? <SelectItem value={selectedConvention.compagnieId}>{selectedConvention.compagnie || "-"}</SelectItem> : null}
           {companies.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}</SelectContent></Select></div>
       <div className="grid gap-1.5"><Label>Mode</Label><Select value={filters.mode ?? "ALL"}
         onValueChange={value => setFilters(current => ({ ...current, mode: value === "ALL" ? undefined : value as "BUREAU" | "FACTURE" }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Bureau et facture</SelectItem>
           <SelectItem value="BUREAU">Bureau</SelectItem><SelectItem value="FACTURE">Facture</SelectItem></SelectContent></Select></div>
+      <div className="grid gap-1.5"><Label>Mouvement</Label><Select value={filters.categorieMouvement ?? "ALL"}
+        onValueChange={value => setFilters(current => ({ ...current, categorieMouvement: value === "ALL" ? undefined : value as ConventionProductionFilters["categorieMouvement"] }))}>
+        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem>
+          <SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem>
+        </SelectContent></Select></div>
+      <div className="grid gap-1.5"><Label>Sens de prime</Label><Select value={filters.sensPrime ?? "ALL"}
+        onValueChange={value => setFilters(current => ({ ...current, sensPrime: value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"] }))}>
+        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les sens</SelectItem>
+          <SelectItem value="PRIME_A_PAYER">Prime à payer</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem><SelectItem value="SANS_INCIDENCE">Sans incidence</SelectItem>
+        </SelectContent></Select></div>
       <div className="grid gap-1.5"><Label>Critère de date</Label><Select value={filters.typeDate}
         onValueChange={value => setFilters(current => ({ ...current, typeDate: value as "EFFET" | "EMISSION" }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EFFET">Date d'effet</SelectItem>
@@ -70,7 +94,7 @@ export default function ConventionProductionPage() {
         onSelect={date => setFilters(current => ({ ...current, dateDu: toDateOnly(date) ?? "" }))} /></div>
       <div className="grid gap-1.5"><Label>Au</Label><DatePicker date={filters.dateAu}
         onSelect={date => setFilters(current => ({ ...current, dateAu: toDateOnly(date) ?? "" }))} /></div>
-      <div className="flex items-end gap-2 sm:col-span-2">
+      <div className="flex flex-wrap items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
         <Button onClick={apply} size="icon" title="Rechercher" aria-label="Rechercher"><Search className="size-4" /></Button>
         <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => {
           const next = initialFilters(); setFilters(next); setApplied(next); setPage(0);

@@ -15,6 +15,20 @@ import java.util.List;
 
 public interface AffectationQuittanceCompagnieRepository extends JpaRepository<AffectationQuittanceCompagnie, Long> {
 
+    @Query("""
+            select a.numeroQuittanceCompagnie
+            from AffectationQuittanceCompagnie a
+            where a.agence.id = :agenceId
+              and a.quittance.contrat.agence.id = :agenceId
+              and a.quittance.contrat.id = :contratId
+              and a.quittance.elementFacturable.id = :elementId
+              and a.quittance.globale = true
+              and a.quittance.alternative = false
+            order by a.dateEffet, a.id
+            """)
+    List<String> findCompanyNumbersForElement(@Param("agenceId") Long agenceId,
+            @Param("contratId") Long contratId, @Param("elementId") Long elementId);
+
     @EntityGraph(attributePaths = {"tiersCompagnie", "tiersCompagnie.compagnieAssurance", "tiersCompagnie.compagnieAssistance"})
     List<AffectationQuittanceCompagnie> findByAgenceIdAndQuittanceIdIn(Long agenceId, Collection<Long> quittanceIds);
 

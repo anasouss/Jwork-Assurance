@@ -284,6 +284,8 @@ export type ConventionBillingInstallment = {
 export type ConventionBillingOption = {
   id: string;
   intitule: string;
+  compagnieId?: string | null;
+  compagnie?: string | null;
   fractionnement: Fractionnement | null;
   blocage?: string | null;
   periodes: { numero: number; debut: string; fin: string }[];
@@ -315,6 +317,9 @@ export type ConventionInvoicePreparation = {
   periodeFin: string;
   lignes: {
     echeanceId: string;
+    periodeDebut?: string;
+    periodeFin?: string;
+    correspondancePartielle?: boolean;
     payeurId: string;
     payeurType: "CLIENT" | "GROUPE";
     payeurNom: string;
@@ -327,6 +332,8 @@ export type ConventionProductionFilters = {
   conventionId?: string;
   compagnieId?: string;
   mode?: "BUREAU" | "FACTURE";
+  categorieMouvement?: "AFFAIRE_NOUVELLE" | "RENOUVELLEMENT" | "AVENANT";
+  sensPrime?: "PRIME_A_PAYER" | "RISTOURNE" | "SANS_INCIDENCE";
   typeDate: "EFFET" | "EMISSION";
   dateDu: string;
   dateAu: string;
@@ -493,6 +500,8 @@ export type ClientDocument = {
   motifAnnulation?: string | null;
   signatureDisponible: boolean;
   lignes: ClientDocumentLine[];
+  suppressionAutorisee?: boolean;
+  motifBlocageSuppression?: string | null;
 };
 
 export type ClientDocumentPage = {

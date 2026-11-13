@@ -46,6 +46,8 @@ public class DocumentClientResponse {
     private LocalDateTime dateAnnulation;
     private String motifAnnulation;
     private boolean signatureDisponible;
+    private boolean suppressionAutorisee;
+    private String motifBlocageSuppression;
     private List<Ligne> lignes;
 
     @Getter

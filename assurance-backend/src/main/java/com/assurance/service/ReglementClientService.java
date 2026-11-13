@@ -331,8 +331,24 @@ public class ReglementClientService {
             Long conventionId,
             boolean includeSettled
     ) {
+        return searchInvoiceReceivables(agenceId, payeurType, payeurId, brancheId, compagnieId,
+                compagnieAssistanceId, typeDate, dateDu, dateAu, search, sortBy, sortDirection,
+                page, size, conventionsOnly, conventionId, includeSettled, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public CreanceClientPageResponse searchInvoiceReceivables(
+            Long agenceId, String payeurType, Long payeurId, Long brancheId, Long compagnieId,
+            Long compagnieAssistanceId, String typeDate, LocalDate dateDu, LocalDate dateAu,
+            String search, String sortBy, String sortDirection, int page, int size,
+            boolean conventionsOnly, Long conventionId, boolean includeSettled,
+            LocalDate periodeDu, LocalDate periodeAu,
+            com.assurance.enums.CategorieMouvementContrat categorieMouvement,
+            com.assurance.enums.SensPrimeConvention sensPrime
+    ) {
         validateOptionalPayer(payeurType, payeurId);
         validatePeriod(dateDu, dateAu);
+        validatePeriod(periodeDu, periodeAu);
         boolean filterByEntryDate = isEntryDateFilter(typeDate);
         Page<DocumentClient> result = documentClientRepository.searchOpenInvoices(
                 agenceId,
@@ -349,6 +365,10 @@ public class ReglementClientService {
                 conventionsOnly || conventionId != null,
                 conventionId,
                 includeSettled,
+                periodeDu,
+                periodeAu,
+                categorieMouvement,
+                sensPrime == null ? null : sensPrime.name(),
                 PageRequest.of(
                         Math.max(page, 0),
                         Math.min(Math.max(size, 1), 100),

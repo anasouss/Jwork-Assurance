@@ -146,7 +146,8 @@ export const comptaApi = {
     )).map(row => ({ ...row, id: String(row.id) }));
   },
 
-  async prepareConventionInvoice(params: { conventionId: string; annee: number; periode: number }) {
+  async prepareConventionInvoice(params: { conventionId: string; annee: number; periode?: number; compagnieId?: string;
+    categorieMouvement?: ConventionProductionFilters["categorieMouvement"]; sensPrime?: ConventionProductionFilters["sensPrime"] }) {
     const result = unwrap(await apiFetch<ApiResponse<ConventionInvoicePreparation>>(
       `/api/v1/compta/facturation-conventions/preparation${buildQueryString(params)}`
     ));
@@ -528,6 +529,12 @@ export const comptaApi = {
     );
   },
 
+  async deleteClientDocument(id: string, motif: string) {
+    unwrap(await apiFetch<ApiResponse<null>>(`/api/v1/compta/documents-clients/${id}`, {
+      method: "DELETE", body: JSON.stringify({ motif }),
+    }));
+  },
+
   async reviseClientDocument(id: string, request: ReviseClientDocumentRequest) {
     return normalizeClientDocument(
       unwrap(
@@ -572,6 +579,10 @@ export const comptaApi = {
   },
 
   async clientInvoiceReceivables(params: {
+    periodeDu?: string;
+    periodeAu?: string;
+    categorieMouvement?: ConventionProductionFilters["categorieMouvement"];
+    sensPrime?: ConventionProductionFilters["sensPrime"];
     conventionsOnly?: boolean;
     conventionId?: string;
     includeSettled?: boolean;

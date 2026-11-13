@@ -16,32 +16,35 @@ export function ConventionBillingSources({ rows, selected, selectionKey, loading
   onToggle: (row: ConventionBillingSource, checked: boolean) => void;
   onTogglePage: (checked: boolean) => void;
 }) {
-  const compatible = rows.filter(row => !row.blocage && row.details.length && (!selectionKey || payerKey(row) === selectionKey));
+  const compatible = rows.filter(row => !row.blocage && row.details.length && (!selectionKey || billingSelectionKey(row) === selectionKey));
   const checked = compatible.length > 0 && compatible.every(row => selected.has(row.echeanceId));
   return <div className="overflow-x-auto border">
     <table className="w-full min-w-[1400px] text-sm">
       <thead className="bg-orange-600 text-left text-xs text-white"><tr>
         <th className="w-10 px-3 py-3"><Checkbox checked={checked} disabled={!canSelect || !compatible.length}
-          onCheckedChange={value => onTogglePage(value === true)} aria-label="Sélectionner les lignes d'un même client ou groupe" /></th>
+          onCheckedChange={value => onTogglePage(value === true)} aria-label="Sélectionner les lignes du même payeur et de la même période" /></th>
         <th className="px-3 py-3">Client</th>
+        <th className="px-3 py-3">Période</th>
         {["Quittance N°", "Police N°", "Compagnie", "Mouvement", "Assuré", "Véhicule", "Date d'effet", "Date d'expiration", "Montant bulletin", "Montant à payer"].map((label, index) =>
           <th key={label} className={`px-3 py-3 ${index >= 8 ? "text-right" : ""}`}>{label}</th>)}
       </tr></thead>
-      <tbody className="divide-y">{error ? <tr><td colSpan={12} className="bg-destructive/5 p-6 text-destructive"><p role="alert">{error}</p></td></tr>
-        : loading ? <TableRowsSkeleton colSpan={12} rows={6} />
-        : !rows.length ? <tr><td colSpan={12} className="p-10 text-center text-muted-foreground">{emptyMessage}</td></tr>
+      <tbody className="divide-y">{error ? <tr><td colSpan={13} className="bg-destructive/5 p-6 text-destructive"><p role="alert">{error}</p></td></tr>
+        : loading ? <TableRowsSkeleton colSpan={13} rows={6} />
+        : !rows.length ? <tr><td colSpan={13} className="p-10 text-center text-muted-foreground">{emptyMessage}</td></tr>
         : rows.flatMap(row => (row.details.length ? row.details : [null]).map((line, index) => <tr key={`${row.echeanceId}:${index}`} className="hover:bg-muted/30">
           {index === 0 && <>
             <td className="px-3 py-3" rowSpan={Math.max(1, row.details.length)}>
               <Checkbox checked={selected.has(row.echeanceId)}
-                disabled={!canSelect || Boolean(row.blocage) || Boolean(selectionKey && selectionKey !== payerKey(row))}
+                disabled={!canSelect || Boolean(row.blocage) || Boolean(selectionKey && selectionKey !== billingSelectionKey(row))}
                 onCheckedChange={value => onToggle(row, value === true)} aria-label={`Sélectionner les lignes de ${row.payeurNom}`} />
             </td>
             <td className="px-3 py-3" rowSpan={Math.max(1, row.details.length)}>
               <div className="font-medium">{row.payeurNom}</div>
               <div className="text-xs text-muted-foreground">{row.payeurType === "GROUPE" ? "Groupe" : "Client"}</div>
+              {row.correspondancePartielle && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Échéance complète · plusieurs lignes</p>}
               {row.blocage && <p className="mt-1 text-xs text-destructive">{row.blocage}</p>}
             </td>
+            <td className="whitespace-nowrap px-3 py-3 text-xs" rowSpan={Math.max(1, row.details.length)}>{date(row.periodeDebut)}<br />{date(row.periodeFin)}</td>
           </>}
           {line ? <>
             {[line.numeroQuittance, line.numeroPolice, line.compagnie, line.mouvement, line.assure, line.vehicule,
@@ -56,6 +59,10 @@ export function ConventionBillingSources({ rows, selected, selectionKey, loading
 
 export function payerKey(row: ConventionBillingSource) {
   return `${row.payeurType}:${row.payeurId}`;
+}
+
+export function billingSelectionKey(row: ConventionBillingSource) {
+  return `${payerKey(row)}:${row.periodeDebut ?? ""}:${row.periodeFin ?? ""}`;
 }
 
 function money(value: number | null) {

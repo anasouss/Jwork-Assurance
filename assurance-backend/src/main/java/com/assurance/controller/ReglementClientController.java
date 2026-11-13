@@ -142,6 +142,10 @@ public class ReglementClientController {
     @GetMapping("/creances/factures")
     @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
     public ResponseEntity<ApiResponse<CreanceClientPageResponse>> invoiceReceivables(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodeDu,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodeAu,
+            @RequestParam(required = false) com.assurance.enums.CategorieMouvementContrat categorieMouvement,
+            @RequestParam(required = false) com.assurance.enums.SensPrimeConvention sensPrime,
             @RequestParam(defaultValue = "false") boolean conventionsOnly,
             @RequestParam(required = false) Long conventionId,
             @RequestParam(defaultValue = "false") boolean includeSettled,
@@ -179,7 +183,11 @@ public class ReglementClientController {
                         size,
                         conventionsOnly,
                         conventionId,
-                        includeSettled
+                        includeSettled,
+                        periodeDu,
+                        periodeAu,
+                        categorieMouvement,
+                        sensPrime
                 )
         ));
     }

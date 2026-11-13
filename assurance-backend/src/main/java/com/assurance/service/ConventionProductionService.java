@@ -5,12 +5,15 @@ import com.assurance.dto.response.ConventionProductionResponse;
 import com.assurance.entity.ElementFacturable;
 import com.assurance.entity.Quittance;
 import com.assurance.enums.ModeReglementConvention;
+import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.NatureElementFacturable;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.enums.TypeContrat;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.ElementFacturableRepository;
+import com.assurance.repository.ConventionRepository;
+import com.assurance.exception.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -32,6 +35,7 @@ public class ConventionProductionService {
     private final ElementFacturableRepository elements;
     private final FacturationConventionService billing;
     private final ConventionBillingDetailsService details;
+    private final ConventionRepository conventions;
 
     @Transactional(readOnly = true)
     public ConventionProductionResponse search(Long agency, ConventionProductionFilter filter, int page, int size) {
@@ -87,10 +91,24 @@ public class ConventionProductionService {
     }
 
     private Specification<ElementFacturable> specification(Long agency, ConventionProductionFilter filter) {
+        if (filter.getConventionId() != null) {
+            var convention = conventions.findByAgenceIdAndId(agency, filter.getConventionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Convention", filter.getConventionId()));
+            if (convention.getCompagnieAssurance() == null) throw new BadRequestException("La compagnie de cette convention n'est pas renseignée");
+            Long linkedCompany = convention.getCompagnieAssurance().getId();
+            if (filter.getCompagnieId() != null && !filter.getCompagnieId().equals(linkedCompany)) {
+                throw new BadRequestException("La compagnie sélectionnée ne correspond pas à la convention");
+            }
+            filter.setCompagnieId(linkedCompany);
+        }
         if (filter.getDateDu() == null || filter.getDateAu() == null || filter.getDateDu().isAfter(filter.getDateAu())) {
             throw new BadRequestException("Selectionnez une periode de production valide");
         }
         if (!List.of("EFFET", "EMISSION").contains(filter.getTypeDate())) throw new BadRequestException("Critere de date invalide");
+        if (filter.getCategorieMouvement() != null && !List.of(CategorieMouvementContrat.AFFAIRE_NOUVELLE,
+                CategorieMouvementContrat.RENOUVELLEMENT, CategorieMouvementContrat.AVENANT).contains(filter.getCategorieMouvement())) {
+            throw new BadRequestException("Sélectionnez un mouvement de production valide");
+        }
         return (root, query, cb) -> {
             var contract = root.join("contrat");
             var movement = root.join("mouvementContrat");
@@ -105,6 +123,17 @@ public class ConventionProductionService {
             predicates.add(cb.not(root.get("statut").in(StatutElementFacturable.BROUILLON, StatutElementFacturable.ANNULE)));
             if (filter.getConventionId() != null) predicates.add(cb.equal(contract.get("convention").get("id"), filter.getConventionId()));
             if (filter.getCompagnieId() != null) predicates.add(cb.equal(contract.get("compagnieAssurance").get("id"), filter.getCompagnieId()));
+            if (filter.getCategorieMouvement() != null) {
+                predicates.add(cb.equal(movement.get("typeMouvement").get("categorie"), filter.getCategorieMouvement()));
+            }
+            if (filter.getSensPrime() != null) {
+                var total = root.<BigDecimal>get("primeTotale");
+                predicates.add(switch (filter.getSensPrime()) {
+                    case PRIME_A_PAYER -> cb.greaterThan(total, BigDecimal.ZERO);
+                    case RISTOURNE -> cb.lessThan(total, BigDecimal.ZERO);
+                    case SANS_INCIDENCE -> cb.equal(total, BigDecimal.ZERO);
+                });
+            }
             if (filter.getMode() != null) {
                 predicates.add(cb.or(cb.equal(movement.get("modeReglementConvention"), filter.getMode()),
                         cb.and(cb.isNull(movement.get("modeReglementConvention")),

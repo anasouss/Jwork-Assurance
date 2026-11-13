@@ -16,7 +16,8 @@ import { comptaApi } from "../api";
 import { ConventionInvoiceLines } from "../components/ConventionInvoiceLines";
 import { AccessDenied } from "@/components/shared";
 import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
-import { ConventionBillingSources, payerKey, type ConventionBillingSource } from "../components/ConventionBillingSources";
+import { ConventionBillingSources, billingSelectionKey, type ConventionBillingSource } from "../components/ConventionBillingSources";
+import type { ConventionProductionFilters } from "../types";
 
 export default function FacturationConventionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
@@ -26,8 +27,11 @@ export default function FacturationConventionsPage() {
   const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
   const queryClient = useQueryClient();
   const [conventionId, setConventionId] = useState("");
+  const [companyId, setCompanyId] = useState("");
+  const [movement, setMovement] = useState<ConventionProductionFilters["categorieMouvement"]>();
+  const [premiumDirection, setPremiumDirection] = useState<ConventionProductionFilters["sensPrime"]>();
   const [year, setYear] = useState(new Date().getFullYear());
-  const [periodNumber, setPeriodNumber] = useState("");
+  const [periodNumber, setPeriodNumber] = useState("ALL");
   const [issueOpen, setIssueOpen] = useState(false);
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
@@ -39,12 +43,16 @@ export default function FacturationConventionsPage() {
     enabled: canView && validYear,
   });
   const convention = options.data?.find(item => item.id === conventionId);
+  const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies, enabled: canView });
+  const effectiveCompanyId = convention?.compagnieId ?? companyId;
+  const conventionOptions = options.data?.filter(item => !companyId || item.compagnieId === companyId);
   const period = convention?.periodes.find(item => String(item.numero) === periodNumber);
-  const readyScope = Boolean(canView && validYear && period && !convention?.blocage);
-  const scope = `${conventionId}:${year}:${periodNumber}`;
+  const readyScope = Boolean(canView && validYear && convention && (periodNumber === "ALL" || period) && !convention.blocage);
+  const scope = `${conventionId}:${year}:${periodNumber}:${effectiveCompanyId}:${movement}:${premiumDirection}`;
   const preparation = useQuery({
-    queryKey: ["compta", "convention-billing-preparation", conventionId, year, periodNumber],
-    queryFn: () => comptaApi.prepareConventionInvoice({ conventionId, annee: year, periode: Number(periodNumber) }),
+    queryKey: ["compta", "convention-billing-preparation", conventionId, year, periodNumber, effectiveCompanyId, movement, premiumDirection],
+    queryFn: () => comptaApi.prepareConventionInvoice({ conventionId, annee: year, periode: periodNumber === "ALL" ? undefined : Number(periodNumber),
+      compagnieId: effectiveCompanyId || undefined, categorieMouvement: movement, sensPrime: premiumDirection }),
     enabled: readyScope,
     staleTime: 0,
   });
@@ -52,7 +60,7 @@ export default function FacturationConventionsPage() {
   const selectedRows = rows.filter(row => selected.has(row.echeanceId));
   const selectedIds = selectedRows.map(row => row.echeanceId);
   const selectedKey = selectedIds.join(",");
-  const selectedPayerKey = selectedRows[0] ? payerKey(selectedRows[0]) : undefined;
+  const selectedPayerKey = selectedRows[0] ? billingSelectionKey(selectedRows[0]) : undefined;
   const invoicePreview = useQuery({
     queryKey: ["compta", "convention-invoice-preview", selectedIds],
     queryFn: () => comptaApi.previewConventionInvoice(selectedIds),
@@ -121,7 +129,7 @@ export default function FacturationConventionsPage() {
       void queryClient.invalidateQueries({ queryKey: ["compta", "convention-invoice-due-date"] });
     },
   });
-  const compatibleSelection = selectedRows.length > 0 && selectedRows.every(row => !row.blocage && payerKey(row) === selectedPayerKey);
+  const compatibleSelection = selectedRows.length > 0 && selectedRows.every(row => !row.blocage && billingSelectionKey(row) === selectedPayerKey);
   const canConfirm = canIssue && hasLines && compatibleSelection && (preview?.total ?? 0) > 0
     && !issue.isPending && !options.isFetching && !preparation.isFetching && !preparation.isError
     && !invoicePreview.isFetching && !invoicePreview.isError
@@ -131,7 +139,7 @@ export default function FacturationConventionsPage() {
   const canPrepare = canSelect && compatibleSelection;
 
   function toggleRow(row: ConventionBillingSource, checked: boolean) {
-    if (checked && selectedPayerKey && payerKey(row) !== selectedPayerKey) return;
+    if (checked && selectedPayerKey && billingSelectionKey(row) !== selectedPayerKey) return;
     setSelected(current => {
       const next = new Set(current);
       if (checked) next.add(row.echeanceId);
@@ -144,7 +152,7 @@ export default function FacturationConventionsPage() {
     if (!checked) { setSelected(new Set()); return; }
     const first = selectedRows[0] ?? rows.find(row => !row.blocage && row.details.length);
     if (!first) return;
-    setSelected(new Set(rows.filter(row => !row.blocage && row.details.length && payerKey(row) === payerKey(first)).map(row => row.echeanceId)));
+    setSelected(new Set(rows.filter(row => !row.blocage && row.details.length && billingSelectionKey(row) === billingSelectionKey(first)).map(row => row.echeanceId)));
   }
 
   if (!canView) return <AccessDenied />;
@@ -154,42 +162,62 @@ export default function FacturationConventionsPage() {
     <section className="border-y bg-card p-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
+          <Label htmlFor="billing-company">Compagnie</Label>
+          <Select value={effectiveCompanyId || "ALL"} disabled={issue.isPending || !!conventionId || companies.isPending || companies.isError}
+            onValueChange={value => { setCompanyId(value === "ALL" ? "" : value); setConventionId(""); setPeriodNumber("ALL"); }}>
+            <SelectTrigger id="billing-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
+              {convention?.compagnieId && !companies.data?.some(item => item.id === convention.compagnieId) ? <SelectItem value={convention.compagnieId}>{convention.compagnie || "-"}</SelectItem> : null}
+              {companies.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
           <Label htmlFor="billing-convention">Convention</Label>
           <Select value={conventionId} disabled={issue.isPending || options.isLoading} onValueChange={value => {
-            setConventionId(value); setPeriodNumber("");
+            setConventionId(value === "NONE" ? "" : value); setPeriodNumber("ALL");
+            if (value !== "NONE") setCompanyId(options.data?.find(item => item.id === value)?.compagnieId ?? "");
           }}>
             <SelectTrigger id="billing-convention"><SelectValue placeholder="Sélectionner une convention" /></SelectTrigger>
-            <SelectContent>{options.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
+            <SelectContent><SelectItem value="NONE">Aucune convention sélectionnée</SelectItem>{conventionOptions?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="grid w-28 shrink-0 gap-1.5">
           <Label htmlFor="billing-year">Année du cycle</Label>
           <Input id="billing-year" type="number" min={1900} max={2200} value={year} disabled={issue.isPending}
-            onChange={event => { setYear(Number(event.target.value)); setPeriodNumber(""); }} />
+            onChange={event => { setYear(Number(event.target.value)); setPeriodNumber("ALL"); }} />
         </div>
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[440px] sm:flex-[1.5_1_320px]">
           <Label htmlFor="billing-period">Période à facturer</Label>
           <Select value={periodNumber} disabled={issue.isPending || !convention?.periodes.length} onValueChange={setPeriodNumber}>
             <SelectTrigger id="billing-period"><SelectValue placeholder="Sélectionner une période" /></SelectTrigger>
-            <SelectContent>{convention?.periodes.map(item => <SelectItem key={item.numero} value={String(item.numero)}>
+            <SelectContent><SelectItem value="ALL">Toutes les périodes</SelectItem>{convention?.periodes.map(item => <SelectItem key={item.numero} value={String(item.numero)}>
               {periodLabel(convention.fractionnement, item.numero)} · {shortDate(item.debut)} au {shortDate(item.fin)}
             </SelectItem>)}</SelectContent>
           </Select>
         </div>
+        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Mouvement</Label>
+          <Select value={movement ?? "ALL"} disabled={issue.isPending} onValueChange={value => setMovement(value === "ALL" ? undefined : value as ConventionProductionFilters["categorieMouvement"])}>
+            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
+          </Select></div>
+        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Sens de prime</Label>
+          <Select value={premiumDirection ?? "ALL"} disabled={issue.isPending} onValueChange={value => setPremiumDirection(value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"])}>
+            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les sens</SelectItem><SelectItem value="PRIME_A_PAYER">Prime à payer</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem><SelectItem value="SANS_INCIDENCE">Sans incidence</SelectItem></SelectContent>
+          </Select></div>
         <div className="flex shrink-0 gap-2">
           <Button type="button" variant="outline" size="icon" title="Actualiser" aria-label="Actualiser"
             disabled={issue.isPending || options.isFetching || preparation.isFetching} onClick={() => {
               void options.refetch();
-              if (period) void preparation.refetch();
+              if (readyScope) void preparation.refetch();
             }}><RefreshCw className="size-4" /></Button>
           <Button type="button" variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" disabled={issue.isPending}
-            onClick={() => { setConventionId(""); setPeriodNumber(""); setYear(new Date().getFullYear()); }}>
+            onClick={() => { setConventionId(""); setCompanyId(""); setMovement(undefined); setPremiumDirection(undefined); setPeriodNumber("ALL"); setYear(new Date().getFullYear()); }}>
             <RotateCcw className="size-4" />
           </Button>
         </div>
       </div>
       {!validYear && <p role="alert" className="mt-3 text-sm text-destructive">Sélectionnez une année entre 1900 et 2200.</p>}
       {options.isError && <p role="alert" className="mt-3 text-sm text-destructive">{options.error.message}</p>}
+      {companies.isError && <p role="alert" className="mt-3 text-sm text-destructive">{companies.error.message}</p>}
       {convention?.blocage && <p role="alert" className="mt-3 text-sm text-destructive">{convention.blocage}</p>}
     </section>
 
@@ -198,7 +226,7 @@ export default function FacturationConventionsPage() {
         <div>
           <h2 className="font-semibold">Lignes à facturer</h2>
           {readyScope && preparation.data && <p className="mt-1 text-sm text-muted-foreground">
-            {preparation.data.convention} · {periodLabel(convention?.fractionnement ?? null, Number(periodNumber))} · {year}
+            {preparation.data.convention} · {periodNumber === "ALL" ? "Toutes les périodes" : periodLabel(convention?.fractionnement ?? null, Number(periodNumber))} · {year}
             {` · du ${shortDate(preparation.data.periodeDebut)} au ${shortDate(preparation.data.periodeFin)}`}
           </p>}
         </div>
@@ -207,11 +235,11 @@ export default function FacturationConventionsPage() {
       <ConventionBillingSources
         rows={rows} selected={selected} selectionKey={selectedPayerKey} canSelect={canSelect}
         onToggle={toggleRow} onTogglePage={togglePage}
-        error={preparation.isError && period ? preparation.error.message : undefined}
-        loading={Boolean(period && preparation.isPending)}
-        emptyMessage={period ? "Aucune ligne à facturer pour cette convention et cette période." : "Sélectionnez une convention et une période."}
+        error={preparation.isError && readyScope ? preparation.error.message : undefined}
+        loading={Boolean(readyScope && preparation.isPending)}
+        emptyMessage={readyScope ? "Aucune ligne à facturer pour ces critères." : "Sélectionnez une convention."}
       />
-      {period && !preparation.isPending && !preparation.isError && !rows.length && <div>
+      {readyScope && !preparation.isPending && !preparation.isError && !rows.length && <div>
         <Button asChild variant="outline"><Link to={canCollect ? "/app/compta/conventions/encaissements" : "/app/compta/releves-factures"}>Consulter les factures émises</Link></Button>
       </div>}
     </section>

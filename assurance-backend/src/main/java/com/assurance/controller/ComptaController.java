@@ -362,10 +362,14 @@ public class ComptaController {
     @GetMapping("/facturation-conventions/preparation")
     @PreAuthorize("hasAuthority('PERM_quittance:view')")
     public ResponseEntity<ApiResponse<com.assurance.dto.response.PreparationFactureConventionResponse>> prepareConventionInvoice(
-            @RequestParam Long conventionId, @RequestParam int annee, @RequestParam int periode
+            @RequestParam Long conventionId, @RequestParam int annee,
+            @RequestParam(required = false) Integer periode,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) com.assurance.enums.CategorieMouvementContrat categorieMouvement,
+            @RequestParam(required = false) com.assurance.enums.SensPrimeConvention sensPrime
     ) {
         return ResponseEntity.ok(ApiResponse.success(facturationConventionService.preparePeriod(
-                TenantContext.getCurrentAgence(), conventionId, annee, periode)));
+                TenantContext.getCurrentAgence(), conventionId, annee, periode, compagnieId, categorieMouvement, sensPrime)));
     }
 
     @PostMapping("/facturation-conventions/apercu")
@@ -510,6 +514,16 @@ public class ComptaController {
                 documentClientService.cancel(TenantContext.getCurrentAgence(), documentId, request),
                 "Document annulé"
         ));
+    }
+
+    @DeleteMapping("/documents-clients/{documentId}")
+    @PreAuthorize("hasAuthority('PERM_quittance:manage')")
+    public ResponseEntity<ApiResponse<Void>> supprimerDocumentClient(
+            @PathVariable Long documentId,
+            @Valid @RequestBody AnnulerDocumentClientRequest request
+    ) {
+        documentClientService.delete(TenantContext.getCurrentAgence(), documentId, request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Facture supprimée définitivement"));
     }
 
     @PostMapping("/documents-clients/{documentId}/revision")

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { Banknote, Download, Eye, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ban, Banknote, Download, Eye, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
@@ -19,36 +20,49 @@ import { comptaApi } from "../api";
 import { ClientPaymentDetailsDialog } from "../components/ClientPaymentDetailsDialog";
 import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
 import { formatAccountingAmount } from "../format";
-import type { ClientReceivable } from "../types";
+import type { ClientReceivable, ConventionProductionFilters } from "../types";
 
 const labels = {
   IMPAYEE: "À encaisser", PARTIELLEMENT_REGLEE: "Partiellement réglée",
   COUVERTE_EN_ATTENTE: "Encaissement en cours", PAYEE: "Soldée",
 } as const;
 const variants = { IMPAYEE: "warning", PARTIELLEMENT_REGLEE: "accent", COUVERTE_EN_ATTENTE: "info", PAYEE: "success" } as const;
-const emptyFilters = { conventionId: "ALL", search: "", dateDu: "", dateAu: "", includeSettled: true };
+const emptyFilters = { conventionId: "ALL", companyId: "ALL", search: "", dateDu: "", dateAu: "", includeSettled: true,
+  year: String(new Date().getFullYear()), period: "ALL", periodeDu: "", periodeAu: "",
+  movement: "ALL", premiumDirection: "ALL" };
 
 export default function ConventionCollectionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canView = permissions.includes("reglement-client:view");
   const canViewDocuments = permissions.includes("quittance:view");
   const canCreate = canView && (permissions.includes("reglement-client:create") || permissions.includes("reglement-client:manage"));
+  const canDelete = canViewDocuments && permissions.includes("quittance:manage");
+  const canCancel = canViewDocuments && (permissions.includes("quittance:create") || permissions.includes("quittance:manage"));
+  const [documentAction, setDocumentAction] = useState<{ id: string; action: "delete" | "cancel" }>();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [filters, setFilters] = useState(emptyFilters);
   const [applied, setApplied] = useState(emptyFilters);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Record<string, ClientReceivable>>({});
-  const year = new Date().getFullYear();
+  const year = Number(filters.year);
+  const validYear = Number.isInteger(year) && year >= 1900 && year <= 2200;
   const options = useQuery({
     queryKey: ["compta", "convention-billing-options", year],
-    queryFn: () => comptaApi.conventionBillingOptions(year), enabled: canView && canViewDocuments,
+    queryFn: () => comptaApi.conventionBillingOptions(year), enabled: canView && canViewDocuments && validYear,
   });
+  const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies, enabled: canView && canViewDocuments });
+  const convention = options.data?.find(option => option.id === filters.conventionId);
+  const effectiveCompany = convention?.compagnieId ?? filters.companyId;
   const invoices = useQuery({
     queryKey: ["compta", "convention-invoice-receivables", applied, page],
     queryFn: () => comptaApi.clientInvoiceReceivables({
       conventionsOnly: true,
       conventionId: applied.conventionId === "ALL" ? undefined : applied.conventionId,
+      compagnieId: applied.companyId === "ALL" ? undefined : applied.companyId,
+      categorieMouvement: applied.movement === "ALL" ? undefined : applied.movement as ConventionProductionFilters["categorieMouvement"],
+      sensPrime: applied.premiumDirection === "ALL" ? undefined : applied.premiumDirection as ConventionProductionFilters["sensPrime"],
+      periodeDu: applied.periodeDu || undefined, periodeAu: applied.periodeAu || undefined,
       includeSettled: applied.includeSettled,
       search: applied.search.trim() || undefined,
       dateDu: applied.dateDu || undefined, dateAu: applied.dateAu || undefined,
@@ -65,11 +79,19 @@ export default function ConventionCollectionsPage() {
   const allSelected = eligible.length > 0 && eligible.every(row => selected[row.source.documentClientId!]);
 
   function apply() {
+    if (!validYear) { toast.error("Sélectionnez une année entre 1900 et 2200."); return; }
     if (filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu) {
       toast.error("La date de début doit précéder la date de fin.");
       return;
     }
-    setApplied({ ...filters }); setPage(0); setSelected({});
+    if (filters.conventionId !== "ALL" && (!convention || options.isFetching || options.isError
+      || (filters.period !== "ALL" && !convention.periodes.some(period => String(period.numero) === filters.period)))) {
+      toast.error("Sélectionnez une période valide."); return;
+    }
+    const period = convention?.periodes.find(item => String(item.numero) === filters.period);
+    setApplied({ ...filters, companyId: effectiveCompany,
+      periodeDu: period?.debut ?? convention?.periodes[0]?.debut ?? "",
+      periodeAu: period?.fin ?? convention?.periodes.at(-1)?.fin ?? "" }); setPage(0); setSelected({});
   }
   function collect(items: ClientReceivable[]) {
     if (!canCreate || !items.length || items.some(row => row.soldeOuvert <= 0 || !row.source.documentClientId)
@@ -90,14 +112,42 @@ export default function ConventionCollectionsPage() {
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Encaissement des factures" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
-      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
-        <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value }))}>
-          <SelectTrigger id="collection-convention"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="ALL">Toutes les conventions</SelectItem>
-            {options.data?.map(option => <SelectItem key={option.id} value={option.id}>{option.intitule}</SelectItem>)}
+      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-company">Compagnie</Label>
+        <Select value={effectiveCompany} disabled={filters.conventionId !== "ALL" || companies.isPending || companies.isError}
+          onValueChange={value => setFilters(current => ({ ...current, companyId: value, conventionId: "ALL", period: "ALL" }))}>
+          <SelectTrigger id="collection-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
+            {convention?.compagnieId && !companies.data?.some(company => company.id === convention.compagnieId) && <SelectItem value={convention.compagnieId}>{convention.compagnie || "-"}</SelectItem>}
+            {companies.data?.map(company => <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>}
+      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
+        <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",
+          companyId: value === "ALL" ? current.companyId : options.data?.find(option => option.id === value)?.compagnieId ?? "ALL" }))}>
+          <SelectTrigger id="collection-convention"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="ALL">Toutes les conventions</SelectItem>
+            {options.data?.filter(option => filters.companyId === "ALL" || option.compagnieId === filters.companyId).map(option => <SelectItem key={option.id} value={option.id}>{option.intitule}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>}
+      {canViewDocuments && <>
+        <div className="grid gap-1.5"><Label htmlFor="collection-year">Année du cycle</Label><Input id="collection-year" type="number" min={1900} max={2200} value={filters.year}
+          onChange={event => setFilters(current => ({ ...current, year: event.target.value, period: "ALL" }))} /></div>
+        <div className="grid gap-1.5"><Label htmlFor="collection-period">Période facturée</Label>
+          <Select value={filters.period} disabled={!convention || options.isFetching} onValueChange={value => setFilters(current => ({ ...current, period: value }))}>
+            <SelectTrigger id="collection-period"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les périodes</SelectItem>
+              {convention?.periodes.map(period => <SelectItem key={period.numero} value={String(period.numero)}>{date(period.debut)} au {date(period.fin)}</SelectItem>)}
+            </SelectContent>
+          </Select></div>
+      </>}
+      <div className="grid gap-1.5"><Label htmlFor="collection-movement">Mouvement</Label>
+        <Select value={filters.movement} onValueChange={value => setFilters(current => ({ ...current, movement: value }))}>
+          <SelectTrigger id="collection-movement"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
+        </Select></div>
+      <div className="grid gap-1.5"><Label htmlFor="collection-premium">Sens de prime</Label>
+        <Select value={filters.premiumDirection} onValueChange={value => setFilters(current => ({ ...current, premiumDirection: value }))}>
+          <SelectTrigger id="collection-premium"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les sens</SelectItem><SelectItem value="PRIME_A_PAYER">Prime à payer</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem><SelectItem value="SANS_INCIDENCE">Sans incidence</SelectItem></SelectContent>
+        </Select></div>
       <div className="grid gap-1.5"><Label htmlFor="collection-search">N° facture / payeur</Label>
         <Input id="collection-search" value={filters.search} onChange={event => setFilters(current => ({ ...current, search: event.target.value }))}
           onKeyDown={event => { if (event.key === "Enter") apply(); }} />
@@ -115,6 +165,7 @@ export default function ConventionCollectionsPage() {
         </div>
       </div>
       {options.isError && canViewDocuments && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-4">{options.error.message}</p>}
+      {companies.isError && canViewDocuments && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-4">{companies.error.message}</p>}
     </section>
     <section className="overflow-hidden rounded-md border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
@@ -156,6 +207,8 @@ export default function ConventionCollectionsPage() {
                     <td className="px-3 py-3"><div className="flex justify-end gap-1">
                       {canViewDocuments && <Button variant="ghost" size="icon" title="Détail de la facture" aria-label={`Détail ${row.source.reference}`} onClick={() => showDocument(id)}><Eye className="size-4" /></Button>}
                       {canCreate && <Button variant="ghost" size="icon" title="Encaisser la facture" aria-label={`Encaisser ${row.source.reference}`} disabled={row.soldeOuvert <= 0 || invoices.isFetching || selectedRows.length > 0} onClick={() => collect([row])}><Banknote className="size-4" /></Button>}
+                      {canCancel && <Button variant="ghost" size="icon" title="Annuler la facture" aria-label={`Annuler ${row.source.reference}`} onClick={() => setDocumentAction({ id, action: "cancel" })}><Ban className="size-4" /></Button>}
+                      {canDelete && <Button variant="ghost" size="icon" className="text-destructive" title="Supprimer définitivement" aria-label={`Supprimer ${row.source.reference}`} onClick={() => setDocumentAction({ id, action: "delete" })}><Trash2 className="size-4" /></Button>}
                     </div></td>
                   </tr>;
                 })}
@@ -166,7 +219,49 @@ export default function ConventionCollectionsPage() {
     </section>
     {canViewDocuments && params.get("documentId") && <InvoiceDialog id={params.get("documentId")!} onClose={closeDetail} />}
     {params.get("reglementId") && <ClientPaymentDetailsDialog paymentId={params.get("reglementId")!} onClose={closeDetail} />}
+    {documentAction && <InvoiceActionDialog key={`${documentAction.id}:${documentAction.action}`} {...documentAction} onClose={() => setDocumentAction(undefined)} />}
   </div>;
+}
+
+function InvoiceActionDialog({ id, action, onClose }: { id: string; action: "delete" | "cancel"; onClose: () => void }) {
+  const client = useQueryClient();
+  const [reason, setReason] = useState("");
+  const detail = useQuery({ queryKey: ["compta", "client-document", id], queryFn: () => comptaApi.clientDocument(id), staleTime: 0 });
+  const deletion = action === "delete";
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (deletion) await comptaApi.deleteClientDocument(id, reason.trim());
+      else await comptaApi.cancelClientDocument(id, reason.trim());
+    },
+    onSuccess: async () => {
+      toast.success(deletion ? "Facture supprimée définitivement" : "Facture annulée");
+      await Promise.all(["convention-invoice-receivables", "convention-billing-preparation", "convention-billing", "client-documents", "client-document-sources", "client-receivables", "client-invoice-receivables"]
+        .map(key => client.invalidateQueries({ queryKey: ["compta", key] })));
+      if (deletion) client.removeQueries({ queryKey: ["compta", "client-document", id] });
+      else await client.invalidateQueries({ queryKey: ["compta", "client-document", id] });
+      onClose();
+    },
+    onError: error => { toast.error(error.message); void detail.refetch(); },
+  });
+  const allowed = detail.data?.statut === "EMIS" && (!deletion || detail.data.suppressionAutorisee === true);
+  return <Dialog open onOpenChange={open => { if (!open && !mutation.isPending) onClose(); }}>
+    <DialogContent onEscapeKeyDown={event => { if (mutation.isPending) event.preventDefault(); }} onPointerDownOutside={event => { if (mutation.isPending) event.preventDefault(); }}>
+      <DialogHeader><DialogTitle>{deletion ? "Supprimer définitivement" : "Annuler"} {detail.data?.numero ?? "la facture"} ?</DialogTitle>
+        <DialogDescription>{deletion ? "Suppression irréversible du document et de ses lignes. Les périodes sont libérées et une trace est conservée dans le journal d’activité."
+          : "La facture est conservée avec le statut annulé. Ses périodes redeviennent disponibles à la facturation."}</DialogDescription>
+      </DialogHeader>
+      {detail.isPending || detail.isFetching ? <p role="status" className="text-sm">Vérification de la facture…</p>
+        : detail.isError ? <p role="alert" className="text-sm text-destructive">{detail.error.message}</p>
+          : !allowed ? <p role="alert" className="text-sm text-destructive">{deletion ? detail.data?.motifBlocageSuppression || "Suppression non autorisée." : "Cette facture ne peut plus être annulée."}</p>
+            : <div className="grid gap-2"><Label htmlFor="invoice-action-reason">Motif <span className="text-destructive">*</span></Label>
+              <Textarea id="invoice-action-reason" required maxLength={500} value={reason} disabled={mutation.isPending} onChange={event => setReason(event.target.value)} /></div>}
+      <DialogFooter><Button variant="outline" disabled={mutation.isPending} onClick={onClose}>Fermer</Button>
+        <Button variant="destructive" disabled={!allowed || !reason.trim() || detail.isFetching || detail.isError || mutation.isPending} onClick={() => mutation.mutate()}>
+          {deletion ? <Trash2 className="size-4" /> : <Ban className="size-4" />}{mutation.isPending ? "Traitement…" : deletion ? "Supprimer définitivement" : "Confirmer l’annulation"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
 }
 
 function payerKey(row: ClientReceivable) {

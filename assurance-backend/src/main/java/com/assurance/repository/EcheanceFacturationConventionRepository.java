@@ -55,7 +55,7 @@ public interface EcheanceFacturationConventionRepository
             """)
     void deactivateCancelledMovementSchedules(@Param("agenceId") Long agenceId);
 
-    List<EcheanceFacturationConvention> findByDocumentClientId(Long documentClientId);
+    List<EcheanceFacturationConvention> findByAgenceIdAndDocumentClientId(Long agenceId, Long documentClientId);
 
     @EntityGraph(attributePaths = {
             "contrat",

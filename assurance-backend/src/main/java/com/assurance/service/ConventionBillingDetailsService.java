@@ -8,7 +8,7 @@ import com.assurance.enums.CategorieMouvementContrat;
 import com.assurance.enums.NatureSnapshotMouvement;
 import com.assurance.enums.RoleClientContrat;
 import com.assurance.repository.ContratClientRepository;
-import com.assurance.repository.QuittanceRepository;
+import com.assurance.repository.AffectationQuittanceCompagnieRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ConventionBillingDetailsService {
     private final ContratClientRepository clients;
-    private final QuittanceRepository quittances;
+    private final AffectationQuittanceCompagnieRepository affectations;
 
     public Details details(ElementFacturable element) {
         MouvementContrat movement = element.getMouvementContrat();
@@ -36,11 +36,11 @@ public class ConventionBillingDetailsService {
                 .map(item -> item.getImmatriculation() == null || item.getImmatriculation().isBlank()
                         ? item.getImmatriculationProvisoire() : item.getImmatriculation())
                 .filter(Objects::nonNull).distinct().collect(Collectors.joining(", "));
-        String receipt = quittances.findByContrat_IdAndElementFacturable_IdOrderByCreatedAtDesc(
+        String receipt = affectations.findCompanyNumbersForElement(element.getAgence().getId(),
                         element.getContrat().getId(), element.getId()).stream()
-                .filter(item -> Boolean.TRUE.equals(item.getGlobale()) && !Boolean.TRUE.equals(item.getAlternative()))
-                .map(com.assurance.entity.Quittance::getNumeroQuittance).findFirst().orElse(null);
-        return new Details(receipt, insured, vehicle);
+                .filter(Objects::nonNull).map(String::trim).filter(number -> !number.isEmpty())
+                .distinct().collect(Collectors.joining(", "));
+        return new Details(receipt.isEmpty() ? null : receipt, insured, vehicle);
     }
 
     public String movementLabel(MouvementContrat movement) {

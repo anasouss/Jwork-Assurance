@@ -92,16 +92,19 @@ public class FacturationConventionService {
     }
 
     private ConventionOption conventionOption(Convention item, int year) {
+        Long compagnieId = item.getCompagnieAssurance() == null ? null : item.getCompagnieAssurance().getId();
+        String compagnie = item.getCompagnieAssurance() == null ? null : item.getCompagnieAssurance().getNom();
         try {
             return new ConventionOption(item.getId(), item.getIntitule(), item.getFractionnement(),
                     ConventionBillingPeriods.cycle(item, year).stream()
-                            .map(period -> new PeriodOption(period.number(), period.start(), period.end())).toList(), null);
+                            .map(period -> new PeriodOption(period.number(), period.start(), period.end())).toList(), null, compagnieId, compagnie);
         } catch (BadRequestException exception) {
-            return new ConventionOption(item.getId(), item.getIntitule(), item.getFractionnement(), List.of(), exception.getMessage());
+            return new ConventionOption(item.getId(), item.getIntitule(), item.getFractionnement(), List.of(), exception.getMessage(), compagnieId, compagnie);
         }
     }
 
-    public record ConventionOption(Long id, String intitule, Fractionnement fractionnement, List<PeriodOption> periodes, String blocage) {
+    public record ConventionOption(Long id, String intitule, Fractionnement fractionnement, List<PeriodOption> periodes,
+            String blocage, Long compagnieId, String compagnie) {
     }
 
     public record PeriodOption(int numero, LocalDate debut, LocalDate fin) {
@@ -109,15 +112,32 @@ public class FacturationConventionService {
 
     @Transactional
     public PreparationFactureConventionResponse preparePeriod(Long agenceId, Long conventionId, int year, int periodNumber) {
+        return preparePeriod(agenceId, conventionId, year, periodNumber, null, null, null);
+    }
+
+    @Transactional
+    public PreparationFactureConventionResponse preparePeriod(Long agenceId, Long conventionId, int year, Integer periodNumber,
+            Long compagnieId, com.assurance.enums.CategorieMouvementContrat categorieMouvement,
+            com.assurance.enums.SensPrimeConvention sensPrime) {
         if (year < 1900 || year > 2200) throw new BadRequestException("Annee de facturation invalide");
         Convention convention = conventionRepository.findByAgenceIdAndId(agenceId, conventionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Convention", conventionId));
         if (!Boolean.TRUE.equals(convention.getActif())) throw new BadRequestException("Cette convention est inactive");
-        var period = ConventionBillingPeriods.cycle(convention, year).stream()
-                .filter(item -> item.number() == periodNumber).findFirst()
-                .orElseThrow(() -> new BadRequestException("Periode incompatible avec le fractionnement de la convention"));
+        if (compagnieId != null && (convention.getCompagnieAssurance() == null
+                || !compagnieId.equals(convention.getCompagnieAssurance().getId()))) {
+            throw new BadRequestException("La compagnie sélectionnée ne correspond pas à la convention");
+        }
+        if (categorieMouvement != null && !List.of(com.assurance.enums.CategorieMouvementContrat.AFFAIRE_NOUVELLE,
+                com.assurance.enums.CategorieMouvementContrat.RENOUVELLEMENT,
+                com.assurance.enums.CategorieMouvementContrat.AVENANT).contains(categorieMouvement)) {
+            throw new BadRequestException("Mouvement de production invalide");
+        }
+        var periods = ConventionBillingPeriods.cycle(convention, year).stream()
+                .filter(item -> periodNumber == null || item.number() == periodNumber).toList();
+        if (periods.isEmpty()) throw new BadRequestException("Periode incompatible avec le fractionnement de la convention");
         synchronizeSchedules(agenceId, conventionId);
-        List<EcheanceFacturationConvention> schedules = echeanceRepository.findPendingPeriod(agenceId, conventionId, period.start(), period.end());
+        List<EcheanceFacturationConvention> schedules = periods.stream().flatMap(period ->
+                echeanceRepository.findPendingPeriod(agenceId, conventionId, period.start(), period.end()).stream()).toList();
         Set<Long> contractIds = schedules.stream().map(item -> item.getContrat().getId()).collect(Collectors.toSet());
         Map<Long, Client> subscribers = loadSubscribers(contractIds);
         Map<Long, List<ElementFacturable>> elements = loadElements(contractIds);
@@ -125,10 +145,14 @@ public class FacturationConventionService {
                 Function.identity(), echeanceRepository::findByContratIdAndActifTrueOrderByNumeroPeriodeAsc));
         List<PreparationFactureConventionResponse.Ligne> rows = new ArrayList<>();
         for (EcheanceFacturationConvention schedule : schedules) {
+            var sources = elements.getOrDefault(schedule.getContrat().getId(), List.of()).stream()
+                    .filter(this::isBillable).filter(ConventionPaymentPolicy::isInvoice)
+                    .filter(element -> matchesSource(element, schedule)).toList();
+            long matched = sources.stream().filter(element -> matchesProductionFilter(element, categorieMouvement, sensPrime)).count();
+            if ((categorieMouvement != null || sensPrime != null) && matched == 0) continue;
             Payer payer = resolvePayer(schedule.getContrat(), subscribers);
             List<ConventionInvoicePreviewResponse.Line> lines = new ArrayList<>();
-            for (ElementFacturable element : elements.getOrDefault(schedule.getContrat().getId(), List.of())) {
-                if (!isBillable(element) || !ConventionPaymentPolicy.isInvoice(element) || !matchesSource(element, schedule)) continue;
+            for (ElementFacturable element : sources) {
                 BigDecimal amount = elementBulletin(element) == null ? null
                         : allocate(element, schedule, allSchedules.get(schedule.getContrat().getId())).ttc();
                 lines.add(invoiceLine(element, schedule, amount));
@@ -137,9 +161,25 @@ public class FacturationConventionService {
                     : lines.stream().anyMatch(line -> line.montantAPayer() == null) ? "Montant facturable manquant" : null;
             rows.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(),
                     payer.group() == null ? payer.client().getId() : payer.group().getId(),
-                    payer.group() == null ? "CLIENT" : "GROUPE", payer.name(), blocked, lines));
+                    payer.group() == null ? "CLIENT" : "GROUPE", payer.name(), blocked, lines,
+                    schedule.getPeriodeDebut(), schedule.getPeriodeFin(), matched > 0 && matched < sources.size()));
         }
-        return new PreparationFactureConventionResponse(convention.getIntitule(), period.start(), period.end(), rows);
+        return new PreparationFactureConventionResponse(convention.getIntitule(), periods.get(0).start(), periods.get(periods.size() - 1).end(), rows);
+    }
+
+    private boolean matchesProductionFilter(ElementFacturable element,
+            com.assurance.enums.CategorieMouvementContrat category, com.assurance.enums.SensPrimeConvention direction) {
+        var movement = element.getMouvementContrat();
+        if (category != null && (movement == null || movement.getTypeMouvement() == null
+                || movement.getTypeMouvement().getCategorie() != category)) return false;
+        if (direction == null) return true;
+        if (element.getPrimeTotale() == null) return false;
+        int sign = element.getPrimeTotale().signum();
+        return switch (direction) {
+            case PRIME_A_PAYER -> sign > 0;
+            case RISTOURNE -> sign < 0;
+            case SANS_INCIDENCE -> sign == 0;
+        };
     }
 
     @Transactional(readOnly = true)

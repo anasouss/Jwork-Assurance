@@ -239,6 +239,23 @@ export function SinistreDeclarationContextDialog({
             </Select>
           </div> : null}
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2">
+              <Label>Date du sinistre <span className="text-red-500">*</span></Label>
+              <DatePicker
+                date={dateSinistre}
+                maxDate={new Date()}
+                onSelect={(date) => {
+                  setDateSinistre(toIso(date));
+                }}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Date de déclaration <span className="text-red-500">*</span></Label>
+              <DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={date => setDateDeclaration(toIso(date))} />
+              {dateDeclaration && dateSinistre && dateDeclaration < dateSinistre ? <p role="alert" className="text-sm text-destructive">La déclaration ne peut pas précéder le sinistre.</p> : null}
+            </div>
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="claim-contract-search">Police, assuré ou immatriculation <span className="text-red-500">*</span></Label>
             {contract ? (
@@ -353,24 +370,6 @@ export function SinistreDeclarationContextDialog({
               {!vehicleChoices.length ? <p className="text-sm text-destructive sm:col-span-2">Aucun véhicule correspondant n’est couvert à cette date.</p> : null}
             </div> : null}
           </section> : null}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Date du sinistre <span className="text-red-500">*</span></Label>
-              <DatePicker
-                date={dateSinistre}
-                maxDate={new Date()}
-                onSelect={(date) => {
-                  setDateSinistre(toIso(date));
-                }}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Date de déclaration <span className="text-red-500">*</span></Label>
-              <DatePicker date={dateDeclaration} maxDate={new Date()} onSelect={date => setDateDeclaration(toIso(date))} />
-              {dateDeclaration && dateSinistre && dateDeclaration < dateSinistre ? <p role="alert" className="text-sm text-destructive">La déclaration ne peut pas précéder le sinistre.</p> : null}
-            </div>
-          </div>
 
           {coverage.isFetching ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">

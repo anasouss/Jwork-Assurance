@@ -78,7 +78,7 @@ export function SinistreTransitionDialog({
           </div>
           <div className="grid gap-1.5">
             <Label>
-              Motif / observation{reasonRequired ? " *" : ""}
+              Motif / observation{reasonRequired ? <span className="text-red-500">*</span> : null}
             </Label>
             <Textarea
               value={motif}

@@ -78,7 +78,7 @@ export function SinistrePartyDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Type *">
+          <Field label="Type" required>
             <Select
               value={form.type}
               onValueChange={(value) => update("type", value)}
@@ -95,7 +95,7 @@ export function SinistrePartyDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Nom *">
+          <Field label="Nom" required>
             <Input
               value={form.nom}
               maxLength={180}
@@ -172,14 +172,16 @@ export function SinistrePartyDialog({
 
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
       {children}
     </div>
   );

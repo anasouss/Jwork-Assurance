@@ -112,13 +112,13 @@ export function SinistreMissionDialog({
           <DialogDescription className="sr-only">Mission d’expertise du dossier</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Phase *">
+          <Field label="Phase" required>
             <Select value={form.phase} onValueChange={(value) => update("phase", value)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="AVANT">Avant réparation</SelectItem><SelectItem value="APRES">Après réparation</SelectItem></SelectContent>
             </Select>
           </Field>
-          <Field label="Expert *">
+          <Field label="Expert" required>
             <Select
               disabled={saving || expertQuery.isFetching || expertQuery.isError}
               value={form.expertId}
@@ -169,7 +169,7 @@ export function SinistreMissionDialog({
               }
             />
           </Field>
-          <Field label="Statut *">
+          <Field label="Statut" required>
             <Select
               value={form.statut}
               onValueChange={(value) => update("statut", value)}
@@ -187,7 +187,7 @@ export function SinistreMissionDialog({
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Date mission *">
+          <Field label="Date mission" required>
             <DatePicker
               date={form.dateMission}
               onSelect={(date) => update("dateMission", toIso(date))}
@@ -263,14 +263,16 @@ export function SinistreMissionDialog({
 
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
       {children}
     </div>
   );

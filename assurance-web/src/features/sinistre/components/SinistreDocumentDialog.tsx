@@ -165,7 +165,7 @@ export function SinistreDocumentDialog({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {financialDocument || reportDocument ? (
-              <Field label="Date du document *">
+              <Field label="Date du document" required>
                 <DatePicker
                   date={dateDocument}
                   maxDate={new Date()}
@@ -176,14 +176,14 @@ export function SinistreDocumentDialog({
 
             {financialDocument ? (
               <>
-                <Field label="Référence *">
+                <Field label="Référence" required>
                   <Input
                     value={reference}
                     maxLength={120}
                     onChange={(event) => setReference(event.target.value)}
                   />
                 </Field>
-                <Field label="Montant *">
+                <Field label="Montant" required>
                   <Input
                     type="number"
                     min="0"
@@ -192,7 +192,7 @@ export function SinistreDocumentDialog({
                     onChange={(event) => setMontant(event.target.value)}
                   />
                 </Field>
-                <Field label="Émetteur *">
+                <Field label="Émetteur" required>
                   <Input
                     value={emetteur}
                     maxLength={180}
@@ -214,7 +214,7 @@ export function SinistreDocumentDialog({
 
             {reportDocument ? (
               <div className="sm:col-span-2">
-                <Field label="Mission d’expertise *">
+                <Field label="Mission d’expertise" required>
                   <OptionalSelect
                     value={missionId}
                     onChange={setMissionId}
@@ -290,10 +290,10 @@ export function SinistreDocumentDialog({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
       {children}
     </div>
   );

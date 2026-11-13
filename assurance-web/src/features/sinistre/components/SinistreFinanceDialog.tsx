@@ -133,7 +133,7 @@ export function SinistreFinanceDialog({
         </DialogHeader>
         <div className="grid gap-4 sm:grid-cols-2">
           {mode === "OPERATION" ? (
-            <Field label="Type *">
+            <Field label="Type" required>
               <Select
                 value={type}
                 onValueChange={(value) => setType(value as TypeOperation)}
@@ -151,14 +151,14 @@ export function SinistreFinanceDialog({
               </Select>
             </Field>
           ) : null}
-          <Field label="Date *">
+          <Field label="Date" required>
             <DatePicker
               date={date}
               maxDate={new Date()}
               onSelect={(value) => setDate(toIso(value))}
             />
           </Field>
-          <Field label="Montant (MAD) *">
+          <Field label="Montant (MAD)" required>
             <Input
               type="number"
               min="0"
@@ -172,7 +172,7 @@ export function SinistreFinanceDialog({
               <Field label={companyLabel(type)}>
                 <Input value={dossier.couverture.compagnie} disabled />
               </Field>
-              <Field label={`${counterpartyLabel(type)} *`}>
+              <Field label={counterpartyLabel(type)} required>
                 <Select
                   value={counterpartyValue}
                   onValueChange={setCounterpartyValue}
@@ -191,7 +191,7 @@ export function SinistreFinanceDialog({
               </Field>
               {selectedCounterparty.type === "AUTRE" ? (
                 <>
-                  <Field label="Nom de la contrepartie *">
+                  <Field label="Nom de la contrepartie" required>
                     <Input
                       value={freeCounterpartyName}
                       maxLength={180}
@@ -200,7 +200,7 @@ export function SinistreFinanceDialog({
                       }
                     />
                   </Field>
-                  <Field label="Justification *">
+                  <Field label="Justification" required>
                     <Input
                       value={freeCounterpartyReason}
                       maxLength={500}
@@ -211,7 +211,7 @@ export function SinistreFinanceDialog({
                   </Field>
                 </>
               ) : null}
-              <Field label="Moyen de paiement *">
+              <Field label="Moyen de paiement" required>
                 <Select
                   value={modeReglement}
                   onValueChange={(value) => {
@@ -234,7 +234,7 @@ export function SinistreFinanceDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Circuit financier *">
+              <Field label="Circuit financier" required>
                 <Select
                   value={circuitFinancier}
                   onValueChange={(value) => {
@@ -251,7 +251,7 @@ export function SinistreFinanceDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label={`Référence${referenceRequired ? " *" : ""}`}>
+              <Field label="Référence" required={referenceRequired}>
                 <Input
                   value={reference}
                   maxLength={120}
@@ -259,7 +259,7 @@ export function SinistreFinanceDialog({
                 />
               </Field>
               {accountRequired ? (
-                <Field label="Compte de trésorerie *">
+                <Field label="Compte de trésorerie" required>
                   <Select
                     value={compteTresorerieId}
                     onValueChange={setCompteTresorerieId}
@@ -280,7 +280,7 @@ export function SinistreFinanceDialog({
             </>
           ) : null}
           <div className="sm:col-span-2">
-            <Field label={mode === "PROVISION" ? "Motif *" : "Notes"}>
+            <Field label={mode === "PROVISION" ? "Motif" : "Notes"} required={mode === "PROVISION"}>
               <Textarea
                 value={motif}
                 maxLength={500}
@@ -392,14 +392,16 @@ const partyTypeLabels: Record<SinistreDetail["parties"][number]["type"], string>
 
 function Field({
   label,
+  required,
   children,
 }: {
   label: string;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label>{label}</Label>
+      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
       {children}
     </div>
   );

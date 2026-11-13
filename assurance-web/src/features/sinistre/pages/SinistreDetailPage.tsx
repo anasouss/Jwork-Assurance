@@ -1319,7 +1319,7 @@ function GeneralSection({
             <Field label="Mode de réparation"><Select disabled={!editable || saving} value={form.modeReparation} onValueChange={(value) => setForm((current) => ({ ...current, modeReparation: value, garageId: "" }))}>
               <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{Object.entries(repairLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
             </Select></Field>
-            <Field label={form.modeReparation === "PEC" ? "Garage conventionné *" : "Garage"}><Select disabled={!editable || saving || garageQuery.isFetching || garageQuery.isError} value={form.garageId || "NONE"} onValueChange={(value) => update("garageId", value === "NONE" ? "" : value)}>
+            <Field label={form.modeReparation === "PEC" ? "Garage conventionné" : "Garage"} required={form.modeReparation === "PEC"}><Select disabled={!editable || saving || garageQuery.isFetching || garageQuery.isError} value={form.garageId || "NONE"} onValueChange={(value) => update("garageId", value === "NONE" ? "" : value)}>
               <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{historicalGarage && dossier.garageId && !garages.some((item) => item.id === dossier.garageId) ? <SelectItem value={dossier.garageId}>{dossier.garage || "Garage actuel"}</SelectItem> : null}{garages.map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}</SelectItem>)}</SelectContent>
             </Select></Field>
             {garageQuery.isError ? <p role="alert" className="text-sm text-destructive">{garageQuery.error.message}</p> : null}
@@ -1336,7 +1336,7 @@ function GeneralSection({
           </Field>
           {responsibilityVisible ? (
             <div className="sm:col-span-2">
-              <Field label="Responsabilité RC *">
+              <Field label="Responsabilité RC" required>
                 <Select
                   disabled={!editable}
                   value={form.responsabilite === "NON_DETERMINEE" ? "" : form.responsabilite}

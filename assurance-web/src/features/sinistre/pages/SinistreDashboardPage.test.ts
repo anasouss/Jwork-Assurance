@@ -21,7 +21,7 @@ describe("claims module entry page", () => {
   it("provides distinct workflows without loading a dashboard table", () => {
     auth.permissions = ["sinistre:create", "sinistre:view", "sinistre:referentiel"];
     const html = render();
-    for (const route of ["declarer", "dossiers", "registre", "statistiques", "referentiels"]) {
+    for (const route of ["declarer", "dossiers", "registre", "statistiques", "experts", "garages"]) {
       expect(html).toContain(`href="/app/sinistre/${route}"`);
     }
     expect(html).toContain("Module sinistres");
@@ -34,7 +34,8 @@ describe("claims module entry page", () => {
     const html = render();
     expect(html).toContain('href="/app/sinistre/declarer"');
     expect(html).not.toContain('href="/app/sinistre/dossiers"');
-    expect(html).not.toContain('href="/app/sinistre/referentiels"');
+    expect(html).not.toContain('href="/app/sinistre/experts"');
+    expect(html).not.toContain('href="/app/sinistre/garages"');
   });
 
   it("shows an explicit empty state when no claims action is authorized", () => {

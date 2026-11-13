@@ -32,6 +32,14 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: ["sinistre:referentiel"],
   },
   {
+    matches: startsWith("/app/sinistre/experts"),
+    anyOf: ["sinistre:referentiel"],
+  },
+  {
+    matches: startsWith("/app/sinistre/garages"),
+    anyOf: ["sinistre:referentiel"],
+  },
+  {
     matches: startsWith("/app/sinistre"),
     anyPrefix: MODULE_PERMISSION_PREFIXES.sinistre,
   },

@@ -82,7 +82,7 @@ describe("guide utilities", () => {
     ["assistance-automobile", ["Souscripteur", "Assuré", "Véhicule assuré", "Produit d’assistance", "Prime nette", "Créer le dossier"]],
     ["companies-navigation", ["Liste des compagnies", "Conventions", "Grilles tarifaires", "Assistance", "Produits assistance", "Contacts"]],
     ["compta-navigation", ["Affectation des quittances", "Relevés et factures", "Facturation conventions", "Règlements clients", "Encaissements en attente", "Bordereaux bancaires", "Journal de trésorerie", "Rejets bancaires", "Bordereaux compagnies"]],
-    ["sinistres-liste", ["Dossiers ouverts", "Actions en retard", "En expertise", "En attente de règlement", "Provisions ouvertes", "Recours de l’année", "Voir les dossiers", "Déclarer", "Experts & garages"]],
+    ["sinistres-liste", ["Dossiers ouverts", "Actions en retard", "En expertise", "En attente de règlement", "Provisions ouvertes", "Recours de l’année", "Voir les dossiers", "Déclarer", "Experts", "Garages"]],
     ["tarifs-usage", ["Ajouter tarif usage", "Ajuster les tarifs", "Réinitialiser", "Paramétrer par usage", "Historique", "Prime nette", "Prime par place"]],
     ["usages-production", ["Code", "Libellé", "Critère", "Groupe attestation", "Consomme attestation", "Carburant", "Puissance fiscale", "Sous-classe", "PTC", "Places / prime", "Catégorie transport", "Garanties personne"]],
     ["garanties-production", ["Groupe d’exclusion", "Branche", "Type", "Traitement métier", "Modes", "Valeur assurée", "Prorata"]],

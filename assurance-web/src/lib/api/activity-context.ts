@@ -24,7 +24,8 @@ export function activitySurfaceForPath(path: string) {
   if (path.startsWith("/app/compta")) return "TREASURY";
   if (/^\/app\/sinistre\/dossiers\/[^/]+/.test(path)) return "CLAIM_FILE";
   if (path.startsWith("/app/sinistre/declarer")) return "CLAIM_DECLARATION";
-  if (path.startsWith("/app/sinistre/referentiels")) return "CLAIM_SETTINGS";
+  if (path.startsWith("/app/sinistre/referentiels") || path.startsWith("/app/sinistre/experts")
+      || path.startsWith("/app/sinistre/garages")) return "CLAIM_SETTINGS";
   if (path.startsWith("/app/sinistre")) return "CLAIM_REGISTER";
   if (path.startsWith("/app/companies")) return "COMPANY_SETTINGS";
   if (path.startsWith("/app/admin")) return "ADMINISTRATION";

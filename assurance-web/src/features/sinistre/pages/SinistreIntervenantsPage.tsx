@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Plus, Search, Wrench, UserRoundSearch } from "lucide-react";
+import { ArrowLeft, Edit, Plus, Search, Wrench, UserRoundSearch } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { TableRowsSkeleton } from "@/components/shared";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -15,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
 import {
@@ -24,19 +24,15 @@ import {
 } from "../components/SinistreIntervenantDialog";
 import type { Intervenant } from "../types";
 
-export default function SinistreReferentielsPage() {
+export default function SinistreIntervenantsPage({ kind }: { kind: IntervenantKind }) {
   const queryClient = useQueryClient();
   const [includeInactive, setIncludeInactive] = useState(false);
   const [query, setQuery] = useState("");
-  const [dialogKind, setDialogKind] = useState<IntervenantKind | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Intervenant | null>(null);
-  const experts = useQuery({
-    queryKey: sinistreKeys.experts(includeInactive),
-    queryFn: () => sinistreApi.experts(includeInactive),
-  });
-  const garages = useQuery({
-    queryKey: sinistreKeys.garages(includeInactive),
-    queryFn: () => sinistreApi.garages(includeInactive),
+  const directory = useQuery({
+    queryKey: kind === "EXPERT" ? sinistreKeys.experts(includeInactive) : sinistreKeys.garages(includeInactive),
+    queryFn: () => kind === "EXPERT" ? sinistreApi.experts(includeInactive) : sinistreApi.garages(includeInactive),
   });
   const cities = useQuery({
     queryKey: ["referentiel", "villes", "sinistre"],
@@ -44,27 +40,21 @@ export default function SinistreReferentielsPage() {
     staleTime: 60_000,
   });
   const save = useMutation({
-    mutationFn: ({
-      kind,
-      request,
-    }: {
-      kind: IntervenantKind;
-      request: object;
-    }) =>
+    mutationFn: (request: object) =>
       kind === "EXPERT"
         ? sinistreApi.saveExpert(editing?.id ?? null, request)
         : sinistreApi.saveGarage(editing?.id ?? null, request),
-    onSuccess: async (_, variables) => {
-      setDialogKind(null);
+    onSuccess: async () => {
+      setDialogOpen(false);
       setEditing(null);
       await queryClient.invalidateQueries({
         queryKey:
-          variables.kind === "EXPERT"
+          kind === "EXPERT"
             ? [...sinistreKeys.all, "experts"]
             : [...sinistreKeys.all, "garages"],
       });
       toast.success(
-        variables.kind === "EXPERT" ? "Expert enregistré" : "Garage enregistré",
+        kind === "EXPERT" ? "Expert enregistré" : "Garage enregistré",
       );
     },
     onError: (error) =>
@@ -82,34 +72,35 @@ export default function SinistreReferentielsPage() {
         .some((value) => value!.toLocaleLowerCase("fr").includes(normalized)),
     );
   };
-  const openCreate = (kind: IntervenantKind) => {
+  const openCreate = () => {
     setEditing(null);
-    setDialogKind(kind);
+    setDialogOpen(true);
   };
-  const openEdit = (kind: IntervenantKind, item: Intervenant) => {
+  const openEdit = (item: Intervenant) => {
     setEditing(item);
-    setDialogKind(kind);
+    setDialogOpen(true);
   };
 
   return (
     <div className="grid gap-4">
-      <div>
-        <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">
-          Sinistres
-        </p>
-        <h1 className="text-xl font-semibold">Experts et garages</h1>
-        <p className="text-sm text-muted-foreground">
-          Intervenants disponibles pour les missions d’expertise de l’agence.
-        </p>
-      </div>
-      <Card className="shadow-none">
-        <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-sky-700 dark:text-sky-400">Sinistres</p>
+          <h1 className="text-xl font-semibold">{kind === "EXPERT" ? "Experts" : "Garages"}</h1>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline"><Link to="/app/sinistre"><ArrowLeft className="size-4" />Module sinistres</Link></Button>
+          <Button disabled={save.isPending} onClick={openCreate}><Plus className="size-4" />{kind === "EXPERT" ? "Ajouter un expert" : "Ajouter un garage"}</Button>
+        </div>
+      </header>
+      <section aria-label="Filtres" className="flex flex-col gap-3 border-y bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative w-full max-w-xl">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
               className="pl-9"
               placeholder="Code, nom, ville, téléphone ou e-mail"
+              aria-label={kind === "EXPERT" ? "Rechercher un expert" : "Rechercher un garage"}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
@@ -120,46 +111,27 @@ export default function SinistreReferentielsPage() {
               onCheckedChange={setIncludeInactive}
             />
           </label>
-        </CardContent>
-      </Card>
-      <Tabs defaultValue="experts" className="grid gap-4">
-        <TabsList className="w-fit">
-          <TabsTrigger value="experts">Experts</TabsTrigger>
-          <TabsTrigger value="garages">Garages</TabsTrigger>
-        </TabsList>
-        <TabsContent value="experts">
-          <IntervenantTable
-            kind="EXPERT"
-            items={filter(experts.data ?? [])}
-            loading={experts.isLoading}
-            onCreate={() => openCreate("EXPERT")}
-            onEdit={(item) => openEdit("EXPERT", item)}
-          />
-        </TabsContent>
-        <TabsContent value="garages">
-          <IntervenantTable
-            kind="GARAGE"
-            items={filter(garages.data ?? [])}
-            loading={garages.isLoading}
-            onCreate={() => openCreate("GARAGE")}
-            onEdit={(item) => openEdit("GARAGE", item)}
-          />
-        </TabsContent>
-      </Tabs>
+      </section>
+      {directory.isError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 text-sm text-destructive">
+        <span>{directory.error instanceof Error ? directory.error.message : "Chargement du répertoire impossible."}</span>
+        <Button variant="outline" disabled={directory.isFetching} onClick={() => directory.refetch()}>Réessayer</Button>
+      </div> : null}
+      <IntervenantTable kind={kind} items={filter(directory.data ?? [])} loading={directory.isPending}
+        error={directory.isError} saving={save.isPending} onEdit={openEdit} />
       <SinistreIntervenantDialog
-        open={dialogKind !== null}
-        kind={dialogKind ?? "EXPERT"}
+        open={dialogOpen}
+        kind={kind}
         intervenant={editing}
         cities={cities.data ?? []}
         saving={save.isPending}
         onOpenChange={(open) => {
           if (!open) {
-            setDialogKind(null);
+            setDialogOpen(false);
             setEditing(null);
           }
         }}
         onSubmit={(request) => {
-          if (dialogKind) save.mutate({ kind: dialogKind, request });
+          if (dialogOpen && !save.isPending) save.mutate(request);
         }}
       />
     </div>
@@ -170,56 +142,53 @@ function IntervenantTable({
   kind,
   items,
   loading,
-  onCreate,
+  error,
+  saving,
   onEdit,
 }: {
   kind: IntervenantKind;
   items: Intervenant[];
   loading: boolean;
-  onCreate: () => void;
+  error: boolean;
+  saving: boolean;
   onEdit: (item: Intervenant) => void;
 }) {
   const Icon = kind === "EXPERT" ? UserRoundSearch : Wrench;
+  const columnCount = kind === "GARAGE" ? 7 : 6;
   return (
-    <Card className="shadow-none">
-      <CardContent className="p-0">
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="font-semibold">
-            {kind === "EXPERT" ? "Experts" : "Garages"}
-          </h2>
-          <Button size="sm" onClick={onCreate}>
-            <Plus className="size-4" /> Ajouter
-          </Button>
-        </div>
+    <section aria-label={kind === "EXPERT" ? "Liste des experts" : "Liste des garages"} className="min-w-0 border">
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
+          <Table className="min-w-[760px]">
+            <TableHeader className="bg-sky-700 [&_th]:text-white">
+              <TableRow className="hover:bg-sky-700">
                 <TableHead>Code</TableHead>
                 <TableHead>{kind === "EXPERT" ? "Expert" : "Garage"}</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Adresse</TableHead>
+                {kind === "GARAGE" ? <TableHead>Convention</TableHead> : null}
                 <TableHead>Statut</TableHead>
                 <TableHead className="w-20 text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+              {loading ? <TableRowsSkeleton rows={5} colSpan={columnCount} /> : null}
               {items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.code}</TableCell>
-                  <TableCell>{item.nom}{kind === "GARAGE" ? <div className="text-xs text-muted-foreground">{item.conventionne ? "Conventionné" : "Non conventionné"}</div> : null}</TableCell>
+                  <TableCell className="max-w-64 whitespace-normal font-medium">{item.nom}</TableCell>
                   <TableCell>
                     <div>{item.telephone || "-"}</div>
                     <div className="text-xs text-muted-foreground">
                       {item.email || "-"}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="max-w-72 whitespace-normal">
                     {[item.adresse, item.ville].filter(Boolean).join(", ") ||
                       "-"}
                   </TableCell>
+                  {kind === "GARAGE" ? <TableCell><Badge variant="outline" className={item.conventionne ? "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200" : "text-muted-foreground"}>{item.conventionne ? "Conventionné" : "Non conventionné"}</Badge></TableCell> : null}
                   <TableCell>
-                    <Badge variant={item.actif ? "default" : "outline"}>
+                    <Badge variant="outline" className={item.actif ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "text-muted-foreground"}>
                       {item.actif ? "Actif" : "Inactif"}
                     </Badge>
                   </TableCell>
@@ -227,7 +196,9 @@ function IntervenantTable({
                     <Button
                       variant="ghost"
                       size="icon"
-                      aria-label="Modifier"
+                      aria-label={`${kind === "EXPERT" ? "Modifier l’expert" : "Modifier le garage"} ${item.nom}`}
+                      title={kind === "EXPERT" ? "Modifier l’expert" : "Modifier le garage"}
+                      disabled={saving}
                       onClick={() => onEdit(item)}
                     >
                       <Edit className="size-4" />
@@ -235,20 +206,19 @@ function IntervenantTable({
                   </TableCell>
                 </TableRow>
               ))}
-              {!loading && items.length === 0 ? (
+              {!loading && !error && items.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={6}
+                    colSpan={columnCount}
                     className="py-10 text-center text-muted-foreground"
                   >
-                    <Icon className="mx-auto mb-2 size-5" /> Aucun intervenant.
+                    <Icon className="mx-auto mb-2 size-5" /> {kind === "EXPERT" ? "Aucun expert ne correspond aux critères." : "Aucun garage ne correspond aux critères."}
                   </TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
           </Table>
         </div>
-      </CardContent>
-    </Card>
+    </section>
   );
 }

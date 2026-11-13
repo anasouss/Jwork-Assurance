@@ -17,6 +17,8 @@ import {
   Truck,
   Users,
   UserCog,
+  UserRoundSearch,
+  Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { MODULE_PERMISSION_PREFIXES } from "@/lib/authorization";
@@ -68,7 +70,8 @@ export const appNavigation: AppNavigationItem[] = [
   { module: "sinistre", title: "Nouvelle ouverture", url: "/app/sinistre/declarer", icon: FilePlus2, permission: "sinistre:create" },
   { module: "sinistre", title: "Registre des sinistres", url: "/app/sinistre/registre", icon: ScrollText, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
   { module: "sinistre", title: "Statistiques", url: "/app/sinistre/statistiques", icon: ClipboardList, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { module: "sinistre", title: "Experts & garages", url: "/app/sinistre/referentiels", icon: Users, permission: "sinistre:referentiel" },
+  { module: "sinistre", title: "Experts", url: "/app/sinistre/experts", icon: UserRoundSearch, permission: "sinistre:referentiel" },
+  { module: "sinistre", title: "Garages", url: "/app/sinistre/garages", icon: Wrench, permission: "sinistre:referentiel" },
   { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permissionPrefixes: MODULE_PERMISSION_PREFIXES.companies },
   { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "referentiel:view" },
   { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "referentiel:view" },

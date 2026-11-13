@@ -75,6 +75,7 @@ public class SinistreDossierService {
     private final SinistreResponseMapper responseMapper;
     private final OperationTresorerieService operationTresorerieService;
     private final BusinessActivityRecorder activityRecorder;
+    private final PrestataireSinistreService prestataireService;
 
     @Transactional
     public SinistreDetailResponse updateGuarantee(
@@ -90,6 +91,7 @@ public class SinistreDossierService {
             assertEditable(context.sinistre());
             SinistreGarantie garantie = garantieRepository.findByIdAndSinistreId(garantieId, sinistreId)
                     .orElseThrow(() -> new ResourceNotFoundException("SinistreGarantie", garantieId));
+            boolean selectionChanged = request.getImpliquee() != null && request.getImpliquee() != garantie.isImpliquee();
             validateGuaranteeDecision(request);
             applyGuaranteeDecision(
                     garantie,
@@ -99,6 +101,10 @@ public class SinistreDossierService {
                     request.getMontantIndemnisable()
             );
             garantieRepository.save(garantie);
+            if (selectionChanged && context.sinistre().getGarage() != null) {
+                prestataireService.assertGarage(context.sinistre(), context.sinistre().getGarage(),
+                        context.sinistre().getModeReparation(), LocalDate.now());
+            }
             validateIndemnityAgainstSettlements(sinistreId);
             evenementService.record(
                     context.sinistre(),
@@ -122,6 +128,8 @@ public class SinistreDossierService {
         return recordChange(context, ActivityAction.UPDATED, "Garanties du sinistre enregistrées", "CLAIM_GUARANTEE_DECISIONS", null, null, () -> {
             assertEditable(context.sinistre());
             Set<Long> ids = new HashSet<>();
+            Set<Long> previousSelection = garantieRepository.findForDetailOrderByConfiguredDisplay(sinistreId).stream()
+                    .filter(SinistreGarantie::isImpliquee).map(SinistreGarantie::getId).collect(java.util.stream.Collectors.toSet());
             request.getGaranties().forEach(item -> {
                 if (!ids.add(item.getId())) {
                     throw new BadRequestException("Une garantie ne peut être mise à jour qu'une seule fois");
@@ -143,6 +151,12 @@ public class SinistreDossierService {
                 );
                 garantieRepository.save(garantie);
             });
+            Set<Long> currentSelection = garantieRepository.findForDetailOrderByConfiguredDisplay(sinistreId).stream()
+                    .filter(SinistreGarantie::isImpliquee).map(SinistreGarantie::getId).collect(java.util.stream.Collectors.toSet());
+            if (!previousSelection.equals(currentSelection) && context.sinistre().getGarage() != null) {
+                prestataireService.assertGarage(context.sinistre(), context.sinistre().getGarage(),
+                        context.sinistre().getModeReparation(), LocalDate.now());
+            }
             validateIndemnityAgainstSettlements(sinistreId);
             evenementService.record(
                     context.sinistre(),
@@ -332,24 +346,32 @@ public class SinistreDossierService {
             }
             ExpertSinistre expert = expertRepository.findByIdAndAgenceId(request.getExpertId(), agenceId)
                     .orElseThrow(() -> new ResourceNotFoundException("ExpertSinistre", request.getExpertId()));
-            if (!expert.isActif()) {
-                throw new BadRequestException("L'expert sélectionné est inactif");
-            }
             GarageSinistre garage = request.getGarageId() == null
                     ? null
                     : garageRepository.findByIdAndAgenceId(request.getGarageId(), agenceId)
                     .orElseThrow(() -> new ResourceNotFoundException("GarageSinistre", request.getGarageId()));
-            if (garage != null && !garage.isActif()) {
-                throw new BadRequestException("Le garage sélectionné est inactif");
-            }
             MissionExpertise mission = missionId == null
                     ? MissionExpertise.builder().sinistre(context.sinistre()).build()
                     : missionRepository.findByIdAndSinistreId(missionId, sinistreId)
                     .orElseThrow(() -> new ResourceNotFoundException("MissionExpertise", missionId));
+            if (missionId == null || mission.getExpert() == null
+                    || !java.util.Objects.equals(mission.getExpert().getId(), request.getExpertId())
+                    || !java.util.Objects.equals(mission.getDateMission(), request.getDateMission())) {
+                prestataireService.assertExpert(context.sinistre(), expert, request.getDateMission());
+            }
+            if (garage != null && (missionId == null || mission.getGarage() == null
+                    || !java.util.Objects.equals(mission.getGarage().getId(), request.getGarageId())
+                    || !java.util.Objects.equals(mission.getDateMission(), request.getDateMission()))) {
+                prestataireService.assertGarage(context.sinistre(), garage, context.sinistre().getModeReparation(), request.getDateMission());
+            }
+            if (mission.getExpert() == null || !java.util.Objects.equals(mission.getExpert().getId(), expert.getId())) {
+                mission.setExpertNomSnapshot(expert.getNom());
+            }
+            if (garage == null || mission.getGarage() == null || !java.util.Objects.equals(mission.getGarage().getId(), garage.getId())) {
+                mission.setGarageNomSnapshot(garage == null ? null : garage.getRaisonSociale());
+            }
             mission.setExpert(expert);
             mission.setGarage(garage);
-            mission.setExpertNomSnapshot(expert.getNom());
-            mission.setGarageNomSnapshot(garage == null ? null : garage.getRaisonSociale());
             mission.setReferenceMission(trimToNull(request.getReferenceMission()));
             mission.setDateMission(request.getDateMission());
             mission.setDateRapport(request.getDateRapport());

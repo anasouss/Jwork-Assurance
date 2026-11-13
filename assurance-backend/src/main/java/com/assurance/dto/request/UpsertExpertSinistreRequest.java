@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class UpsertExpertSinistreRequest {
+public class UpsertExpertSinistreRequest extends ConfigurationPrestataireRequest {
 
     @NotBlank
     @Size(max = 40)

@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class UpsertGarageSinistreRequest {
+public class UpsertGarageSinistreRequest extends ConfigurationPrestataireRequest {
 
     @NotBlank
     @Size(max = 40)
@@ -30,5 +30,4 @@ public class UpsertGarageSinistreRequest {
 
     private Boolean actif;
 
-    private Boolean conventionne;
 }

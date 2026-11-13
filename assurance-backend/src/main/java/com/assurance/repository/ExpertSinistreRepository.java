@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface ExpertSinistreRepository extends JpaRepository<ExpertSinistre, Long> {
+public interface ExpertSinistreRepository extends JpaRepository<ExpertSinistre, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<ExpertSinistre> {
+
+    boolean existsBySpecialitesId(Long specialiteId);
 
     @EntityGraph(attributePaths = "ville")
     List<ExpertSinistre> findByAgenceIdAndActifTrueOrderByNomAsc(Long agenceId);

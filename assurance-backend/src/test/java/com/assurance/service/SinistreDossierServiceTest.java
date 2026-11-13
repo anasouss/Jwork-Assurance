@@ -90,7 +90,8 @@ class SinistreDossierServiceTest {
             events,
             mapper,
             treasuryOperations,
-            activity.recorder
+            activity.recorder,
+            mock(PrestataireSinistreService.class)
     );
 
     private Sinistre claim;
@@ -220,7 +221,7 @@ class SinistreDossierServiceTest {
     @Test
     void designatedRepairGarageCanReceiveSettlementWithoutAnExpertMission() {
         var garage = com.assurance.entity.GarageSinistre.builder()
-                .agence(claim.getAgence()).raisonSociale("Garage PEC").conventionne(true).build();
+                .agence(claim.getAgence()).raisonSociale("Garage PEC").build();
         garage.setId(71L);
         claim.setGarage(garage);
         when(garages.findByIdAndAgenceId(71L, 1L)).thenReturn(java.util.Optional.of(garage));

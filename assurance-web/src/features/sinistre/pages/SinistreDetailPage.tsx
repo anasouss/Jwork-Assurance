@@ -89,7 +89,7 @@ import type {
   SinistreDetail,
   StatutSinistre,
   TypeDocument,
-  Intervenant,
+  ModeReparationSinistre,
 } from "../types";
 
 export default function SinistreDetailPage() {
@@ -120,16 +120,6 @@ export default function SinistreDetailPage() {
     queryKey: sinistreKeys.detail(sinistreId),
     queryFn: () => sinistreApi.get(sinistreId),
     enabled: Boolean(sinistreId),
-  });
-  const experts = useQuery({
-    queryKey: sinistreKeys.experts(false),
-    queryFn: () => sinistreApi.experts(false),
-    enabled: canManage && Boolean(detail.data),
-  });
-  const garages = useQuery({
-    queryKey: sinistreKeys.garages(false),
-    queryFn: () => sinistreApi.garages(false),
-    enabled: canManage && Boolean(detail.data),
   });
   const managers = useQuery({
     queryKey: sinistreKeys.managers(),
@@ -347,7 +337,6 @@ export default function SinistreDetailPage() {
           <GeneralSection
             dossier={dossier}
             managers={managers.data ?? []}
-            garages={garages.data ?? []}
             responsibilityVisible={
               dossier.garanties.some((item) => item.impliquee && item.responsabiliteCivile)
             }
@@ -731,8 +720,7 @@ export default function SinistreDetailPage() {
         initialPhase={dossier.etapeSuivi === "EXPERTISE_APRES" ? "APRES" : "AVANT"}
         open={missionOpen}
         mission={editingMission}
-        experts={experts.data ?? []}
-        garages={garages.data ?? []}
+        dossier={dossier}
         saving={mission.isPending}
         onOpenChange={(open) => {
           setMissionOpen(open);
@@ -1197,7 +1185,6 @@ function DocumentStage({
 function GeneralSection({
   dossier,
   managers,
-  garages,
   responsibilityVisible,
   editable,
   saving,
@@ -1205,7 +1192,6 @@ function GeneralSection({
 }: {
   dossier: SinistreDetail;
   managers: Array<{ id: string; nom: string }>;
-  garages: Intervenant[];
   responsibilityVisible: boolean;
   editable: boolean;
   saving: boolean;
@@ -1254,6 +1240,13 @@ function GeneralSection({
   );
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+  const garageContext = { sinistreId: dossier.id, modeReparation: (form.modeReparation || undefined) as ModeReparationSinistre | undefined,
+    garantieIds: dossier.garanties.filter(g => g.impliquee).map(g => g.garantieId) };
+  const garageQuery = useQuery({ queryKey: sinistreKeys.eligible("GARAGE", garageContext), queryFn: () => sinistreApi.eligibleProviders("GARAGE", garageContext), enabled: dossier.couverture.brancheCode === "AUTOMOBILE" });
+  const garages = garageQuery.data ?? [];
+  const historicalGarage = form.garageId === dossier.garageId && form.modeReparation === dossier.modeReparation;
+  const garageChanged = form.garageId !== (dossier.garageId || "") || form.modeReparation !== (dossier.modeReparation || "");
+  const garageInvalid = !!form.garageId && !historicalGarage && !garages.some(item => item.id === form.garageId);
   return (
       <section id="modifier" ref={sectionRef} className="scroll-mt-24 rounded-md border bg-card p-4">
         <div className="mb-4 flex items-center justify-between">
@@ -1261,7 +1254,7 @@ function GeneralSection({
           {editable ? (
             <Button
               size="sm"
-              disabled={saving || (dossier.statut !== "BROUILLON" && !form.referenceCompagnie.trim()) || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
+              disabled={saving || garageInvalid || (garageChanged && (garageQuery.isFetching || garageQuery.isError)) || (dossier.statut !== "BROUILLON" && !form.referenceCompagnie.trim()) || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
               onClick={() =>
                 onSave({
                   referenceCompagnie:
@@ -1326,9 +1319,10 @@ function GeneralSection({
             <Field label="Mode de réparation"><Select disabled={!editable || saving} value={form.modeReparation} onValueChange={(value) => setForm((current) => ({ ...current, modeReparation: value, garageId: "" }))}>
               <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{Object.entries(repairLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
             </Select></Field>
-            <Field label={form.modeReparation === "PEC" ? "Garage conventionné *" : "Garage"}><Select disabled={!editable || saving} value={form.garageId || "NONE"} onValueChange={(value) => update("garageId", value === "NONE" ? "" : value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{dossier.garageId && !garages.some((item) => item.id === dossier.garageId) ? <SelectItem value={dossier.garageId}>{dossier.garage || "Garage actuel"}</SelectItem> : null}{garages.filter((item) => form.modeReparation !== "PEC" || item.conventionne || item.id === dossier.garageId).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}</SelectItem>)}</SelectContent>
+            <Field label={form.modeReparation === "PEC" ? "Garage conventionné *" : "Garage"}><Select disabled={!editable || saving || garageQuery.isFetching || garageQuery.isError} value={form.garageId || "NONE"} onValueChange={(value) => update("garageId", value === "NONE" ? "" : value)}>
+              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{historicalGarage && dossier.garageId && !garages.some((item) => item.id === dossier.garageId) ? <SelectItem value={dossier.garageId}>{dossier.garage || "Garage actuel"}</SelectItem> : null}{garages.map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}</SelectItem>)}</SelectContent>
             </Select></Field>
+            {garageQuery.isError ? <p role="alert" className="text-sm text-destructive">{garageQuery.error.message}</p> : null}
           </> : null}
           <Field label="Référence compagnie" required={dossier.statut !== "BROUILLON"}>
             <Input

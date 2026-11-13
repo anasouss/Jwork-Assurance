@@ -19,15 +19,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 class SinistreQualificationServiceTest {
     private final GarageSinistreRepository garages = mock(GarageSinistreRepository.class);
-    private final SinistreQualificationService service = new SinistreQualificationService(garages);
+    private final PrestataireSinistreService providers = mock(PrestataireSinistreService.class);
+    private final SinistreQualificationService service = new SinistreQualificationService(garages, providers);
 
     @Test
     void pecRequiresConfiguredActiveTenantGarageAndStoresHistoricalName() {
         Sinistre claim = automobile();
-        GarageSinistre garage = GarageSinistre.builder().raisonSociale("Garage agree").conventionne(true).build();
+        GarageSinistre garage = GarageSinistre.builder().raisonSociale("Garage agree").build();
         when(garages.findByIdAndAgenceId(9L, 1L)).thenReturn(Optional.of(garage));
         service.apply(claim, TypeDommageSinistre.MIXTE, ModeReparationSinistre.PEC, 9L, new BigDecimal("50.00"));
         assertThat(claim.getGarageNomSnapshot()).isEqualTo("Garage agree");
@@ -35,6 +39,7 @@ class SinistreQualificationServiceTest {
         garage.setRaisonSociale("Nouveau nom");
         assertThat(claim.getGarageNomSnapshot()).isEqualTo("Garage agree");
         verify(garages).findByIdAndAgenceId(9L, 1L);
+        verify(providers).assertGarage(eq(claim), eq(garage), eq(ModeReparationSinistre.PEC), any());
     }
 
     @Test
@@ -43,9 +48,10 @@ class SinistreQualificationServiceTest {
                 ModeReparationSinistre.PEC, null, null)).isInstanceOf(BadRequestException.class);
         GarageSinistre garage = GarageSinistre.builder().raisonSociale("Non conventionne").build();
         when(garages.findByIdAndAgenceId(9L, 1L)).thenReturn(Optional.of(garage));
+        doThrow(new BadRequestException("Accord conventionné manquant ou prestataire inactif"))
+                .when(providers).assertGarage(any(), eq(garage), eq(ModeReparationSinistre.PEC), any());
         assertThatThrownBy(() -> service.apply(automobile(), TypeDommageSinistre.MATERIEL,
                 ModeReparationSinistre.PEC, 9L, null)).isInstanceOf(BadRequestException.class);
-        garage.setConventionne(true);
         garage.setActif(false);
         assertThatThrownBy(() -> service.apply(automobile(), TypeDommageSinistre.MATERIEL,
                 ModeReparationSinistre.PEC, 9L, null)).isInstanceOf(BadRequestException.class);

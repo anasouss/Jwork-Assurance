@@ -18,7 +18,7 @@ import { SinistreOpeningFields, type OpeningFields } from "../components/Sinistr
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
 import { parseOpeningDamage } from "../opening-context";
 import { damageLabels } from "../workflow";
-import type { CoverageGuarantee, Intervenant, OpeningDocument } from "../types";
+import type { CoverageGuarantee, OpeningDocument } from "../types";
 
 const GUARANTEE_GROUPS = [
   { type: "VEHICULE", label: "Garanties du risque" },
@@ -108,13 +108,13 @@ export default function SinistreDeclarationPage() {
     mutationFn: (request: object) => sinistreApi.saveExpert(null, request),
     onSuccess: (expert) => {
       queryClient.invalidateQueries({ queryKey: [...sinistreKeys.all, "experts"] });
+      queryClient.invalidateQueries({ queryKey: sinistreKeys.providers() });
+      queryClient.invalidateQueries({ queryKey: [...sinistreKeys.all, "eligible-prestataires"] });
       if (expert.actif) {
-        queryClient.setQueryData<Intervenant[]>(sinistreKeys.experts(false, expert.villeId || undefined), (current = []) =>
-          [...current.filter((item) => item.id !== expert.id), expert].sort((a, b) => a.nom.localeCompare(b.nom, "fr")));
         setOpening((current) => ({ ...current, expertVilleId: expert.villeId ?? "", expertId: expert.id }));
       }
       setExpertDialogOpen(false);
-      toast.success(expert.actif ? "Expert ajouté et sélectionné" : "Expert ajouté comme inactif, non sélectionné");
+      toast.success(expert.actif ? "Expert ajouté · compatibilité à vérifier" : "Expert ajouté comme inactif, non sélectionné");
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Ajout de l’expert impossible"),
   });
@@ -153,10 +153,12 @@ export default function SinistreDeclarationPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Création impossible"),
   });
 
+  const [providersValid, setProvidersValid] = useState(true);
   const busy = create.isPending || createExpert.isPending;
 
   function submit(declarer: boolean, confirmed = false) {
     if (busy || expertDialogOpen) return;
+    if (!providersValid) { toast.error("Un prestataire sélectionné est incompatible ou en cours de vérification"); return; }
     if (!hasContext || !coverage.data || (automobile && !selectedVehicle)) {
       toast.error("Le contexte de couverture est incomplet");
       return;
@@ -287,15 +289,16 @@ export default function SinistreDeclarationPage() {
 
           <Section title="Ouverture et intervenants" icon={ShieldCheck}>
             <SinistreOpeningFields automobile={automobile} responsabiliteCivile={responsabiliteCivile} value={opening} onChange={setOpening}
+              providerContext={{ contratId, vehiculeId: selectedVehicle?.id, dateSinistre, garantieIds: guaranteeIds }} onEligibilityChange={setProvidersValid}
               documents={documents} onDocumentsChange={setDocuments} disabled={busy}
               onAddExpert={canCreateExpert ? () => setExpertDialogOpen(true) : undefined} />
           </Section>
 
           <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-            <Button variant="outline" disabled={busy} onClick={() => submit(false)}>
+            <Button variant="outline" disabled={busy || !providersValid} onClick={() => submit(false)}>
               {create.isPending && create.variables === false ? <LoaderCircle className="size-4 animate-spin" /> : null} Enregistrer en brouillon
             </Button>
-            <Button disabled={busy} onClick={() => submit(true)}>
+            <Button disabled={busy || !providersValid} onClick={() => submit(true)}>
               {create.isPending && create.variables === true ? <LoaderCircle className="size-4 animate-spin" /> : null} Enregistrer l’ouverture
             </Button>
           </div>

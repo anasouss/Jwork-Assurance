@@ -74,7 +74,7 @@ class SinistreServiceTest {
     @Spy
     private SinistreWorkflowService workflow = new SinistreWorkflowService();
     @Spy
-    private SinistreQualificationService qualification = new SinistreQualificationService(mock(GarageSinistreRepository.class));
+    private SinistreQualificationService qualification = new SinistreQualificationService(mock(GarageSinistreRepository.class), mock(PrestataireSinistreService.class));
     @InjectMocks
     private SinistreService service;
     private CreateSinistreRequest request;

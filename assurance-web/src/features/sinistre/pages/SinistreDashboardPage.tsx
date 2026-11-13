@@ -1,4 +1,4 @@
-import { BarChart3, FilePlus2, Files, ScrollText, UserRoundSearch, Wrench } from "lucide-react";
+import { BarChart3, FilePlus2, Files, ScrollText, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -7,8 +7,7 @@ const actions = [
   { title: "Consultation et suivi", subtitle: "Dossiers, étapes et historique.", href: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
   { title: "Registre des sinistres", subtitle: "Références, assurés et compagnies.", href: "/app/sinistre/registre", icon: ScrollText, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
   { title: "Statistiques", subtitle: "Déclarations, délais et montants.", href: "/app/sinistre/statistiques", icon: BarChart3, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { title: "Experts", subtitle: "Experts, coordonnées et villes.", href: "/app/sinistre/experts", icon: UserRoundSearch, permissions: ["sinistre:referentiel"] },
-  { title: "Garages", subtitle: "Garages et conventionnement.", href: "/app/sinistre/garages", icon: Wrench, permissions: ["sinistre:referentiel"] },
+  { title: "Prestataires", subtitle: "Experts, garages, spécialités et accords.", href: "/app/sinistre/prestataires", icon: Users, permissions: ["sinistre:referentiel"] },
 ];
 
 export default function SinistreDashboardPage() {

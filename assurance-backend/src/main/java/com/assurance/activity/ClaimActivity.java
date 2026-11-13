@@ -290,7 +290,13 @@ public final class ClaimActivity {
     public static Map<String, String> intervenantSnapshot(SinistreIntervenantResponse person) {
         return new ActivityValues().put("Code", person.getCode()).put("Nom", person.getNom()).put("Téléphone", person.getTelephone())
                 .put("E-mail", person.getEmail()).put("Adresse", person.getAdresse()).put("Ville", person.getVille())
-                .put("Conventionné", person.isConventionne()).put("Actif", person.isActif()).snapshot();
+                .put("Toutes compagnies", person.isToutesCompagnies()).put("Actif", person.isActif())
+                .put("Spécialités", person.getSpecialites() == null ? "" : person.getSpecialites().stream()
+                        .map(com.assurance.dto.response.SpecialitePrestataireResponse::libelle).sorted().collect(java.util.stream.Collectors.joining(", ")))
+                .put("Accords compagnies", person.getAccords() == null ? "" : person.getAccords().stream()
+                        .map(a -> a.compagnie() + " / " + (a.conventionne() ? "Conventionné" : "Non conventionné")
+                                + " / " + a.actif() + " / " + a.dateDebut() + " / " + a.dateFin())
+                        .sorted().collect(java.util.stream.Collectors.joining(" ; "))).snapshot();
     }
 
     public static ActivityCommand intervenantCommand(Long agencyId, SinistreIntervenantResponse person, Map<String, String> before,

@@ -16,4 +16,12 @@ public class SinistreIntervenantResponse {
     private String ville;
     private boolean actif;
     private boolean conventionne;
+    private com.assurance.enums.TypePrestataireSinistre typePrestataire;
+    private boolean toutesCompagnies;
+    private java.util.List<SpecialitePrestataireResponse> specialites;
+    private java.util.List<Accord> accords;
+
+    public record Accord(Long compagnieId, String compagnie, boolean actif, boolean conventionne,
+            java.time.LocalDate dateDebut, java.time.LocalDate dateFin) {
+    }
 }

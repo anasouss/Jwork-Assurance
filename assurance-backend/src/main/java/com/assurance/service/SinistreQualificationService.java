@@ -17,6 +17,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SinistreQualificationService {
     private final GarageSinistreRepository garageRepository;
+    private final PrestataireSinistreService prestataireService;
 
     public void apply(Sinistre sinistre, TypeDommageSinistre type, ModeReparationSinistre mode,
             Long garageId, BigDecimal responsabilite) {
@@ -30,16 +31,20 @@ public class SinistreQualificationService {
         GarageSinistre garage = garageId == null ? null
                 : garageRepository.findByIdAndAgenceId(garageId, sinistre.getAgence().getId())
                         .orElseThrow(() -> new ResourceNotFoundException("GarageSinistre", garageId));
-        if (garage != null && !garage.isActif()) {
-            throw new BadRequestException("Le garage selectionne est inactif");
+        if (mode == ModeReparationSinistre.PEC && garage == null) {
+            throw new BadRequestException("La PEC exige un garage conventionné pour la compagnie du sinistre");
         }
-        if (mode == ModeReparationSinistre.PEC && (garage == null || !garage.isConventionne())) {
-            throw new BadRequestException("La PEC exige un garage conventionne actif de l'agence");
+        if (garage != null && (sinistre.getGarage() == null
+                || !java.util.Objects.equals(sinistre.getGarage().getId(), garageId) || mode != sinistre.getModeReparation())) {
+            prestataireService.assertGarage(sinistre, garage, mode, java.time.LocalDate.now());
         }
         sinistre.setTypeDommage(type);
         sinistre.setModeReparation(mode);
+        if (garage == null || sinistre.getGarage() == null
+                || !java.util.Objects.equals(sinistre.getGarage().getId(), garageId)) {
+            sinistre.setGarageNomSnapshot(garage == null ? null : garage.getRaisonSociale());
+        }
         sinistre.setGarage(garage);
-        sinistre.setGarageNomSnapshot(garage == null ? null : garage.getRaisonSociale());
         sinistre.setTauxResponsabilite(responsabilite);
     }
 

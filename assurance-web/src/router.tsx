@@ -53,16 +53,18 @@ export const router = createBrowserRouter([
       },
       {
         path: "sinistre/referentiels",
-        element: <Navigate to="/app/sinistre/experts" replace />,
+        element: <Navigate to="/app/sinistre/prestataires" replace />,
       },
       {
         path: "sinistre/experts",
-        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreExpertsPage")),
+        element: <Navigate to="/app/sinistre/prestataires?type=EXPERT" replace />,
       },
       {
         path: "sinistre/garages",
-        lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreGaragesPage")),
+        element: <Navigate to="/app/sinistre/prestataires?type=GARAGE" replace />,
       },
+      { path: "sinistre/prestataires", lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistrePrestatairesPage")) },
+      { path: "sinistre/prestataires/specialites", lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreSpecialitesPage")) },
       {
         path: "production/ajouter-dossier",
         lazy: lazyRoute(() => import("@/features/production/pages/ContratCreationPage")),

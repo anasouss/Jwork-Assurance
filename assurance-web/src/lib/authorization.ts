@@ -32,7 +32,7 @@ const routePermissionRules: readonly RoutePermissionRule[] = [
     anyOf: ["sinistre:referentiel"],
   },
   {
-    matches: startsWith("/app/sinistre/experts"),
+    matches: (pathname) => startsWith("/app/sinistre/prestataires")(pathname) || startsWith("/app/sinistre/experts")(pathname),
     anyOf: ["sinistre:referentiel"],
   },
   {

@@ -23,6 +23,10 @@ import type {
   SinistreSummary,
   StatutSinistre,
   TypeDocument,
+  ProviderEligibilityContext,
+  ProviderKind,
+  ProviderReference,
+  ProviderSpecialty,
 } from "./types";
 
 const unwrap = <T>(response: ApiResponse<T>) => response.data;
@@ -45,10 +49,30 @@ export const sinistreKeys = {
   garages: (includeInactive: boolean) =>
     [...sinistreKeys.all, "garages", includeInactive] as const,
   managers: () => [...sinistreKeys.all, "managers"] as const,
+  providers: () => [...sinistreKeys.all, "prestataires"] as const,
+  specialties: () => [...sinistreKeys.providers(), "specialites"] as const,
+  providerOptions: () => [...sinistreKeys.providers(), "options"] as const,
+  eligible: (type: ProviderKind, context: ProviderEligibilityContext) => [...sinistreKeys.all, "eligible-prestataires", type, context] as const,
   treasuryAccounts: () => [...sinistreKeys.all, "treasury-accounts"] as const,
 };
 
 export const sinistreApi = {
+  async providers(params: { typePrestataire: ProviderKind; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; page: number; size: number }) {
+    return unwrap(await apiFetch<ApiResponse<PagedResponse<Intervenant>>>(`/api/v1/sinistres/prestataires${buildQueryString(params)}`));
+  },
+  async providerOptions() {
+    return unwrap(await apiFetch<ApiResponse<{ compagnies: ProviderReference[]; garanties: ProviderReference[] }>>("/api/v1/sinistres/prestataires/options"));
+  },
+  async specialties() {
+    return unwrap(await apiFetch<ApiResponse<ProviderSpecialty[]>>("/api/v1/sinistres/prestataires/specialites"));
+  },
+  async saveSpecialty(id: string | null, request: { code: string; libelle: string; typePrestataire: ProviderKind; actif: boolean; garantieIds: string[] }) {
+    return unwrap(await apiFetch<ApiResponse<ProviderSpecialty>>(`/api/v1/sinistres/prestataires/specialites${id ? `/${id}` : ""}`,
+      { method: id ? "PUT" : "POST", body: JSON.stringify(request) }));
+  },
+  async eligibleProviders(typePrestataire: ProviderKind, context: ProviderEligibilityContext) {
+    return unwrap(await apiFetch<ApiResponse<Intervenant[]>>(`/api/v1/sinistres/prestataires/eligibles${buildQueryString({ typePrestataire, ...context })}`));
+  },
   async lookupContracts(brancheId: string, query: string) {
     return unwrap(await apiFetch<ApiResponse<SinistreContractOption[]>>(
       `/api/v1/sinistres/contrats${buildQueryString({ brancheId, query })}`,

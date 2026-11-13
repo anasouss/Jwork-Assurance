@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,7 +13,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { Intervenant } from "../types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toDateOnly } from "@/features/production/date";
+import { sinistreApi, sinistreKeys } from "../api";
+import type { Intervenant, ProviderAgreement } from "../types";
 import {
   SinistreVilleSelect,
   type CityOption,
@@ -46,8 +53,12 @@ export function SinistreIntervenantDialog({
     adresse: "",
     villeId: "",
     actif: true,
-    conventionne: false,
+    toutesCompagnies: true,
+    specialiteIds: [] as string[],
+    accords: [] as ProviderAgreement[],
   });
+  const options = useQuery({ queryKey: sinistreKeys.providerOptions(), queryFn: sinistreApi.providerOptions, enabled: open });
+  const specialties = useQuery({ queryKey: sinistreKeys.specialties(), queryFn: sinistreApi.specialties, enabled: open });
 
   useEffect(() => {
     if (!open) return;
@@ -59,11 +70,13 @@ export function SinistreIntervenantDialog({
       adresse: intervenant?.adresse ?? "",
       villeId: intervenant?.villeId ?? initialVilleId,
       actif: intervenant?.actif ?? true,
-      conventionne: intervenant?.conventionne ?? false,
+      toutesCompagnies: intervenant?.toutesCompagnies ?? true,
+      specialiteIds: intervenant?.specialites?.map(s => s.id) ?? [],
+      accords: intervenant?.accords?.map(a => ({ ...a })) ?? [],
     });
   }, [intervenant, open, initialVilleId]);
 
-  function update(key: keyof typeof form, value: string | boolean) {
+  function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -76,13 +89,15 @@ export function SinistreIntervenantDialog({
       adresse: form.adresse.trim() || undefined,
       villeId: form.villeId || undefined,
       actif: form.actif,
-      ...(kind === "GARAGE" ? { conventionne: form.conventionne } : {}),
+      toutesCompagnies: form.toutesCompagnies,
+      specialiteIds: form.specialiteIds,
+      accords: form.accords,
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
-      <DialogContent className="sm:max-w-2xl" showCloseButton={!saving}>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl" showCloseButton={!saving}>
         <DialogHeader>
           <DialogTitle>
             {intervenant ? "Modifier" : "Ajouter"}{" "}
@@ -147,17 +162,43 @@ export function SinistreIntervenantDialog({
               />
             </Field>
           </div>
-          {kind === "GARAGE" ? <label className="flex items-center justify-between gap-3 text-sm sm:col-span-2">
-            Garage conventionné
-            <Switch checked={form.conventionne} onCheckedChange={(value) => update("conventionne", value)} />
-          </label> : null}
         </fieldset>
+        <fieldset disabled={saving} className="grid gap-3 border-t pt-4">
+          <legend className="text-sm font-semibold">Spécialités</legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(specialties.data ?? []).filter(s => s.typePrestataire === kind).map(s => <label key={s.id} className="flex items-start gap-2 text-sm">
+              <Checkbox checked={form.specialiteIds.includes(s.id)} disabled={!s.actif && !form.specialiteIds.includes(s.id)} onCheckedChange={checked => update("specialiteIds", checked ? [...form.specialiteIds, s.id] : form.specialiteIds.filter(id => id !== s.id))} />
+              <span>{s.libelle}{!s.actif ? " (inactive)" : ""}<span className="block text-xs text-muted-foreground">{s.garanties.map(g => g.libelle).join(", ")}</span></span>
+            </label>)}
+          </div>
+          {specialties.isSuccess && !specialties.data.some(s => s.typePrestataire === kind) && <p className="text-sm text-muted-foreground">Aucune spécialité configurée pour ce type de prestataire.</p>}
+        </fieldset>
+        <fieldset disabled={saving} className="grid gap-3 border-t pt-4">
+          <legend className="text-sm font-semibold">Compagnies et accords</legend>
+          <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.toutesCompagnies} onCheckedChange={checked => update("toutesCompagnies", checked === true)} />Intervient pour toutes les compagnies, même sans accord</label>
+          {form.accords.map((agreement, index) => {
+            const change = (patch: Partial<ProviderAgreement>) => update("accords", form.accords.map((a, i) => i === index ? { ...a, ...patch } : a));
+            return <div key={index} className="grid items-end gap-3 border-b pb-3 sm:grid-cols-2 lg:grid-cols-[minmax(160px,1fr)_auto_auto_140px_140px_auto]">
+              <Field label="Compagnie" required><Select value={agreement.compagnieId} onValueChange={value => change({ compagnieId: value })}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{(options.data?.compagnies ?? []).filter(c => c.id === agreement.compagnieId || !form.accords.some(a => a.compagnieId === c.id)).map(c => <SelectItem key={c.id} value={c.id}>{c.libelle}</SelectItem>)}</SelectContent>
+              </Select></Field>
+              <label className="flex h-10 items-center gap-2 text-sm"><Checkbox checked={agreement.actif} onCheckedChange={value => change({ actif: value === true })} />Actif</label>
+              <label className="flex h-10 items-center gap-2 text-sm"><Checkbox checked={agreement.conventionne} onCheckedChange={value => change({ conventionne: value === true })} />Conventionné</label>
+              <Field label="Du"><DatePicker date={agreement.dateDebut ?? ""} onSelect={date => change({ dateDebut: toDateOnly(date) ?? null })} /></Field>
+              <Field label="Au"><DatePicker date={agreement.dateFin ?? ""} onSelect={date => change({ dateFin: toDateOnly(date) ?? null })} /></Field>
+              <Button type="button" variant="ghost" size="icon" title="Retirer l'accord" aria-label="Retirer l'accord" onClick={() => update("accords", form.accords.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
+            </div>;
+          })}
+          <Button type="button" variant="outline" className="justify-self-start" disabled={options.isPending || options.isError || form.accords.some(a => !a.compagnieId)} onClick={() => update("accords", [...form.accords, { compagnieId: "", actif: true, conventionne: false }])}><Plus className="size-4" />Ajouter une compagnie</Button>
+        </fieldset>
+        {(options.isError || specialties.isError) && <p role="alert" className="text-sm text-destructive">{options.error?.message || specialties.error?.message}</p>}
         <DialogFooter>
           <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
           <Button
-            disabled={!form.code.trim() || !form.nom.trim() || saving}
+            disabled={!form.code.trim() || !form.nom.trim() || saving || options.isPending || specialties.isPending || options.isError || specialties.isError
+              || (!form.toutesCompagnies && !form.accords.length) || form.accords.some(a => !a.compagnieId || (a.dateDebut && a.dateFin && a.dateDebut > a.dateFin))}
             onClick={submit}
           >
             Enregistrer

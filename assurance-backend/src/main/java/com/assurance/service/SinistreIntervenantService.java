@@ -32,6 +32,7 @@ public class SinistreIntervenantService {
     private final ExpertSinistreRepository expertRepository;
     private final GarageSinistreRepository garageRepository;
     private final BusinessActivityRecorder activityRecorder;
+    private final PrestataireSinistreService prestataireService;
 
     @Transactional(readOnly = true)
     public List<SinistreIntervenantResponse> listExperts(Long agenceId, boolean includeInactive) {
@@ -78,6 +79,7 @@ public class SinistreIntervenantService {
         expert.setAdresse(trimToNull(request.getAdresse()));
         expert.setVille(resolveVille(request.getVilleId()));
         expert.setActif(request.getActif() == null || request.getActif());
+        prestataireService.configure(expert, request);
         expert = expertRepository.save(expert);
         var response = toResponse(expert);
         activityRecorder.record(ClaimActivity.intervenantCommand(expert.getAgence().getId(), response, before, ActivityRecordType.EXPERT_SINISTRE, id == null));
@@ -117,9 +119,7 @@ public class SinistreIntervenantService {
         garage.setAdresse(trimToNull(request.getAdresse()));
         garage.setVille(resolveVille(request.getVilleId()));
         garage.setActif(request.getActif() == null || request.getActif());
-        if (request.getConventionne() != null) {
-            garage.setConventionne(request.getConventionne());
-        }
+        prestataireService.configure(garage, request);
         garage = garageRepository.save(garage);
         var response = toResponse(garage);
         activityRecorder.record(ClaimActivity.intervenantCommand(garage.getAgence().getId(), response, before, ActivityRecordType.GARAGE_SINISTRE, id == null));
@@ -149,6 +149,10 @@ public class SinistreIntervenantService {
                 .villeId(expert.getVille() == null ? null : expert.getVille().getId())
                 .ville(expert.getVille() == null ? null : expert.getVille().getNom())
                 .actif(expert.isActif())
+                .typePrestataire(com.assurance.enums.TypePrestataireSinistre.EXPERT)
+                .toutesCompagnies(expert.isToutesCompagnies())
+                .specialites(expert.getSpecialites().stream().map(prestataireService::specialiteResponse).toList())
+                .accords(accordResponses(expert.getAccords()))
                 .build();
     }
 
@@ -163,8 +167,74 @@ public class SinistreIntervenantService {
                 .villeId(garage.getVille() == null ? null : garage.getVille().getId())
                 .ville(garage.getVille() == null ? null : garage.getVille().getNom())
                 .actif(garage.isActif())
-                .conventionne(garage.isConventionne())
+                .typePrestataire(com.assurance.enums.TypePrestataireSinistre.GARAGE)
+                .toutesCompagnies(garage.isToutesCompagnies())
+                .specialites(garage.getSpecialites().stream().map(prestataireService::specialiteResponse).toList())
+                .accords(accordResponses(garage.getAccords()))
                 .build();
+    }
+
+    private List<SinistreIntervenantResponse.Accord> accordResponses(java.util.Set<com.assurance.entity.AccordPrestataireSinistre> agreements) {
+        return agreements.stream().sorted(java.util.Comparator.comparing(a -> a.getCompagnie().getNom()))
+                .map(a -> new SinistreIntervenantResponse.Accord(a.getCompagnie().getId(), a.getCompagnie().getNom(),
+                        a.isActif(), a.isConventionne(), a.getDateDebut(), a.getDateFin())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SinistreIntervenantResponse> eligible(Long agenceId, com.assurance.enums.TypePrestataireSinistre type,
+            Long sinistreId, Long contratId, Long vehiculeId, java.time.LocalDate dateSinistre,
+            java.util.Set<Long> garantieIds, java.time.LocalDate dateIntervention,
+            com.assurance.enums.ModeReparationSinistre mode, Long villeId) {
+        return eligible(type, prestataireService.context(agenceId, sinistreId, contratId, vehiculeId,
+                dateSinistre, garantieIds, dateIntervention, mode), villeId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SinistreIntervenantResponse> eligible(com.assurance.enums.TypePrestataireSinistre type,
+            PrestataireSinistreService.Eligibility context, Long villeId) {
+        if (type == com.assurance.enums.TypePrestataireSinistre.EXPERT) {
+            return prestataireService.eligibleExperts(context, villeId).stream().map(this::toResponse).toList();
+        }
+        return prestataireService.eligibleGarages(context, villeId).stream().map(garage -> {
+            var response = toResponse(garage);
+            response.setConventionne(prestataireService.approved(garage.getAccords(), context));
+            return response;
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public com.assurance.dto.response.PagedResponse<SinistreIntervenantResponse> directory(Long agenceId,
+            com.assurance.enums.TypePrestataireSinistre type, boolean includeInactive, String query,
+            Long villeId, Long compagnieId, Long specialiteId, int page, int size) {
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
+                org.springframework.data.domain.Sort.by(type == com.assurance.enums.TypePrestataireSinistre.EXPERT ? "nom" : "raisonSociale").and(org.springframework.data.domain.Sort.by("id")));
+        org.springframework.data.domain.Page<SinistreIntervenantResponse> result;
+        if (type == com.assurance.enums.TypePrestataireSinistre.EXPERT) {
+            result = expertRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, "nom"), pageable).map(this::toResponse);
+        } else {
+            result = garageRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, "raisonSociale"), pageable).map(this::toResponse);
+        }
+        return com.assurance.dto.response.PagedResponse.<SinistreIntervenantResponse>builder()
+                .items(result.getContent()).page(com.assurance.dto.response.PageMetadata.from(result)).build();
+    }
+
+    private <T> org.springframework.data.jpa.domain.Specification<T> directoryFilter(Long agenceId, boolean includeInactive,
+            String query, Long villeId, Long compagnieId, Long specialiteId, String nameField) {
+        return (root, criteria, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            predicates.add(cb.equal(root.get("agence").get("id"), agenceId));
+            if (!includeInactive) predicates.add(cb.isTrue(root.get("actif")));
+            if (villeId != null) predicates.add(cb.equal(root.get("ville").get("id"), villeId));
+            if (compagnieId != null) predicates.add(cb.equal(root.join("accords").get("compagnie").get("id"), compagnieId));
+            if (specialiteId != null) predicates.add(cb.equal(root.join("specialites").get("id"), specialiteId));
+            if (query != null && !query.isBlank()) {
+                String pattern = "%" + query.trim().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+                predicates.add(cb.or(cb.like(cb.lower(root.get("code")), pattern, '!'), cb.like(cb.lower(root.get(nameField)), pattern, '!'),
+                        cb.like(cb.lower(root.get("telephone")), pattern, '!'), cb.like(cb.lower(root.get("email")), pattern, '!')));
+            }
+            criteria.distinct(true);
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        };
     }
 
     private String normalizeCode(String value) {

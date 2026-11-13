@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -19,14 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Intervenant, PhaseExpertise, SinistreDetail } from "../types";
+import type { PhaseExpertise, SinistreDetail } from "../types";
+import { sinistreApi, sinistreKeys } from "../api";
 
 type Mission = SinistreDetail["missionsExpertise"][number];
 export function SinistreMissionDialog({
   open,
   mission,
-  experts,
-  garages,
+  dossier,
   saving,
   initialPhase = "AVANT",
   onOpenChange,
@@ -34,8 +35,7 @@ export function SinistreMissionDialog({
 }: {
   open: boolean;
   mission: Mission | null;
-  experts: Intervenant[];
-  garages: Intervenant[];
+  dossier: SinistreDetail;
   saving: boolean;
   initialPhase?: PhaseExpertise;
   onOpenChange: (open: boolean) => void;
@@ -91,6 +91,17 @@ export function SinistreMissionDialog({
   }, [open, mission, initialPhase]);
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+  const context = { sinistreId: dossier.id, dateIntervention: form.dateMission || undefined,
+    garantieIds: dossier.garanties.filter(g => g.impliquee).map(g => g.garantieId) };
+  const expertQuery = useQuery({ queryKey: sinistreKeys.eligible("EXPERT", context), queryFn: () => sinistreApi.eligibleProviders("EXPERT", context), enabled: open && !!form.dateMission });
+  const garageContext = { ...context, modeReparation: dossier.modeReparation ?? undefined };
+  const garageQuery = useQuery({ queryKey: sinistreKeys.eligible("GARAGE", garageContext), queryFn: () => sinistreApi.eligibleProviders("GARAGE", garageContext), enabled: open && !!form.dateMission });
+  const experts = expertQuery.data ?? [];
+  const garages = garageQuery.data ?? [];
+  const historicalExpert = mission?.expertId === form.expertId && mission.dateMission === form.dateMission;
+  const historicalGarage = mission?.garageId === form.garageId && mission.dateMission === form.dateMission;
+  const validExpert = historicalExpert || experts.some(item => item.id === form.expertId);
+  const validGarage = !form.garageId || historicalGarage || garages.some(item => item.id === form.garageId);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
@@ -109,6 +120,7 @@ export function SinistreMissionDialog({
           </Field>
           <Field label="Expert *">
             <Select
+              disabled={saving || expertQuery.isFetching || expertQuery.isError}
               value={form.expertId}
               onValueChange={(value) => update("expertId", value)}
             >
@@ -116,8 +128,8 @@ export function SinistreMissionDialog({
                 <SelectValue placeholder="Sélectionner" />
               </SelectTrigger>
               <SelectContent>
+                {form.expertId && !experts.some(item => item.id === form.expertId) ? <SelectItem value={form.expertId} disabled={!historicalExpert}>{historicalExpert ? mission?.expert : "Expert incompatible · à remplacer"}</SelectItem> : null}
                 {experts
-                  .filter((item) => item.actif || item.id === form.expertId)
                   .map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.code} · {item.nom}
@@ -128,6 +140,7 @@ export function SinistreMissionDialog({
           </Field>
           <Field label="Garage">
             <Select
+              disabled={saving || garageQuery.isFetching || garageQuery.isError}
               value={form.garageId || "NONE"}
               onValueChange={(value) =>
                 update("garageId", value === "NONE" ? "" : value)
@@ -138,8 +151,8 @@ export function SinistreMissionDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="NONE">Non désigné</SelectItem>
+                {form.garageId && !garages.some(item => item.id === form.garageId) ? <SelectItem value={form.garageId} disabled={!historicalGarage}>{historicalGarage ? mission?.garage : "Garage incompatible · à remplacer"}</SelectItem> : null}
                 {garages
-                  .filter((item) => item.actif || item.id === form.garageId)
                   .map((item) => (
                     <SelectItem key={item.id} value={item.id}>
                       {item.code} · {item.nom}
@@ -213,12 +226,14 @@ export function SinistreMissionDialog({
             </Field>
           </div>
         </div>
+        {expertQuery.isError || garageQuery.isError ? <p role="alert" className="text-sm text-destructive">{(expertQuery.error ?? garageQuery.error)?.message}</p> : null}
+        {!validExpert || !validGarage ? <p className="text-sm text-muted-foreground">Sélectionnez des prestataires compatibles avec la compagnie et les garanties.</p> : null}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
           <Button
-            disabled={!form.expertId || !form.dateMission || saving}
+            disabled={!form.expertId || !form.dateMission || saving || !validExpert || !validGarage || expertQuery.isFetching || garageQuery.isFetching || expertQuery.isError || garageQuery.isError}
             onClick={() =>
               onSubmit(mission?.id ?? null, {
                 expertId: form.expertId,

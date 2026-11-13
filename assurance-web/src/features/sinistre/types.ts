@@ -435,4 +435,23 @@ export type Intervenant = {
   ville?: string | null;
   actif: boolean;
   conventionne?: boolean;
+  typePrestataire?: "EXPERT" | "GARAGE";
+  toutesCompagnies?: boolean;
+  specialites?: ProviderSpecialty[];
+  accords?: ProviderAgreement[];
+};
+
+export type ProviderKind = "EXPERT" | "GARAGE";
+export type ProviderReference = { id: string; libelle: string };
+export type ProviderSpecialty = {
+  id: string; code: string; libelle: string; typePrestataire: ProviderKind; actif: boolean;
+  garanties: ProviderReference[];
+};
+export type ProviderAgreement = {
+  compagnieId: string; compagnie?: string; actif: boolean; conventionne: boolean;
+  dateDebut?: string | null; dateFin?: string | null;
+};
+export type ProviderEligibilityContext = {
+  sinistreId?: string; contratId?: string; vehiculeId?: string; dateSinistre?: string;
+  garantieIds?: string[]; modeReparation?: ModeReparationSinistre; dateIntervention?: string; villeId?: string;
 };

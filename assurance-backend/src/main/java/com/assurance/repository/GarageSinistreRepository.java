@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.Optional;
 
-public interface GarageSinistreRepository extends JpaRepository<GarageSinistre, Long> {
+public interface GarageSinistreRepository extends JpaRepository<GarageSinistre, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<GarageSinistre> {
+
+    boolean existsBySpecialitesId(Long specialiteId);
 
     @EntityGraph(attributePaths = "ville")
     List<GarageSinistre> findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(Long agenceId);

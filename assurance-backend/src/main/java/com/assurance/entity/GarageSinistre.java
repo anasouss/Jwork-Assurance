@@ -8,6 +8,10 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.CascadeType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -27,6 +31,20 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GarageSinistre extends BaseEntity {
+
+    @Builder.Default
+    @Column(name = "toutes_compagnies", nullable = false)
+    private boolean toutesCompagnies = true;
+
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "garages_sinistre_specialites", joinColumns = @JoinColumn(name = "garage_id"),
+            inverseJoinColumns = @JoinColumn(name = "specialite_id"))
+    private java.util.Set<SpecialitePrestataireSinistre> specialites = new java.util.LinkedHashSet<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "garage", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.Set<AccordPrestataireSinistre> accords = new java.util.LinkedHashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agence_id", nullable = false)
@@ -50,9 +68,6 @@ public class GarageSinistre extends BaseEntity {
 
     @Column(length = 500)
     private String adresse;
-
-    @Column(nullable = false)
-    private boolean conventionne;
 
     @Builder.Default
     @Column(nullable = false)

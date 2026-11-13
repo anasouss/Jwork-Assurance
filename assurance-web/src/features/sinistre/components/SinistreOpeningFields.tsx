@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Paperclip, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -7,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
-import type { ModeReparationSinistre, OpeningDocument } from "../types";
+import type { ModeReparationSinistre, OpeningDocument, ProviderEligibilityContext } from "../types";
 import { SinistreVilleSelect } from "./SinistreVilleSelect";
 import { appendOpeningFiles } from "../opening-files";
 import { toast } from "@/lib/toast";
@@ -25,7 +26,7 @@ export type OpeningFields = {
   dateMission: string;
 };
 
-export function SinistreOpeningFields({ automobile, responsabiliteCivile, value, onChange, documents, onDocumentsChange, disabled, onAddExpert }: {
+export function SinistreOpeningFields({ automobile, responsabiliteCivile, value, onChange, documents, onDocumentsChange, disabled, onAddExpert, providerContext, onEligibilityChange }: {
   automobile: boolean;
   responsabiliteCivile: boolean;
   value: OpeningFields;
@@ -34,10 +35,17 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
   onDocumentsChange: (documents: OpeningDocument[]) => void;
   disabled: boolean;
   onAddExpert?: () => void;
+  providerContext: ProviderEligibilityContext;
+  onEligibilityChange: (valid: boolean) => void;
 }) {
   const cities = useQuery({ queryKey: ["referentiel", "villes", "sinistre"], queryFn: () => referenceApi.list("villes"), staleTime: 60_000 });
-  const experts = useQuery({ queryKey: sinistreKeys.experts(false, value.expertVilleId || undefined), queryFn: () => sinistreApi.experts(false, value.expertVilleId || undefined) });
-  const garages = useQuery({ queryKey: sinistreKeys.garages(false), queryFn: () => sinistreApi.garages(false), enabled: automobile });
+  const expertContext = { ...providerContext, villeId: value.expertVilleId || undefined, dateIntervention: value.dateMission || undefined };
+  const garageContext = { ...providerContext, modeReparation: value.modeReparation || undefined };
+  const experts = useQuery({ queryKey: sinistreKeys.eligible("EXPERT", expertContext), queryFn: () => sinistreApi.eligibleProviders("EXPERT", expertContext) });
+  const garages = useQuery({ queryKey: sinistreKeys.eligible("GARAGE", garageContext), queryFn: () => sinistreApi.eligibleProviders("GARAGE", garageContext), enabled: automobile });
+  const expertValid = !value.expertId || (!experts.isFetching && !experts.isError && !!experts.data?.some(item => item.id === value.expertId));
+  const garageValid = !value.garageId || (!garages.isFetching && !garages.isError && !!garages.data?.some(item => item.id === value.garageId));
+  useEffect(() => { onEligibilityChange(expertValid && garageValid); }, [expertValid, garageValid, onEligibilityChange]);
   const update = <K extends keyof OpeningFields>(key: K, next: OpeningFields[K]) => onChange({ ...value, [key]: next });
   return <div className="grid gap-5">
     <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -47,7 +55,9 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
         </Select></Field>
         <Field label={value.modeReparation === "PEC" ? "Garage conventionné" : "Garage"} required={value.modeReparation === "PEC"}><Select disabled={disabled || garages.isPending || garages.isError} value={value.garageId || "NONE"} onValueChange={(next) => update("garageId", next === "NONE" ? "" : next)}>
           <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>
-            {(garages.data ?? []).filter((item) => item.actif && (value.modeReparation !== "PEC" || item.conventionne)).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}
+            {value.garageId && !garages.data?.some(item => item.id === value.garageId) ? <SelectItem value={value.garageId} disabled>Garage incompatible · à remplacer</SelectItem> : null}
+            {(garages.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}
+            {garages.isSuccess && !garages.data.length ? <SelectItem value="EMPTY" disabled>Aucun garage compatible</SelectItem> : null}
           </SelectContent></Select></Field>
       </> : null}
       {responsabiliteCivile ? <Field label="Responsabilité RC" required><Select disabled={disabled} value={value.tauxResponsabilite} onValueChange={(next) => update("tauxResponsabilite", next)}>
@@ -60,11 +70,12 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
           {onAddExpert ? <Button type="button" variant="ghost" size="sm" className="h-6 px-1 text-xs" disabled={disabled || cities.isPending || cities.isError} onClick={onAddExpert}><Plus className="size-3.5" />Ajouter un expert</Button> : null}
         </div>
         <Select disabled={disabled || experts.isPending || experts.isError} value={value.expertId || "NONE"} onValueChange={(next) => update("expertId", next === "NONE" ? "" : next)}>
-          <SelectTrigger id="opening-expert"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{(experts.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}</SelectContent>
+          <SelectTrigger id="opening-expert"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{value.expertId && !experts.data?.some(item => item.id === value.expertId) ? <SelectItem value={value.expertId} disabled>Expert incompatible · à remplacer</SelectItem> : null}{(experts.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}{item.ville ? ` · ${item.ville}` : ""}</SelectItem>)}{experts.isSuccess && !experts.data.length ? <SelectItem value="EMPTY" disabled>Aucun expert compatible</SelectItem> : null}</SelectContent>
         </Select>
       </div>
       {value.expertId ? <Field label="Date de mission initiale" required><DatePicker disabled={disabled} date={value.dateMission} onSelect={(date) => update("dateMission", date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}` : "")} /></Field> : null}
     </fieldset>
+    {!expertValid || !garageValid ? <p role="alert" className="text-sm text-destructive">Vérifiez les prestataires sélectionnés : compagnie, garanties et validité des accords.</p> : null}
     {experts.isError || garages.isError || cities.isError ? <p role="alert" className="text-sm text-destructive">{[experts.error, garages.error, cities.error].filter(Boolean).map((error) => error instanceof Error ? error.message : "Référentiel indisponible").join(" · ")}</p> : null}
     <div className="border-t pt-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Paperclip className="size-4" /> Pièces d’ouverture</h3>

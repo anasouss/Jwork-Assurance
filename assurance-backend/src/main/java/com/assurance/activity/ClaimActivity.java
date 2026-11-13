@@ -63,6 +63,13 @@ public final class ClaimActivity {
             add(references, ActivityRecordType.GARANTIE_SINISTRE, guarantee.getId(), guarantee.getLibelle());
             add(references, ActivityRecordType.GARANTIE, guarantee.getGarantieId(), guarantee.getLibelle());
         }
+        for (var assistance : items(claim.getAssistances())) {
+            part(parts, "assistance:" + assistance.id(), "Assistance liée", new ActivityValues()
+                    .put("Référence", assistance.reference()).put("Compagnie", assistance.compagnie())
+                    .put("Produit", assistance.produit()).put("Date d'effet", assistance.dateEffet())
+                    .put("Date d'échéance", assistance.dateEcheance()));
+            add(references, ActivityRecordType.ASSISTANCE, assistance.id(), assistance.reference());
+        }
         int index = 0;
         for (var party : items(claim.getParties())) {
             part(parts, "party:" + party.getId(), "Partie " + (++index) + " - " + party.getNom(), new ActivityValues()

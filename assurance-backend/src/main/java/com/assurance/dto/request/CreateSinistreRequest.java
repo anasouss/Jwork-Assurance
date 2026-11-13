@@ -23,6 +23,9 @@ public class CreateSinistreRequest {
 
     private List<Long> garantieIds;
 
+    @Size(max = 20)
+    private List<@NotNull Long> assistanceIds;
+
     private Boolean declarer;
 
     @Size(max = 100)

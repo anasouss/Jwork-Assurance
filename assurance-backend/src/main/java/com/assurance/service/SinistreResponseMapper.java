@@ -148,6 +148,8 @@ public class SinistreResponseMapper {
                         .resteARegler(remaining(totalIndemnisable, totaux.reglements()))
                         .build())
                 .garanties(garanties.stream().map(this::toGuarantee).toList())
+                .assistances(sinistre.getAssistances().stream().map(SinistreAssistanceService::toResponse)
+                        .sorted(java.util.Comparator.comparing(com.assurance.dto.response.SinistreAssistanceResponse::id)).toList())
                 .parties(parties.stream().map(this::toParty).toList())
                 .documents(documents.stream().map(this::toDocument).toList())
                 .missionsExpertise(missions.stream().map(this::toMission).toList())

@@ -65,6 +65,7 @@ public class SinistreService {
     private final BusinessActivityRecorder activityRecorder;
     private final SinistreQualificationService qualificationService;
     private final SinistreSuiviService suiviService;
+    private final SinistreAssistanceService assistanceService;
 
     @Transactional
     public SinistreDetailResponse transitionEtape(Long agenceId, Long utilisateurId, Long id,
@@ -173,6 +174,9 @@ public class SinistreService {
         sinistre.setReferenceCompagnie(trimToNull(request.getReferenceCompagnie()));
         qualificationService.apply(sinistre, request.getTypeDommage(), request.getModeReparation(),
                 request.getGarageId(), request.getTauxResponsabilite());
+        if (request.getAssistanceIds() != null && !request.getAssistanceIds().isEmpty()) {
+            assistanceService.select(sinistre, request.getAssistanceIds());
+        }
         if (declarer) {
             List<String> blockers = SinistreQualificationService.declarationBlockers(sinistre);
             if (!blockers.isEmpty()) {

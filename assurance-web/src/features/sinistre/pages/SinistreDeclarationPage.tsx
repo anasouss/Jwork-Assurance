@@ -16,6 +16,7 @@ import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 import { SinistreOpeningFields, type OpeningFields } from "../components/SinistreOpeningFields";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
+import { SinistreAssistanceTable } from "../components/SinistreAssistanceTable";
 import { parseOpeningDamage } from "../opening-context";
 import { damageLabels } from "../workflow";
 import type { CoverageGuarantee, OpeningDocument } from "../types";
@@ -42,6 +43,7 @@ export default function SinistreDeclarationPage() {
   const hasContext = Boolean(contratId && dateSinistre && dateDeclaration);
   const [contextOpen, setContextOpen] = useState(!hasContext);
   const [guaranteeIds, setGuaranteeIds] = useState<string[]>([]);
+  const [assistanceIds, setAssistanceIds] = useState<string[]>([]);
   const [opening, setOpening] = useState(emptyOpeningFields);
   const [documents, setDocuments] = useState<OpeningDocument[]>([]);
   const [expertDialogOpen, setExpertDialogOpen] = useState(false);
@@ -52,6 +54,7 @@ export default function SinistreDeclarationPage() {
   useEffect(() => {
     if (!hasContext) setContextOpen(true);
     setGuaranteeIds([]);
+    setAssistanceIds([]);
   }, [contratId, dateSinistre, hasContext, requestedVehicleId]);
   useEffect(() => {
     setOpening(emptyOpeningFields);
@@ -77,6 +80,14 @@ export default function SinistreDeclarationPage() {
       ?? (coverage.data.vehicules.length === 1 ? coverage.data.vehicules[0] : undefined);
   }, [automobile, coverage.data, requestedVehicleId]);
   const guarantees = selectedVehicle?.garanties ?? coverage.data?.garanties ?? [];
+  const assistanceContextReady = !!(hasContext && coverage.data && (!automobile || selectedVehicle));
+  const assistances = useQuery({
+    queryKey: sinistreKeys.assistances(contratId, selectedVehicle?.id, dateSinistre),
+    queryFn: () => sinistreApi.assistances(contratId, selectedVehicle?.id, dateSinistre),
+    enabled: assistanceContextReady,
+    retry: false,
+  });
+  const assistancePending = assistanceContextReady && (assistances.isPending || assistances.isFetching);
   const responsabiliteCivile = guarantees.some((item) => guaranteeIds.includes(item.id) && item.responsabiliteCivile);
   const initialContract = useMemo(() => coverage.data ? ({
     id: coverage.data.contratId,
@@ -126,6 +137,7 @@ export default function SinistreDeclarationPage() {
         dateSinistre,
         dateDeclaration,
         garantieIds: guaranteeIds,
+        assistanceIds,
         declarer,
         referenceCompagnie: referenceCompagnie.trim() || undefined,
         ...(automobile ? {
@@ -158,6 +170,8 @@ export default function SinistreDeclarationPage() {
 
   function submit(declarer: boolean, confirmed = false) {
     if (busy || expertDialogOpen) return;
+    if (assistancePending || assistances.isError) { toast.error("Vérifiez la disponibilité de l’assistance avant d’enregistrer"); return; }
+    if (assistanceIds.some(id => !assistances.data?.some(item => item.id === id))) { toast.error("Une assistance sélectionnée n’est plus disponible à cette date"); return; }
     if (!providersValid) { toast.error("Un prestataire sélectionné est incompatible ou en cours de vérification"); return; }
     if (!hasContext || !coverage.data || (automobile && !selectedVehicle)) {
       toast.error("Le contexte de couverture est incomplet");
@@ -285,6 +299,10 @@ export default function SinistreDeclarationPage() {
           <Section title="Garanties impliquées" icon={ShieldCheck}>
             <GuaranteeTable guarantees={guarantees} selectedIds={guaranteeIds} onToggle={(id, checked) =>
               setGuaranteeIds((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id))} />
+            {assistancePending ? <p role="status" className="mt-4 text-sm text-muted-foreground">Vérification de l’assistance liée…</p> : null}
+            {assistances.isError ? <div role="alert" className="mt-4 flex flex-wrap items-center gap-3 text-sm text-destructive"><span>{assistances.error.message}</span><Button variant="outline" size="sm" onClick={() => void assistances.refetch()}>Réessayer</Button></div> : null}
+            <SinistreAssistanceTable items={assistances.data ?? []} selectedIds={assistanceIds} disabled={busy || assistancePending}
+              onToggle={(id, checked) => setAssistanceIds(current => checked ? [...new Set([...current, id])] : current.filter(item => item !== id))} />
           </Section>
 
           <Section title="Ouverture et intervenants" icon={ShieldCheck}>
@@ -295,10 +313,10 @@ export default function SinistreDeclarationPage() {
           </Section>
 
           <div className="flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end">
-            <Button variant="outline" disabled={busy || !providersValid} onClick={() => submit(false)}>
+            <Button variant="outline" disabled={busy || !providersValid || assistancePending || assistances.isError} onClick={() => submit(false)}>
               {create.isPending && create.variables === false ? <LoaderCircle className="size-4 animate-spin" /> : null} Enregistrer en brouillon
             </Button>
-            <Button disabled={busy || !providersValid} onClick={() => submit(true)}>
+            <Button disabled={busy || !providersValid || assistancePending || assistances.isError} onClick={() => submit(true)}>
               {create.isPending && create.variables === true ? <LoaderCircle className="size-4 animate-spin" /> : null} Enregistrer l’ouverture
             </Button>
           </div>

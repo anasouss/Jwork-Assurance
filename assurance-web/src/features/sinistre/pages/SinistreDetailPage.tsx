@@ -82,6 +82,7 @@ import {
   documentTypeLabels,
 } from "../components/SinistreDocumentDialog";
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
+import { SinistreAssistanceTable } from "../components/SinistreAssistanceTable";
 import { SinistreTracking } from "../components/SinistreTracking";
 import { damageLabels, repairLabels, suiviLabels } from "../workflow";
 import type {
@@ -1521,6 +1522,7 @@ function CoverageSection({
           );
         })}
       </div>
+      {dossier.assistances?.length ? <div className="px-4 pb-4"><SinistreAssistanceTable items={dossier.assistances} /></div> : null}
     </WorkflowPanel>
   );
 }

@@ -18,6 +18,32 @@ import java.util.List;
 import java.util.Optional;
 
 public interface AssistanceContratRepository extends JpaRepository<AssistanceContrat, Long> {
+    @EntityGraph(attributePaths = {"compagnieAssistance", "produitAssistance"})
+    @Query("""
+            select a from AssistanceContrat a
+            left join a.elementFacturable element
+            where a.contrat.agence.id = :agenceId
+              and a.contrat.id = :contratId
+              and (a.actif = true or (element is not null
+                   and element.statut <> com.assurance.enums.StatutElementFacturable.ANNULE))
+              and a.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+              and a.mouvementContrat.dateEffet <= :dateSinistre
+              and a.dateEffet <= :dateSinistre
+              and a.dateEcheance >= :dateSinistre
+              and (a.vehicule is null or a.vehicule.id = :vehiculeId)
+              and not exists (select newer.id from AssistanceContrat newer
+                  where newer.contrat = a.contrat
+                    and (newer.vehicule = a.vehicule or (newer.vehicule is null and a.vehicule is null))
+                    and newer.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+                    and newer.mouvementContrat.dateEffet <= :dateSinistre
+                    and (newer.mouvementContrat.dateEffet > a.mouvementContrat.dateEffet
+                         or (newer.mouvementContrat.dateEffet = a.mouvementContrat.dateEffet and newer.id > a.id)))
+            order by a.dateEffet desc, a.id desc
+            """)
+    List<AssistanceContrat> findForClaim(@Param("agenceId") Long agenceId,
+            @Param("contratId") Long contratId, @Param("vehiculeId") Long vehiculeId,
+            @Param("dateSinistre") LocalDate dateSinistre);
+
     List<AssistanceContrat> findByContratIdAndContratAgenceIdOrderByCreatedAtDesc(Long contratId, Long agenceId);
 
     @Query("""

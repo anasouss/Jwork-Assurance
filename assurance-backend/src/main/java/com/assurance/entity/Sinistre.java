@@ -39,6 +39,13 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class Sinistre extends AuditedEntity {
 
+    @Builder.Default
+    @jakarta.persistence.ElementCollection
+    @jakarta.persistence.CollectionTable(name = "sinistres_assistances",
+            joinColumns = @JoinColumn(name = "sinistre_id"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_sinistre_assistance", columnNames = {"sinistre_id", "assistance_contrat_id"}))
+    private java.util.Set<SinistreAssistance> assistances = new java.util.LinkedHashSet<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agence_id", nullable = false)
     private Agence agence;

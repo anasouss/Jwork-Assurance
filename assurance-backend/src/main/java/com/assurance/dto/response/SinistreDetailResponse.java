@@ -48,6 +48,7 @@ public class SinistreDetailResponse {
     private Couverture couverture;
     private Totaux totaux;
     private List<Garantie> garanties;
+    private List<SinistreAssistanceResponse> assistances;
     private List<Partie> parties;
     private List<Document> documents;
     private List<Mission> missionsExpertise;

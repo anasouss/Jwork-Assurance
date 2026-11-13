@@ -13,6 +13,7 @@ import type {
   SinistreListParams,
   SinistreOpeningRequest,
   SinistreContractOption,
+  ClaimAssistance,
   TypeRechercheContratSinistre,
   PagedResponse,
   SinistreDashboard,
@@ -41,6 +42,8 @@ export const sinistreKeys = {
   detail: (id: string) => [...sinistreKeys.all, "detail", id] as const,
   coverage: (contractId: string, date: string) =>
     [...sinistreKeys.all, "coverage", contractId, date] as const,
+  assistances: (contractId: string, vehicleId: string | undefined, date: string) =>
+    [...sinistreKeys.all, "assistances", contractId, vehicleId, date] as const,
   contracts: (brancheId: string, query: string, typeRecherche: TypeRechercheContratSinistre = "POLICE") =>
     [...sinistreKeys.all, "contracts", brancheId, typeRecherche, query] as const,
   duplicates: (contractId: string, vehicleId: string | undefined, date: string) =>
@@ -58,6 +61,9 @@ export const sinistreKeys = {
 };
 
 export const sinistreApi = {
+  async assistances(contratId: string, vehiculeId: string | undefined, dateSinistre: string) {
+    return unwrap(await apiFetch<ApiResponse<ClaimAssistance[]>>(`/api/v1/sinistres/assistances${buildQueryString({ contratId, vehiculeId, dateSinistre })}`));
+  },
   async providers(params: { typePrestataire: ProviderKind; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; page: number; size: number }) {
     return unwrap(await apiFetch<ApiResponse<PagedResponse<Intervenant>>>(`/api/v1/sinistres/prestataires${buildQueryString(params)}`));
   },

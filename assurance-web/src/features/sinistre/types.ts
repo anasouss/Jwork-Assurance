@@ -54,6 +54,7 @@ export type SinistreOpeningRequest = {
   dateSinistre: string;
   dateDeclaration: string;
   garantieIds: string[];
+  assistanceIds?: string[];
   declarer: boolean;
   referenceCompagnie?: string;
   tauxResponsabilite?: number;
@@ -190,6 +191,15 @@ export type SinistreStatistics = {
   parCompagnie: { id: string; nom: string; dossiers: number; provisions: number; reglements: number; recours: number; frais: number }[];
 };
 
+export type ClaimAssistance = {
+  id: string;
+  reference?: string | null;
+  compagnie?: string | null;
+  produit?: string | null;
+  dateEffet: string;
+  dateEcheance: string;
+};
+
 export type CoveragePreview = {
   contratId: string;
   numeroDossier?: string | null;
@@ -269,6 +279,7 @@ export type SinistreDetail = Omit<SinistreSummary,
     totalRecours: number;
     resteARegler: number;
   };
+  assistances?: ClaimAssistance[];
   garanties: Array<{
     id: string;
     garantieId: string;

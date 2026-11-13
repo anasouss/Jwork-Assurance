@@ -40,7 +40,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.Normalizer;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -151,7 +151,8 @@ public class DevisPdfService {
         String clientAddress = resolveAddress(contrat);
         String devisNumber = value(contrat.getNumeroDevis(), value(contrat.getNumeroPolice(), "DEV-" + contrat.getId()));
         String agencyCity = contrat.getAgence() == null ? "" : value(contrat.getAgence().getVille(), "");
-        String cityAndDate = (agencyCity.isBlank() ? "" : agencyCity + " le ") + formatDateTime(contrat.getCreatedAt());
+        String cityAndDate = (agencyCity.isBlank() ? "" : agencyCity + " le ")
+                + formatDate(LocalDate.now(ZoneId.of("Africa/Casablanca")));
 
         Table infoHeader = new Table(new float[]{6, 4}).setWidth(UnitValue.createPercentValue(100));
         Cell insuredCell = new Cell()
@@ -834,10 +835,6 @@ public class DevisPdfService {
     }
 
     private static String formatDate(LocalDate date) {
-        return date == null ? "" : date.format(DATE_FORMAT);
-    }
-
-    private static String formatDateTime(LocalDateTime date) {
         return date == null ? "" : date.format(DATE_FORMAT);
     }
 

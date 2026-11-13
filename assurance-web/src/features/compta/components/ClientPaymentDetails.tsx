@@ -9,7 +9,7 @@ import { downloadBlob } from "@/lib/download";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import { formatTreasuryDate, paymentModeLabel } from "../pages/treasury-format";
-import type { ClientPayment, PaymentAllocationStatus, PaymentInstrumentStatus } from "../types";
+import type { ClientPayment, PaymentInstrumentStatus } from "../types";
 import { RemittanceSlipPdfDialog } from "./RemittanceSlipPdfDialog";
 
 const INSTRUMENT_LABELS: Record<PaymentInstrumentStatus, string> = {
@@ -18,16 +18,11 @@ const INSTRUMENT_LABELS: Record<PaymentInstrumentStatus, string> = {
 const INSTRUMENT_VARIANTS = {
   EN_ATTENTE: "warning", REMIS_EN_BANQUE: "info", CONFIRME: "success", REJETE: "red", REMPLACE: "gray",
 } as const;
-const ALLOCATION_LABELS: Record<PaymentAllocationStatus, string> = {
-  EN_ATTENTE: "En attente", CONFIRMEE: "Confirmée", ANNULEE: "Annulée",
-};
-const ALLOCATION_VARIANTS = { EN_ATTENTE: "warning", CONFIRMEE: "success", ANNULEE: "red" } as const;
 
 export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
   const canViewTreasury = useAuthStore((state) => state.user?.permissions.includes("tresorerie:view") ?? false);
   const [bordereauPdf, setBordereauPdf] = useState<{ id: string; numero?: string | null } | null>(null);
   const detail = payment.detail;
-  const history = groupAllocations(payment).filter(allocation => allocation.statut === "ANNULEE");
   const downloadReceipt = useMutation({
     mutationFn: () => comptaApi.clientPaymentReceipt(payment.id),
     onSuccess: blob => downloadBlob(blob, payment.bordereauNomFichier || `bordereau-${payment.numero}`),
@@ -129,48 +124,10 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
       </div>
     </section>
 
-    {history.length > 0 && <details className="border-t pt-4 text-sm">
-      <summary className="cursor-pointer font-medium">Historique des affectations annulées</summary>
-      <div className="mt-3 overflow-x-auto rounded-md border"><table className="w-full min-w-[600px] text-sm">
-        <thead className="bg-muted text-xs"><tr><th className="px-3 py-2 text-left">Police / contrat</th><th className="px-3 py-2 text-left">Mouvement / document</th><th className="px-3 py-2 text-right">Montant</th><th className="px-3 py-2 text-left">Statut</th></tr></thead>
-        <tbody className="divide-y">{history.map(allocation => <tr key={allocation.key}><td className="px-3 py-2">{allocation.numeroPolice || "-"}</td><td className="px-3 py-2">{allocation.mouvement || allocation.referenceDocument || "-"}</td><td className="px-3 py-2 text-right tabular-nums">{amount(allocation.montant)}</td><td className="px-3 py-2"><Badge variant={ALLOCATION_VARIANTS[allocation.statut]}>{ALLOCATION_LABELS[allocation.statut]}</Badge></td></tr>)}</tbody>
-      </table></div>
-    </details>}
     {payment.notes && <section className="space-y-2 border-t pt-4"><h2 className="text-sm font-semibold">Notes</h2><p className="whitespace-pre-wrap break-words text-sm">{payment.notes}</p></section>}
     <div className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-muted-foreground"><span>Créé par : {payment.creePar || "-"}</span><span>Non affecté : {amount(payment.montantNonAffecte)}</span></div>
     {bordereauPdf && <RemittanceSlipPdfDialog key={bordereauPdf.id} {...bordereauPdf} onClose={() => setBordereauPdf(null)} />}
   </div>;
-}
-
-function groupAllocations(payment: ClientPayment) {
-  const grouped = new Map<string, {
-    key: string;
-    numeroPolice?: string | null;
-    mouvement?: string | null;
-    documentId?: string | null;
-    referenceDocument?: string | null;
-    payer: string;
-    instrumentIds: Set<string>;
-    montant: number;
-    statut: PaymentAllocationStatus;
-  }>();
-  payment.instruments.forEach(instrument => {
-    instrument.affectations.forEach(allocation => {
-      const target = allocation.documentClientId
-        ? `D:${allocation.documentClientId}:E:${allocation.elementFacturableId ?? ""}`
-        : `E:${allocation.elementFacturableId ?? ""}`;
-      const key = `${target}:${allocation.statut}:${allocation.payeurType ?? ""}:${allocation.payeurId ?? ""}`;
-      const current = grouped.get(key) ?? {
-        key, numeroPolice: allocation.numeroPolice, mouvement: allocation.mouvement,
-        documentId: allocation.documentClientId, referenceDocument: allocation.referenceDocument,
-        payer: allocation.payeurNom || "-", instrumentIds: new Set<string>(), montant: 0, statut: allocation.statut,
-      };
-      current.instrumentIds.add(instrument.id);
-      current.montant += allocation.montant;
-      grouped.set(key, current);
-    });
-  });
-  return Array.from(grouped.values());
 }
 
 function Summary({ label, value, children }: { label: string; value: string; children?: ReactNode }) {

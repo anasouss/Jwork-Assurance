@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, Banknote, ChartColumn, CircleCheck, Clock3, FileCheck2, FolderOpen, Receipt, RefreshCw, ShieldCheck, Undo2, type LucideIcon } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,19 @@ import type { SinistreStatistics } from "../types";
 const MONTHS = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août", "Sept.", "Oct.", "Nov.", "Déc."];
 const STAGE_COLORS: Record<string, string> = {
   OUVERTURE: "#0284c7", EXPERTISE_AVANT: "#0891b2", INSTANCE_CLIENT: "#d97706",
-  EXPERTISE_APRES: "#6366f1", COMPAGNIE: "#059669", CLOTURE: "#64748b",
+  EXPERTISE_APRES: "#6366f1", COMPAGNIE: "#2563eb", CLOTURE: "#059669",
+};
+const METRIC_TONES = {
+  blue: { icon: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300", value: "text-sky-800 dark:text-sky-300" },
+  amber: { icon: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300", value: "text-amber-800 dark:text-amber-300" },
+  green: { icon: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300", value: "text-emerald-800 dark:text-emerald-300" },
+  teal: { icon: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300", value: "text-teal-800 dark:text-teal-300" },
+  neutral: { icon: "bg-muted text-muted-foreground", value: "text-foreground" },
+};
+const SECTION_TONES = {
+  blue: "border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40",
+  amber: "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30",
+  teal: "border-teal-200 bg-teal-50 dark:border-teal-900 dark:bg-teal-950/30",
 };
 const count = (value: number) => value.toLocaleString("fr-MA").replace(/[\u00a0\u202f]/g, " ");
 
@@ -52,16 +64,16 @@ export default function SinistreStatisticsPage() {
     </div> : data ? <>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>Hors brouillons et dossiers annulés</span>
-        <div className="flex flex-wrap gap-4"><span>{count(data.rejetes)} rejeté(s)</span><span className={data.actionsEnRetard ? "font-medium text-amber-800 dark:text-amber-300" : ""}>{count(data.actionsEnRetard)} action(s) en retard</span></div>
+        <div className="flex flex-wrap gap-4"><span>{count(data.rejetes)} rejeté(s)</span><span className={data.actionsEnRetard ? "font-semibold text-red-700 dark:text-red-300" : ""}>{count(data.actionsEnRetard)} action(s) en retard</span></div>
       </div>
       <dl className="grid grid-cols-2 border-y bg-card md:grid-cols-4">
-        <Metric label="Dossiers déclarés" value={count(data.declares)} />
-        <Metric label="Encore ouverts" value={count(data.ouverts)} />
-        <Metric label="Clôturés" value={count(data.clotures)} />
-        <Metric label="Délai moyen de clôture" value={data.delaiMoyenClotureJours == null ? "-" : `${count(data.delaiMoyenClotureJours)} jours`} />
+        <Metric label="Dossiers déclarés" value={count(data.declares)} icon={FileCheck2} tone="blue" />
+        <Metric label="Encore ouverts" value={count(data.ouverts)} icon={FolderOpen} tone="amber" />
+        <Metric label="Clôturés" value={count(data.clotures)} icon={CircleCheck} tone="green" />
+        <Metric label="Délai moyen de clôture" value={data.delaiMoyenClotureJours == null ? "-" : `${count(data.delaiMoyenClotureJours)} jours`} icon={Clock3} />
       </dl>
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <ChartSection title="Déclarations par mois" subtitle="Date de déclaration" empty={data.declares === 0}>
+        <ChartSection title="Déclarations par mois" subtitle="Date de déclaration" empty={data.declares === 0} tone="blue">
           <ChartContainer config={{ declarations: { label: "Déclarations", color: "#0284c7" } }} className="h-[260px] w-full aspect-auto">
             <BarChart data={data.evolution} accessibilityLayer margin={{ left: -12, right: 12, top: 10 }}>
               <CartesianGrid vertical={false} strokeDasharray="3 4" />
@@ -72,28 +84,28 @@ export default function SinistreStatisticsPage() {
             </BarChart>
           </ChartContainer>
         </ChartSection>
-        <Distribution title="Étapes de suivi" subtitle="Étape actuelle des dossiers de l’année" rows={data.parEtape} colors={STAGE_COLORS} empty={data.declares === 0} />
+        <Distribution title="Étapes de suivi" subtitle="Étape actuelle des dossiers de l’année" rows={data.parEtape} colors={STAGE_COLORS} empty={data.declares === 0} tone="amber" />
       </div>
       <section className="min-w-0 border-y bg-card">
-        <SectionHeader title="Situation financière" subtitle="Cumul des opérations non annulées de ces dossiers · MAD" />
+        <SectionHeader title="Situation financière" subtitle="Cumul des opérations non annulées de ces dossiers · MAD" tone="teal" />
         <dl className="grid grid-cols-2 lg:grid-cols-4">
-          <Metric label="Provisions ouvertes" value={moneyAmount(data.provisionsOuvertes)} />
-          <Metric label="Règlements cumulés" value={moneyAmount(data.reglementsCumules)} />
-          <Metric label="Recours cumulés" value={moneyAmount(data.recoursCumules)} />
-          <Metric label="Frais cumulés" value={moneyAmount(data.fraisCumules)} />
+          <Metric label="Provisions ouvertes" value={moneyAmount(data.provisionsOuvertes)} icon={ShieldCheck} tone="amber" />
+          <Metric label="Règlements cumulés" value={moneyAmount(data.reglementsCumules)} icon={Banknote} tone="blue" />
+          <Metric label="Recours cumulés" value={moneyAmount(data.recoursCumules)} icon={Undo2} tone="teal" />
+          <Metric label="Frais cumulés" value={moneyAmount(data.fraisCumules)} icon={Receipt} />
         </dl>
       </section>
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <Distribution title="Répartition par branche" subtitle="Dossiers déclarés" rows={data.parBranche} empty={data.declares === 0} />
+        <Distribution title="Répartition par branche" subtitle="Dossiers déclarés" rows={data.parBranche} empty={data.declares === 0} tone="teal" />
         <section className="min-w-0 border-y bg-card">
-          <SectionHeader title="Situation par compagnie" subtitle="Dossiers et montants cumulés · MAD" />
+          <SectionHeader title="Situation par compagnie" subtitle="Dossiers et montants cumulés · MAD" tone="blue" />
           <div className="overflow-x-auto"><Table className="min-w-[680px]">
-            <TableHeader><TableRow><TableHead>Compagnie</TableHead><TableHead className="text-right">Dossiers</TableHead><TableHead className="text-right">Provisions</TableHead><TableHead className="text-right">Règlements</TableHead><TableHead className="text-right">Recours</TableHead><TableHead className="text-right">Frais</TableHead></TableRow></TableHeader>
+            <TableHeader className="bg-muted/50"><TableRow><TableHead>Compagnie</TableHead><TableHead className="text-right">Dossiers</TableHead><TableHead className="text-right">Provisions</TableHead><TableHead className="text-right">Règlements</TableHead><TableHead className="text-right">Recours</TableHead><TableHead className="text-right">Frais</TableHead></TableRow></TableHeader>
             <TableBody>{data.parCompagnie.map((company) => <TableRow key={company.id}>
               <TableCell className="font-medium">{company.nom}</TableCell><TableCell className="text-right tabular-nums">{count(company.dossiers)}</TableCell>
               {[company.provisions, company.reglements, company.recours, company.frais].map((amount, index) => <TableCell key={index} className="text-right tabular-nums">{moneyAmount(amount)}</TableCell>)}
             </TableRow>)}
-              {!data.parCompagnie.length ? <TableRow><TableCell colSpan={6} className="h-40 text-center text-muted-foreground">Aucun dossier déclaré sur cette année.</TableCell></TableRow> : null}
+              {!data.parCompagnie.length ? <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">Aucun dossier déclaré sur cette année.</TableCell></TableRow> : null}
             </TableBody>
           </Table></div>
         </section>
@@ -102,24 +114,28 @@ export default function SinistreStatisticsPage() {
   </div>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0 border-r border-border px-4 py-4 last:border-r-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-lg font-semibold tabular-nums">{value}</dd></div>;
+function Metric({ label, value, icon: Icon, tone = "neutral" }: { label: string; value: string; icon: LucideIcon; tone?: keyof typeof METRIC_TONES }) {
+  const colors = METRIC_TONES[tone];
+  return <div className="flex min-w-0 items-start gap-3 border-r border-border px-4 py-4 last:border-r-0">
+    <span className={`grid size-8 shrink-0 place-items-center rounded-md ${colors.icon}`}><Icon aria-hidden="true" className="size-4" /></span>
+    <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className={`mt-1 break-words text-lg font-semibold tabular-nums ${colors.value}`}>{value}</dd></div>
+  </div>;
 }
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
-  return <div className="border-b bg-muted/50 px-4 py-3"><h2 className="text-base font-semibold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{subtitle}</p></div>;
+function SectionHeader({ title, subtitle, tone }: { title: string; subtitle: string; tone?: keyof typeof SECTION_TONES }) {
+  return <div className={`border-b px-4 py-3 ${tone ? SECTION_TONES[tone] : "bg-muted/50"}`}><h2 className="text-base font-semibold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{subtitle}</p></div>;
 }
 
-function ChartSection({ title, subtitle, children, empty }: { title: string; subtitle: string; children: React.ReactNode; empty: boolean }) {
-  return <section className="min-w-0 border-y bg-card"><SectionHeader title={title} subtitle={subtitle} />
-    <div className="p-4">{empty ? <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">Aucun dossier déclaré sur cette année.</div> : children}</div>
+function ChartSection({ title, subtitle, children, empty, tone }: { title: string; subtitle: string; children: React.ReactNode; empty: boolean; tone?: keyof typeof SECTION_TONES }) {
+  return <section className="min-w-0 border-y bg-card"><SectionHeader title={title} subtitle={subtitle} tone={tone} />
+    <div className="p-4">{empty ? <div className="flex min-h-36 flex-col items-center justify-center gap-3 px-3 py-6 text-center text-sm text-muted-foreground"><ChartColumn aria-hidden="true" className="size-6 opacity-60" /><p>Aucun dossier déclaré sur cette année.</p></div> : children}</div>
   </section>;
 }
 
-function Distribution({ title, subtitle, rows, empty, colors }: {
-  title: string; subtitle: string; rows: SinistreStatistics["parEtape"]; empty: boolean; colors?: Record<string, string>;
+function Distribution({ title, subtitle, rows, empty, colors, tone }: {
+  title: string; subtitle: string; rows: SinistreStatistics["parEtape"]; empty: boolean; colors?: Record<string, string>; tone?: keyof typeof SECTION_TONES;
 }) {
-  return <ChartSection title={title} subtitle={subtitle} empty={empty}>
+  return <ChartSection title={title} subtitle={subtitle} empty={empty} tone={tone}>
     <ChartContainer config={{ nombre: { label: "Dossiers", color: "#059669" } }} className="h-[260px] w-full aspect-auto">
       <BarChart data={rows} layout="vertical" accessibilityLayer margin={{ left: 0, right: 18, top: 0 }}>
         <CartesianGrid horizontal={false} strokeDasharray="3 4" />

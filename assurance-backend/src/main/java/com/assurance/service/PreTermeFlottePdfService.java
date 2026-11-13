@@ -41,7 +41,7 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -193,7 +193,8 @@ public class PreTermeFlottePdfService {
     private void writeContext(Document document, Contrat draft, boolean avecPrime) {
         Client client = resolveClient(draft);
         String agencyCity = draft.getAgence() == null ? "" : value(draft.getAgence().getVille(), "");
-        String cityAndDate = (agencyCity.isEmpty() ? "" : agencyCity + " le ") + formatDateTime(draft.getCreatedAt());
+        String cityAndDate = (agencyCity.isEmpty() ? "" : agencyCity + " le ")
+                + formatDate(LocalDate.now(ZoneId.of("Africa/Casablanca")));
 
         Table infoHeader = new Table(new float[]{6, 4}).setWidth(UnitValue.createPercentValue(100));
         Cell insuredCell = new Cell()
@@ -831,10 +832,6 @@ public class PreTermeFlottePdfService {
     }
 
     private static String formatDate(LocalDate date) {
-        return date == null ? "" : date.format(DATE_FORMAT);
-    }
-
-    private static String formatDateTime(LocalDateTime date) {
         return date == null ? "" : date.format(DATE_FORMAT);
     }
 

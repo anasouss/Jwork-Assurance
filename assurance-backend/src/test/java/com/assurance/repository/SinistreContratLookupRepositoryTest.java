@@ -49,7 +49,7 @@ class SinistreContratLookupRepositoryTest {
         draft.setBrouillon(true);
         entityManager.flush();
 
-        assertThat(repository.search(agency.getId(), branch.getId(), "%000123%", PageRequest.of(0, 20)))
+        assertThat(repository.search(agency.getId(), branch.getId(), "POLICE", "000123", PageRequest.of(0, 20)))
                 .extracting(Contrat::getId).containsExactly(current.getId(), old.getId());
     }
 
@@ -67,11 +67,11 @@ class SinistreContratLookupRepositoryTest {
                 .nature(NatureSnapshotMouvement.AJOUT).immatriculation("OLD-123-A").build());
         entityManager.flush();
 
-        assertThat(repository.search(agency.getId(), branch.getId(), "%old-123-a%", PageRequest.of(0, 20)))
+        assertThat(repository.search(agency.getId(), branch.getId(), "IMMATRICULATION", "old123a", PageRequest.of(0, 20)))
                 .extracting(Contrat::getId).containsExactly(contract.getId());
         movement.setStatut(StatutMouvementContrat.BROUILLON);
         entityManager.flush();
-        assertThat(repository.search(agency.getId(), branch.getId(), "%old-123-a%", PageRequest.of(0, 20))).isEmpty();
+        assertThat(repository.search(agency.getId(), branch.getId(), "IMMATRICULATION", "old123a", PageRequest.of(0, 20))).isEmpty();
     }
 
     private Agence agency(String code) {

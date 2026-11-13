@@ -489,11 +489,11 @@ export default function ReglementsEnregistresPage() {
           </Select>
         </div>
         <div className="grid w-full min-w-0 gap-2 sm:w-48 sm:grow">
-          <Label>État du moyen</Label>
+          <Label>Statut</Label>
           <Select value={instrumentStatus} onValueChange={(value) => setInstrumentStatus(value as PaymentInstrument["statut"] | "ALL")}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Tous les états</SelectItem>
+              <SelectItem value="ALL">Tous les statuts</SelectItem>
               <SelectItem value="EN_ATTENTE">En instance</SelectItem>
               <SelectItem value="REMIS_EN_BANQUE">Remis en banque</SelectItem>
               <SelectItem value="CONFIRME">Encaissé</SelectItem>
@@ -532,7 +532,7 @@ export default function ReglementsEnregistresPage() {
                 <th className="px-4 py-3 text-left">Moyen</th>
                 <th className="px-4 py-3 text-left">Référence</th>
                 <th className="px-4 py-3 text-left">Date de valeur</th>
-                <th className="px-4 py-3 text-center">État du moyen</th>
+                <th className="px-4 py-3 text-center">Statut</th>
                 {showInstruments ? <th className="px-4 py-3 text-left">Banque</th>
                   : <PaymentSortHeader column="statut" activeColumn={sortBy} direction={sortDirection} onSort={changeSort} align="center">Règlement</PaymentSortHeader>}
                 <th className="px-4 py-3 text-right">Action</th>

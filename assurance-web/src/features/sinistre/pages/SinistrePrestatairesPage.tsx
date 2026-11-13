@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { referenceApi } from "@/features/production/api/references";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
 import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
+import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import type { Intervenant, ProviderKind } from "../types";
 
 const initialFilters = { query: "", villeId: "ALL", compagnieId: "ALL", specialiteId: "ALL", includeInactive: false };
@@ -61,27 +61,31 @@ export default function SinistrePrestatairesPage() {
         <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" />{kind === "EXPERT" ? "Ajouter un expert" : "Ajouter un garage"}</Button>
       </div>
     </header>
-    <Tabs value={kind} onValueChange={value => {
-      setParams({ type: value }, { replace: true }); setPage(0); setFilters(initialFilters); setApplied(initialFilters); setOpen(false); setEditing(null);
-    }}><TabsList><TabsTrigger value="GARAGE">Garages</TabsTrigger><TabsTrigger value="EXPERT">Experts</TabsTrigger></TabsList></Tabs>
-    <section aria-label="Filtres des prestataires" className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section aria-label="Filtres des prestataires" className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-1.5"><Label htmlFor="provider-type">Type de prestataire</Label><Select value={kind} onValueChange={value => {
+        setParams({ type: value }, { replace: true }); setPage(0);
+        setFilters(current => ({ ...current, specialiteId: "ALL" }));
+        setApplied(current => ({ ...current, specialiteId: "ALL" }));
+        setOpen(false); setEditing(null);
+      }}><SelectTrigger id="provider-type"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="GARAGE">Garage</SelectItem><SelectItem value="EXPERT">Expert</SelectItem></SelectContent></Select></div>
       <div className="grid gap-1.5"><Label htmlFor="provider-search">Code, nom ou contact</Label><Input id="provider-search" value={filters.query}
         onChange={e => setFilters(f => ({ ...f, query: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") { setApplied(filters); setPage(0); } }} /></div>
-      <div className="grid gap-1.5"><Label>Ville</Label><Select value={filters.villeId} onValueChange={value => setFilters(f => ({ ...f, villeId: value }))}>
-        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les villes</SelectItem>{cities.data?.map(c => <SelectItem key={c.id} value={c.id}>{c.libelle}</SelectItem>)}</SelectContent>
-      </Select></div>
+      <div className="grid gap-1.5"><Label>Ville</Label><SinistreVilleSelect
+        cities={[{ id: "ALL", libelle: "Toutes les villes" }, ...(cities.data ?? [])]}
+        value={filters.villeId} disabled={cities.isPending || cities.isError}
+        onValueChange={value => setFilters(f => ({ ...f, villeId: value || "ALL" }))} /></div>
       <div className="grid gap-1.5"><Label>Compagnie liée</Label><Select value={filters.compagnieId} onValueChange={value => setFilters(f => ({ ...f, compagnieId: value }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>{options.data?.compagnies.map(c => <SelectItem key={c.id} value={c.id}>{c.libelle}</SelectItem>)}</SelectContent>
       </Select></div>
       <div className="grid gap-1.5"><Label>Spécialité</Label><Select value={filters.specialiteId} onValueChange={value => setFilters(f => ({ ...f, specialiteId: value }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les spécialités</SelectItem>{specialties.data?.filter(s => s.typePrestataire === kind).map(s => <SelectItem key={s.id} value={s.id}>{s.libelle}</SelectItem>)}</SelectContent>
       </Select></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 xl:col-span-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 xl:col-span-5">
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeInactive} onCheckedChange={checked => setFilters(f => ({ ...f, includeInactive: checked === true }))} />Inclure les inactifs</label>
         <div className="flex gap-2"><Button size="icon" title="Rechercher" aria-label="Rechercher" onClick={() => { setApplied({ ...filters }); setPage(0); }}><Search className="size-4" /></Button>
           <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => { setFilters(initialFilters); setApplied(initialFilters); setPage(0); }}><RotateCcw className="size-4" /></Button></div>
       </div>
-      {(options.isError || specialties.isError || cities.isError) && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-4">Impossible de charger les filtres.</p>}
+      {(options.isError || specialties.isError || cities.isError) && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-5">Impossible de charger les filtres.</p>}
     </section>
     <section className="min-w-0 overflow-hidden rounded-md border bg-card">
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm">

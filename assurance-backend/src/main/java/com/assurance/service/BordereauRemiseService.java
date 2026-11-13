@@ -667,7 +667,7 @@ public class BordereauRemiseService {
             case EFFET -> "BRE";
             case VERSEMENT_ESPECES -> "BRV";
         };
-        return String.format(Locale.ROOT, "%s-%d-%06d", prefix, year, sequence.getValeur());
+        return String.format(Locale.ROOT, "%s%02d-%06d", prefix, year % 100, sequence.getValeur());
     }
 
     private BordereauRemiseResponse toResponse(BordereauRemise slip, boolean includeLines) {

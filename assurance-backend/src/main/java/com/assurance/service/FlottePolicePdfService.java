@@ -218,13 +218,27 @@ public class FlottePolicePdfService {
         int guaranteeColumns = Math.max(1, codes.size() + (showAssistance ? 2 : 0));
         int columnCount = 6 + (showPfOrPtc ? 1 : 0) + (showEnergy ? 1 : 0)
                 + valueColumns + guaranteeColumns;
-        float[] widths = tariffWidths(codes.size(), hasDcCapital, showAssistance, showPfOrPtc, showEnergy);
-        float totalWeight = 0;
-        for (float width : widths) totalWeight += width;
         float availableWidth = document.getPdfDocument().getDefaultPageSize().getWidth()
                 - document.getLeftMargin() - document.getRightMargin();
-        float valueCellWidth = availableWidth * VALUE_COLUMN_WEIGHT / totalWeight;
         PdfFont valueFont = document.getPdfDocument().getDefaultFont();
+        float[] valueWidths = new float[valueColumns];
+        String[] valueHeaders = {"Valeur à", "vénale", "Valeur des", "Capital"};
+        for (int index = 0; index < valueColumns; index++) {
+            valueWidths[index] = valueFont.getWidth(valueHeaders[index], tableStyle.fontSize()) * 1.1f
+                    + 2 * tableStyle.padding() + 4;
+        }
+        for (Target target : targets) {
+            BigDecimal[] values = {target.valeurNeuf(), target.valeurVenale(), target.valeurGlace(),
+                    hasDcCapital ? capitalFor(guaranteesFor(guarantees, target), "DC") : null};
+            for (int index = 0; index < valueColumns; index++) {
+                valueWidths[index] = Math.max(valueWidths[index],
+                        valueFont.getWidth(formatMoneyOrEmpty(values[index]), tableStyle.fontSize())
+                                + 2 * tableStyle.padding() + 4);
+            }
+        }
+        float[] widths = tariffWidths(codes.size(), hasDcCapital, showAssistance, showPfOrPtc, showEnergy,
+                valueWidths, availableWidth);
+        int firstValueColumn = 5 + (showPfOrPtc ? 1 : 0) + (showEnergy ? 1 : 0);
         Table table = new Table(UnitValue.createPercentArray(widths))
                 .setFixedLayout()
                 .setWidth(UnitValue.createPercentValue(100))
@@ -243,7 +257,7 @@ public class FlottePolicePdfService {
         }
         addHeader(table, "VALEURS", 1, valueColumns, HEADER_BG, tableStyle);
         addHeader(table, "GARANTIES ASSURÉES", 1, guaranteeColumns, GUARANTEE_GROUP_BG, tableStyle);
-        addHeader(table, "Montant total", 2, 1, HEADER_BG, tableStyle);
+        addHeader(table, "Montant\ntotal", 2, 1, HEADER_BG, tableStyle);
         addHeader(table, "Valeur à\nneuf", 1, 1, HEADER_BG, tableStyle);
         addHeader(table, "Valeur\nvénale", 1, 1, HEADER_BG, tableStyle);
         addHeader(table, "Valeur des\nglaces", 1, 1, HEADER_BG, tableStyle);
@@ -279,11 +293,12 @@ public class FlottePolicePdfService {
             if (showEnergy) {
                 table.addCell(valueCell(target.energie(), TextAlignment.CENTER, tableStyle));
             }
-            table.addCell(singleLineValueCell(formatMoneyOrEmpty(target.valeurNeuf()), valueFont, valueCellWidth, tableStyle));
-            table.addCell(singleLineValueCell(formatMoneyOrEmpty(target.valeurVenale()), valueFont, valueCellWidth, tableStyle));
-            table.addCell(singleLineValueCell(formatMoneyOrEmpty(target.valeurGlace()), valueFont, valueCellWidth, tableStyle));
+            table.addCell(singleLineValueCell(formatMoneyOrEmpty(target.valeurNeuf()), valueFont, widths[firstValueColumn], tableStyle));
+            table.addCell(singleLineValueCell(formatMoneyOrEmpty(target.valeurVenale()), valueFont, widths[firstValueColumn + 1], tableStyle));
+            table.addCell(singleLineValueCell(formatMoneyOrEmpty(target.valeurGlace()), valueFont, widths[firstValueColumn + 2], tableStyle));
             if (hasDcCapital) {
-                table.addCell(singleLineValueCell(formatMoneyOrEmpty(capitalFor(rowGuarantees, "DC")), valueFont, valueCellWidth, tableStyle));
+                table.addCell(singleLineValueCell(formatMoneyOrEmpty(capitalFor(rowGuarantees, "DC")), valueFont,
+                        widths[firstValueColumn + 3], tableStyle));
             }
             if (codes.isEmpty() && !showAssistance) {
                 table.addCell(valueCell("-", TextAlignment.CENTER, tableStyle));
@@ -680,7 +695,9 @@ public class FlottePolicePdfService {
             boolean hasDcCapital,
             boolean showAssistance,
             boolean showPfOrPtc,
-            boolean showEnergy
+            boolean showEnergy,
+            float[] valueWidths,
+            float availableWidth
     ) {
         List<Float> widths = new ArrayList<>(List.of(1.0f, 1.5f, 2.3f, 2.0f, 1.35f));
         if (showPfOrPtc) {
@@ -702,9 +719,21 @@ public class FlottePolicePdfService {
             widths.add(1.25f);
         }
         widths.add(1.55f);
+        float totalWeight = 0;
+        for (float width : widths) totalWeight += width;
+        float valueWeight = VALUE_COLUMN_WEIGHT * valueWidths.length;
+        float requestedValueWidth = 0;
+        for (float width : valueWidths) requestedValueWidth += width;
+        // Reclaim unused value space without letting unusually large amounts crowd out vehicle details.
+        float valueScale = Math.min(1, availableWidth * valueWeight / totalWeight / requestedValueWidth);
+        float otherColumnScale = (availableWidth - requestedValueWidth * valueScale) / (totalWeight - valueWeight);
+        int firstValueColumn = 5 + (showPfOrPtc ? 1 : 0) + (showEnergy ? 1 : 0);
         float[] result = new float[widths.size()];
         for (int index = 0; index < widths.size(); index++) {
-            result[index] = widths.get(index);
+            int valueIndex = index - firstValueColumn;
+            result[index] = valueIndex >= 0 && valueIndex < valueWidths.length
+                    ? valueWidths[valueIndex] * valueScale
+                    : widths.get(index) * otherColumnScale;
         }
         return result;
     }

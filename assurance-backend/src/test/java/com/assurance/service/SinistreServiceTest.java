@@ -130,7 +130,7 @@ class SinistreServiceTest {
 
     @Test
     void registerRejectsInvertedDateRangeBeforeQuerying() {
-        assertThatThrownBy(() -> service.registre(1L, null, null, null, null, null, null, null,
+        assertThatThrownBy(() -> service.registre(1L, null, null, null, null, null, null,
                 LocalDate.now(), LocalDate.now().minusDays(1)))
                 .isInstanceOf(BadRequestException.class).hasMessageContaining("date de debut");
         verifyNoInteractions(claims);

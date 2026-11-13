@@ -107,8 +107,8 @@ describe("claims API contracts", () => {
       dateEffet: "2025-01-01", dateEcheance: "2025-12-31",
     }];
     vi.mocked(apiFetch).mockResolvedValueOnce({ success: true, data: contracts });
-    expect(await sinistreApi.lookupContracts("7", "12345-A-6")).toEqual(contracts);
-    expect(apiFetch).toHaveBeenCalledWith("/api/v1/sinistres/contrats?brancheId=7&query=12345-A-6");
+    expect(await sinistreApi.lookupContracts("7", "12345-A-6", "IMMATRICULATION")).toEqual(contracts);
+    expect(apiFetch).toHaveBeenCalledWith("/api/v1/sinistres/contrats?brancheId=7&query=12345-A-6&typeRecherche=IMMATRICULATION");
     expect(sinistreKeys.contracts("7", "P-14")).not.toEqual(sinistreKeys.contracts("8", "P-14"));
   });
 

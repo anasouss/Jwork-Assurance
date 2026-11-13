@@ -68,6 +68,8 @@ export function SinistreDeclarationContextDialog({
   const [dateSinistre, setDateSinistre] = useState("");
   const [dateDeclaration, setDateDeclaration] = useState("");
   const [vehiculeId, setVehiculeId] = useState("");
+  const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
+  const [vehiclePreview, setVehiclePreview] = useState<{ id: string; immatriculation?: string | null } | null>(null);
   const [brancheId, setBrancheId] = useState("");
   const [typeDommage, setTypeDommage] = useState<TypeDommageSinistre | "">("");
   const branches = useQuery({
@@ -88,8 +90,12 @@ export function SinistreDeclarationContextDialog({
       setDateSinistre(initialDateSinistre);
       setDateDeclaration(initialDateDeclaration || toIso(new Date()));
       setVehiculeId(initialVehicleId);
+      setVehiclePickerOpen(false);
+      setVehiclePreview(initialContract?.vehiculesCorrespondants?.find(vehicle => vehicle.id === initialVehicleId) ?? null);
       setBrancheId("");
       setTypeDommage(initialTypeDommage);
+    } else if (!open) {
+      setSubmittedSearch(null);
     }
     wasOpen.current = open;
   }, [initialContract, initialDateSinistre, initialDateDeclaration, initialVehicleId, initialTypeDommage, open]);
@@ -109,7 +115,7 @@ export function SinistreDeclarationContextDialog({
   const searchAllowed = !!effectiveBrancheId && (!automobile || !!typeDommage);
   const searchComplete = search.trim().length >= (searchType === "ASSURE" ? 3 : 1);
   function runSearch() {
-    if (!searchAllowed) return;
+    if (!searchAllowed || contracts.isFetching) return;
     if (!searchComplete) {
       setSearchError(searchType === "ASSURE" ? "Renseignez au moins 3 caractères du nom de l’assuré." : "Renseignez la référence complète.");
       return;
@@ -136,7 +142,7 @@ export function SinistreDeclarationContextDialog({
     const coveredVehicles = coverage.data.vehicules;
     setVehiculeId(current => {
       if (!automobile) return "";
-      if (coveredVehicles.some(vehicle => vehicle.id === current)) return current;
+      if (current) return current;
       const matchedIds = new Set(contract?.vehiculesCorrespondants?.map(vehicle => vehicle.id) ?? []);
       if (matchedIds.size) {
         const matches = coveredVehicles.filter(vehicle => matchedIds.has(vehicle.id));
@@ -146,12 +152,19 @@ export function SinistreDeclarationContextDialog({
     });
   }, [automobile, coverage.data, contract, dateSinistre]);
 
+  useEffect(() => {
+    const vehicle = coverage.data?.vehicules.find(item => item.id === vehiculeId);
+    if (vehicle) setVehiclePreview({ id: vehicle.id, immatriculation: vehicle.immatriculation });
+  }, [coverage.data, vehiculeId]);
+
   function selectContract(item: SinistreContractOption) {
     setContract(item);
     setSearch("");
     setSubmittedSearch(null);
+    setVehiclePickerOpen(false);
     const matchedIds = [...new Set(item.vehiculesCorrespondants?.map(vehicle => vehicle.id) ?? [])];
     setVehiculeId(matchedIds.length === 1 ? matchedIds[0] : "");
+    setVehiclePreview(matchedIds.length === 1 ? item.vehiculesCorrespondants?.find(vehicle => vehicle.id === matchedIds[0]) ?? null : null);
   }
 
   function resetContract() {
@@ -159,6 +172,8 @@ export function SinistreDeclarationContextDialog({
     setContract(null);
     setSubmittedSearch(null);
     setVehiculeId("");
+    setVehiclePickerOpen(false);
+    setVehiclePreview(null);
   }
 
   function continueDeclaration() {
@@ -176,7 +191,15 @@ export function SinistreDeclarationContextDialog({
     navigate(`/app/sinistre/declarer?${params.toString()}`);
   }
 
-  const vehicleRequired = automobile && (coverage.data?.vehicules.length ?? 0) > 1;
+  const coveredVehicles = coverage.data?.vehicules ?? [];
+  const selectedVehicle = coveredVehicles.find(vehicle => vehicle.id === vehiculeId)
+    ?? contract?.vehiculesCorrespondants?.find(vehicle => vehicle.id === vehiculeId)
+    ?? (vehiclePreview?.id === vehiculeId ? vehiclePreview : null);
+  const selectedVehicleCovered = coveredVehicles.some(vehicle => vehicle.id === vehiculeId);
+  const matchedVehicleIds = new Set(contract?.vehiculesCorrespondants?.map(vehicle => vehicle.id) ?? []);
+  const vehicleChoices = !vehiclePickerOpen && matchedVehicleIds.size
+    ? coveredVehicles.filter(vehicle => matchedVehicleIds.has(vehicle.id)) : coveredVehicles;
+  const coverageReady = !!coverage.data && !coverage.isFetching && !coverage.isError;
   const canContinue = Boolean(
     contract &&
       dateSinistre &&
@@ -184,6 +207,7 @@ export function SinistreDeclarationContextDialog({
       dateSinistre <= toIso(new Date()) &&
       coverage.data &&
       !coverage.isFetching &&
+      !coverage.isError &&
       (!automobile || typeDommage) &&
       (!automobile || coverage.data.vehicules.some(vehicle => vehicle.id === vehiculeId)),
   );
@@ -201,7 +225,7 @@ export function SinistreDeclarationContextDialog({
           <div className="grid gap-2">
             <Label>Branche <span className="text-red-500">*</span></Label>
             <Select value={effectiveBrancheId}
-              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setSearch(""); setSubmittedSearch(null); setSearchError(""); setTypeDommage(""); }}>
+              onValueChange={(value) => { setBrancheId(value); setContract(null); setVehiculeId(""); setVehiclePickerOpen(false); setSearch(""); setSubmittedSearch(null); setSearchError(""); setTypeDommage(""); }}>
               <SelectTrigger><SelectValue placeholder="Sélectionner une branche" /></SelectTrigger>
               <SelectContent>{(branches.data ?? []).map((item) => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}</SelectContent>
             </Select>
@@ -240,9 +264,9 @@ export function SinistreDeclarationContextDialog({
               </div>
             ) : (
               <div>
-                <div className="grid gap-2 sm:grid-cols-[180px_minmax(0,1fr)_40px]">
+                <div className="grid grid-cols-[minmax(0,1fr)_40px] gap-2 sm:grid-cols-[180px_minmax(0,1fr)_40px]">
                 <Select value={searchType} onValueChange={value => { setSearchType(value as TypeRechercheContratSinistre); setSubmittedSearch(null); setSearchError(""); setSearch(""); }} disabled={!searchAllowed}>
-                  <SelectTrigger aria-label="Type de recherche"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(searchLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+                  <SelectTrigger className="col-span-2 sm:col-span-1" aria-label="Type de recherche"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(searchLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
                 </Select>
                 <Input
                   id="claim-contract-search"
@@ -300,6 +324,36 @@ export function SinistreDeclarationContextDialog({
             )}
           </div>
 
+          {contract && automobile ? <section aria-label="Véhicule concerné" className="grid gap-3 border-y py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Label>Véhicule concerné <span className="text-red-500">*</span></Label>
+              <Button type="button" variant="outline" size="sm" disabled={!coverageReady || !coveredVehicles.length}
+                onClick={() => setVehiclePickerOpen(current => !current)}>
+                {vehiclePickerOpen ? "Fermer la sélection" : vehiculeId ? "Changer de véhicule" : "Sélectionner un véhicule"}
+              </Button>
+            </div>
+            {vehiculeId ? <div className="flex flex-wrap items-center justify-between gap-3 bg-sky-50/50 p-3 dark:bg-sky-950/20">
+              <div className="flex min-w-0 items-center gap-3"><Car className="size-5 shrink-0 text-sky-700 dark:text-sky-400" />
+                <dl className="min-w-0"><SummaryValue label="Immatriculation" value={selectedVehicle?.immatriculation || "-"} /></dl>
+              </div>
+              <Badge variant={coverageReady ? selectedVehicleCovered ? "success" : "destructive" : "outline"}>
+                {coverage.isFetching ? "Vérification en cours" : coverage.isError ? "Couverture indisponible" : coverageReady ? selectedVehicleCovered ? "Couvert à la date du sinistre" : "Non couvert à cette date" : "Couverture à vérifier"}
+              </Badge>
+            </div> : <p className="text-sm text-muted-foreground">Aucun véhicule sélectionné.</p>}
+            {coverageReady && (vehiclePickerOpen || !vehiculeId) ? <div className="grid gap-2 sm:grid-cols-2">
+              {vehicleChoices.map(vehicle => <button key={vehicle.id} type="button" aria-pressed={vehicle.id === vehiculeId}
+                className={cn("flex min-w-0 items-center gap-3 rounded-md border p-3 text-left", vehicle.id === vehiculeId
+                  ? "border-sky-600 bg-sky-50 dark:border-sky-500 dark:bg-sky-950/50" : "bg-background hover:border-sky-300 dark:hover:border-sky-800")}
+                onClick={() => { setVehiculeId(vehicle.id); setVehiclePreview({ id: vehicle.id, immatriculation: vehicle.immatriculation }); setVehiclePickerOpen(false); }}>
+                <Car className="size-5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0"><span className="block break-words font-medium">{vehicle.immatriculation || "Sans immatriculation"}</span>
+                  <span className="block break-words text-xs text-muted-foreground">{vehicle.marque || "-"} · {vehicle.usageLibelle || vehicle.usageCode || "-"}</span></span>
+                {vehicle.id === vehiculeId ? <Check className="ml-auto size-4 shrink-0 text-sky-700" /> : null}
+              </button>)}
+              {!vehicleChoices.length ? <p className="text-sm text-destructive sm:col-span-2">Aucun véhicule correspondant n’est couvert à cette date.</p> : null}
+            </div> : null}
+          </section> : null}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label>Date du sinistre <span className="text-red-500">*</span></Label>
@@ -308,7 +362,6 @@ export function SinistreDeclarationContextDialog({
                 maxDate={new Date()}
                 onSelect={(date) => {
                   setDateSinistre(toIso(date));
-                  setVehiculeId("");
                 }}
               />
             </div>
@@ -332,9 +385,9 @@ export function SinistreDeclarationContextDialog({
               </AlertDescription>
             </Alert>
           ) : null}
-          {coverage.data ? (
+          {coverageReady && coverage.data ? (
             <div className="grid gap-4 overflow-hidden rounded-md border border-sky-200 bg-sky-50/35 p-4 dark:border-sky-900 dark:bg-sky-950/20">
-              <div className="flex flex-wrap items-center gap-3 border-b border-sky-200 pb-3 text-sm dark:border-sky-900">
+              <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="flex items-center gap-2 font-medium">
                   <Shield className="size-4 text-sky-700" />
                   {coverage.data.brancheLibelle || coverage.data.brancheCode || "Branche"}
@@ -343,46 +396,11 @@ export function SinistreDeclarationContextDialog({
                   Couverture du {formatIsoDate(coverage.data.dateEffet)} au {formatIsoDate(coverage.data.dateEcheance)}
                 </span>
               </div>
-              {automobile ? (
-                <div className="grid gap-2">
-                  <Label>Véhicule concerné <span className="text-red-500">*</span></Label>
-                  {contract?.vehiculesCorrespondants?.length && !coverage.data.vehicules.some(vehicle => contract.vehiculesCorrespondants?.some(match => match.id === vehicle.id)) ? <p role="alert" className="text-sm text-amber-700 dark:text-amber-400">Le véhicule recherché n’est pas couvert à cette date. Vérifiez la police, la date et le véhicule concerné.</p> : null}
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {coverage.data.vehicules.map((vehicle) => {
-                      const selected = vehicle.id === vehiculeId;
-                      return (
-                        <button
-                          key={vehicle.id}
-                          type="button"
-                          className={cn(
-                            "flex cursor-pointer items-center gap-3 rounded-md border p-3 text-left",
-                            selected
-                              ? "border-sky-600 bg-sky-100/80 shadow-sm dark:border-sky-500 dark:bg-sky-950/55"
-                              : "bg-background/80 hover:border-sky-300 hover:bg-background dark:hover:border-sky-800",
-                          )}
-                          onClick={() => setVehiculeId(vehicle.id)}
-                        >
-                          <Car className="size-5 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0">
-                            <span className="block font-medium">{vehicle.immatriculation || "Sans immatriculation"}</span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {vehicle.marque || "Marque non renseignée"} · {vehicle.usageLibelle || vehicle.usageCode || "Usage non renseigné"}
-                            </span>
-                          </span>
-                          {selected ? <Check className="ml-auto size-4 shrink-0 text-sky-700" /> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {vehicleRequired && !vehiculeId ? (
-                    <p className="text-xs text-amber-700 dark:text-amber-400">Sélectionnez le véhicule impliqué.</p>
-                  ) : null}
-                </div>
-              ) : (
+              {!automobile ? (
                 <p className="text-sm text-muted-foreground">
                   Aucun véhicule n’est requis pour cette branche.
                 </p>
-              )}
+              ) : null}
             </div>
           ) : null}
         </div>

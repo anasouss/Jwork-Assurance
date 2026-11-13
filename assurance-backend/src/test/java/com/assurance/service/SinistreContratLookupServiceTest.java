@@ -7,6 +7,7 @@ import com.assurance.entity.MouvementContrat;
 import com.assurance.entity.MouvementVehicule;
 import com.assurance.entity.Vehicule;
 import com.assurance.exception.BadRequestException;
+import com.assurance.enums.TypeRechercheContratSinistre;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.SinistreContratLookupRepository;
 import org.junit.jupiter.api.Test;
@@ -30,11 +31,11 @@ class SinistreContratLookupServiceTest {
 
     @Test
     void lookupIsAgencyAndBranchScopedAndEscapesLikeWildcards() {
-        when(contracts.search(7L, 3L, "%abc!%!_!!%", PageRequest.of(0, 20))).thenReturn(List.of());
+        when(contracts.search(7L, 3L, "ASSURE", "%abc!%!_!!%", PageRequest.of(0, 20))).thenReturn(List.of());
 
-        assertThat(service.search(7L, 3L, " ABC%_! ")).isEmpty();
+        assertThat(service.search(7L, 3L, " ABC%_! ", TypeRechercheContratSinistre.ASSURE)).isEmpty();
 
-        verify(contracts).search(7L, 3L, "%abc!%!_!!%", PageRequest.of(0, 20));
+        verify(contracts).search(7L, 3L, "ASSURE", "%abc!%!_!!%", PageRequest.of(0, 20));
         verifyNoInteractions(clients);
     }
 
@@ -42,10 +43,10 @@ class SinistreContratLookupServiceTest {
     void lookupKeepsSeparateContractPeriodsEvenWithTheSamePolicyNumber() {
         var old = contract(1L, 2025);
         var current = contract(2L, 2026);
-        when(contracts.search(7L, 3L, "%000123%", PageRequest.of(0, 20))).thenReturn(List.of(current, old));
+        when(contracts.search(7L, 3L, "POLICE", "000123", PageRequest.of(0, 20))).thenReturn(List.of(current, old));
         when(clients.findByContratIdIn(List.of(2L, 1L))).thenReturn(List.of());
 
-        var results = service.search(7L, 3L, "000123");
+        var results = service.search(7L, 3L, "000123", TypeRechercheContratSinistre.POLICE);
 
         assertThat(results).extracting(item -> item.id()).containsExactly(2L, 1L);
         assertThat(results).extracting(item -> item.dateEffet().getYear()).containsExactly(2026, 2025);
@@ -54,8 +55,9 @@ class SinistreContratLookupServiceTest {
 
     @Test
     void incompleteLookupIsRejectedBeforeReadingOperationalData() {
-        assertThatThrownBy(() -> service.search(7L, null, "POLICE")).isInstanceOf(BadRequestException.class);
-        assertThatThrownBy(() -> service.search(7L, 3L, "A")).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.search(7L, null, "POLICE", TypeRechercheContratSinistre.POLICE)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.search(7L, 3L, "AB", TypeRechercheContratSinistre.ASSURE)).isInstanceOf(BadRequestException.class);
+        assertThatThrownBy(() -> service.search(7L, 3L, " - ", TypeRechercheContratSinistre.IMMATRICULATION)).isInstanceOf(BadRequestException.class);
         verifyNoInteractions(contracts, clients);
     }
 
@@ -67,17 +69,17 @@ class SinistreContratLookupServiceTest {
         vehicle.setId(30L);
         var snapshot = MouvementVehicule.builder().vehicule(vehicle).immatriculation("7571-A-73")
                 .mouvementContrat(MouvementContrat.builder().contrat(first).build()).build();
-        when(contracts.search(7L, 3L, "%7571%", PageRequest.of(0, 20))).thenReturn(List.of(first, second));
-        when(contracts.matchingVehicles(7L, List.of(1L, 2L), "%7571%")).thenReturn(List.of(snapshot, snapshot));
+        when(contracts.search(7L, 3L, "IMMATRICULATION", "7571a73", PageRequest.of(0, 20))).thenReturn(List.of(first, second));
+        when(contracts.matchingVehicles(7L, List.of(1L, 2L), "7571a73")).thenReturn(List.of(snapshot, snapshot));
 
-        var results = service.search(7L, 3L, "7571");
+        var results = service.search(7L, 3L, " 7571 - A - 73 ", TypeRechercheContratSinistre.IMMATRICULATION);
 
         assertThat(results.get(0).vehiculesCorrespondants()).singleElement().satisfies(match -> {
             assertThat(match.id()).isEqualTo(30L);
             assertThat(match.immatriculation()).isEqualTo("7571-A-73");
         });
         assertThat(results.get(1).vehiculesCorrespondants()).isEmpty();
-        verify(contracts).matchingVehicles(7L, List.of(1L, 2L), "%7571%");
+        verify(contracts).matchingVehicles(7L, List.of(1L, 2L), "7571a73");
     }
 
     private Contrat contract(Long id, int year) {

@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Download, Landmark } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import { formatTreasuryDate, paymentModeLabel } from "../pages/treasury-format";
 import type { ClientPayment, PaymentAllocationStatus, PaymentInstrumentStatus } from "../types";
+import { RemittanceSlipPdfDialog } from "./RemittanceSlipPdfDialog";
 
 const INSTRUMENT_LABELS: Record<PaymentInstrumentStatus, string> = {
   EN_ATTENTE: "En attente", REMIS_EN_BANQUE: "Remis en banque", CONFIRME: "Confirmé", REJETE: "Impayé", REMPLACE: "Remplacé",
@@ -23,6 +24,8 @@ const ALLOCATION_LABELS: Record<PaymentAllocationStatus, string> = {
 const ALLOCATION_VARIANTS = { EN_ATTENTE: "warning", CONFIRMEE: "success", ANNULEE: "red" } as const;
 
 export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
+  const canViewTreasury = useAuthStore((state) => state.user?.permissions.includes("tresorerie:view") ?? false);
+  const [bordereauPdf, setBordereauPdf] = useState<{ id: string; numero?: string | null } | null>(null);
   const detail = payment.detail;
   const history = groupAllocations(payment).filter(allocation => allocation.statut === "ANNULEE");
   const downloadReceipt = useMutation({
@@ -112,7 +115,12 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
               {instrument.motifStatut && instrument.motifStatut.trim().toLocaleLowerCase("fr")
                 !== (payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]).toLocaleLowerCase("fr")
                 && <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>{instrument.motifStatut}</div>}
-              {instrument.bordereauRemiseId && <Link className="mt-2 flex items-center gap-1.5 text-xs font-medium text-blue-700 underline-offset-4 hover:underline dark:text-blue-300" to={`/app/compta/tresorerie/bordereaux-remise/${instrument.bordereauRemiseId}`}><Landmark className="size-3.5 shrink-0" />{instrument.numeroBordereauRemise || "Voir le bordereau"}</Link>}
+              {instrument.bordereauRemiseId && (canViewTreasury ? <Button type="button" variant="link"
+                className="mt-2 flex h-auto items-center justify-start gap-1.5 whitespace-normal p-0 text-left text-xs font-medium text-blue-700 dark:text-blue-300"
+                title="Afficher le PDF du bordereau"
+                onClick={() => { if (instrument.bordereauRemiseId) setBordereauPdf({ id: instrument.bordereauRemiseId, numero: instrument.numeroBordereauRemise }); }}>
+                <Landmark className="size-3.5 shrink-0" />{instrument.numeroBordereauRemise || "Voir le bordereau"}
+              </Button> : instrument.numeroBordereauRemise ? <div className="mt-2 text-xs text-muted-foreground">{instrument.numeroBordereauRemise}</div> : null)}
             </td>
           </tr>)}
             {!payment.instruments.length && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Aucun encaissement.</td></tr>}
@@ -130,6 +138,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
     </details>}
     {payment.notes && <section className="space-y-2 border-t pt-4"><h2 className="text-sm font-semibold">Notes</h2><p className="whitespace-pre-wrap break-words text-sm">{payment.notes}</p></section>}
     <div className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-muted-foreground"><span>Créé par : {payment.creePar || "-"}</span><span>Non affecté : {amount(payment.montantNonAffecte)}</span></div>
+    {bordereauPdf && <RemittanceSlipPdfDialog key={bordereauPdf.id} {...bordereauPdf} onClose={() => setBordereauPdf(null)} />}
   </div>;
 }
 

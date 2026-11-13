@@ -63,7 +63,6 @@ import { AttestationNumberInput } from "../components/AttestationNumberInput";
 import { QuittancePreviewCard } from "../components/QuittancePreviewCard";
 import { AvenantManualQuittanceTable, emptyAvenantQuittance, hasAvenantQuittanceAmounts } from "../components/AvenantManualQuittanceTable";
 import { toDateOnly } from "../date";
-import { numberValue } from "../utils/format";
 import type { AssistanceDraft, AvenantRequest, GarantieInput, QuittanceInput, QuittancePreview, RemorqueInput, VehiculeInput } from "../types";
 
 export default function AvenantContratPage() {

@@ -40,12 +40,14 @@ public interface SinistreContratLookupRepository extends Repository<Contrat, Lon
             Pageable pageable
     );
 
-    @EntityGraph(attributePaths = {"vehicule", "mouvementContrat", "mouvementContrat.contrat"})
     @Query("""
             select mv from MouvementVehicule mv
-            where mv.mouvementContrat.contrat.agence.id = :agenceId
-              and mv.mouvementContrat.contrat.id in :contratIds
-              and mv.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+            join fetch mv.vehicule
+            join fetch mv.mouvementContrat m
+            join fetch m.contrat c
+            where c.agence.id = :agenceId
+              and c.id in :contratIds
+              and m.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
               and (lower(coalesce(mv.immatriculation, '')) like :pattern escape '!'
                    or lower(coalesce(mv.immatriculationProvisoire, '')) like :pattern escape '!')
             order by mv.id desc

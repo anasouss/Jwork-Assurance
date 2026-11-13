@@ -21,16 +21,15 @@ public interface SinistreContratLookupRepository extends Repository<Contrat, Lon
               and c.statut <> com.assurance.enums.StatutContrat.DRAFT
               and (
                 lower(coalesce(c.numeroPolice, '')) like :pattern escape '!'
-                or lower(coalesce(c.numeroDossier, '')) like :pattern escape '!'
                 or exists (select cc.id from ContratClient cc where cc.contrat = c
+                    and cc.role in (com.assurance.enums.RoleClientContrat.PROPRIETAIRE, com.assurance.enums.RoleClientContrat.SOUSCRIPTEUR)
                     and (lower(coalesce(cc.client.raisonSociale, '')) like :pattern escape '!'
                          or lower(concat(coalesce(cc.client.prenom, ''), ' ', coalesce(cc.client.nom, ''))) like :pattern escape '!'
                          or lower(concat(coalesce(cc.client.nom, ''), ' ', coalesce(cc.client.prenom, ''))) like :pattern escape '!'))
                 or exists (select mv.id from MouvementVehicule mv where mv.mouvementContrat.contrat = c
                     and mv.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
                     and (lower(coalesce(mv.immatriculation, '')) like :pattern escape '!'
-                         or lower(coalesce(mv.immatriculationProvisoire, '')) like :pattern escape '!'
-                         or lower(coalesce(mv.numeroAttestation, '')) like :pattern escape '!'))
+                         or lower(coalesce(mv.immatriculationProvisoire, '')) like :pattern escape '!'))
               )
             order by c.dateEffet desc, c.id desc
             """)
@@ -39,5 +38,21 @@ public interface SinistreContratLookupRepository extends Repository<Contrat, Lon
             @Param("brancheId") Long brancheId,
             @Param("pattern") String pattern,
             Pageable pageable
+    );
+
+    @EntityGraph(attributePaths = {"vehicule", "mouvementContrat", "mouvementContrat.contrat"})
+    @Query("""
+            select mv from MouvementVehicule mv
+            where mv.mouvementContrat.contrat.agence.id = :agenceId
+              and mv.mouvementContrat.contrat.id in :contratIds
+              and mv.mouvementContrat.statut = com.assurance.enums.StatutMouvementContrat.VALIDE
+              and (lower(coalesce(mv.immatriculation, '')) like :pattern escape '!'
+                   or lower(coalesce(mv.immatriculationProvisoire, '')) like :pattern escape '!')
+            order by mv.id desc
+            """)
+    List<com.assurance.entity.MouvementVehicule> matchingVehicles(
+            @Param("agenceId") Long agenceId,
+            @Param("contratIds") List<Long> contratIds,
+            @Param("pattern") String pattern
     );
 }

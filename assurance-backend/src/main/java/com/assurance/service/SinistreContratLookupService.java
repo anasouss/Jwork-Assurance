@@ -31,6 +31,10 @@ public class SinistreContratLookupService {
                 .replace("!", "!!").replace("%", "!%").replace("_", "!_");
         var results = contracts.search(agenceId, brancheId, "%" + literal + "%", PageRequest.of(0, 20));
         if (results.isEmpty()) return List.of();
+        var contractIds = results.stream().map(item -> item.getId()).toList();
+        var vehiclesByContract = contracts.matchingVehicles(agenceId, contractIds, "%" + literal + "%")
+                .stream().filter(item -> item.getVehicule() != null)
+                .collect(Collectors.groupingBy(item -> item.getMouvementContrat().getContrat().getId()));
         var rolesByContract = clients.findByContratIdIn(results.stream().map(item -> item.getId()).toList())
                 .stream().sorted(Comparator.comparing((ContratClient item) -> !Boolean.TRUE.equals(item.getPrincipalPourRole()))
                         .thenComparing(ContratClient::getId))
@@ -43,7 +47,12 @@ public class SinistreContratLookupService {
                 contract.getDateEffet(), contract.getDateEcheance(),
                 rolesByContract.getOrDefault(contract.getId(), List.of()).stream()
                         .map(role -> new SinistreContratLookupResponse.ClientRole(role.getRole(), role.getClient().getNomAffichage()))
-                        .toList()
+                        .toList(),
+                vehiclesByContract.getOrDefault(contract.getId(), List.of()).stream()
+                        .map(vehicle -> new SinistreContratLookupResponse.MatchedVehicle(vehicle.getVehicule().getId(),
+                                vehicle.getImmatriculation() == null || vehicle.getImmatriculation().isBlank()
+                                        ? vehicle.getImmatriculationProvisoire() : vehicle.getImmatriculation()))
+                        .distinct().toList()
         )).toList();
     }
 }

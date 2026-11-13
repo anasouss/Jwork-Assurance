@@ -3,6 +3,9 @@ package com.assurance.service;
 import com.assurance.entity.BrancheAssurance;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Contrat;
+import com.assurance.entity.MouvementContrat;
+import com.assurance.entity.MouvementVehicule;
+import com.assurance.entity.Vehicule;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.SinistreContratLookupRepository;
@@ -54,6 +57,27 @@ class SinistreContratLookupServiceTest {
         assertThatThrownBy(() -> service.search(7L, null, "POLICE")).isInstanceOf(BadRequestException.class);
         assertThatThrownBy(() -> service.search(7L, 3L, "A")).isInstanceOf(BadRequestException.class);
         verifyNoInteractions(contracts, clients);
+    }
+
+    @Test
+    void registrationMatchesCarryVehicleIdsWithinTheirOwnPolicy() {
+        var first = contract(1L, 2026);
+        var second = contract(2L, 2026);
+        var vehicle = new Vehicule();
+        vehicle.setId(30L);
+        var snapshot = MouvementVehicule.builder().vehicule(vehicle).immatriculation("7571-A-73")
+                .mouvementContrat(MouvementContrat.builder().contrat(first).build()).build();
+        when(contracts.search(7L, 3L, "%7571%", PageRequest.of(0, 20))).thenReturn(List.of(first, second));
+        when(contracts.matchingVehicles(7L, List.of(1L, 2L), "%7571%")).thenReturn(List.of(snapshot, snapshot));
+
+        var results = service.search(7L, 3L, "7571");
+
+        assertThat(results.get(0).vehiculesCorrespondants()).singleElement().satisfies(match -> {
+            assertThat(match.id()).isEqualTo(30L);
+            assertThat(match.immatriculation()).isEqualTo("7571-A-73");
+        });
+        assertThat(results.get(1).vehiculesCorrespondants()).isEmpty();
+        verify(contracts).matchingVehicles(7L, List.of(1L, 2L), "%7571%");
     }
 
     private Contrat contract(Long id, int year) {

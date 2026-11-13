@@ -15,8 +15,12 @@ public record SinistreContratLookupResponse(
         String compagnieLibelle,
         LocalDate dateEffet,
         LocalDate dateEcheance,
-        List<ClientRole> clients
+        List<ClientRole> clients,
+        List<MatchedVehicle> vehiculesCorrespondants
 ) {
     public record ClientRole(RoleClientContrat role, String nomAffichage) {
+    }
+
+    public record MatchedVehicle(Long id, String immatriculation) {
     }
 }

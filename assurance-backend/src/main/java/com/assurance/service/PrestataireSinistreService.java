@@ -197,17 +197,15 @@ public class PrestataireSinistreService {
         return covered.containsAll(required);
     }
 
-    public List<ExpertSinistre> eligibleExperts(Eligibility context, Long villeId) {
+    public List<ExpertSinistre> eligibleExperts(Eligibility context) {
         Set<Long> required = requiredGuarantees(context, TypePrestataireSinistre.EXPERT);
-        List<ExpertSinistre> experts = villeId == null ? expertRepository.findByAgenceIdAndActifTrueOrderByNomAsc(context.agenceId())
-                : expertRepository.findByAgenceIdAndVilleIdAndActifTrueOrderByNomAsc(context.agenceId(), villeId);
+        List<ExpertSinistre> experts = expertRepository.findByAgenceIdAndActifTrueOrderByNomAsc(context.agenceId());
         return experts.stream().filter(e -> eligible(e.isToutesCompagnies(), e.getAccords(), e.getSpecialites(), context, required)).toList();
     }
 
-    public List<GarageSinistre> eligibleGarages(Eligibility context, Long villeId) {
+    public List<GarageSinistre> eligibleGarages(Eligibility context) {
         Set<Long> required = requiredGuarantees(context, TypePrestataireSinistre.GARAGE);
         return garageRepository.findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(context.agenceId()).stream()
-                .filter(g -> villeId == null || (g.getVille() != null && g.getVille().getId().equals(villeId)))
                 .filter(g -> eligible(g.isToutesCompagnies(), g.getAccords(), g.getSpecialites(), context, required))
                 .filter(g -> context.modeReparation() != ModeReparationSinistre.PEC || approved(g.getAccords(), context)).toList();
     }

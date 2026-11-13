@@ -48,10 +48,9 @@ public class PrestataireSinistreController {
             @RequestParam(required = false) LocalDate dateSinistre,
             @RequestParam(required = false) LocalDate dateIntervention,
             @RequestParam(required = false) Set<Long> garantieIds,
-            @RequestParam(required = false) ModeReparationSinistre modeReparation,
-            @RequestParam(required = false) Long villeId) {
+            @RequestParam(required = false) ModeReparationSinistre modeReparation) {
         return ApiResponse.success(intervenants.eligible(TenantContext.getCurrentAgence(), typePrestataire,
-                sinistreId, contratId, vehiculeId, dateSinistre, garantieIds, dateIntervention, modeReparation, villeId));
+                sinistreId, contratId, vehiculeId, dateSinistre, garantieIds, dateIntervention, modeReparation));
     }
 
     @GetMapping("/options")

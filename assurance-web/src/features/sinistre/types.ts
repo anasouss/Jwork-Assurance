@@ -24,6 +24,7 @@ export type SinistreContractOption = {
   compagnieCode?: string | null;
   compagnieLibelle?: string | null;
   clients?: Array<{ role: string; nomAffichage?: string | null }>;
+  vehiculesCorrespondants?: Array<{ id: string; immatriculation?: string | null }>;
   dateEffet?: string | null;
   dateEcheance?: string | null;
 };
@@ -453,5 +454,5 @@ export type ProviderAgreement = {
 };
 export type ProviderEligibilityContext = {
   sinistreId?: string; contratId?: string; vehiculeId?: string; dateSinistre?: string;
-  garantieIds?: string[]; modeReparation?: ModeReparationSinistre; dateIntervention?: string; villeId?: string;
+  garantieIds?: string[]; modeReparation?: ModeReparationSinistre; dateIntervention?: string;
 };

@@ -108,17 +108,24 @@ export function SinistreDeclarationContextDialog({
 
   useEffect(() => {
     if (!coverage.data) return;
-    if (coverage.data.vehicules.length === 1) {
-      setVehiculeId(coverage.data.vehicules[0].id);
-    } else if (!automobile) {
-      setVehiculeId("");
-    }
-  }, [automobile, coverage.data]);
+    const coveredVehicles = coverage.data.vehicules;
+    setVehiculeId(current => {
+      if (!automobile) return "";
+      if (coveredVehicles.some(vehicle => vehicle.id === current)) return current;
+      const matchedIds = new Set(contract?.vehiculesCorrespondants?.map(vehicle => vehicle.id) ?? []);
+      if (matchedIds.size) {
+        const matches = coveredVehicles.filter(vehicle => matchedIds.has(vehicle.id));
+        return matches.length === 1 ? matches[0].id : "";
+      }
+      return coveredVehicles.length === 1 ? coveredVehicles[0].id : "";
+    });
+  }, [automobile, coverage.data, contract, dateSinistre]);
 
   function selectContract(item: SinistreContractOption) {
     setContract(item);
     setSearch("");
-    setVehiculeId("");
+    const matchedIds = [...new Set(item.vehiculesCorrespondants?.map(vehicle => vehicle.id) ?? [])];
+    setVehiculeId(matchedIds.length === 1 ? matchedIds[0] : "");
   }
 
   function resetContract() {
@@ -151,7 +158,7 @@ export function SinistreDeclarationContextDialog({
       coverage.data &&
       !coverage.isFetching &&
       (!automobile || typeDommage) &&
-      (!automobile || vehiculeId),
+      (!automobile || coverage.data.vehicules.some(vehicle => vehicle.id === vehiculeId)),
   );
 
   return (
@@ -185,17 +192,20 @@ export function SinistreDeclarationContextDialog({
             <Label htmlFor="claim-contract-search">Police, assuré ou immatriculation <span className="text-red-500">*</span></Label>
             {contract ? (
               <div className="flex flex-col gap-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/35 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold">{contract.numeroPolice || contract.numeroDossier}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">Police sélectionnée</p>
                     <Badge variant="outline">
                       {contract.brancheAssuranceLibelle || contract.brancheAssuranceCode || "Branche non renseignée"}
                     </Badge>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {mainInsured(contract)} · {contract.compagnieLibelle || contract.compagnieCode || "-"}
-                  </p>
-                  {contract.dateEffet || contract.dateEcheance ? <p className="mt-1 text-xs text-muted-foreground">{contractPeriod(contract)}</p> : null}
+                  <dl className="grid gap-x-5 gap-y-3 text-sm sm:grid-cols-2">
+                    <SummaryValue label="N° de police" value={contract.numeroPolice || "-"} />
+                    <SummaryValue label="Assuré" value={mainInsured(contract)} />
+                    <SummaryValue label="Compagnie" value={contract.compagnieLibelle || contract.compagnieCode || "-"} />
+                    <SummaryValue label="Date d’effet" value={contract.dateEffet ? formatIsoDate(contract.dateEffet) : "-"} />
+                    <SummaryValue label="Date d’expiration" value={contract.dateEcheance ? formatIsoDate(contract.dateEcheance) : "-"} />
+                  </dl>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={resetContract}>
                   Changer
@@ -210,7 +220,8 @@ export function SinistreDeclarationContextDialog({
                   autoFocus
                   disabled={!effectiveBrancheId || (automobile && !typeDommage)}
                   value={search}
-                  placeholder="N° police, dossier, assuré, immatriculation ou attestation"
+                  placeholder="N° de police, assuré ou immatriculation"
+                  maxLength={120}
                   onChange={(event) => setSearch(event.target.value)}
                 />
                 {search.trim().length >= 2 ? (
@@ -232,15 +243,16 @@ export function SinistreDeclarationContextDialog({
                           >
                             <span className="min-w-0">
                               <span className="flex flex-wrap items-center gap-2 font-medium">
-                                {item.numeroPolice || item.numeroDossier}
+                                N° de police : {item.numeroPolice || "-"}
                                 <span className="text-xs font-normal text-muted-foreground">
                                   {item.brancheAssuranceLibelle || item.brancheAssuranceCode || "-"}
                                 </span>
                               </span>
                               <span className="block truncate text-sm text-muted-foreground">
-                                {mainInsured(item)} · {item.compagnieLibelle || item.compagnieCode || "-"}
+                                Assuré : {mainInsured(item)} · Compagnie : {item.compagnieLibelle || item.compagnieCode || "-"}
                               </span>
                               <span className="mt-1 block text-xs text-muted-foreground">{contractPeriod(item)}</span>
+                              {item.vehiculesCorrespondants?.length ? <span className="mt-1 block break-words text-xs text-sky-700 dark:text-sky-400">Immatriculation : {[...new Set(item.vehiculesCorrespondants.map(vehicle => vehicle.immatriculation || "-"))].join(", ")}</span> : null}
                             </span>
                             <Check className="size-4 shrink-0 text-muted-foreground" />
                           </button>
@@ -301,6 +313,7 @@ export function SinistreDeclarationContextDialog({
               {automobile ? (
                 <div className="grid gap-2">
                   <Label>Véhicule concerné <span className="text-red-500">*</span></Label>
+                  {contract?.vehiculesCorrespondants?.length && !coverage.data.vehicules.some(vehicle => contract.vehiculesCorrespondants?.some(match => match.id === vehicle.id)) ? <p role="alert" className="text-sm text-amber-700 dark:text-amber-400">Le véhicule recherché n’est pas couvert à cette date. Vérifiez la police, la date et le véhicule concerné.</p> : null}
                   <div className="grid gap-2 sm:grid-cols-2">
                     {coverage.data.vehicules.map((vehicle) => {
                       const selected = vehicle.id === vehiculeId;
@@ -365,7 +378,11 @@ function mainInsured(contract: SinistreContractOption) {
 }
 
 function contractPeriod(contract: SinistreContractOption) {
-  return `${contract.dateEffet ? formatIsoDate(contract.dateEffet) : "-"} au ${contract.dateEcheance ? formatIsoDate(contract.dateEcheance) : "-"}`;
+  return `Effet : ${contract.dateEffet ? formatIsoDate(contract.dateEffet) : "-"} · Expiration : ${contract.dateEcheance ? formatIsoDate(contract.dateEcheance) : "-"}`;
+}
+
+function SummaryValue({ label, value }: { label: string; value: string }) {
+  return <div className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-0.5 break-words font-medium">{value}</dd></div>;
 }
 
 function toIso(date?: Date) {

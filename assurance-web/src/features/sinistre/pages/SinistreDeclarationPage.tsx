@@ -26,7 +26,7 @@ const GUARANTEE_GROUPS = [
 ] as const;
 const emptyOpeningFields: OpeningFields = {
   modeReparation: "",
-  tauxResponsabilite: "", garageId: "", expertVilleId: "", expertId: "", dateMission: "",
+  tauxResponsabilite: "", garageId: "", expertId: "", dateMission: "",
 };
 
 export default function SinistreDeclarationPage() {
@@ -111,7 +111,7 @@ export default function SinistreDeclarationPage() {
       queryClient.invalidateQueries({ queryKey: sinistreKeys.providers() });
       queryClient.invalidateQueries({ queryKey: [...sinistreKeys.all, "eligible-prestataires"] });
       if (expert.actif) {
-        setOpening((current) => ({ ...current, expertVilleId: expert.villeId ?? "", expertId: expert.id }));
+        setOpening((current) => ({ ...current, expertId: expert.id }));
       }
       setExpertDialogOpen(false);
       toast.success(expert.actif ? "Expert ajouté · compatibilité à vérifier" : "Expert ajouté comme inactif, non sélectionné");
@@ -314,7 +314,7 @@ export default function SinistreDeclarationPage() {
         initialTypeDommage={typeDommage}
       />
       <SinistreIntervenantDialog open={expertDialogOpen} kind="EXPERT" intervenant={null}
-        cities={cities.data ?? []} initialVilleId={opening.expertVilleId} saving={createExpert.isPending}
+        cities={cities.data ?? []} saving={createExpert.isPending}
         onOpenChange={setExpertDialogOpen}
         onSubmit={(request) => { if (canCreateExpert && !busy) createExpert.mutate(request); }} />
       <Dialog open={confirmationOpen} onOpenChange={(open) => { if (!busy) setConfirmationOpen(open); }}>

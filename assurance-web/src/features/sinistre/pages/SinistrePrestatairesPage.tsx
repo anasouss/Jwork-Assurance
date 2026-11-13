@@ -17,7 +17,7 @@ import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDial
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import type { Intervenant, ProviderKind } from "../types";
 
-const initialFilters = { query: "", villeId: "ALL", compagnieId: "ALL", specialiteId: "ALL", includeInactive: false };
+const initialFilters = { query: "", villeId: "", compagnieId: "ALL", specialiteId: "ALL", includeInactive: false };
 
 export default function SinistrePrestatairesPage() {
   const canManage = useAuthStore(s => s.user?.permissions.includes("sinistre:referentiel") ?? false);
@@ -35,7 +35,7 @@ export default function SinistrePrestatairesPage() {
   const directory = useQuery({
     queryKey: [...sinistreKeys.providers(), "directory", kind, applied, page],
     queryFn: () => sinistreApi.providers({ typePrestataire: kind, query: applied.query || undefined,
-      villeId: applied.villeId === "ALL" ? undefined : applied.villeId,
+      villeId: applied.villeId || undefined,
       compagnieId: applied.compagnieId === "ALL" ? undefined : applied.compagnieId,
       specialiteId: applied.specialiteId === "ALL" ? undefined : applied.specialiteId,
       includeInactive: applied.includeInactive, page, size: 25 }), enabled: canManage,
@@ -71,9 +71,10 @@ export default function SinistrePrestatairesPage() {
       <div className="grid gap-1.5"><Label htmlFor="provider-search">Code, nom ou contact</Label><Input id="provider-search" value={filters.query}
         onChange={e => setFilters(f => ({ ...f, query: e.target.value }))} onKeyDown={e => { if (e.key === "Enter") { setApplied(filters); setPage(0); } }} /></div>
       <div className="grid gap-1.5"><Label>Ville</Label><SinistreVilleSelect
-        cities={[{ id: "ALL", libelle: "Toutes les villes" }, ...(cities.data ?? [])]}
+        placeholder="Toutes les villes"
+        cities={cities.data ?? []}
         value={filters.villeId} disabled={cities.isPending || cities.isError}
-        onValueChange={value => setFilters(f => ({ ...f, villeId: value || "ALL" }))} /></div>
+        onValueChange={value => setFilters(f => ({ ...f, villeId: value }))} /></div>
       <div className="grid gap-1.5"><Label>Compagnie liée</Label><Select value={filters.compagnieId} onValueChange={value => setFilters(f => ({ ...f, compagnieId: value }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>{options.data?.compagnies.map(c => <SelectItem key={c.id} value={c.id}>{c.libelle}</SelectItem>)}</SelectContent>
       </Select></div>

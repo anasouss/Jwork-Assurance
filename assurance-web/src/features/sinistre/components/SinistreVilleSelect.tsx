@@ -10,18 +10,20 @@ export function SinistreVilleSelect({
   cities,
   value,
   disabled = false,
+  placeholder = "Sélectionner une ville",
   onValueChange,
 }: {
   cities: CityOption[];
   value: string;
   disabled?: boolean;
+  placeholder?: string;
   onValueChange: (value: string) => void;
 }) {
   return (
     <AutocompleteSelect
       value={value}
       disabled={disabled}
-      placeholder="Sélectionner une ville"
+      placeholder={placeholder}
       emptyText="Aucune ville trouvée"
       invalidText="Ville invalide : choisissez une option existante."
       options={cities.map((city) => ({

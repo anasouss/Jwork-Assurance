@@ -33,13 +33,13 @@ class PrestataireSinistreServiceTest {
         var garage = garage();
         garage.getAccords().add(agreement(garage, 4L, date.minusDays(1), date));
         when(garages.findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(1L)).thenReturn(List.of(garage));
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.PEC, Set.of()), null)).containsExactly(garage);
-        assertThat(service.eligibleGarages(context(5L, date, ModeReparationSinistre.PEC, Set.of()), null)).isEmpty();
-        assertThat(service.eligibleGarages(context(4L, date.plusDays(1), ModeReparationSinistre.PEC, Set.of()), null)).isEmpty();
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.PEC, Set.of()))).containsExactly(garage);
+        assertThat(service.eligibleGarages(context(5L, date, ModeReparationSinistre.PEC, Set.of()))).isEmpty();
+        assertThat(service.eligibleGarages(context(4L, date.plusDays(1), ModeReparationSinistre.PEC, Set.of()))).isEmpty();
         garage.getAccords().add(agreement(garage, 5L, null, null));
-        assertThat(service.eligibleGarages(context(5L, date, ModeReparationSinistre.PEC, Set.of()), null)).containsExactly(garage);
+        assertThat(service.eligibleGarages(context(5L, date, ModeReparationSinistre.PEC, Set.of()))).containsExactly(garage);
         garage.getAccords().forEach(a -> a.setActif(false));
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.PEC, Set.of()), null)).isEmpty();
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.PEC, Set.of()))).isEmpty();
     }
 
     @Test
@@ -53,30 +53,26 @@ class PrestataireSinistreServiceTest {
         var generalGarage = garage();
         generalGarage.getSpecialites().addAll(List.of(glass, body));
         when(garages.findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(1L)).thenReturn(List.of(glassGarage, generalGarage));
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of(10L, 12L)), null))
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of(10L, 12L))))
                 .containsExactly(glassGarage, generalGarage);
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of(10L, 11L)), null))
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of(10L, 11L))))
                 .containsExactly(generalGarage);
         glass.setActif(false);
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of(10L)), null))
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of(10L))))
                 .containsExactly(glassGarage, generalGarage);
     }
 
     @Test
-    void restrictedProvidersNeedAnActiveAgreementAndRespectCity() {
+    void restrictedProvidersNeedAnActiveAgreement() {
         var garage = garage();
         garage.setToutesCompagnies(false);
-        var city = new Ville();
-        city.setId(9L);
-        garage.setVille(city);
         when(garages.findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(1L)).thenReturn(List.of(garage));
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of()), 9L)).isEmpty();
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of()))).isEmpty();
         var agreement = agreement(garage, 4L, null, null);
         agreement.setConventionne(false);
         garage.getAccords().add(agreement);
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of()), 9L)).containsExactly(garage);
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of()), 10L)).isEmpty();
-        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.PEC, Set.of()), 9L)).isEmpty();
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.NORMAL, Set.of()))).containsExactly(garage);
+        assertThat(service.eligibleGarages(context(4L, date, ModeReparationSinistre.PEC, Set.of()))).isEmpty();
     }
 
     @Test

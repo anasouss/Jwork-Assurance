@@ -184,18 +184,18 @@ public class SinistreIntervenantService {
     public List<SinistreIntervenantResponse> eligible(Long agenceId, com.assurance.enums.TypePrestataireSinistre type,
             Long sinistreId, Long contratId, Long vehiculeId, java.time.LocalDate dateSinistre,
             java.util.Set<Long> garantieIds, java.time.LocalDate dateIntervention,
-            com.assurance.enums.ModeReparationSinistre mode, Long villeId) {
+            com.assurance.enums.ModeReparationSinistre mode) {
         return eligible(type, prestataireService.context(agenceId, sinistreId, contratId, vehiculeId,
-                dateSinistre, garantieIds, dateIntervention, mode), villeId);
+                dateSinistre, garantieIds, dateIntervention, mode));
     }
 
     @Transactional(readOnly = true)
     public List<SinistreIntervenantResponse> eligible(com.assurance.enums.TypePrestataireSinistre type,
-            PrestataireSinistreService.Eligibility context, Long villeId) {
+            PrestataireSinistreService.Eligibility context) {
         if (type == com.assurance.enums.TypePrestataireSinistre.EXPERT) {
-            return prestataireService.eligibleExperts(context, villeId).stream().map(this::toResponse).toList();
+            return prestataireService.eligibleExperts(context).stream().map(this::toResponse).toList();
         }
-        return prestataireService.eligibleGarages(context, villeId).stream().map(garage -> {
+        return prestataireService.eligibleGarages(context).stream().map(garage -> {
             var response = toResponse(garage);
             response.setConventionne(prestataireService.approved(garage.getAccords(), context));
             return response;

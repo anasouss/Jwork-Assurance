@@ -34,7 +34,6 @@ export function SinistreIntervenantDialog({
   saving,
   onOpenChange,
   onSubmit,
-  initialVilleId = "",
 }: {
   open: boolean;
   kind: IntervenantKind;
@@ -43,7 +42,6 @@ export function SinistreIntervenantDialog({
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (request: object) => void;
-  initialVilleId?: string;
 }) {
   const [form, setForm] = useState({
     code: "",
@@ -68,13 +66,13 @@ export function SinistreIntervenantDialog({
       telephone: intervenant?.telephone ?? "",
       email: intervenant?.email ?? "",
       adresse: intervenant?.adresse ?? "",
-      villeId: intervenant?.villeId ?? initialVilleId,
+      villeId: intervenant?.villeId ?? "",
       actif: intervenant?.actif ?? true,
       toutesCompagnies: intervenant?.toutesCompagnies ?? true,
       specialiteIds: intervenant?.specialites?.map(s => s.id) ?? [],
       accords: intervenant?.accords?.map(a => ({ ...a })) ?? [],
     });
-  }, [intervenant, open, initialVilleId]);
+  }, [intervenant, open]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -291,10 +292,10 @@ export function QuittanceRulesDialog({
           </DialogHeader>
 
           <div className="flex justify-end">
-            <Button type="button" size="sm" onClick={startCreate}>
+            <PermissionButton permission="regle-quittance:create" type="button" size="sm" onClick={startCreate}>
               <Plus className="size-4" />
               Nouvelle règle
-            </Button>
+            </PermissionButton>
           </div>
 
           {showForm ? (
@@ -661,13 +662,13 @@ export function QuittanceRulesDialog({
                 >
                   Annuler
                 </Button>
-                <Button
+                <PermissionButton permission={editing ? "regle-quittance:update" : "regle-quittance:create"}
                   type="button"
                   disabled={!isComplete(form) || saveRule.isPending}
                   onClick={() => saveRule.mutate()}
                 >
                   Enregistrer
-                </Button>
+                </PermissionButton>
               </div>
             </div>
           ) : null}
@@ -729,12 +730,12 @@ export function QuittanceRulesDialog({
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end gap-1">
-                          <Button type="button" size="icon" variant="ghost" title="Modifier" onClick={() => startEdit(rule)}>
+                          <PermissionButton permission="regle-quittance:update" type="button" size="icon" variant="ghost" title="Modifier" onClick={() => startEdit(rule)}>
                             <Pencil className="size-4" />
-                          </Button>
-                          <Button type="button" size="icon" variant="ghost" title="Supprimer" onClick={() => setPendingDelete(rule)}>
+                          </PermissionButton>
+                          <PermissionButton permission="regle-quittance:delete" type="button" size="icon" variant="ghost" title="Supprimer" onClick={() => setPendingDelete(rule)}>
                             <Trash2 className="size-4 text-destructive" />
-                          </Button>
+                          </PermissionButton>
                         </div>
                       </td>
                     </tr>

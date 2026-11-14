@@ -320,6 +320,7 @@ public class ContratService {
     @Transactional
     public ContratResponse updateDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         String operation = com.assurance.security.AuditRequestContext.getOperationCode();
         String title = switch (operation == null ? "" : operation) {
@@ -348,6 +349,7 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehicule(Long agenceId, Long contratId, int index, CreateContratRequest.VehiculeInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> {
             enforceRenewalPeriod(contrat, input);
@@ -419,6 +421,7 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftVehiculeGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> {
             MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
@@ -451,6 +454,7 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorque(Long agenceId, Long contratId, int index, CreateContratRequest.RemorqueInput input) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> {
             enforceRenewalPeriod(contrat, input);
@@ -490,6 +494,7 @@ public class ContratService {
     @Transactional
     public ContratResponse saveDraftRemorqueGaranties(Long agenceId, Long contratId, int index, List<CreateContratRequest.GarantieInput> inputs) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> {
             MouvementContrat mouvementInitial = preparerCorrectionAffaireNouvelleSiNecessaire(contrat);
@@ -503,6 +508,7 @@ public class ContratService {
     @Transactional(readOnly = true)
     public RecalculTarifsBrouillonResponse previewDraftTariffRecalculation(Long agenceId, Long contratId) {
         Contrat contrat = resolveDraft(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         return buildDraftTariffRecalculation(contrat).response();
     }
 
@@ -510,6 +516,7 @@ public class ContratService {
     public ContratResponse applyDraftTariffRecalculation(Long agenceId, Long contratId) {
         Contrat contrat = contratRepository.findByAgenceIdAndIdForUpdate(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         return businessActivityRecorder.perform(() -> applyDraftTariffRecalculationRecord(contrat), result ->
                 ContractActivity.command(before, result, ActivityAction.RECALCULATED,
@@ -677,6 +684,7 @@ public class ContratService {
     @Transactional
     public ContratResponse finalizeDraft(Long agenceId, Long contratId, CreateContratRequest request) {
         Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
         ContratResponse before = toResponse(contrat);
         boolean correction = isCorrectionAffaireNouvelle(contrat);
         return businessActivityRecorder.perform(() -> finalizeDraftRecord(agenceId, contrat, request), result ->
@@ -964,6 +972,31 @@ public class ContratService {
         }
 
         return toResponse(contrat);
+    }
+
+    @Transactional
+    public AssistanceContratResponse saveEditingAssistance(Long agenceId, Long contratId, UpsertAssistanceContratRequest request) {
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
+        request.setMouvementContratId(null);
+        return assistanceContratService.upsert(agenceId, contratId, request);
+    }
+
+    @Transactional
+    public void removeEditingAssistance(Long agenceId, Long contratId, Long assistanceId) {
+        Contrat contrat = resolveEditableContrat(agenceId, contratId);
+        requireContractEditingPermission(contrat);
+        assistanceContratService.deactivate(agenceId, contratId, assistanceId);
+    }
+
+    private void requireContractEditingPermission(Contrat contrat) {
+        if (isCorrectionAffaireNouvelle(contrat)) {
+            com.assurance.security.BusinessPermission.require("contrat:update");
+        } else if (contrat.getContratOrigine() != null) {
+            com.assurance.security.BusinessPermission.require("contrat:renew");
+        } else if (!com.assurance.security.BusinessPermission.has("contrat:create")) {
+            com.assurance.security.BusinessPermission.require("contrat:update");
+        }
     }
 
     private Contrat resolveDraft(Long agenceId, Long contratId) {

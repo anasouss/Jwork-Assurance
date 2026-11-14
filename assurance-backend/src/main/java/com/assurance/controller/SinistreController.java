@@ -18,7 +18,7 @@ import com.assurance.dto.response.SinistreDetailResponse;
 import com.assurance.dto.response.SinistreGestionnaireResponse;
 import com.assurance.dto.response.SinistreDoublonResponse;
 import com.assurance.dto.response.SinistreSummaryResponse;
-import com.assurance.dto.response.CompteTresorerieResponse;
+import com.assurance.dto.response.CompteTresorerieOptionResponse;
 import com.assurance.enums.StatutSinistre;
 import com.assurance.security.TenantContext;
 import com.assurance.service.SinistreCouvertureService;
@@ -56,7 +56,7 @@ public class SinistreController {
     private final com.assurance.service.SinistreOuvertureService ouvertureService;
 
     @GetMapping("/doublons")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:create')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create')")
     public ResponseEntity<ApiResponse<List<SinistreDoublonResponse>>> duplicates(
             @RequestParam Long contratId,
             @RequestParam(required = false) Long vehiculeId,
@@ -71,15 +71,15 @@ public class SinistreController {
     }
 
     @GetMapping("/comptes-tresorerie")
-    @PreAuthorize("hasAuthority('PERM_sinistre:finance')")
-    public ResponseEntity<ApiResponse<List<CompteTresorerieResponse>>> treasuryAccounts() {
+    @PreAuthorize("hasAuthority('PERM_sinistre-operation:create')")
+    public ResponseEntity<ApiResponse<List<CompteTresorerieOptionResponse>>> treasuryAccounts() {
         return ResponseEntity.ok(ApiResponse.success(
-                tresorerieService.listAccounts(TenantContext.getCurrentAgence(), false)
+                tresorerieService.accountOptions(TenantContext.getCurrentAgence())
         ));
     }
 
     @GetMapping("/gestionnaires")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create')")
     public ResponseEntity<ApiResponse<List<SinistreGestionnaireResponse>>> gestionnaires() {
         return ResponseEntity.ok(ApiResponse.success(
                 sinistreService.listManagers(TenantContext.getCurrentAgence())
@@ -87,7 +87,7 @@ public class SinistreController {
     }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<ApiResponse<SinistreDashboardResponse>> dashboard() {
         return ResponseEntity.ok(ApiResponse.success(
                 dashboardService.get(TenantContext.getCurrentAgence())
@@ -95,7 +95,7 @@ public class SinistreController {
     }
 
     @GetMapping("/couverture")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create')")
     public ResponseEntity<ApiResponse<SinistreCouverturePreviewResponse>> previewCoverage(
             @RequestParam Long contratId,
             @RequestParam LocalDate dateSinistre
@@ -108,7 +108,7 @@ public class SinistreController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<ApiResponse<PagedResponse<SinistreSummaryResponse>>> list(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Long clientId,
@@ -165,7 +165,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/etape")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:transition')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> transitionEtape(
             @PathVariable Long id,
             @Valid @RequestBody com.assurance.dto.request.TransitionEtapeSinistreRequest request
@@ -176,7 +176,7 @@ public class SinistreController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 sinistreService.get(TenantContext.getCurrentAgence(), id)
@@ -184,7 +184,7 @@ public class SinistreController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateSinistreRequest request
@@ -198,7 +198,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/transition")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:transition')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> transition(
             @PathVariable Long id,
             @Valid @RequestBody TransitionSinistreRequest request
@@ -212,14 +212,14 @@ public class SinistreController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:delete')")
     public ResponseEntity<ApiResponse<Void>> deleteEarlyClaim(@PathVariable Long id) {
         dossierService.deleteEarlyClaim(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Dossier supprimé"));
     }
 
     @PutMapping("/{id}/garanties/{garantieId}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateGuarantee(
             @PathVariable Long id,
             @PathVariable Long garantieId,
@@ -235,7 +235,7 @@ public class SinistreController {
     }
 
     @PutMapping("/{id}/garanties")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateGuarantees(
             @PathVariable Long id,
             @Valid @RequestBody UpdateSinistreGarantiesRequest request
@@ -249,7 +249,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/parties")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> addParty(
             @PathVariable Long id,
             @Valid @RequestBody AddSinistrePartieRequest request
@@ -263,7 +263,7 @@ public class SinistreController {
     }
 
     @PutMapping("/{id}/parties/{partieId}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateParty(
             @PathVariable Long id,
             @PathVariable Long partieId,
@@ -279,7 +279,7 @@ public class SinistreController {
     }
 
     @DeleteMapping("/{id}/parties/{partieId}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> deleteParty(
             @PathVariable Long id,
             @PathVariable Long partieId
@@ -293,7 +293,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/provisions")
-    @PreAuthorize("hasAuthority('PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-provision:create')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> addProvision(
             @PathVariable Long id,
             @Valid @RequestBody AddProvisionSinistreRequest request
@@ -307,7 +307,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/missions")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-mission:create')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> createMission(
             @PathVariable Long id,
             @Valid @RequestBody UpsertMissionExpertiseRequest request
@@ -316,7 +316,7 @@ public class SinistreController {
     }
 
     @PutMapping("/{id}/missions/{missionId}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-mission:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> updateMission(
             @PathVariable Long id,
             @PathVariable Long missionId,
@@ -326,7 +326,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/operations")
-    @PreAuthorize("hasAuthority('PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-operation:create')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> addOperation(
             @PathVariable Long id,
             @Valid @RequestBody AddSinistreOperationRequest request
@@ -340,7 +340,7 @@ public class SinistreController {
     }
 
     @PostMapping("/{id}/operations/{operationId}/annulation")
-    @PreAuthorize("hasAuthority('PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-operation:cancel')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> cancelOperation(
             @PathVariable Long id,
             @PathVariable Long operationId,

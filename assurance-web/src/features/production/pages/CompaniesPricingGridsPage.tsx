@@ -45,7 +45,8 @@ const EMPTY_FILTERS: Filters = {
 export default function CompaniesPricingGridsPage() {
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("grille-tarifaire:manage") || permissions.includes("referentiel:manage");
+  const canCreate = permissions.includes("grille-tarifaire:create");
+  const canManage = permissions.includes("grille-tarifaire:update");
   const [draftFilters, setDraftFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<{ column: PricingGridSortColumn; direction: TableSortDirection }>({ column: "grid", direction: "asc" });
@@ -132,7 +133,7 @@ export default function CompaniesPricingGridsPage() {
             Consultez les grilles, leurs usages configurés et les conventions qui les utilisent.
           </p>
         </div>
-        {canManage ? (
+        {canCreate ? (
           <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
             <Plus className="size-4" />
             Ajouter une grille
@@ -261,8 +262,8 @@ export default function CompaniesPricingGridsPage() {
                       <TableRowActions
                         label={`Actions ${grille.libelle}`}
                         actions={[
-                          { label: "Configurer", icon: SlidersHorizontal, iconTone: "primary", onSelect: () => setConfiguring(grille) },
-                          { label: "Modifier", icon: Edit, iconTone: "primary", onSelect: () => { setEditing(grille); setDialogOpen(true); } },
+                          { permission: "grille-tarifaire:update", label: "Configurer", icon: SlidersHorizontal, iconTone: "primary", onSelect: () => setConfiguring(grille) },
+                          { permission: "grille-tarifaire:update", label: "Modifier", icon: Edit, iconTone: "primary", onSelect: () => { setEditing(grille); setDialogOpen(true); } },
                         ]}
                       />
                     </TableCell>

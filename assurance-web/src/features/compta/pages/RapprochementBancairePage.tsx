@@ -18,6 +18,7 @@ import {
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
@@ -79,7 +80,8 @@ export default function RapprochementBancairePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
+  const canImport = permissions.includes("rapprochement-bancaire:import");
+  const canManage = permissions.includes("rapprochement-bancaire:update");
   const [accountId, setAccountId] = useState(searchParams.get("compteId") ?? "");
   const [importId, setImportId] = useState(searchParams.get("importId") ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -91,8 +93,8 @@ export default function RapprochementBancairePage() {
   const [ignoredIds, setIgnoredIds] = useState<Set<string>>(new Set());
 
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
   });
   const bankAccounts = (accounts.data ?? []).filter((account) => account.typeCompte === "BANQUE");
 
@@ -257,7 +259,7 @@ export default function RapprochementBancairePage() {
         </div>
       </header>
 
-      {canManage && !importId && (
+      {canImport && !importId && (
         <section className="grid gap-4 rounded-md border p-4">
           <div>
             <h2 className="font-semibold">Importer un relevé</h2>
@@ -332,7 +334,7 @@ export default function RapprochementBancairePage() {
                   <X className="size-4" /> Retirer
                 </Button>
               ) : null}
-              <Button
+              <PermissionButton permission="rapprochement-bancaire:import"
                 onClick={() => previewMutation.mutate()}
                 disabled={!file || previewMutation.isPending}
               >
@@ -340,7 +342,7 @@ export default function RapprochementBancairePage() {
                   ? <RefreshCw className="size-4 animate-spin" />
                   : <FileSearch className="size-4" />}
                 Prévisualiser
-              </Button>
+              </PermissionButton>
             </div>
           </div>
 
@@ -570,12 +572,12 @@ function PreviewWorkspace({
         <Button variant="outline" onClick={onRefresh} disabled={busy}>
           <RefreshCw className="size-4" /> Actualiser l’aperçu
         </Button>
-        <Button
+        <PermissionButton permission="rapprochement-bancaire:import"
           onClick={onConfirm}
           disabled={busy || !preview.configurationComplete || missingConfigurationName}
         >
           <Upload className="size-4" /> Confirmer l’import
-        </Button>
+        </PermissionButton>
       </div>
     </div>
   );
@@ -650,8 +652,8 @@ function ReconciliationWorkspace({
           <StatusBadge status={statement.statut} />
         </div>
         {editable && <div className="flex gap-2">
-          <Button variant="outline" onClick={onSave} disabled={busy}><Save className="size-4" /> Enregistrer</Button>
-          <Button onClick={onValidate} disabled={busy}><CheckCircle2 className="size-4" /> Valider le rapprochement</Button>
+          <PermissionButton permission="rapprochement-bancaire:update" variant="outline" onClick={onSave} disabled={busy}><Save className="size-4" /> Enregistrer</PermissionButton>
+          <PermissionButton permission="rapprochement-bancaire:validate" onClick={onValidate} disabled={busy}><CheckCircle2 className="size-4" /> Valider le rapprochement</PermissionButton>
         </div>}
       </div>
       <div className="overflow-hidden rounded-md border">

@@ -16,7 +16,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuthStore } from "@/store/auth-store";
 import {
   Command,
   CommandEmpty,
@@ -62,6 +64,7 @@ type ProductSortDirection = "asc" | "desc";
 type TariffSortColumn = "PERIOD" | "HT" | "TTC";
 
 export default function AssistanceProductsSettingsPage() {
+  const canChangeStatus = useAuthStore(state => state.user?.permissions.includes("produit-assistance:deactivate") ?? false);
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [productSearch, setProductSearch] = useState(searchParams.get("recherche") || "");
@@ -270,10 +273,10 @@ export default function AssistanceProductsSettingsPage() {
           <h1 className="text-xl font-semibold tracking-tight">Produits assistance</h1>
           <p className="text-sm text-muted-foreground">Produits par compagnie, type et périodes tarifaires.</p>
         </div>
-        <Button onClick={() => { setEditingProduct(null); setProductDialogOpen(true); }}>
+        <PermissionButton permission="produit-assistance:create" onClick={() => { setEditingProduct(null); setProductDialogOpen(true); }}>
           <Plus className="size-4" />
           Produit assistance
-        </Button>
+        </PermissionButton>
       </div>
 
       <section className="rounded-lg border bg-card p-4">
@@ -368,7 +371,7 @@ export default function AssistanceProductsSettingsPage() {
                     <TableRowActions
                       label={`Actions ${product.libelle}`}
                       actions={[
-                        {
+                        { permission: "produit-assistance:view",
                           label: voyage ? "Tarifs et promotions" : "Tarifs",
                           icon: CalendarDays,
                           onSelect: () => {
@@ -377,20 +380,20 @@ export default function AssistanceProductsSettingsPage() {
                             setEditingPromo(null);
                           },
                         },
-                        {
+                        { permission: "produit-assistance:update",
                           label: "Modifier",
                           icon: Edit,
                           iconTone: "primary",
                           onSelect: () => { setEditingProduct(product); setProductDialogOpen(true); },
                         },
-                        {
+                        { permission: "produit-assistance:deactivate",
                           label: "Désactiver",
                           icon: PowerOff,
                           destructive: true,
                           disabled: product.actif === false || deactivateProduct.isPending,
                           onSelect: () => deactivateProduct.mutate(product.id),
                         },
-                        {
+                        { permission: "produit-assistance:delete",
                           label: "Supprimer définitivement",
                           icon: Trash2,
                           destructive: true,
@@ -497,7 +500,7 @@ export default function AssistanceProductsSettingsPage() {
               />
             </Field> : null}
             <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950/70">
-              <Checkbox checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />
+              <Checkbox disabled={Boolean(editingProduct) && !canChangeStatus} checked={productPayload.actif !== false} onCheckedChange={(value) => setProductPayload((current) => ({ ...current, actif: Boolean(value) }))} />
               <span>Actif</span>
             </label>
           </div>
@@ -509,9 +512,9 @@ export default function AssistanceProductsSettingsPage() {
           </Field>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProductDialogOpen(false)}>Annuler</Button>
-            <Button disabled={saveProduct.isPending} onClick={() => submitProduct(editingProduct, productPayload, saveProduct.mutate)}>
+            <PermissionButton permission={editingProduct ? "produit-assistance:update" : "produit-assistance:create"} disabled={saveProduct.isPending} onClick={() => submitProduct(editingProduct, productPayload, saveProduct.mutate)}>
               Enregistrer
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -558,9 +561,9 @@ export default function AssistanceProductsSettingsPage() {
               <MoneyInput value={tarifPayload.montantTtc} onValueChange={(value) => setTarifPayload((current) => ({ ...current, montantTtc: value ?? 0 }))} />
             </Field>
             <div className="flex gap-2 md:col-span-4">
-              <Button disabled={saveTarif.isPending || !tarifProduct} onClick={() => submitTarif(tarifProduct, editingTarif, tarifPayload, saveTarif.mutate)}>
+              <PermissionButton permission={editingTarif ? "tarif-assistance:update" : "tarif-assistance:create"} disabled={saveTarif.isPending || !tarifProduct} onClick={() => submitTarif(tarifProduct, editingTarif, tarifPayload, saveTarif.mutate)}>
                 {editingTarif ? "Mettre à jour" : "Ajouter le tarif"}
-              </Button>
+              </PermissionButton>
               <Button variant="outline" onClick={() => { setEditingTarif(null); setTarifPayload(emptyTarif()); }}>Réinitialiser</Button>
             </div>
           </div>
@@ -591,13 +594,13 @@ export default function AssistanceProductsSettingsPage() {
                       <TableRowActions
                         label="Actions tarif"
                         actions={[
-                          {
+                          { permission: "tarif-assistance:update",
                             label: "Modifier tarif",
                             icon: Edit,
                             iconTone: "primary",
                             onSelect: () => setEditingTarif(tarif),
                           },
-                          {
+                          { permission: "tarif-assistance:delete",
                             label: "Supprimer tarif",
                             icon: Trash2,
                             destructive: true,
@@ -643,9 +646,9 @@ export default function AssistanceProductsSettingsPage() {
                   <span>Actif</span>
                 </label>
                 <div className="flex gap-2 md:col-span-4">
-                  <Button disabled={savePromo.isPending} onClick={() => submitPromo(tarifProduct, editingPromo, promoPayload, savePromo.mutate)}>
+                  <PermissionButton permission={editingPromo ? "promo-assistance:update" : "promo-assistance:create"} disabled={savePromo.isPending} onClick={() => submitPromo(tarifProduct, editingPromo, promoPayload, savePromo.mutate)}>
                     {editingPromo ? "Mettre à jour" : "Ajouter le code"}
-                  </Button>
+                  </PermissionButton>
                   <Button variant="outline" onClick={() => { setEditingPromo(null); setPromoPayload(emptyPromo()); }}>Réinitialiser</Button>
                 </div>
               </div>
@@ -670,8 +673,8 @@ export default function AssistanceProductsSettingsPage() {
                         <TableCell>{promo.actif === false ? "Inactif" : "Actif"}</TableCell>
                         <TableCell className="text-right">
                           <TableRowActions label={`Actions code ${promo.code || promo.libelle}`} actions={[
-                            { label: "Modifier le code", icon: Edit, iconTone: "primary", onSelect: () => setEditingPromo(promo) },
-                            { label: "Désactiver le code", icon: PowerOff, destructive: true, disabled: promo.actif === false || deletePromo.isPending, onSelect: () => deletePromo.mutate({ productId: tarifProduct.id, promoId: promo.id }) },
+                            { permission: "promo-assistance:update", label: "Modifier le code", icon: Edit, iconTone: "primary", onSelect: () => setEditingPromo(promo) },
+                            { permission: "promo-assistance:delete", label: "Désactiver le code", icon: PowerOff, destructive: true, disabled: promo.actif === false || deletePromo.isPending, onSelect: () => deletePromo.mutate({ productId: tarifProduct.id, promoId: promo.id }) },
                           ]} />
                         </TableCell>
                       </TableRow>

@@ -43,7 +43,7 @@ public class ClientController {
     private final AcquisitionClientService acquisitionClientService;
 
     @GetMapping("/acquisition/options")
-    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_client:create', 'PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_origine-commerciale:view', 'PERM_client:view', 'PERM_client:create', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<AcquisitionOptionsResponse>> acquisitionOptions() {
         return ResponseEntity.ok(ApiResponse.success(
                 acquisitionClientService.options(TenantContext.getCurrentAgence())
@@ -51,7 +51,7 @@ public class ClientController {
     }
 
     @GetMapping("/origines-commerciales")
-    @PreAuthorize("hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_origine-commerciale:view', 'PERM_client:create', 'PERM_client:update', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<List<OrigineCommercialeResponse>>> listOrigins() {
         return ResponseEntity.ok(ApiResponse.success(
                 acquisitionClientService.listOrigins(TenantContext.getCurrentAgence())
@@ -59,7 +59,7 @@ public class ClientController {
     }
 
     @PostMapping("/origines-commerciales")
-    @PreAuthorize("hasAuthority('PERM_client:manage')")
+    @PreAuthorize("hasAuthority('PERM_origine-commerciale:create')")
     public ResponseEntity<ApiResponse<OrigineCommercialeResponse>> createOrigin(
             @Valid @RequestBody UpsertOrigineCommercialeRequest request
     ) {
@@ -70,7 +70,7 @@ public class ClientController {
     }
 
     @PutMapping("/origines-commerciales/{originId}")
-    @PreAuthorize("hasAuthority('PERM_client:manage')")
+    @PreAuthorize("hasAuthority('PERM_origine-commerciale:update')")
     public ResponseEntity<ApiResponse<OrigineCommercialeResponse>> updateOrigin(
             @PathVariable Long originId,
             @Valid @RequestBody UpsertOrigineCommercialeRequest request
@@ -82,7 +82,7 @@ public class ClientController {
     }
 
     @PutMapping("/{id}/acquisition")
-    @PreAuthorize("hasAuthority('PERM_client:manage')")
+    @PreAuthorize("hasAuthority('PERM_acquisition-client:update')")
     public ResponseEntity<ApiResponse<AcquisitionClientResponse>> updateAcquisition(
             @PathVariable Long id,
             @Valid @RequestBody AcquisitionClientRequest request
@@ -99,7 +99,7 @@ public class ClientController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew', 'PERM_avenant:create', 'PERM_avenant:update-draft', 'PERM_avenant:rectify')")
     public ResponseEntity<ApiResponse<ClientPageResponse>> list(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Long groupeId,
@@ -119,6 +119,21 @@ public class ClientController {
                         size
                 )
         ));
+    }
+
+    @GetMapping("/options")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_document-client:view', 'PERM_reglement-client:view', 'PERM_instrument-reglement:view', 'PERM_bordereau-compagnie:view')")
+    public ResponseEntity<ApiResponse<com.assurance.dto.response.PagedResponse<com.assurance.dto.response.ClientLookupResponse>>> lookupOptions(
+            @RequestParam(required = false) String query,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        return ResponseEntity.ok(ApiResponse.success(
+                clientCrmService.lookupOptions(TenantContext.getCurrentAgence(), query, page, size)));
+    }
+
+    @GetMapping("/options/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_document-client:view', 'PERM_reglement-client:view', 'PERM_instrument-reglement:view', 'PERM_bordereau-compagnie:view')")
+    public ResponseEntity<ApiResponse<com.assurance.dto.response.ClientLookupResponse>> lookup(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success(clientCrmService.lookup(TenantContext.getCurrentAgence(), id)));
     }
 
     @GetMapping("/{id}")
@@ -152,7 +167,7 @@ public class ClientController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_client:manage')")
+    @PreAuthorize("hasAuthority('PERM_client:update')")
     public ResponseEntity<ApiResponse<ClientResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody CreateClientRequest request
@@ -164,7 +179,7 @@ public class ClientController {
     }
 
     @PutMapping("/{id}/groupe")
-    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    @PreAuthorize("hasAuthority('PERM_groupe-client:assign')")
     public ResponseEntity<ApiResponse<ClientResponse.GroupeView>> assignGroup(
             @PathVariable Long id,
             @Valid @RequestBody AssignGroupeClientRequest request
@@ -176,7 +191,7 @@ public class ClientController {
     }
 
     @DeleteMapping("/{id}/groupes/{membershipId}")
-    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    @PreAuthorize("hasAuthority('PERM_groupe-client:end-membership')")
     public ResponseEntity<ApiResponse<Void>> endGroupMembership(
             @PathVariable Long id,
             @PathVariable Long membershipId

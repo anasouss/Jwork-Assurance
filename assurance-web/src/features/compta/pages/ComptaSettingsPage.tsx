@@ -1,5 +1,7 @@
 import { Banknote, Landmark, ReceiptText } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuthStore } from "@/store/auth-store";
+import { canAccessPath } from "@/lib/authorization";
 import { Card, CardContent } from "@/components/ui/card";
 
 const settings = [
@@ -24,6 +26,7 @@ const settings = [
 ];
 
 export default function ComptaSettingsPage() {
+  const permissions = useAuthStore(state => state.user?.permissions ?? []);
   return (
     <div className="grid gap-5">
       <header>
@@ -37,7 +40,7 @@ export default function ComptaSettingsPage() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {settings.map((item) => {
+        {settings.filter(item => canAccessPath(permissions, item.href)).map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} to={item.href} className="group">

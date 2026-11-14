@@ -36,7 +36,7 @@ public class PieceJointeController {
     private final PieceJointeService pieceJointeService;
 
     @GetMapping("/api/v1/pieces-jointes/types")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_type-piece-jointe:view', 'PERM_piece-jointe:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<TypePieceJointeResponse>>> listTypes(
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
@@ -44,13 +44,13 @@ public class PieceJointeController {
     }
 
     @PostMapping("/api/v1/pieces-jointes/types")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_type-piece-jointe:create')")
     public ResponseEntity<ApiResponse<TypePieceJointeResponse>> createType(@Valid @org.springframework.web.bind.annotation.RequestBody UpsertTypePieceJointeRequest request) {
         return ResponseEntity.ok(ApiResponse.success(pieceJointeService.upsertType(TenantContext.getCurrentAgence(), null, request), "Type de piece jointe enregistre"));
     }
 
     @PutMapping("/api/v1/pieces-jointes/types/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_type-piece-jointe:update')")
     public ResponseEntity<ApiResponse<TypePieceJointeResponse>> updateType(
             @PathVariable Long id,
             @Valid @org.springframework.web.bind.annotation.RequestBody UpsertTypePieceJointeRequest request
@@ -59,14 +59,24 @@ public class PieceJointeController {
     }
 
     @DeleteMapping("/api/v1/pieces-jointes/types/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_type-piece-jointe:deactivate')")
     public ResponseEntity<ApiResponse<Void>> deactivateType(@PathVariable Long id) {
         pieceJointeService.deactivateType(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Type de piece jointe desactive"));
     }
 
+    @PutMapping("/api/v1/pieces-jointes/types/{id}/actif")
+    @PreAuthorize("hasAuthority('PERM_type-piece-jointe:deactivate')")
+    public ResponseEntity<ApiResponse<Void>> changeTypeStatus(
+            @PathVariable Long id,
+            @Valid @org.springframework.web.bind.annotation.RequestBody com.assurance.dto.request.UpdateActiveStatusRequest request
+    ) {
+        pieceJointeService.setTypeActive(TenantContext.getCurrentAgence(), id, request.actif());
+        return ResponseEntity.ok(ApiResponse.success(null, "Statut du type de document mis a jour"));
+    }
+
     @GetMapping("/api/v1/pieces-jointes/types-mouvements")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_type-piece-jointe:view', 'PERM_piece-jointe:view', 'PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<ReferenceOptionResponse>>> listTypesMouvement() {
         return ResponseEntity.ok(ApiResponse.success(pieceJointeService.listTypesMouvement()));
     }
@@ -81,7 +91,7 @@ public class PieceJointeController {
     }
 
     @PostMapping(path = "/api/v1/contrats/{contratId}/pieces-jointes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_piece-jointe:upload')")
     public ResponseEntity<ApiResponse<PieceJointeResponse>> upload(
             @PathVariable Long contratId,
             @RequestParam(required = false) Long mouvementId,
@@ -103,7 +113,7 @@ public class PieceJointeController {
     }
 
     @PutMapping("/api/v1/pieces-jointes/natures/{natureId}/policy")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_type-piece-jointe:update')")
     public ResponseEntity<ApiResponse<Void>> policy(@PathVariable Long natureId,
             @RequestParam com.assurance.enums.DocumentOwner owner,
             @RequestParam com.assurance.enums.DocumentExpiry expiry,
@@ -113,20 +123,20 @@ public class PieceJointeController {
     }
 
     @GetMapping("/api/v1/clients/documents/types")
-    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_client:create', 'PERM_client:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_document-crm:view', 'PERM_document-crm:upload', 'PERM_client:create', 'PERM_contrat:create', 'PERM_contrat:update')")
     public ResponseEntity<ApiResponse<List<TypePieceJointeResponse>>> clientTypes(
             @RequestParam com.assurance.enums.TypeClient typeClient) {
         return ResponseEntity.ok(ApiResponse.success(pieceJointeService.clientTypes(TenantContext.getCurrentAgence(), typeClient)));
     }
 
     @GetMapping("/api/v1/clients/{clientId}/pieces-jointes")
-    @PreAuthorize("hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAuthority('PERM_document-crm:view')")
     public ResponseEntity<ApiResponse<List<PieceJointeResponse>>> clientDocuments(@PathVariable Long clientId) {
         return ResponseEntity.ok(ApiResponse.success(pieceJointeService.clientDocuments(TenantContext.getCurrentAgence(), clientId)));
     }
 
     @PostMapping(path = "/api/v1/clients/{clientId}/pieces-jointes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    @PreAuthorize("hasAuthority('PERM_document-crm:upload')")
     public ResponseEntity<ApiResponse<PieceJointeResponse>> uploadClient(@PathVariable Long clientId,
             @RequestParam Long typePieceJointeId, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate expiresOn,
             @RequestParam(required = false) Long previousVersionId, @RequestParam(required = false) String reason,
@@ -136,14 +146,14 @@ public class PieceJointeController {
     }
 
     @DeleteMapping("/api/v1/clients/{clientId}/pieces-jointes/{pieceId}")
-    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    @PreAuthorize("hasAuthority('PERM_document-crm:delete')")
     public ResponseEntity<ApiResponse<Void>> deleteClient(@PathVariable Long clientId, @PathVariable Long pieceId) {
         pieceJointeService.deleteClientDocument(TenantContext.getCurrentAgence(), clientId, pieceId);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     @GetMapping("/api/v1/clients/{clientId}/pieces-jointes/{pieceId}/download")
-    @PreAuthorize("hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAuthority('PERM_document-crm:view')")
     public ResponseEntity<Resource> downloadClient(@PathVariable Long clientId, @PathVariable Long pieceId) {
         PieceJointeService.DownloadedPiece download = pieceJointeService.downloadClientDocument(TenantContext.getCurrentAgence(), clientId, pieceId);
         return ResponseEntity.ok().contentType(download.mediaType())
@@ -153,7 +163,7 @@ public class PieceJointeController {
     }
 
     @PostMapping("/api/v1/contrats/{contratId}/pieces-jointes/reuse")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update') and hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAuthority('PERM_piece-jointe:upload') and hasAuthority('PERM_document-crm:view')")
     public ResponseEntity<ApiResponse<PieceJointeResponse>> reuse(@PathVariable Long contratId,
             @RequestParam Long pieceId, @RequestParam Long typePieceJointeId,
             @RequestParam(required = false) Long mouvementId) {
@@ -162,7 +172,7 @@ public class PieceJointeController {
     }
 
     @PostMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/owner")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_piece-jointe:upload')")
     public ResponseEntity<ApiResponse<PieceJointeResponse>> assignOwner(@PathVariable Long contratId, @PathVariable Long pieceId,
             @RequestParam(required = false) Long clientId, @RequestParam(required = false) Long vehiculeId) {
         return ResponseEntity.ok(ApiResponse.success(pieceJointeService.assignOwner(TenantContext.getCurrentAgence(),
@@ -170,7 +180,7 @@ public class PieceJointeController {
     }
 
     @DeleteMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/usage")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_piece-jointe:delete')")
     public ResponseEntity<ApiResponse<Void>> unlink(@PathVariable Long contratId, @PathVariable Long pieceId,
             @RequestParam(required = false) Long mouvementId) {
         pieceJointeService.unlink(TenantContext.getCurrentAgence(), contratId, mouvementId, pieceId);
@@ -178,7 +188,7 @@ public class PieceJointeController {
     }
 
     @PostMapping(path = "/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}/replace", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_piece-jointe:upload')")
     public ResponseEntity<ApiResponse<PieceJointeResponse>> replace(@PathVariable Long contratId, @PathVariable Long pieceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate expiresOn, @RequestParam String reason,
             @RequestPart("files") List<MultipartFile> files) {
@@ -200,7 +210,7 @@ public class PieceJointeController {
     }
 
     @DeleteMapping("/api/v1/contrats/{contratId}/pieces-jointes/{pieceId}")
-    @PreAuthorize("hasAnyAuthority('PERM_piece-jointe:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_piece-jointe:delete')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long contratId, @PathVariable Long pieceId) {
         pieceJointeService.delete(TenantContext.getCurrentAgence(), contratId, pieceId);
         return ResponseEntity.ok(ApiResponse.success(null, "Piece jointe supprimee"));

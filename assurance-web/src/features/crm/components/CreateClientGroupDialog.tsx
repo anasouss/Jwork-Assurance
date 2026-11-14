@@ -4,6 +4,7 @@ import { Save } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -82,11 +83,11 @@ function CreateClientGroupForm({ open, onOpenChange, onSaved }: Props) {
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" disabled={create.isPending} onClick={() => onOpenChange(false)}>Annuler</Button>
-        <Button type="button" disabled={!code.trim() || !libelle.trim() || create.isPending}
+        <PermissionButton permission="groupe-client:create" type="button" disabled={!code.trim() || !libelle.trim() || create.isPending}
           onClick={() => create.mutate({ code: code.trim(), libelle: libelle.trim(), clientTeteId: clientTeteId || undefined,
             clientTresorerieId: clientTresorerieId || undefined, facturationConsolideeDefaut: consolidated, actif: true })}>
           <Save className="size-4" />{create.isPending ? "Enregistrement..." : "Créer le groupe"}
-        </Button>
+        </PermissionButton>
       </DialogFooter>
     </DialogContent>
   </Dialog>;

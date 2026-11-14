@@ -15,6 +15,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FileDropzone } from "@/components/ui/file-dropzone";
@@ -338,7 +339,7 @@ export function AffectationQuittanceDialog({
                               }}
                             />
                           </Field>
-                          <Button
+                          <PermissionButton permission="quittance-affectation:import"
                             type="button"
                             variant="outline"
                             disabled={!file || previewFile.isPending}
@@ -346,7 +347,7 @@ export function AffectationQuittanceDialog({
                           >
                             <Upload className="size-4" />
                             Analyser le fichier
-                          </Button>
+                          </PermissionButton>
                         </div>
                       </div>
                     ) : null}
@@ -372,11 +373,11 @@ export function AffectationQuittanceDialog({
 
           <DialogFooter className="gap-2 sm:justify-between">
             <div>
-              {hasAllocation && !readOnly ? (
-                <Button type="button" variant="destructive" onClick={() => setConfirmClear(true)}>
+              {hasAllocation ? (
+                <PermissionButton permission="quittance-affectation:delete" type="button" variant="destructive" onClick={() => setConfirmClear(true)}>
                   <Trash2 className="size-4" />
                   Supprimer l'affectation
-                </Button>
+                </PermissionButton>
               ) : null}
             </div>
             <div className="flex gap-2">
@@ -384,9 +385,9 @@ export function AffectationQuittanceDialog({
                 {readOnly ? "Fermer" : "Annuler"}
               </Button>
               {!readOnly ? (
-                <Button type="button" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
+                <PermissionButton permission="quittance-affectation:update" type="button" disabled={!canSave || save.isPending} onClick={() => save.mutate()}>
                   Enregistrer
-                </Button>
+                </PermissionButton>
               ) : null}
             </div>
           </DialogFooter>

@@ -33,43 +33,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
 
-    private static final Set<String> OPERATIONAL_ADMIN_PERMISSION_CODES = Set.of(
-            "avenant:view",
-            "avenant:create",
-            "avenant:draft",
-            "avenant:rectify",
-            "avenant:delete",
-            "client:view",
-            "client:create",
-            "client:manage",
-            "vehicule:view",
-            "attestation-stock:view",
-            "attestation-stock:manage",
-            "attestation-stock:cancel",
-            "agence:manage-self",
-            "regle-fiscale:view",
-            "regle-fiscale:manage",
-            "contrat:recalculate-financial-history",
-            "contact-compagnie:view",
-            "contact-compagnie:manage",
-            "bordereau-compagnie:view",
-            "bordereau-compagnie:create",
-            "bordereau-compagnie:validate",
-            "bordereau-compagnie:transmit",
-            "bordereau-compagnie:reconcile",
-            "bordereau-compagnie:cancel",
-            "reglement-compagnie:view",
-            "reglement-compagnie:create",
-            "reglement-compagnie:manage",
-            "sinistre:view",
-            "sinistre:create",
-            "sinistre:manage",
-            "sinistre:finance",
-            "sinistre:referentiel",
-            "audit:view",
-            "activity:view"
-    );
-
     private final PermissionRepository permissionRepository;
     private final RoleRepository roleRepository;
     private final AgenceRepository agenceRepository;
@@ -105,41 +68,12 @@ public class DataSeeder implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         normalizePlatformAdministrators();
-        Permission referentielView = seedPermission(
-                "referentiel:view",
-                "Consulter les référentiels",
-                "referentiel"
-        );
-        Permission referentielManage = seedPermission(
-                "referentiel:manage",
-                "Gérer les référentiels",
-                "referentiel"
-        );
-        grantReferentielPermissionsToAdministrators(referentielView, referentielManage);
-        grantOperationalPermissionsToAdministrators();
         if (!isBusinessBootstrapEmpty()) {
             return;
         }
-        Permission contratView = seedPermission("contrat:view", "Consulter les contrats", "contrat");
-        Permission contratCreate = seedPermission("contrat:create", "Creer un contrat", "contrat");
-        Permission contratUpdate = seedPermission("contrat:update", "Modifier un contrat", "contrat");
-        Permission clientView = seedPermission("client:view", "Consulter les clients", "client");
-        Permission clientCreate = seedPermission("client:create", "Creer un client", "client");
-        Permission garantieView = seedPermission("garantie:view", "Consulter les garanties", "garantie");
-        Permission garantieManage = seedPermission("garantie:manage", "Gerer les garanties", "garantie", true);
-        Permission grilleView = seedPermission("grille-tarifaire:view", "Consulter les grilles tarifaires", "grille-tarifaire");
-        Permission grilleManage = seedPermission("grille-tarifaire:manage", "Gerer les grilles tarifaires", "grille-tarifaire");
-        Permission quittanceView = seedPermission("quittance:view", "Consulter les quittances", "quittance");
-        Permission quittanceCreate = seedPermission("quittance:create", "Creer une quittance", "quittance");
-        Permission quittanceManage = seedPermission("quittance:manage", "Gérer les règles de quittance", "quittance");
-        Permission agenceView = seedPermission("agence:view", "Consulter les agences", "agence", true);
-        Permission agenceCreate = seedPermission("agence:create", "Creer une agence", "agence", true);
-        Permission userView = seedPermission("user:view", "Consulter les utilisateurs", "admin");
-        Permission userManage = seedPermission("user:manage", "Gerer les utilisateurs", "admin");
-        Permission roleView = seedPermission("role:view", "Consulter les roles", "admin");
-        Permission roleManage = seedPermission("role:manage", "Gerer les roles", "admin");
-        Permission configView = seedPermission("config:view", "Consulter la configuration", "config", true);
-        Permission configManage = seedPermission("config:manage", "Gerer la configuration", "config", true);
+        Set<Permission> bootstrapPermissions = permissionRepository.findAll().stream()
+                .filter(permission -> com.assurance.security.PermissionCatalog.contains(permission.getCode()))
+                .collect(java.util.stream.Collectors.toSet());
 
         Agence agenceDefaut = agenceRepository.findByCode("AG-001").orElseGet(() -> agenceRepository.save(
                 Agence.builder()
@@ -273,7 +207,7 @@ public class DataSeeder implements CommandLineRunner {
                         .systemRole(true)
                         .build()
         ));
-        superAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, garantieManage, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, agenceView, agenceCreate, userView, userManage, roleView, roleManage, configView, configManage, referentielView, referentielManage));
+        superAdmin.getPermissions().addAll(bootstrapPermissions);
         roleRepository.save(superAdmin);
 
         Role agenceAdmin = roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENCY_ADMIN").orElseGet(() -> roleRepository.save(
@@ -284,7 +218,9 @@ public class DataSeeder implements CommandLineRunner {
                         .systemRole(true)
                         .build()
         ));
-        agenceAdmin.getPermissions().addAll(List.of(contratView, contratCreate, contratUpdate, clientView, clientCreate, garantieView, grilleView, grilleManage, quittanceView, quittanceCreate, quittanceManage, userView, userManage, roleView, roleManage, referentielView, referentielManage));
+        agenceAdmin.getPermissions().addAll(bootstrapPermissions.stream()
+                .filter(permission -> !Boolean.TRUE.equals(permission.getSuperAdminOnly()))
+                .toList());
         roleRepository.save(agenceAdmin);
 
         roleRepository.findByAgenceIdAndCode(agenceDefaut.getId(), "AGENT").orElseGet(() -> roleRepository.save(
@@ -349,7 +285,6 @@ public class DataSeeder implements CommandLineRunner {
                         .actif(true)
                         .build()
         ));
-        grantOperationalPermissionsToAdministrators();
     }
 
     private boolean isBusinessBootstrapEmpty() {
@@ -376,43 +311,6 @@ public class DataSeeder implements CommandLineRunner {
         }
         if (changed) {
             userRepository.saveAll(platformAdministrators);
-        }
-    }
-
-    private void grantReferentielPermissionsToAdministrators(Permission view, Permission manage) {
-        List<Role> administratorRoles = roleRepository.findAll().stream()
-                .filter(role -> "SUPER_ADMIN".equalsIgnoreCase(role.getCode())
-                        || "AGENCY_ADMIN".equalsIgnoreCase(role.getCode()))
-                .toList();
-        boolean changed = false;
-        for (Role role : administratorRoles) {
-            changed |= role.getPermissions().add(view);
-            changed |= role.getPermissions().add(manage);
-        }
-        if (changed) {
-            roleRepository.saveAll(administratorRoles);
-        }
-    }
-
-    private void grantOperationalPermissionsToAdministrators() {
-        Set<Permission> permissions = permissionRepository.findAll().stream()
-                .filter(permission -> OPERATIONAL_ADMIN_PERMISSION_CODES.contains(permission.getCode()))
-                .collect(java.util.stream.Collectors.toSet());
-        if (permissions.size() != OPERATIONAL_ADMIN_PERMISSION_CODES.size()) {
-            throw new IllegalStateException("Operational permissions are incomplete");
-        }
-
-        List<Role> administratorRoles = roleRepository.findAll().stream()
-                .filter(role -> Boolean.TRUE.equals(role.getSystemRole()))
-                .filter(role -> "SUPER_ADMIN".equalsIgnoreCase(role.getCode())
-                        || "AGENCY_ADMIN".equalsIgnoreCase(role.getCode()))
-                .toList();
-        boolean changed = false;
-        for (Role role : administratorRoles) {
-            changed |= role.getPermissions().addAll(permissions);
-        }
-        if (changed) {
-            roleRepository.saveAll(administratorRoles);
         }
     }
 
@@ -534,21 +432,6 @@ public class DataSeeder implements CommandLineRunner {
             regle.setExcelColonneStatut("Statut");
         }
         return regle;
-    }
-
-    private Permission seedPermission(String code, String nom, String module) {
-        return seedPermission(code, nom, module, false);
-    }
-
-    private Permission seedPermission(String code, String nom, String module, boolean superAdminOnly) {
-        return permissionRepository.findByCode(code).orElseGet(() ->
-                permissionRepository.save(Permission.builder()
-                        .code(code)
-                        .nom(nom)
-                        .module(module)
-                        .superAdminOnly(superAdminOnly)
-                        .build())
-        );
     }
 
     private List<CompagnieAssurance> seedCompagniesAssurance() {

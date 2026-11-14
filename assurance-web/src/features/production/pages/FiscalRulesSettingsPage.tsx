@@ -7,7 +7,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +21,7 @@ const key = ["fiscal-rules"] as const;
 export default function FiscalRulesSettingsPage() {
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("regle-fiscale:manage") || permissions.includes("config:manage");
+  const canManage = ["regle-fiscale:create", "regle-fiscale:update", "regle-fiscale:deactivate"].some(code => permissions.includes(code));
   const [search, setSearch] = useState("");
   const [nature, setNature] = useState<string>("ALL");
   const [status, setStatus] = useState("ACTIVE");
@@ -69,7 +69,7 @@ export default function FiscalRulesSettingsPage() {
           <h1 className="text-xl font-semibold">Règles fiscales</h1>
           <p className="text-sm text-muted-foreground">Taxes, TPF, EVCAT et CNPAC applicables par période et périmètre.</p>
         </div>
-        {canManage ? <Button onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="size-4" /> Ajouter</Button> : null}
+        {canManage ? <PermissionButton permission="regle-fiscale:create" onClick={() => { setEditing(null); setDialogOpen(true); }}><Plus className="size-4" /> Ajouter</PermissionButton> : null}
       </div>
 
       <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_220px_180px]">
@@ -101,7 +101,7 @@ export default function FiscalRulesSettingsPage() {
                 <TableCell className="max-w-72 whitespace-normal">{scopeLabel(rule)}</TableCell>
                 <TableCell><div>Du {formatDate(rule.dateDebut)}</div><div className="text-xs text-muted-foreground">{rule.dateFin ? `au ${formatDate(rule.dateFin)} exclu` : "Sans date de fin"}</div></TableCell>
                 <TableCell><div className="flex flex-wrap gap-1"><Badge variant={rule.actif ? "default" : "secondary"}>{rule.actif ? "Active" : "Inactive"}</Badge>{!rule.applicable ? <Badge variant="outline">Exonération</Badge> : null}</div></TableCell>
-                {canManage ? <TableCell className="text-right"><Button variant="ghost" size="icon-sm" title="Modifier" onClick={() => { setEditing(rule); setDialogOpen(true); }}><Edit className="size-4" /></Button>{rule.actif ? <Button variant="ghost" size="icon-sm" title="Désactiver" onClick={() => setDeactivating(rule)}><Trash2 className="size-4 text-red-600" /></Button> : null}</TableCell> : null}
+                {canManage ? <TableCell className="text-right"><PermissionButton permission="regle-fiscale:update" variant="ghost" size="icon-sm" title="Modifier" onClick={() => { setEditing(rule); setDialogOpen(true); }}><Edit className="size-4" /></PermissionButton>{rule.actif ? <PermissionButton permission="regle-fiscale:deactivate" variant="ghost" size="icon-sm" title="Désactiver" onClick={() => setDeactivating(rule)}><Trash2 className="size-4 text-red-600" /></PermissionButton> : null}</TableCell> : null}
               </TableRow>)}
             </TableBody>
           </Table>

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
@@ -76,8 +77,9 @@ export default function BordereauCompagnieDetailPage() {
     enabled: Boolean(bordereauId),
   });
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
+    enabled: permissions.includes("reglement-compagnie:confirm"),
   });
 
   const refresh = async () => {
@@ -315,14 +317,14 @@ export default function BordereauCompagnieDetailPage() {
                 <TableCell className="text-right font-semibold">{money(payment.montantAffecte)}</TableCell>
                 <TableCell className="text-center"><StatusBadge value={payment.statut} /></TableCell>
                 <TableCell className="text-right">
-                  {payment.statut === "EN_ATTENTE" && permissions.includes("reglement-compagnie:manage") ? (
+                  {payment.statut === "EN_ATTENTE" ? (
                     <div className="flex justify-end gap-1">
-                      <Button size="sm" variant="outline" onClick={() => setInstrumentAction({ instrument: payment, status: "CONFIRME" })}>
+                      <PermissionButton permission="reglement-compagnie:confirm" size="sm" variant="outline" onClick={() => setInstrumentAction({ instrument: payment, status: "CONFIRME" })}>
                         Confirmer
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setInstrumentAction({ instrument: payment, status: "REJETE" })}>
+                      </PermissionButton>
+                      <PermissionButton permission="reglement-compagnie:reject" size="sm" variant="ghost" onClick={() => setInstrumentAction({ instrument: payment, status: "REJETE" })}>
                         Rejeter
-                      </Button>
+                      </PermissionButton>
                     </div>
                   ) : "-"}
                 </TableCell>

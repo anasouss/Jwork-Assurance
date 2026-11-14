@@ -86,6 +86,17 @@ public class CarteVerteService {
     }
 
     @Transactional
+    public CarteVerteResponse saveStandalone(Long agenceId, Long contratId, UpsertCarteVerteRequest request) {
+        contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        boolean exists = carteVerteRepository
+                .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contratId, request.getVehiculeId())
+                .isPresent();
+        com.assurance.security.BusinessPermission.require(exists ? "carte-verte:update" : "carte-verte:create");
+        return upsert(agenceId, contratId, request);
+    }
+
+    @Transactional
     public CarteVerteResponse upsert(Long agenceId, Long contratId, UpsertCarteVerteRequest request) {
         Contrat contrat = resolveContrat(agenceId, contratId);
         Vehicule vehicule = vehiculeRepository.findById(request.getVehiculeId())

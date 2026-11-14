@@ -5,6 +5,7 @@ import { toast } from "@/lib/toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -198,9 +199,9 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
                     setFile(selected); setPreview(null); setLines([]);
                   }}
                 />
-                <Button type="button" variant="outline" disabled={!file || importFile.isPending} onClick={() => importFile.mutate()}>
+                <PermissionButton permission="quittance-affectation:import" type="button" variant="outline" disabled={!file || importFile.isPending} onClick={() => importFile.mutate()}>
                   <Upload className="size-4" /> Analyser le fichier
-                </Button>
+                </PermissionButton>
               </div>
               {preview ? <ImportSummary preview={preview} /> : null}
               <BatchLinesTable lines={lines} targets={targets} imported onChange={setLines} />
@@ -210,9 +211,9 @@ export function BulkAffectationQuittanceDialog({ rows, open, onOpenChange, onSav
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => close(false)}>Annuler</Button>
-          <Button type="button" disabled={!complete || save.isPending} onClick={() => save.mutate()}>
+          <PermissionButton permission="quittance-affectation:update" type="button" disabled={!complete || save.isPending} onClick={() => save.mutate()}>
             Enregistrer l’affectation groupée
-          </Button>
+          </PermissionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

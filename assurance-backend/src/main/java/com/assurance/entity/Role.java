@@ -58,10 +58,13 @@ public class Role extends BaseEntity {
     private Set<Permission> permissions = new HashSet<>();
 
     public boolean hasPermission(String code) {
-        return permissions.stream().anyMatch(permission -> permission.getCode().equals(code));
+        return com.assurance.security.PermissionCatalog.contains(code)
+                && permissions.stream().anyMatch(permission -> permission.getCode().equals(code));
     }
 
     public Set<String> getPermissionCodes() {
-        return permissions.stream().map(Permission::getCode).collect(Collectors.toSet());
+        return permissions.stream().map(Permission::getCode)
+                .filter(com.assurance.security.PermissionCatalog::contains)
+                .collect(Collectors.toSet());
     }
 }

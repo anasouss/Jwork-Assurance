@@ -131,24 +131,37 @@ public class BusinessActivityRecorder {
     public void recordGlobalReference(ActivityCommand command) {
         Long actorId = TenantContext.getCurrentUser();
         Utilisateur actor = actorId == null ? null : utilisateurRepository.findById(actorId).orElse(null);
-        java.util.Set<String> permissions = switch (command.subject().type()) {
-            case REGLE_FISCALE -> java.util.Set.of("regle-fiscale:manage", "config:manage");
-            case AJUSTEMENT_TARIF_USAGE, COMPAGNIE, COMPAGNIE_ASSISTANCE, PRODUIT_ASSISTANCE, TARIF_ASSISTANCE, CODE_PROMO_ASSISTANCE ->
-                    java.util.Set.of("referentiel:manage", "config:manage");
-            case USAGE, CONFIGURATION_USAGES, TARIF_USAGE, MARQUE, CARROSSERIE, CARBURANT, SOUS_CLASSE,
-                    CATEGORIE_CLIENT, CATEGORIE_TRANSPORT, GROUPE_USAGE_ATTESTATION, GROUPE_EXCLUSION_GARANTIE, GARANTIE ->
-                    java.util.Set.of("referentiel:manage");
-            case GRILLE_TARIFAIRE, LIGNE_GRILLE_TARIFAIRE, FORMULE_GARANTIE_PERSONNE ->
-                    java.util.Set.of("grille-tarifaire:manage", "referentiel:manage", "config:manage");
-            default -> java.util.Set.of();
+        String resource = switch (command.subject().type()) {
+            case REGLE_FISCALE -> "regle-fiscale";
+            case AJUSTEMENT_TARIF_USAGE, TARIF_USAGE -> "tarif-usage";
+            case COMPAGNIE -> "compagnie-assurance";
+            case COMPAGNIE_ASSISTANCE -> "compagnie-assistance";
+            case PRODUIT_ASSISTANCE -> "produit-assistance";
+            case TARIF_ASSISTANCE -> "tarif-assistance";
+            case CODE_PROMO_ASSISTANCE -> "promo-assistance";
+            case USAGE, CONFIGURATION_USAGES -> "usage";
+            case MARQUE -> "marque";
+            case CARROSSERIE -> "carrosserie";
+            case CARBURANT -> "carburant";
+            case SOUS_CLASSE -> "sous-classe";
+            case CATEGORIE_CLIENT -> "categorie-client";
+            case CATEGORIE_TRANSPORT -> "categorie-transport";
+            case GROUPE_USAGE_ATTESTATION -> "groupe-usage-attestation";
+            case GROUPE_EXCLUSION_GARANTIE, GARANTIE -> "garantie";
+            case GRILLE_TARIFAIRE, LIGNE_GRILLE_TARIFAIRE, FORMULE_GARANTIE_PERSONNE -> "grille-tarifaire";
+            default -> null;
         };
+        // The root workflow is authorized by its controller; configuration may create child rows.
+        boolean referenceWriter = actor != null && resource != null && actor.getPermissions().stream()
+                .map(com.assurance.security.PermissionCatalog::find)
+                .filter(java.util.Objects::nonNull)
+                .anyMatch(permission -> permission.resource().equals(resource) && !permission.action().equals("view"));
         ActivityModule expectedModule = switch (command.subject().type()) {
             case COMPAGNIE, COMPAGNIE_ASSISTANCE, PRODUIT_ASSISTANCE, TARIF_ASSISTANCE, CODE_PROMO_ASSISTANCE -> ActivityModule.COMPAGNIES;
             case GRILLE_TARIFAIRE, LIGNE_GRILLE_TARIFAIRE, FORMULE_GARANTIE_PERSONNE -> ActivityModule.COMPAGNIES;
             default -> ActivityModule.REFERENTIELS;
         };
-        if (command.agenceId() != null || command.module() != expectedModule || permissions.isEmpty()
-                || actor == null || permissions.stream().noneMatch(actor.getPermissions()::contains)) {
+        if (command.agenceId() != null || command.module() != expectedModule || !referenceWriter) {
             throw new AccessDeniedException("Activité de référentiel global non autorisée");
         }
         if ((command.action() == ActivityAction.UPDATED || command.action() == ActivityAction.SAVED

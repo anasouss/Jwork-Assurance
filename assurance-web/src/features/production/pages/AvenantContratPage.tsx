@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Save, Settings2 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { useAuthStore } from "@/store/auth-store";
 import { amendmentKeys, attestationStockKeys, contractKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,10 @@ export default function AvenantContratPage() {
   const queryClient = useQueryClient();
   const movementCode = normalizeAmendmentCode(code);
   const validatedMovementId = searchParams.get("mouvementId");
+  const permissions = useAuthStore(state => state.user?.permissions ?? []);
+  const canSaveDraft = permissions.includes("avenant:update-draft");
+  const canValidate = permissions.includes(validatedMovementId ? "avenant:rectify" : "avenant:create");
+  const canPreview = canSaveDraft || canValidate;
   const [dateEffet, setDateEffet] = useState<string>();
   const [dateEcheance, setDateEcheance] = useState<string>();
   const [libelleReleve, setLibelleReleve] = useState("");
@@ -803,7 +808,7 @@ export default function AvenantContratPage() {
   });
 
   useEffect(() => {
-    if (initialLoading || saveMutation.isPending || validatedMovementId) {
+    if (!canPreview || initialLoading || saveMutation.isPending || validatedMovementId) {
       return;
     }
     const request = buildAutoPreviewRequest();
@@ -835,6 +840,7 @@ export default function AvenantContratPage() {
   // Effect Events read the latest request builder and mutation without retriggering.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    canPreview,
     initialLoading,
     saveMutation.isPending,
     validatedMovementId,
@@ -891,6 +897,7 @@ export default function AvenantContratPage() {
   ]);
 
   const save = () => {
+    if (!canValidate) return;
     if (contrat?.typeContrat === "CONVENTION" && preview?.requiresConventionPayment) {
       if (!modeReglement) { toast.error("Sélectionnez le mode de règlement de l'avenant"); return; }
     }
@@ -899,6 +906,7 @@ export default function AvenantContratPage() {
   };
 
   const saveDraft = () => {
+    if (!canSaveDraft) return;
     draftMutation.mutate({ request: buildDraftRequest() }, {
       onSuccess: () => toast.success("Brouillon d'avenant enregistré"),
     });
@@ -1006,6 +1014,7 @@ export default function AvenantContratPage() {
       previewTargetCreation(target, () => previewCompleteDraft(selectedGarantiesRef.current));
       return true;
     }
+    if (!canSaveDraft) return false;
     const request = buildDraftRequest();
     draftMutation.mutate({ request, target, section: part === "info" ? "INFO" : "GARANTIES" }, {
       onSuccess: () => {
@@ -1046,7 +1055,7 @@ export default function AvenantContratPage() {
           </h1>
           <p className="text-sm text-muted-foreground">{contrat?.numeroDossier ?? contrat?.numeroContrat ?? contratId}</p>
         </div>
-        {!validatedMovementId ? <div className="flex gap-2">
+        {!validatedMovementId && canSaveDraft ? <div className="flex gap-2">
           <Button
             type="button"
             variant="outline"
@@ -1256,7 +1265,7 @@ export default function AvenantContratPage() {
           type="button"
           onClick={save}
           disabled={
-            saveMutation.isPending
+            !canValidate || saveMutation.isPending
             || draftMutation.isPending
             || contextQuery.isLoading
             || rectificationQuery.isLoading

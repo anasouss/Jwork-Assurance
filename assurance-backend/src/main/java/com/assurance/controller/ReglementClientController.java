@@ -63,25 +63,25 @@ public class ReglementClientController {
     private final RejetBancaireSuiviService rejetSuiviService;
 
     @GetMapping("/rejets-bancaires/{rejetId}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:view')")
     public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse.RejetDetail>> rejectionDetail(@PathVariable Long rejetId) {
         return ResponseEntity.ok(ApiResponse.success(rejetSuiviService.detailRejet(TenantContext.getCurrentAgence(), rejetId)));
     }
 
     @GetMapping("/instruments/{instrumentId}/suivi-rejet")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:view')")
     public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse>> rejectionHistory(@PathVariable Long instrumentId) {
         return ResponseEntity.ok(ApiResponse.success(rejetSuiviService.detail(TenantContext.getCurrentAgence(), instrumentId)));
     }
 
     @GetMapping("/instruments/{instrumentId}/fiche-payeur-rejet")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view') and hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:view') and hasAuthority('PERM_client:view')")
     public ResponseEntity<ApiResponse<SuiviRejetBancaireResponse.FichePayeur>> rejectionPayer(@PathVariable Long instrumentId) {
         return ResponseEntity.ok(ApiResponse.success(rejetSuiviService.fichePayeur(TenantContext.getCurrentAgence(), instrumentId)));
     }
 
     @PostMapping("/instruments/{instrumentId}/suivi-rejet")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view') and hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:followup')")
     public ResponseEntity<ApiResponse<Void>> addRejectionMovement(@PathVariable Long instrumentId,
             @Valid @RequestBody AjouterMouvementRejetRequest request) {
         rejetSuiviService.ajouter(TenantContext.getCurrentAgence(), instrumentId, request);
@@ -204,7 +204,7 @@ public class ReglementClientController {
     }
 
     @GetMapping("/politique")
-    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:view', 'PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
     public ResponseEntity<ApiResponse<ReglementClientPolicyResponse>> paymentPolicy() {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.paymentPolicy(
                 TenantContext.getCurrentAgence()
@@ -212,7 +212,7 @@ public class ReglementClientController {
     }
 
     @PutMapping("/politique")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:configure')")
     public ResponseEntity<ApiResponse<ReglementClientPolicyResponse>> updatePaymentPolicy(
             @Valid @RequestBody UpdateReglementClientPolicyRequest request
     ) {
@@ -321,7 +321,7 @@ public class ReglementClientController {
     }
 
     @PostMapping("/{paymentId}/quittance-prime/pdf")
-    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-prime:issue')")
     public ResponseEntity<byte[]> issuePremiumReceipt(@PathVariable Long paymentId,
             @Valid @RequestBody(required = false) QuittancePrimeSelectionRequest request) {
         Long agencyId = TenantContext.getCurrentAgence();
@@ -331,32 +331,32 @@ public class ReglementClientController {
     }
 
     @GetMapping("/{paymentId}/quittance-prime/options")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-prime:view')")
     public ResponseEntity<ApiResponse<QuittancePrimeSelectionService.Options>> premiumReceiptOptions(@PathVariable Long paymentId) {
         return ResponseEntity.ok(ApiResponse.success(quittancePrimeSelectionService.options(TenantContext.getCurrentAgence(), paymentId)));
     }
 
     @GetMapping("/{paymentId}/quittance-prime/{receiptId}/pdf")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-prime:view')")
     public ResponseEntity<byte[]> selectedPremiumReceipt(@PathVariable Long paymentId, @PathVariable Long receiptId) {
         return premiumReceiptResponse(quittancePrimeSelectionService.read(TenantContext.getCurrentAgence(), paymentId, receiptId));
     }
 
     @GetMapping("/{paymentId}/quittance-prime/pdf")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-prime:view')")
     public ResponseEntity<byte[]> premiumReceipt(@PathVariable Long paymentId) {
         return premiumReceiptResponse(quittancePrimeClientService.read(TenantContext.getCurrentAgence(), paymentId));
     }
 
     @DeleteMapping("/{paymentId}/quittance-prime/pdf")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-prime:delete')")
     public ResponseEntity<ApiResponse<Void>> deleteLegacyPremiumReceipt(@PathVariable Long paymentId) {
         quittancePrimeSelectionService.delete(TenantContext.getCurrentAgence(), paymentId, null);
         return ResponseEntity.ok(ApiResponse.success(null, "Archive de quittance supprimée"));
     }
 
     @DeleteMapping("/{paymentId}/quittance-prime/{receiptId}/pdf")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-prime:delete')")
     public ResponseEntity<ApiResponse<Void>> deletePremiumReceipt(@PathVariable Long paymentId, @PathVariable Long receiptId) {
         quittancePrimeSelectionService.delete(TenantContext.getCurrentAgence(), paymentId, receiptId);
         return ResponseEntity.ok(ApiResponse.success(null, "Archive de quittance supprimée"));
@@ -388,7 +388,7 @@ public class ReglementClientController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:refund')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> create(
             @Valid @RequestBody CreerReglementClientRequest request
     ) {
@@ -400,7 +400,7 @@ public class ReglementClientController {
     }
 
     @PostMapping(value = "/versements-bancaires", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:create', 'PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:create')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> createDirectDeposit(
             @Valid @RequestPart("request") CreerReglementClientRequest request,
             @RequestPart("bordereau") MultipartFile receipt
@@ -430,7 +430,7 @@ public class ReglementClientController {
     }
 
     @PostMapping("/{paymentId}/facture")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_document-client:issue')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> createInvoice(
             @PathVariable Long paymentId
     ) {
@@ -444,7 +444,7 @@ public class ReglementClientController {
     }
 
     @PostMapping("/{paymentId}/annulation")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_reglement-client:cancel')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> cancel(
             @PathVariable Long paymentId,
             @Valid @RequestBody AnnulerReglementClientRequest request
@@ -457,7 +457,7 @@ public class ReglementClientController {
     }
 
     @GetMapping("/instruments/en-attente")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_instrument-reglement:view', 'PERM_rapprochement-bancaire:view')")
     public ResponseEntity<ApiResponse<List<ReglementClientResponse.Instrument>>> pendingInstruments() {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.pendingInstruments(
                 TenantContext.getCurrentAgence()
@@ -465,7 +465,7 @@ public class ReglementClientController {
     }
 
     @GetMapping("/instruments/rejets-bancaires")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:view')")
     public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> bankRejections(
             @RequestParam(required = false) ModeReglementClient mode,
             @RequestParam(required = false) Long banqueId,
@@ -489,7 +489,7 @@ public class ReglementClientController {
     }
 
     @GetMapping("/instruments/rejets-bancaires/export")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:view')")
     public ResponseEntity<byte[]> exportBankRejections(
             @RequestParam(required = false) ModeReglementClient mode,
             @RequestParam(required = false) Long banqueId,
@@ -514,7 +514,7 @@ public class ReglementClientController {
     }
 
     @PostMapping("/instruments/{instrumentId}/rejet-bancaire")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:reject')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> registerBankRejection(
             @PathVariable Long instrumentId,
             @Valid @RequestBody ChangerStatutInstrumentReglementRequest request
@@ -525,7 +525,7 @@ public class ReglementClientController {
     }
 
     @GetMapping("/instruments")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_instrument-reglement:view', 'PERM_rapprochement-bancaire:view')")
     public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> instruments(
             @RequestParam(required = false) StatutInstrumentReglement statut,
             @RequestParam(required = false) List<StatutInstrumentReglement> statuts,
@@ -564,11 +564,14 @@ public class ReglementClientController {
     }
 
     @PutMapping("/instruments/{instrumentId}/statut")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_instrument-reglement:confirm', 'PERM_instrument-reglement:reject')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> changeInstrumentStatus(
             @PathVariable Long instrumentId,
             @Valid @RequestBody ChangerStatutInstrumentReglementRequest request
     ) {
+        com.assurance.security.BusinessPermission.require(
+                request.getStatut() == com.assurance.enums.StatutInstrumentReglement.CONFIRME
+                        ? "instrument-reglement:confirm" : "instrument-reglement:reject");
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.changeInstrumentStatus(
                 TenantContext.getCurrentAgence(),
                 instrumentId,
@@ -577,7 +580,7 @@ public class ReglementClientController {
     }
 
     @PostMapping("/instruments/{instrumentId}/remplacement")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:replace')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> replaceInstrument(
             @PathVariable Long instrumentId,
             @Valid @RequestBody RemplacerInstrumentReglementRequest request
@@ -590,7 +593,7 @@ public class ReglementClientController {
     }
 
     @PostMapping("/instruments/{instrumentId}/representation")
-    @PreAuthorize("hasAuthority('PERM_reglement-client:manage')")
+    @PreAuthorize("hasAuthority('PERM_instrument-reglement:represent')")
     public ResponseEntity<ApiResponse<ReglementClientResponse>> representInstrument(
             @PathVariable Long instrumentId,
             @Valid @RequestBody RepresenterInstrumentReglementRequest request

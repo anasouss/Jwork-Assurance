@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FilterField, ServerPagination, TableRowsSkeleton } from "@/components/shared";
@@ -60,8 +61,8 @@ export default function QuittanceAffectationPage() {
   const [urlParams, setUrlParams] = useSearchParams();
   const [initialState] = useState(() => searchStateFromUrl(urlParams));
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canAffect = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
-  const canConfigure = permissions.includes("quittance:manage") || permissions.includes("config:manage");
+  const canAffect = permissions.includes("quittance-affectation:update");
+  const canConfigure = permissions.includes("regle-quittance:view");
   const [filters, setFilters] = useState<Filters>(initialState.filters);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(initialState.filters);
   const [searched, setSearched] = useState(initialState.searched);
@@ -364,7 +365,7 @@ export default function QuittanceAffectationPage() {
               Affecter la sélection ({selectedRows.length})
             </Button>
           ) : null}
-          <Button
+          <PermissionButton permission="quittance-affectation:export"
             type="button"
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700"
@@ -373,7 +374,7 @@ export default function QuittanceAffectationPage() {
           >
             <Download className="size-4" />
             {exporting ? "Export..." : "Exporter Excel"}
-          </Button>
+          </PermissionButton>
           </div>
         </CardHeader>
         <CardContent className="min-w-0 p-0">
@@ -564,7 +565,7 @@ export default function QuittanceAffectationPage() {
         quittanceId={selectedQuittanceId}
         open={allocationOpen}
         readOnly={!canAffect}
-        onConfigureRule={(data) => {
+        onConfigureRule={canConfigure ? (data) => {
           setAllocationOpen(false);
           setSelectedQuittanceId(undefined);
           setRuleTarget({
@@ -573,7 +574,7 @@ export default function QuittanceAffectationPage() {
             rule: data.regle,
           });
           setRulesOpen(true);
-        }}
+        } : undefined}
         onOpenChange={(value) => {
           setAllocationOpen(value);
           if (!value) setSelectedQuittanceId(undefined);

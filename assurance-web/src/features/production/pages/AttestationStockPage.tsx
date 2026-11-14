@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Boxes, ClipboardList, Plus, Settings2, TriangleAlert, Truck } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DonutChart, type DonutChartDatum } from "@/components/ui/donut-chart";
 import { Switch } from "@/components/ui/switch";
@@ -99,6 +100,7 @@ export default function AttestationStockPage() {
 }
 
 function AttestationStockDashboardPage() {
+  const canConfigure = useAuthStore(state => state.user?.permissions.includes("attestation-stock:configure") ?? false);
   const queryClient = useQueryClient();
   const [urlParams, setUrlParams] = useSearchParams();
   const appliedSearch = useMemo(() => attestationStockFiltersFromSearchParams(urlParams), [urlParams]);
@@ -240,7 +242,7 @@ function AttestationStockDashboardPage() {
             Paramètres stock
           </CardTitle>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <AttestationThresholdsDialog
+            {canConfigure && <AttestationThresholdsDialog
               form={seuilForm}
               compagnies={compagnies.data ?? []}
               groupes={groupes.data ?? []}
@@ -248,7 +250,7 @@ function AttestationStockDashboardPage() {
               pending={saveSeuil.isPending}
               onFormChange={setSeuilForm}
               onSubmit={submitSeuil}
-            />
+            />}
             <div className="flex items-center gap-3 rounded-md border px-3 py-2">
               <div className="text-right">
                 <div className="text-sm font-medium">Contrôle à la saisie</div>
@@ -256,7 +258,7 @@ function AttestationStockDashboardPage() {
               </div>
               <Switch
                 checked={Boolean(dashboard.data?.controleStockActif)}
-                disabled={updateSettings.isPending || dashboard.isLoading}
+                disabled={!canConfigure || updateSettings.isPending || dashboard.isLoading}
                 onCheckedChange={setPendingStockControl}
               />
             </div>
@@ -334,6 +336,9 @@ function AttestationStockDashboardPage() {
 }
 
 function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
+  const permissions = useAuthStore(state => state.user?.permissions ?? []);
+  const canCreate = permissions.includes("attestation-stock:create") && (source === "COMMANDE"
+    || ["attestation-stock:receive", "attestation-stock:validate"].every(code => permissions.includes(code)));
   const queryClient = useQueryClient();
   const [urlParams, setUrlParams] = useSearchParams();
   const [createForm, setCreateForm] = useState(emptyCreateForm);
@@ -593,10 +598,10 @@ function AttestationWorkflowPage({ source }: { source: LivraisonSource }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={() => setCreateOpen(true)}>
+          {canCreate && <Button type="button" onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             {source === "COMMANDE" ? "Nouvelle commande" : "Nouvelle réception"}
-          </Button>
+          </Button>}
           <Button asChild variant="outline">
             <Link to="/app/production/attestations-stock">
               <Boxes className="size-4" />

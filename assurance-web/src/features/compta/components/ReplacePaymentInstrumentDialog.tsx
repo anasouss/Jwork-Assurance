@@ -46,7 +46,7 @@ export function ReplacePaymentInstrumentDialog({ instrument, onClose, onReplaced
   const [reason, setReason] = useState("");
   const needsAccount = rows.some((row) => requiresBankAccountAtEntry(row.mode));
   const needsBank = rows.some((row) => showsOriginatingBank(row.mode));
-  const accounts = useQuery({ queryKey: ["compta", "treasury-accounts"], queryFn: comptaApi.treasuryAccounts, enabled: needsAccount });
+  const accounts = useQuery({ queryKey: ["compta", "treasury-account-options"], queryFn: comptaApi.treasuryAccountOptions, enabled: needsAccount });
   const banks = useQuery({ queryKey: ["compta", "banks", "active"], queryFn: () => comptaApi.banks(), enabled: needsBank });
   const bankAccounts = (accounts.data ?? []).filter((account) => account.actif && account.typeCompte === "BANQUE");
   const earliestDate = instrument.statut === "REJETE" ? instrument.dateRejet || instrument.dateStatut : undefined;

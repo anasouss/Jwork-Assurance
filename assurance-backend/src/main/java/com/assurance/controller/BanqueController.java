@@ -28,7 +28,7 @@ public class BanqueController {
     private final BanqueService banqueService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_reglement-client:view', 'PERM_reglement-client:create', 'PERM_reglement-client:manage', 'PERM_tresorerie:view', 'PERM_tresorerie:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_banque:view', 'PERM_reglement-client:view', 'PERM_compte-tresorerie:view', 'PERM_bordereau-remise:view', 'PERM_reglement-compagnie:view')")
     public ResponseEntity<ApiResponse<List<BanqueResponse>>> list(
             @RequestParam(defaultValue = "false") boolean inclureInactives
     ) {
@@ -39,7 +39,7 @@ public class BanqueController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_banque:create')")
     public ResponseEntity<ApiResponse<BanqueResponse>> create(
             @Valid @RequestBody UpsertBanqueRequest request
     ) {
@@ -50,7 +50,7 @@ public class BanqueController {
     }
 
     @PutMapping("/{bankId}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_banque:update')")
     public ResponseEntity<ApiResponse<BanqueResponse>> update(
             @PathVariable Long bankId,
             @Valid @RequestBody UpsertBanqueRequest request

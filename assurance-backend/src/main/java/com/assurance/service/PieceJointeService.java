@@ -133,6 +133,9 @@ public class PieceJointeService {
             throw new ResourceNotFoundException("TypePieceJointe", id);
         }
         var before = id == null ? null : DocumentActivity.type(type);
+        if (id != null && Boolean.TRUE.equals(type.getActif()) != (request.getActif() == null || request.getActif())) {
+            com.assurance.security.BusinessPermission.require("type-piece-jointe:deactivate");
+        }
         BrancheAssurance branche = request.getBrancheAssuranceId() == null
                 ? null
                 : brancheAssuranceRepository.findById(request.getBrancheAssuranceId())
@@ -171,6 +174,11 @@ public class PieceJointeService {
 
     @Transactional
     public void deactivateType(Long agenceId, Long id) {
+        setTypeActive(agenceId, id, false);
+    }
+
+    @Transactional
+    public void setTypeActive(Long agenceId, Long id, boolean actif) {
         TypePieceJointe type = typePieceJointeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TypePieceJointe", id));
         if (type.getAgence() == null) {
@@ -180,10 +188,10 @@ public class PieceJointeService {
             throw new ResourceNotFoundException("TypePieceJointe", id);
         }
         var before = DocumentActivity.type(type);
-        type.setActif(false);
+        type.setActif(actif);
         typePieceJointeRepository.save(type);
         businessActivityRecorder.record(new ActivityCommand(agenceId, ActivityModule.REFERENTIELS, ActivityAction.UPDATED,
-                "Type de document désactivé", "DOCUMENT_TYPE_DEACTIVATION",
+                actif ? "Type de document réactivé" : "Type de document désactivé", "DOCUMENT_TYPE_STATUS",
                 ActivityReference.of(ActivityRecordType.TYPE_DOCUMENT, type.getId(), type.getLibelle()), List.of(),
                 ActivityValues.changes(before, DocumentActivity.type(type))));
     }

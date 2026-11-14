@@ -21,7 +21,7 @@ export function usePayerSearch(type?: PayerType, selected?: PayerSelection) {
 
   const clients = useQuery({
     queryKey: ["compta", "payer-search", "clients", deferredQuery],
-    queryFn: () => clientApi.listClients({
+    queryFn: () => clientApi.clientOptions({
       query: deferredQuery || undefined,
       page: 0,
       size: 30,
@@ -31,7 +31,7 @@ export function usePayerSearch(type?: PayerType, selected?: PayerSelection) {
   });
   const groups = useQuery({
     queryKey: ["compta", "payer-search", "groups"],
-    queryFn: clientApi.listGroupesClients,
+    queryFn: clientApi.groupOptions,
     enabled: type === "GROUPE",
     staleTime: 60_000,
   });
@@ -57,7 +57,6 @@ export function usePayerSearch(type?: PayerType, selected?: PayerSelection) {
         keywords: [
           group.clientTeteNom,
           group.clientTresorerieNom,
-          ...group.membres.map((member) => member.clientNom),
         ].filter(Boolean).join(" "),
       }));
 
@@ -97,7 +96,7 @@ export function usePayerSearch(type?: PayerType, selected?: PayerSelection) {
       name: group.libelle,
       identifier: group.code,
       treasuryName: group.clientTresorerieNom || undefined,
-      memberCount: group.membres.length,
+      memberCount: group.nombreMembres,
     };
   }
 

@@ -37,7 +37,7 @@ public class ReleveBancaireController {
             value = "/previsualisation",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:import')")
     public ResponseEntity<ApiResponse<ImportReleveBancaireResponse>> preview(
             @RequestPart("file") MultipartFile file,
             @Valid @RequestPart("configuration") ConfigurationImportReleveBancaireRequest configuration
@@ -49,7 +49,7 @@ public class ReleveBancaireController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:import')")
     public ResponseEntity<ApiResponse<ImportReleveBancaireResponse>> confirmImport(
             @RequestParam Long compteId,
             @RequestParam(required = false) Long profilId,
@@ -66,7 +66,7 @@ public class ReleveBancaireController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:view')")
     public ResponseEntity<ApiResponse<PagedResponse<ImportReleveBancaireResponse>>> list(
             @RequestParam Long compteId,
             @RequestParam(defaultValue = "0") int page,
@@ -81,7 +81,7 @@ public class ReleveBancaireController {
     }
 
     @GetMapping("/profils")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:view')")
     public ResponseEntity<ApiResponse<List<ProfilImportReleveBancaireResponse>>> profiles(
             @RequestParam Long compteId
     ) {
@@ -92,7 +92,7 @@ public class ReleveBancaireController {
     }
 
     @GetMapping("/{importId}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:view')")
     public ResponseEntity<ApiResponse<ImportReleveBancaireResponse>> detail(
             @PathVariable Long importId
     ) {
@@ -103,7 +103,7 @@ public class ReleveBancaireController {
     }
 
     @PutMapping("/{importId}/rapprochements")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:update')")
     public ResponseEntity<ApiResponse<ImportReleveBancaireResponse>> saveReconciliations(
             @PathVariable Long importId,
             @Valid @RequestBody EnregistrerRapprochementsBancairesRequest request
@@ -116,7 +116,7 @@ public class ReleveBancaireController {
     }
 
     @PostMapping("/{importId}/validation")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:validate')")
     public ResponseEntity<ApiResponse<ImportReleveBancaireResponse>> validate(
             @PathVariable Long importId
     ) {

@@ -48,8 +48,10 @@ export default function ImpayesClientsPage() {
   const [params, setParams] = useSearchParams();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("reglement-client:manage");
-  const canReject = permissions.includes("tresorerie:manage");
+  const canFollowUp = permissions.includes("instrument-reglement:followup");
+  const canRepresent = permissions.includes("instrument-reglement:represent");
+  const canReplace = permissions.includes("instrument-reglement:replace");
+  const canReject = permissions.includes("instrument-reglement:reject");
   const canViewClient = permissions.includes("client:view");
   const mode = parseMode(params.get("mode"));
   const appliedSearch = params.get("search")?.trim() ?? "";
@@ -83,14 +85,14 @@ export default function ImpayesClientsPage() {
   }, [params, setParams]);
 
   const requestedClient = useQuery({
-    queryKey: ["crm-client", payerId], queryFn: () => clientApi.getClientCrm(payerId),
+    queryKey: ["payer-client-option", payerId], queryFn: () => clientApi.clientOption(payerId),
     enabled: Boolean(payerId) && payerType === "CLIENT",
   });
   useEffect(() => {
     if (!payerId) { setSelectedPayer(undefined); return; }
     if (selectedPayer?.id === payerId && selectedPayer.type === payerType) return;
-    if (payerType === "CLIENT" && requestedClient.data?.client) {
-      const client = requestedClient.data.client;
+    if (payerType === "CLIENT" && requestedClient.data) {
+      const client = requestedClient.data;
       setSelectedPayer({ type: "CLIENT", id: client.id, name: client.nomAffichage || "Client", identifier: client.codeClient || "" });
     } else if (payerType === "GROUPE") {
       const group = payerSearch.groups.find((item) => item.id === payerId);
@@ -291,10 +293,10 @@ export default function ImpayesClientsPage() {
                       <DropdownMenuContent align="end" className="min-w-60">
                         {canViewClient && <DropdownMenuItem onSelect={() => setPayerTarget(instrument)}><UserRound className="size-4 text-emerald-600 dark:text-emerald-400" /> Fiche client</DropdownMenuItem>}
                         <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "history" })}><History className="size-4 text-blue-600 dark:text-blue-400" /> Voir le détail</DropdownMenuItem>
-                        {canManage && <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "movement" })}><Plus className="size-4 text-orange-600 dark:text-orange-400" /> Ajouter un mouvement</DropdownMenuItem>}
-                        {canManage && instrument.statut === "REJETE" && (instrument.representationPossible || instrument.remplacementPossible) && <DropdownMenuSeparator />}
-                        {canManage && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Nouvelle remise en banque</DropdownMenuItem>}
-                        {canManage && instrument.statut === "REJETE" && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => setReplacementTarget(instrument)}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Régler par contre-valeur</DropdownMenuItem>}
+                        {canFollowUp && <DropdownMenuItem onSelect={() => setFollowUpTarget({ instrument, mode: "movement" })}><Plus className="size-4 text-orange-600 dark:text-orange-400" /> Ajouter un mouvement</DropdownMenuItem>}
+                        {((canRepresent && instrument.representationPossible) || (canReplace && instrument.remplacementPossible)) && instrument.statut === "REJETE" && <DropdownMenuSeparator />}
+                        {canRepresent && instrument.representationPossible && <DropdownMenuItem onSelect={() => openRepresentation(instrument)}><RefreshCcw className="size-4 text-blue-600 dark:text-blue-400" /> Nouvelle remise en banque</DropdownMenuItem>}
+                        {canReplace && instrument.statut === "REJETE" && instrument.remplacementPossible && <DropdownMenuItem onSelect={() => setReplacementTarget(instrument)}><RotateCcw className="size-4 text-amber-600 dark:text-amber-400" /> Régler par contre-valeur</DropdownMenuItem>}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

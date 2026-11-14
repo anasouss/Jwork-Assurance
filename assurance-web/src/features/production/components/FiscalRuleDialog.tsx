@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useAuthStore } from "@/store/auth-store";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Field } from "./Field";
@@ -27,6 +28,7 @@ const NONE = "__none__";
 const categories: QuittanceCategory[] = ["AUTOMOBILE", "CORPOREL", "EVCAT"];
 
 export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }: Props) {
+  const canChangeStatus = useAuthStore(state => state.user?.permissions.includes("regle-fiscale:deactivate") ?? false);
   const [form, setForm] = useState<UpsertFiscalRule>(() => emptyRule());
   const branches = useReference("branches-assurance", open);
   const compagnies = useReference("compagnies-assurance", open);
@@ -148,7 +150,7 @@ export function FiscalRuleDialog({ open, rule, pending, onOpenChange, onSubmit }
           </Field>
 
           <Toggle label="Applicable" checked={form.applicable} onChange={(applicable) => setForm({ ...form, applicable })} />
-          <Toggle label="Active" checked={form.actif} onChange={(actif) => setForm({ ...form, actif })} />
+          <Toggle disabled={Boolean(rule) && !canChangeStatus} label="Active" checked={form.actif} onChange={(actif) => setForm({ ...form, actif })} />
           <Field label="Référence réglementaire">
             <Input value={form.referenceReglementaire ?? ""} onChange={(event) => setForm({ ...form, referenceReglementaire: event.target.value || null })} />
           </Field>
@@ -261,8 +263,8 @@ function referenceLabel(item: { code?: string | null; libelle: string }) {
   return item.code ? `${item.code} - ${item.libelle}` : item.libelle;
 }
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
-  return <div className="flex h-9 items-center justify-between rounded-md border px-3"><span className="text-sm font-medium">{label}</span><Switch checked={checked} onCheckedChange={onChange} /></div>;
+function Toggle({ label, checked, onChange, disabled = false }: { label: string; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean }) {
+  return <div className="flex h-9 items-center justify-between rounded-md border px-3"><span className="text-sm font-medium">{label}</span><Switch disabled={disabled} checked={checked} onCheckedChange={onChange} /></div>;
 }
 
 function emptyRule(): UpsertFiscalRule {

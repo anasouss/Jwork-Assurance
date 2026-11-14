@@ -78,7 +78,8 @@ export function UsersPanel({
   canSelectAgency,
   currentAgencyId,
   currentAgencyName,
-  canManage,
+  rights,
+  grantablePermissionCodes,
   currentUserId,
   onChanged,
 }: {
@@ -89,7 +90,8 @@ export function UsersPanel({
   canSelectAgency: boolean;
   currentAgencyId?: string;
   currentAgencyName?: string;
-  canManage: boolean;
+  rights: { create: boolean; update: boolean; deactivate: boolean; resetPassword: boolean; revokeSession: boolean; assignRole: boolean };
+  grantablePermissionCodes: string[];
   currentUserId?: string;
   onChanged: () => void;
 }) {
@@ -115,9 +117,10 @@ export function UsersPanel({
 
   const rolesForAgency = useMemo(
     () => roles.filter(
-      (role) => String(role.agenceId) === String(form.agenceId),
+      (role) => String(role.agenceId) === String(form.agenceId)
+        && (role.id === editing?.roleId || role.permissionCodes.every(code => grantablePermissionCodes.includes(code))),
     ),
-    [form.agenceId, roles],
+    [form.agenceId, roles, editing?.roleId, grantablePermissionCodes],
   );
 
   const filtered = useMemo(() => {
@@ -132,7 +135,9 @@ export function UsersPanel({
   }, [search, users]);
 
   const save = useMutation({
-    mutationFn: () => editing ? adminApi.updateUser(editing.id, form) : adminApi.createUser(form),
+    mutationFn: () => editing
+      ? rights.update ? adminApi.updateUser(editing.id, form) : adminApi.assignUserRole(editing.id, form.roleId)
+      : adminApi.createUser(form),
     onSuccess: async () => {
       setDialogOpen(false);
       setEditing(null);
@@ -161,7 +166,7 @@ export function UsersPanel({
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-9" placeholder="Filtrer utilisateurs" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
-        <Button disabled={!canManage} onClick={() => { setEditing(null); setDialogOpen(true); }}>
+        <Button disabled={!rights.create || !rights.assignRole} onClick={() => { setEditing(null); setDialogOpen(true); }}>
           <Plus className="size-4" />
           Ajouter utilisateur
         </Button>
@@ -199,10 +204,10 @@ export function UsersPanel({
                     label={`Actions ${item.fullName}`}
                     actions={[
                       {
-                        label: "Modifier",
+                        label: rights.update ? "Modifier" : "Attribuer un rôle",
                         icon: Edit,
                         iconTone: "primary",
-                        disabled: !canManage,
+                        disabled: !rights.update && !rights.assignRole,
                         onSelect: () => { setEditing(item); setDialogOpen(true); },
                       },
                       {
@@ -214,14 +219,14 @@ export function UsersPanel({
                         label: "Changer le mot de passe",
                         icon: KeyRound,
                         iconTone: "warning",
-                        disabled: !canManage,
+                        disabled: !rights.resetPassword,
                         onSelect: () => setPasswordTarget(item),
                       },
                       {
                         label: "Désactiver",
                         icon: Trash2,
                         destructive: true,
-                        disabled: !canManage || item.id === currentUserId || !item.actif,
+                        disabled: !rights.deactivate || item.id === currentUserId || !item.actif,
                         onSelect: () => setDeactivateTarget(item),
                       },
                     ]}
@@ -250,15 +255,16 @@ export function UsersPanel({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            <LabeledInput label="Prénom" value={form.prenom} onChange={(value) => setForm({ ...form, prenom: value })} />
-            <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
-            <LabeledInput label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
-            <LabeledInput label="Téléphone" value={form.telephone ?? ""} onChange={(value) => setForm({ ...form, telephone: value })} />
-            <LabeledInput label={editing ? "Nouveau mot de passe" : "Mot de passe"} type="password" value={form.password ?? ""} onChange={(value) => setForm({ ...form, password: value })} />
+            <LabeledInput disabled={Boolean(editing) && !rights.update} label="Prénom" value={form.prenom} onChange={(value) => setForm({ ...form, prenom: value })} />
+            <LabeledInput disabled={Boolean(editing) && !rights.update} label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
+            <LabeledInput disabled={Boolean(editing) && !rights.update} label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
+            <LabeledInput disabled={Boolean(editing) && !rights.update} label="Téléphone" value={form.telephone ?? ""} onChange={(value) => setForm({ ...form, telephone: value })} />
+            {!editing || rights.update && rights.resetPassword ? <LabeledInput label={editing ? "Nouveau mot de passe" : "Mot de passe"} type="password" value={form.password ?? ""} onChange={(value) => setForm({ ...form, password: value })} /> : null}
             {canSelectAgency ? (
               <label className="grid gap-1.5 text-sm">
                 <span className="font-medium">Agence</span>
                 <Select
+                  disabled={!rights.assignRole || Boolean(editing) && !rights.update}
                   value={form.agenceId ?? ""}
                   onValueChange={(value) => setForm({
                     ...form,
@@ -275,19 +281,19 @@ export function UsersPanel({
             ) : null}
             <label className="grid gap-1.5 text-sm">
               <span className="font-medium">Rôle</span>
-              <Select value={form.roleId} onValueChange={(value) => setForm({ ...form, roleId: value })}>
+              <Select value={form.roleId} disabled={!rights.assignRole} onValueChange={(value) => setForm({ ...form, roleId: value })}>
                 <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                <SelectContent>{rolesForAgency.map((role) => <SelectItem key={role.id} value={role.id}>{role.nom}</SelectItem>)}</SelectContent>
+                <SelectContent>{editing?.roleId && !rolesForAgency.some(role => role.id === editing.roleId) ? <SelectItem value={editing.roleId}>{editing.roleNom ?? editing.roleCode}</SelectItem> : null}{rolesForAgency.map((role) => <SelectItem key={role.id} value={role.id}>{role.nom}</SelectItem>)}</SelectContent>
               </Select>
             </label>
             <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-              <Checkbox checked={form.actif} onCheckedChange={(checked) => setForm({ ...form, actif: Boolean(checked) })} />
+              <Checkbox disabled={Boolean(editing) && (!rights.update || !rights.deactivate)} checked={form.actif} onCheckedChange={(checked) => setForm({ ...form, actif: Boolean(checked) })} />
               Actif
             </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>Enregistrer</Button>
+            <Button onClick={() => save.mutate()} disabled={save.isPending || (editing ? !rights.update && !rights.assignRole : !rights.create || !rights.assignRole)}>Enregistrer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -295,7 +301,7 @@ export function UsersPanel({
       <ResetPasswordDialog user={passwordTarget} onOpenChange={(open) => !open && setPasswordTarget(null)} onChanged={onChanged} />
       <UserSessionsDialog
         user={sessionsTarget}
-        canRevoke={canManage}
+        canRevoke={rights.revokeSession}
         onOpenChange={(open) => !open && setSessionsTarget(null)}
       />
       <AlertDialog open={Boolean(deactivateTarget)} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
@@ -2743,7 +2749,7 @@ export function RolesPanel({
   loading,
   permissions,
   agencies,
-  canManage,
+  rights,
   roleId,
   onChanged,
 }: {
@@ -2751,7 +2757,7 @@ export function RolesPanel({
   loading: boolean;
   permissions: AdminPermission[];
   agencies: AdminAgency[];
-  canManage: boolean;
+  rights: { create: boolean; update: boolean; delete: boolean; assignPermissions: boolean };
   roleId?: string;
   onChanged: () => void;
 }) {
@@ -2759,6 +2765,9 @@ export function RolesPanel({
   const navigate = useNavigate();
   const editing = roleId && roleId !== "new" ? roles.find((role) => role.id === roleId) ?? null : null;
   const editorOpen = Boolean(roleId);
+  const canEdit = roleId === "new" ? rights.create : rights.update;
+  const canAssignPermissions = rights.assignPermissions
+    && (!editing || editing.permissionIds.every(id => permissions.find(permission => permission.id === id)?.assignable !== false));
   const [permissionModule, setPermissionModule] = useState("");
   const [form, setForm] = useState<UpsertAdminRoleRequest>(emptyRole(agencies[0]?.id));
   const groupedPermissions = useMemo(() => groupPermissions(permissions), [permissions]);
@@ -2768,7 +2777,7 @@ export function RolesPanel({
     const next = editing ? roleToForm(editing) : emptyRole(agencies[0]?.id);
     setForm({
       ...next,
-      permissionIds: includePermissionDependencies(next.permissionIds, permissions),
+      permissionIds: next.permissionIds,
     });
     setPermissionModule(groupedPermissions[0]?.[0] ?? "");
   }, [agencies, editing, editorOpen, groupedPermissions, permissions, roleId]);
@@ -2794,7 +2803,7 @@ export function RolesPanel({
     onError: showError,
   });
 
-  if (editorOpen && !canManage) {
+  if (roleId === "new" && !rights.create) {
     return <Navigate to="/app/admin/roles" replace />;
   }
 
@@ -2815,7 +2824,7 @@ export function RolesPanel({
     <div className="grid gap-4 rounded-lg border bg-card p-4">
       {!editorOpen ? <>
       <div className="flex justify-end">
-        <Button disabled={!canManage} onClick={() => navigate("/app/admin/roles/new")}>
+        <Button disabled={!rights.create} onClick={() => navigate("/app/admin/roles/new")}>
           <Plus className="size-4" />
           Ajouter rôle
         </Button>
@@ -2848,17 +2857,17 @@ export function RolesPanel({
                     label={`Actions ${role.nom}`}
                     actions={[
                       {
-                        label: "Modifier",
+                        label: rights.update ? "Modifier" : "Consulter",
                         icon: Edit,
                         iconTone: "primary",
-                        disabled: !canManage,
+                        disabled: false,
                         onSelect: () => navigate(`/app/admin/roles/${role.id}`),
                       },
                       {
                         label: "Supprimer",
                         icon: Trash2,
                         destructive: true,
-                        disabled: !canManage || role.systemRole,
+                        disabled: !rights.delete || role.systemRole,
                         onSelect: () => remove.mutate(role.id),
                       },
                     ]}
@@ -2879,18 +2888,18 @@ export function RolesPanel({
         <div className="grid gap-5">
           <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold">{editing ? "Modifier le rôle" : "Ajouter un rôle"}</h2>
+              <h2 className="text-lg font-semibold">{editing ? canEdit ? "Modifier le rôle" : "Consulter le rôle" : "Ajouter un rôle"}</h2>
               <p className="text-sm text-muted-foreground">Les permissions déterminent les modules visibles et les actions autorisées.</p>
             </div>
             <Button variant="outline" onClick={() => navigate("/app/admin/roles")}>Retour aux rôles</Button>
           </div>
           <div className="grid gap-5">
             <div className="grid gap-3 sm:grid-cols-2">
-              <LabeledInput label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
-              <LabeledInput label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
+              <LabeledInput disabled={!canEdit} label="Code" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
+              <LabeledInput disabled={!canEdit} label="Nom" value={form.nom} onChange={(value) => setForm({ ...form, nom: value })} />
               <label className="grid gap-1.5 text-sm">
                 <span className="font-medium">Agence</span>
-                <Select value={form.agenceId ?? ""} disabled={agencies.length <= 1} onValueChange={(value) => setForm({ ...form, agenceId: value })}>
+                <Select value={form.agenceId ?? ""} disabled={!canEdit || agencies.length <= 1} onValueChange={(value) => setForm({ ...form, agenceId: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {agencies.map((agence) => <SelectItem key={agence.id} value={agence.id}>{agence.nom}</SelectItem>)}
@@ -2899,7 +2908,7 @@ export function RolesPanel({
               </label>
               <label className="grid gap-1.5 text-sm sm:col-span-2">
                 <span className="font-medium">Description</span>
-                <Textarea value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+                <Textarea disabled={!canEdit} value={form.description ?? ""} onChange={(event) => setForm({ ...form, description: event.target.value })} />
               </label>
             </div>
 
@@ -2935,17 +2944,18 @@ export function RolesPanel({
                       </div>
                       <label className="flex items-center gap-2 text-sm font-medium">
                         <Checkbox
+                          disabled={!canAssignPermissions}
                           checked={allSelected ? true : selectedCount > 0 ? "indeterminate" : false}
                           onCheckedChange={(checked) => setForm((current) => ({
                             ...current,
                             permissionIds: checked === true
                               ? includePermissionDependencies(
-                                  [...current.permissionIds, ...modulePermissions.map((permission) => permission.id)],
+                                  [...current.permissionIds, ...modulePermissions.filter(permission => permission.assignable !== false).map((permission) => permission.id)],
                                   permissions,
                                 )
                               : removePermissionSelection(
                                   current.permissionIds,
-                                  modulePermissions.map((permission) => permission.id),
+                                  modulePermissions.filter(permission => permission.assignable !== false).map((permission) => permission.id),
                                   permissions,
                                 ),
                           }))}
@@ -2957,12 +2967,13 @@ export function RolesPanel({
                     <div className="divide-y rounded-md border">
                       {resources.map(([resource, items]) => (
                         <section key={resource} className="grid gap-2 p-3">
-                          <div className="text-xs font-semibold uppercase text-muted-foreground">{resourceLabel(resource)}</div>
+                          <div className="text-xs font-semibold uppercase text-muted-foreground">{items[0]?.resourceLabel ?? resourceLabel(resource)}</div>
                           <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
                             {items.map((permission) => (
                               <label key={permission.id} className="flex min-h-8 items-start gap-2 text-sm">
                                 <Checkbox
                                   className="mt-0.5"
+                                  disabled={!canAssignPermissions || permission.assignable === false}
                                   checked={form.permissionIds.includes(permission.id)}
                                   onCheckedChange={(checked) => setForm((current) => ({
                                     ...current,
@@ -2974,7 +2985,10 @@ export function RolesPanel({
                                     ),
                                   }))}
                                 />
-                                <span className="font-medium leading-5">{permission.nom}</span>
+                                <span className="grid gap-1">
+                                  <span className="font-medium leading-5">{permission.actionLabel ?? permission.nom}</span>
+                                  {permission.sensitive && permission.description && <span className="text-xs font-normal text-muted-foreground">{permission.description}</span>}
+                                </span>
                               </label>
                             ))}
                           </div>
@@ -2988,7 +3002,7 @@ export function RolesPanel({
           </div>
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button variant="outline" onClick={() => navigate("/app/admin/roles")}>Annuler</Button>
-            <Button onClick={() => save.mutate()} disabled={save.isPending}>Enregistrer</Button>
+            {canEdit && <Button onClick={() => save.mutate()} disabled={save.isPending}>Enregistrer</Button>}
           </div>
         </div>
       )}
@@ -3547,8 +3561,8 @@ function agencyToForm(agence: AdminAgency): UpsertAdminAgencyRequest {
 function groupPermissions(permissions: AdminPermission[]) {
   const groups = new Map<string, Map<string, AdminPermission[]>>();
   permissions.forEach((permission) => {
-    const module = permission.module || "Autres";
-    const resource = permission.code.split(":", 1)[0] || "autres";
+    const module = permission.module === "shared" ? "production" : permission.module || "administration";
+    const resource = permission.resource || permission.code.split(":", 1)[0] || "autres";
     const resources = groups.get(module) ?? new Map<string, AdminPermission[]>();
     resources.set(resource, [...(resources.get(resource) ?? []), permission]);
     groups.set(module, resources);
@@ -3558,7 +3572,8 @@ function groupPermissions(permissions: AdminPermission[]) {
     .map(([module, resources]) => [
       module,
       Array.from(resources.entries())
-        .sort(([left], [right]) => resourceLabel(left).localeCompare(resourceLabel(right)))
+        .sort(([left, leftItems], [right, rightItems]) => (leftItems[0]?.resourceLabel ?? resourceLabel(left))
+          .localeCompare(rightItems[0]?.resourceLabel ?? resourceLabel(right), "fr"))
         .map(([resource, items]) => [
           resource,
           [...items].sort((left, right) => permissionActionOrder(left.code) - permissionActionOrder(right.code)),
@@ -3628,13 +3643,13 @@ function removePermissionSelection(
 
 function permissionActionOrder(code: string) {
   const action = code.split(":")[1] ?? "";
-  const order = ["view", "create", "update", "manage", "draft", "rectify", "renew", "validate", "transmit", "reconcile", "cancel", "delete"];
+  const order = ["view", "create", "update", "update-draft", "upload", "issue", "renew", "receive", "validate", "confirm", "deposit", "transmit", "reconcile", "import", "export", "transfer", "open", "close", "rectify", "revise", "reject", "replace", "represent", "followup", "assign", "end-membership", "refund", "adjust", "cancel", "deactivate", "delete-draft", "delete", "configure", "configure-access", "assign-role", "assign-permissions", "reset-password", "revoke-session", "recalculate-financial-history"];
   const index = order.indexOf(action);
   return index === -1 ? order.length : index;
 }
 
 function moduleOrder(module: string) {
-  const order = ["production", "companies", "crm", "sinistre", "compta", "administration", "shared"];
+  const order = ["production", "sinistre", "companies", "crm", "compta", "administration"];
   const index = order.indexOf(module);
   return index === -1 ? order.length : index;
 }
@@ -3644,8 +3659,8 @@ function moduleLabel(module: string) {
     production: "Production",
     companies: "Compagnies",
     crm: "CRM",
-    sinistre: "Sinistres",
-    compta: "Comptabilité",
+    sinistre: "Sinistre",
+    compta: "Compta",
     administration: "Administration",
     shared: "Référentiels partagés",
   } as Record<string, string>)[module] ?? module;

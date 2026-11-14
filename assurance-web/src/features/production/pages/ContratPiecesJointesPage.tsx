@@ -37,8 +37,11 @@ export default function ContratPiecesJointesPage() {
   const [assignment, setAssignment] = useState<PieceJointe>();
   const [assignmentOwner, setAssignmentOwner] = useState("");
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
-  const canManage = permissions.includes("piece-jointe:manage") || permissions.includes("contrat:update");
-  const canManageClient = permissions.includes("client:manage") || permissions.includes("client:create");
+  const canUpload = permissions.includes("piece-jointe:upload");
+  const canDelete = permissions.includes("piece-jointe:delete");
+  const canUploadClient = permissions.includes("document-crm:upload");
+  const canDeleteClient = permissions.includes("document-crm:delete");
+  const canReadClient = permissions.includes("document-crm:view");
 
   const piecesQuery = useQuery({
     queryKey: ["contrat-pieces-jointes", contratId, mouvementId],
@@ -178,7 +181,7 @@ export default function ContratPiecesJointesPage() {
           const type = data.types.find(item => item.id === piece.typePieceJointeId);
           return <div key={piece.id} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
             <div><strong>{piece.typePieceJointeLibelle}</strong><p className="text-muted-foreground">{piece.ownerName} · {piece.nomFichier}</p></div>
-            {canManage && type && <Button type="button" size="sm" variant="outline" disabled={reuseMutation.isPending}
+            {canUpload && canReadClient && type && <Button type="button" size="sm" variant="outline" disabled={reuseMutation.isPending}
               onClick={() => reuseMutation.mutate({ pieceId: piece.id, typeId: type.id })}>Utiliser ce document</Button>}
           </div>;
         })}
@@ -190,7 +193,7 @@ export default function ContratPiecesJointesPage() {
             <CardTitle className="text-sm">Documents enregistrés</CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">Pièces liées à ce mouvement.</p>
           </div>
-          <Button type="button" size="sm" disabled={!canManage} onClick={() => setUploadOpen(true)}>
+          <Button type="button" size="sm" disabled={!canUpload} onClick={() => setUploadOpen(true)}>
             <Plus className="size-4" />
             Ajouter un document
           </Button>
@@ -234,14 +237,14 @@ export default function ContratPiecesJointesPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-right text-muted-foreground">{formatAttachmentSize(piece.tailleOctets) || "-"}</td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
-                          {canManage && !piece.clientId && !piece.vehiculeId && !piece.archived && (piece.expectedOwner === "CLIENT" || piece.expectedOwner === "VEHICULE") &&
+                          {canUpload && !piece.clientId && !piece.vehiculeId && !piece.archived && (piece.expectedOwner === "CLIENT" || piece.expectedOwner === "VEHICULE") &&
                             <Button type="button" variant="ghost" size="icon" className="size-8" title="Identifier le titulaire" onClick={() => { setAssignmentOwner(""); setAssignment(piece); }}><Link2 className="size-4" /></Button>}
                           <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => download(piece)} title="Télécharger">
                             <Download className="size-4" />
                           </Button>
-                          {canManage && !piece.archived && (!piece.clientId || canManageClient) && <Button type="button" variant="ghost" size="icon" className="size-8" title="Remplacer"
+                          {canUpload && !piece.archived && (!piece.clientId || canUploadClient) && <Button type="button" variant="ghost" size="icon" className="size-8" title="Remplacer"
                             onClick={() => { setReplacement(piece); setOwnerId(piece.clientId ?? piece.vehiculeId ?? ""); setSelectedTypeId(piece.typePieceJointeId ?? ""); setUploadOpen(true); }}><RefreshCw className="size-4" /></Button>}
-                          {canManage && (piece.canUnlink || (!piece.archived && (!piece.clientId || canManageClient))) && <Button
+                          {canDelete && (piece.canUnlink || (!piece.archived && (!piece.clientId || canDeleteClient))) && <Button
                             type="button"
                             variant="ghost"
                             size="icon"

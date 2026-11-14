@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Ambulance, Building2, Handshake, Package, TableProperties, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { canAccessPath } from "@/lib/authorization";
 
 type CompanyAction = {
   title: string;
@@ -19,50 +20,43 @@ export default function CompaniesDashboardPage() {
 
   const actions: CompanyAction[] = [
     {
-      title: "Liste des compagnies",
-      description: "Assureurs, ordre d'affichage, RC, ICE et préfixes.",
-      icon: Building2,
-      href: "/app/companies/liste",
-      permission: "referentiel:view",
-      primary: true,
-    },
+  title: "Liste des compagnies",
+  description: "Assureurs, ordre d'affichage, RC, ICE et préfixes.",
+  icon: Building2,
+  href: "/app/companies/liste",
+  primary: true
+},
     {
-      title: "Conventions",
-      description: "Produits conventionnés par compagnie.",
-      icon: Handshake,
-      href: "/app/companies/conventions",
-      permission: "referentiel:view",
-    },
+  title: "Conventions",
+  description: "Produits conventionnés par compagnie.",
+  icon: Handshake,
+  href: "/app/companies/conventions"
+},
     {
-      title: "Grilles tarifaires",
-      description: "Catalogue des grilles et configurations par usage.",
-      icon: TableProperties,
-      href: "/app/companies/grilles-tarifaires",
-      permissions: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"],
-    },
+  title: "Grilles tarifaires",
+  description: "Catalogue des grilles et configurations par usage.",
+  icon: TableProperties,
+  href: "/app/companies/grilles-tarifaires"
+},
     {
-      title: "Assistance",
-      description: "Compagnies assistance.",
-      icon: Ambulance,
-      href: "/app/companies/assistance",
-      permission: "referentiel:view",
-    },
+  title: "Assistance",
+  description: "Compagnies assistance.",
+  icon: Ambulance,
+  href: "/app/companies/assistance"
+},
     {
-      title: "Produits assistance",
-      description: "Produits, usages et tarifs assistance.",
-      icon: Package,
-      href: "/app/companies/assistance/produits",
-      permission: "referentiel:view",
-    },
+  title: "Produits assistance",
+  description: "Produits, usages et tarifs assistance.",
+  icon: Package,
+  href: "/app/companies/assistance/produits"
+},
     {
-      title: "Contacts",
-      description: "Interlocuteurs compagnie.",
-      icon: Users,
-      href: "/app/companies/contacts",
-      permissions: ["contact-compagnie:view", "contact-compagnie:manage"],
-    },
-  ].filter((item) => item.permissions?.some((permission) => permissions.includes(permission))
-    ?? (!item.permission || permissions.includes(item.permission)));
+  title: "Contacts",
+  description: "Interlocuteurs compagnie.",
+  icon: Users,
+  href: "/app/companies/contacts"
+},
+  ].filter(item => canAccessPath(permissions, item.href));
 
   return (
     <div className="grid gap-6">

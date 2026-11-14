@@ -179,6 +179,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/usages")
+    @PreAuthorize("hasAuthority('PERM_usage:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createUsage(@Valid @RequestBody UpsertUsageRequest request) {
         return catalogueActivity.perform(() -> createUsageRecord(request));
@@ -197,6 +198,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/usages/{id}")
+    @PreAuthorize("hasAuthority('PERM_usage:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateUsage(
             @PathVariable Long id,
@@ -222,6 +224,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/usages/taux-extension-remorque")
+    @PreAuthorize("hasAuthority('PERM_usage:update')")
     @Transactional
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> updateUsageTauxExtensionRemorque(
             @Valid @RequestBody UpdateUsageTauxExtensionRemorqueRequest request
@@ -260,6 +263,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/marques")
+    @PreAuthorize("hasAuthority('PERM_marque:create')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createMarque(@Valid @RequestBody UpsertReferenceRequest request) {
         return catalogueActivity.perform(() -> createMarqueRecord(request));
     }
@@ -278,6 +282,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/marques/{id}")
+    @PreAuthorize("hasAuthority('PERM_marque:update')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateMarque(
             @PathVariable Long id,
             @Valid @RequestBody UpsertReferenceRequest request
@@ -310,6 +315,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/carrosseries")
+    @PreAuthorize("hasAuthority('PERM_carrosserie:create')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarrosserie(@Valid @RequestBody UpsertReferenceRequest request) {
         return catalogueActivity.perform(() -> createCarrosserieRecord(request));
     }
@@ -328,6 +334,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/carrosseries/{id}")
+    @PreAuthorize("hasAuthority('PERM_carrosserie:update')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarrosserie(
             @PathVariable Long id,
             @Valid @RequestBody UpsertReferenceRequest request
@@ -360,6 +367,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/carburants")
+    @PreAuthorize("hasAuthority('PERM_carburant:create')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCarburant(@Valid @RequestBody UpsertCodeReferenceRequest request) {
         return catalogueActivity.perform(() -> createCarburantRecord(request));
     }
@@ -379,6 +387,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/carburants/{id}")
+    @PreAuthorize("hasAuthority('PERM_carburant:update')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCarburant(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCodeReferenceRequest request
@@ -412,6 +421,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/sous-classes")
+    @PreAuthorize("hasAuthority('PERM_sous-classe:create')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createSousClasse(@Valid @RequestBody UpsertSousClasseRequest request) {
         return catalogueActivity.perform(() -> createSousClasseRecord(request));
     }
@@ -434,6 +444,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/sous-classes/{id}")
+    @PreAuthorize("hasAuthority('PERM_sous-classe:update')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateSousClasse(
             @PathVariable Long id,
             @Valid @RequestBody UpsertSousClasseRequest request
@@ -478,6 +489,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/compagnies-assurance")
+    @PreAuthorize("hasAuthority('PERM_compagnie-assurance:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssurance(
             @Valid @RequestBody UpsertCompagnieAssuranceRequest request
@@ -502,6 +514,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/compagnies-assurance/{id}")
+    @PreAuthorize("hasAuthority('PERM_compagnie-assurance:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssurance(
             @PathVariable Long id,
@@ -542,7 +555,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/compagnies-assistance")
-    @PreAuthorize("hasAuthority('PERM_referentiel:manage')")
+    @PreAuthorize("hasAuthority('PERM_compagnie-assistance:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCompagnieAssistance(
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
@@ -566,7 +579,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/compagnies-assistance/{id}")
-    @PreAuthorize("hasAuthority('PERM_referentiel:manage')")
+    @PreAuthorize("hasAuthority('PERM_compagnie-assistance:update')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCompagnieAssistance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCompagnieAssistanceRequest request
@@ -578,6 +591,9 @@ public class ReferentielController {
         CompagnieAssistance compagnie = compagnieAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("CompagnieAssistance", id));
         var before = CompanyCatalogueActivity.state(compagnie);
+        if (!java.util.Objects.equals(Boolean.TRUE.equals(compagnie.getActif()), request.getActif() == null || request.getActif())) {
+            com.assurance.security.BusinessPermission.require("compagnie-assistance:deactivate");
+        }
         applyCompagnieAssistanceRequest(compagnie, request);
         compagnie = compagnieAssistanceRepository.save(compagnie);
         String codeIntermediaire = saveAssistanceCodeIntermediaire(compagnie, request.getCodeIntermediaire());
@@ -590,6 +606,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/compagnies-assistance/{id}")
+    @PreAuthorize("hasAuthority('PERM_compagnie-assistance:deactivate')")
     public ResponseEntity<ApiResponse<Void>> deleteCompagnieAssistance(@PathVariable Long id) {
         return catalogueActivity.perform(() -> deleteCompagnieAssistanceRecord(id));
     }
@@ -628,6 +645,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/produits-assistance")
+    @PreAuthorize("hasAuthority('PERM_produit-assistance:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createProduitAssistance(
             @Valid @RequestBody UpsertProduitAssistanceRequest request
@@ -648,6 +666,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/produits-assistance/{id}")
+    @PreAuthorize("hasAuthority('PERM_produit-assistance:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateProduitAssistance(
             @PathVariable Long id,
@@ -660,6 +679,9 @@ public class ReferentielController {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("ProduitAssistance", id));
         var before = CompanyCatalogueActivity.state(produit);
+        if (!java.util.Objects.equals(Boolean.TRUE.equals(produit.getActif()), request.getActif() == null || request.getActif())) {
+            com.assurance.security.BusinessPermission.require("produit-assistance:deactivate");
+        }
         applyProduitAssistanceRequest(produit, request);
         produit = produitAssistanceRepository.save(produit);
         catalogueActivity.record(before, CompanyCatalogueActivity.state(produit), ActivityAction.UPDATED,
@@ -671,6 +693,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/produits-assistance/{id}")
+    @PreAuthorize("hasAuthority('PERM_produit-assistance:deactivate')")
     public ResponseEntity<ApiResponse<Void>> deleteProduitAssistance(@PathVariable Long id) {
         return catalogueActivity.perform(() -> deleteProduitAssistanceRecord(id));
     }
@@ -687,6 +710,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/produits-assistance/{id}/permanent")
+    @PreAuthorize("hasAuthority('PERM_produit-assistance:delete')")
     @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteProduitAssistancePermanently(@PathVariable Long id) {
         return catalogueActivity.perform(() -> deleteProduitAssistancePermanentlyRecord(id));
@@ -707,6 +731,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/produits-assistance/{id}/tarifs")
+    @PreAuthorize("hasAnyAuthority('PERM_tarif-assistance:view', 'PERM_produit-assistance:view')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> tarifsProduitAssistance(@PathVariable Long id) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
@@ -719,6 +744,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/produits-assistance/{id}/tarifs")
+    @PreAuthorize("hasAuthority('PERM_tarif-assistance:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createTarifProduitAssistance(
             @PathVariable Long id,
@@ -742,6 +768,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/produits-assistance/{produitId}/tarifs/{tarifId}")
+    @PreAuthorize("hasAuthority('PERM_tarif-assistance:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifProduitAssistance(
             @PathVariable Long produitId,
@@ -772,6 +799,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/produits-assistance/{produitId}/tarifs/{tarifId}")
+    @PreAuthorize("hasAuthority('PERM_tarif-assistance:delete')")
     @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteTarifProduitAssistance(
             @PathVariable Long produitId,
@@ -795,6 +823,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/produits-assistance/{id}/codes-promo")
+    @PreAuthorize("hasAnyAuthority('PERM_promo-assistance:view', 'PERM_produit-assistance:view')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> codesPromoAssistance(@PathVariable Long id) {
         ProduitAssistance produit = produitAssistanceRepository.findById(id)
@@ -807,6 +836,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/produits-assistance/{id}/codes-promo")
+    @PreAuthorize("hasAuthority('PERM_promo-assistance:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCodePromoAssistance(
             @PathVariable Long id,
@@ -830,6 +860,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/produits-assistance/{produitId}/codes-promo/{promoId}")
+    @PreAuthorize("hasAuthority('PERM_promo-assistance:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCodePromoAssistance(
             @PathVariable Long produitId,
@@ -860,6 +891,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/produits-assistance/{produitId}/codes-promo/{promoId}")
+    @PreAuthorize("hasAuthority('PERM_promo-assistance:delete')")
     @Transactional
     public ResponseEntity<ApiResponse<Void>> deleteCodePromoAssistance(
             @PathVariable Long produitId,
@@ -904,6 +936,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/grilles-tarifaires/catalogue")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:view')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<GrilleTarifaireCatalogueResponse>>> catalogueGrillesTarifaires(
             @RequestParam(required = false) String query,
@@ -941,6 +974,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/tarifs-usage")
+    @PreAuthorize("hasAuthority('PERM_tarif-usage:create')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createTarifUsage(@Valid @RequestBody UpsertTarifUsageRequest request) {
         return catalogueActivity.perform(() -> createTarifUsageRecord(request));
     }
@@ -955,6 +989,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/tarifs-usage/{id}")
+    @PreAuthorize("hasAuthority('PERM_tarif-usage:update')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateTarifUsage(
             @PathVariable Long id,
             @Valid @RequestBody UpsertTarifUsageRequest request
@@ -978,6 +1013,7 @@ public class ReferentielController {
     }
 
     @DeleteMapping("/tarifs-usage/{id}")
+    @PreAuthorize("hasAuthority('PERM_tarif-usage:delete')")
     public ResponseEntity<ApiResponse<Void>> deleteTarifUsage(@PathVariable Long id) {
         return catalogueActivity.perform(() -> deleteTarifUsageRecord(id));
     }
@@ -994,6 +1030,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/tarifs-usage/bulk-prime-nette")
+    @PreAuthorize("hasAuthority('PERM_tarif-usage:adjust')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> bulkUpdatePrimeNette(
             @Valid @RequestBody BulkUpdateTarifUsageRequest request
     ) {
@@ -1007,6 +1044,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/tarifs-usage/ajustements")
+    @PreAuthorize("hasAuthority('PERM_tarif-usage:view')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<PagedResponse<AjustementTarifUsageResponse>>> tarifUsageAdjustmentHistory(
             @RequestParam(defaultValue = "0") int page,
@@ -1030,6 +1068,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/conventions")
+    @PreAuthorize("hasAuthority('PERM_convention:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createConvention(@Valid @RequestBody UpsertConventionRequest request) {
         return catalogueActivity.perform(() -> createConventionRecord(request));
@@ -1045,6 +1084,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/conventions/{id}")
+    @PreAuthorize("hasAuthority('PERM_convention:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateConvention(
             @PathVariable Long id,
@@ -1066,6 +1106,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/grilles-tarifaires")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:create')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createGrilleTarifaire(
             @Valid @RequestBody UpsertGrilleTarifaireRequest request
     ) {
@@ -1087,6 +1128,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/grilles-tarifaires/{id}")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:update')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateGrilleTarifaire(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGrilleTarifaireRequest request
@@ -1122,6 +1164,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/garanties/parametrage")
+    @PreAuthorize("hasAnyAuthority('PERM_garantie:view', 'PERM_regle-fiscale:view', 'PERM_grille-tarifaire:view', 'PERM_specialite-prestataire:view')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> garantiesParametrage() {
         return ResponseEntity.ok(ApiResponse.success(garantieRepository.findAll(Sort.by("ordreAffichage", "code")).stream()
@@ -1138,6 +1181,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/groupes-exclusion-garanties/parametrage")
+    @PreAuthorize("hasAuthority('PERM_garantie:view')")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesExclusionGarantiesParametrage() {
         return ResponseEntity.ok(ApiResponse.success(groupeExclusionGarantieRepository.findAll(Sort.by("typeGarantie", "code")).stream()
                 .map(this::toGroupeExclusionGarantieResponse)
@@ -1145,6 +1189,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/groupes-exclusion-garanties")
+    @PreAuthorize("hasAuthority('PERM_garantie:create')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeExclusionGarantie(@Valid @RequestBody UpsertGroupeExclusionGarantieRequest request) {
         return catalogueActivity.perform(() -> createGroupeExclusionGarantieRecord(request));
     }
@@ -1162,6 +1207,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/groupes-exclusion-garanties/{id}")
+    @PreAuthorize("hasAuthority('PERM_garantie:update')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeExclusionGarantie(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGroupeExclusionGarantieRequest request
@@ -1186,6 +1232,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/garanties")
+    @PreAuthorize("hasAuthority('PERM_garantie:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGarantie(@Valid @RequestBody UpsertGarantieRequest request) {
         return catalogueActivity.perform(() -> createGarantieRecord(request));
@@ -1206,6 +1253,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/garanties/{id}")
+    @PreAuthorize("hasAuthority('PERM_garantie:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateGarantie(
             @PathVariable Long id,
@@ -1271,6 +1319,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/grilles-tarifaires/{grilleId}/lignes")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:create')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createLigneGrilleTarifaire(
             @PathVariable Long grilleId,
             @Valid @RequestBody UpsertLigneGrilleTarifaireRequest request
@@ -1289,6 +1338,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/lignes-grille-tarifaire/{id}")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:update')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateLigneGrilleTarifaire(
             @PathVariable Long id,
             @Valid @RequestBody UpsertLigneGrilleTarifaireRequest request
@@ -1307,6 +1357,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/grilles-tarifaires/{grilleId}/usages/{usageId}/configuration")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> replaceGrilleUsageConfiguration(
             @PathVariable Long grilleId,
@@ -1390,6 +1441,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/grilles-tarifaires/{grilleId}/formules-personne")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:create')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createFormuleGarantiePersonne(
             @PathVariable Long grilleId,
             @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
@@ -1408,6 +1460,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/formules-garantie-personne/{id}")
+    @PreAuthorize("hasAuthority('PERM_grille-tarifaire:update')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateFormuleGarantiePersonne(
             @PathVariable Long id,
             @Valid @RequestBody UpsertFormuleGarantiePersonneRequest request
@@ -1455,6 +1508,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/categories-client")
+    @PreAuthorize("hasAuthority('PERM_categorie-client:create')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createCategorieClient(
             @Valid @RequestBody UpsertCategorieClientRequest request
     ) {
@@ -1474,6 +1528,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/categories-client/{id}")
+    @PreAuthorize("hasAuthority('PERM_categorie-client:update')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateCategorieClient(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCategorieClientRequest request
@@ -1507,6 +1562,7 @@ public class ReferentielController {
     }
 
     @GetMapping("/groupes-usage-attestation/parametrage")
+    @PreAuthorize("hasAuthority('PERM_groupe-usage-attestation:view')")
     @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> groupesUsageAttestationParametrage() {
         return ResponseEntity.ok(ApiResponse.success(groupeUsageAttestationRepository.findAll(Sort.by("code")).stream()
@@ -1515,6 +1571,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/groupes-usage-attestation")
+    @PreAuthorize("hasAuthority('PERM_groupe-usage-attestation:create')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> createGroupeUsageAttestation(@Valid @RequestBody UpsertGroupeUsageAttestationRequest request) {
         return catalogueActivity.perform(() -> createGroupeUsageAttestationRecord(request));
@@ -1536,6 +1593,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/groupes-usage-attestation/{id}")
+    @PreAuthorize("hasAuthority('PERM_groupe-usage-attestation:update')")
     @Transactional
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateGroupeUsageAttestation(
             @PathVariable Long id,
@@ -1572,6 +1630,7 @@ public class ReferentielController {
     }
 
     @PostMapping("/categories-transport")
+    @PreAuthorize("hasAuthority('PERM_categorie-transport:create')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> createCategorieTransport(
             @Valid @RequestBody UpsertCategorieTransportRequest request
     ) {
@@ -1594,6 +1653,7 @@ public class ReferentielController {
     }
 
     @PutMapping("/categories-transport/{id}")
+    @PreAuthorize("hasAuthority('PERM_categorie-transport:update')")
     public ResponseEntity<ApiResponse<ReferenceOptionResponse>> updateCategorieTransport(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCategorieTransportRequest request

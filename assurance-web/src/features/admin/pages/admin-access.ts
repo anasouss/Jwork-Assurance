@@ -10,14 +10,26 @@ export type AdminSection = {
 export function useAdminAccess() {
   const user = useAuthStore((state) => state.user);
   const permissions = user?.permissions ?? [];
-  const canViewUsers = hasAny(permissions, "user:view", "user:manage", "config:view", "config:manage");
-  const canViewRoles = hasAny(permissions, "role:view", "role:manage", "config:view", "config:manage");
+  const canViewUsers = hasAny(permissions, "user:view", "config:view", "config:manage");
+  const canViewRoles = hasAny(permissions, "role:view", "config:view", "config:manage");
   const canViewAudit = permissions.includes("audit:view");
-  const canViewActivity = permissions.includes("activity:view")
-    && (user?.roleCode === "AGENCY_ADMIN" || user?.roleCode === "SUPER_ADMIN");
-  const canManageUsers = hasAny(permissions, "user:manage", "config:manage");
-  const canManageRoles = hasAny(permissions, "role:manage", "config:manage");
-  const canManagePlatformAgencies = hasAny(permissions, "agence:create", "config:manage");
+  const canViewActivity = permissions.includes("activity:view");
+  const capability = (code: string) => hasAny(permissions, code, "config:manage");
+  const userRights = {
+    create: capability("user:create"),
+    update: capability("user:update"),
+    deactivate: capability("user:deactivate"),
+    resetPassword: capability("user:reset-password"),
+    revokeSession: capability("user:revoke-session"),
+    assignRole: capability("user:assign-role"),
+  };
+  const roleRights = {
+    create: capability("role:create"),
+    update: capability("role:update"),
+    delete: capability("role:delete"),
+    assignPermissions: capability("role:assign-permissions"),
+  };
+  const canManagePlatformAgencies = hasAny(permissions, "agence:update", "config:manage");
   const canManageOwnAgency = permissions.includes("agence:manage-self");
   const canViewAgencies = hasAny(permissions, "agence:view", "config:view");
   const canAccessAgencySettings = canViewAgencies || canManageOwnAgency || canManagePlatformAgencies;
@@ -43,8 +55,9 @@ export function useAdminAccess() {
     canViewRoles,
     canViewAudit,
     canViewActivity,
-    canManageUsers,
-    canManageRoles,
+    userRights,
+    roleRights,
+    canCreateAgencies: capability("agence:create"),
     canManagePlatformAgencies,
     canManageOwnAgency,
     canAccessAgencySettings,

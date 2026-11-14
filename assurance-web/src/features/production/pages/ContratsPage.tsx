@@ -527,13 +527,14 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
   const terminal = isTerminalContratRow(contrat, movement);
   const canUpdateContrat = permissions.includes("contrat:update");
   const canCreateContrat = permissions.includes("contrat:create");
-  const canCreateAvenant = permissions.includes("avenant:create") || canUpdateContrat;
-  const canRectifyAvenant = permissions.includes("avenant:rectify") || canUpdateContrat;
-  const canDeleteContrat = permissions.includes("contrat:delete") || canUpdateContrat;
-  const canDeleteAvenant = permissions.includes("avenant:delete") || canUpdateContrat;
-  const canRenewContrat = permissions.includes("contrat:renew") || canUpdateContrat;
-  const canManageAssistance = permissions.includes("assistance:manage") || canUpdateContrat;
-  const canManageCarteVerte = permissions.includes("carte-verte:manage") || canUpdateContrat;
+  const canCreateAvenant = permissions.includes("avenant:create");
+  const canRectifyAvenant = permissions.includes("avenant:rectify");
+  const canDeleteContrat = permissions.includes("contrat:delete");
+  const canDeleteAvenant = permissions.includes("avenant:delete");
+  const canRenewContrat = permissions.includes("contrat:renew");
+  const canManageAssistance = permissions.includes("assistance:update");
+  const canViewAssistance = permissions.includes("assistance:view");
+  const canViewCarteVerte = permissions.includes("carte-verte:view");
   const canViewContrat = permissions.includes("contrat:view");
   const canViewPieces = permissions.includes("piece-jointe:view") || permissions.includes("contrat:view");
   const isDraftContract = Boolean(contrat.brouillon)
@@ -583,12 +584,12 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
     && !isInitialContractMovement(movement)
     && String(movement.statut ?? "").trim().toUpperCase() === "VALIDE";
   const canDownload = canViewContrat && !isLinkedAutomobileAssistance && !isTerminalMovementCode(movement.code);
-  const canOpenAssistance = canManageAssistance
+  const canOpenAssistance = canViewAssistance
     && !isAssistanceRecord
     && !terminal
     && !movement.isSynthetic
     && movement.autoriseAssistance === true;
-  const canOpenCarteVerte = canManageCarteVerte
+  const canOpenCarteVerte = canViewCarteVerte
     && !isAssistanceRecord
     && !terminal
     && !movement.isSynthetic
@@ -680,7 +681,7 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          {canCreateAvenant && avenantDrafts.length ? (
+          {permissions.includes("avenant:update-draft") && avenantDrafts.length ? (
             <>
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
@@ -828,12 +829,13 @@ function RowActions({ contrat, movement, child }: { contrat: ContratListItem; mo
         }}
         draftDialog={{
           draft: selectedDraft,
+          canRestart: permissions.includes("avenant:delete-draft"),
           pending: restartDraftMutation.isPending,
           onOpenChange: (open) => {
             if (!open && !restartDraftMutation.isPending) setDraftChoiceCode(null);
           },
           onRestart: () => {
-            if (selectedDraft) restartDraftMutation.mutate(selectedDraft.codeTypeMouvement);
+            if (selectedDraft && permissions.includes("avenant:delete-draft")) restartDraftMutation.mutate(selectedDraft.codeTypeMouvement);
           },
           onContinue: () => {
             if (!selectedDraft) return;

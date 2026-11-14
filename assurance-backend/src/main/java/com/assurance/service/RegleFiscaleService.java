@@ -71,6 +71,9 @@ public class RegleFiscaleService {
     @Transactional
     public RegleFiscaleResponse update(Long id, UpsertRegleFiscaleRequest request) {
         RegleFiscale rule = get(id);
+        if (Boolean.TRUE.equals(rule.getActif()) != (request.getActif() == null || request.getActif())) {
+            com.assurance.security.BusinessPermission.require("regle-fiscale:deactivate");
+        }
         var before = FiscalRuleActivity.snapshot(rule);
         var previousReferences = FiscalRuleActivity.references(rule);
         if (applicationRepository.existsByRegleFiscaleId(id) && changesCalculation(rule, request)) {

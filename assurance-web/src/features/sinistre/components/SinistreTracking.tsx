@@ -15,7 +15,7 @@ import type { EtapeSuiviSinistre, SinistreDetail } from "../types";
 
 export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
   const queryClient = useQueryClient();
-  const canManage = useAuthStore((state) => state.user?.permissions.includes("sinistre:manage") ?? false);
+  const canTransition = useAuthStore((state) => state.user?.permissions.includes("sinistre:transition") ?? false);
   const [changeOpen, setChangeOpen] = useState(false);
   const [selected, setSelected] = useState<EtapeSuiviSinistre | null>(null);
   const [motif, setMotif] = useState("");
@@ -45,7 +45,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
       <h2 className="text-sm font-semibold">Suivi opérationnel</h2>
       <div className="flex flex-wrap items-center gap-3">
         {currentIndex >= 0 ? <p className="text-xs font-medium text-sky-700 dark:text-sky-300">Étape {currentIndex + 1}/{suiviSteps.length} · {suiviLabels[dossier.etapeSuivi]}</p> : null}
-        {canManage && destinations.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={() => {
+        {canTransition && destinations.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={() => {
           setSelected(null);
           setMotif("");
           setChangeOpen(true);
@@ -78,7 +78,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
       })}
     </ol>
     {dossier.etapeSuivi === "INSTANCE_CLIENT" && dossier.prochaineAction ? <p className="mt-3 border-t pt-3 text-sm text-muted-foreground">{dossier.prochaineAction}</p> : null}
-    <Dialog open={changeOpen && canManage} onOpenChange={(open) => { if (!change.isPending) setChangeOpen(open); }}>
+    <Dialog open={changeOpen && canTransition} onOpenChange={(open) => { if (!change.isPending) setChangeOpen(open); }}>
       <DialogContent className="sm:max-w-lg" showCloseButton={!change.isPending}>
         <DialogHeader>
           <DialogTitle>Changer l’étape de suivi</DialogTitle>
@@ -86,7 +86,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
         </DialogHeader>
         <form className="grid gap-4" onSubmit={(event) => {
           event.preventDefault();
-          if (canManage && selected && transition?.autorisee && !change.isPending
+          if (canTransition && selected && transition?.autorisee && !change.isPending
               && (!transition.motifObligatoire || motif.trim())) change.mutate();
         }}>
           <div className="grid gap-1.5">

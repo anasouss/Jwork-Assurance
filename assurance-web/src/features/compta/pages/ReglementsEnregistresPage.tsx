@@ -116,10 +116,11 @@ export default function ReglementsEnregistresPage() {
     ? "GROUPE"
     : "CLIENT";
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("reglement-client:manage");
-  const canCreate = permissions.includes("reglement-client:create") || canManage;
-  const canIssueInvoice = permissions.includes("quittance:create")
-    || permissions.includes("quittance:manage");
+  const canManage = permissions.includes("reglement-client:cancel");
+  const canViewPremiumReceipt = permissions.includes("quittance-prime:view");
+  const canIssuePremiumReceipt = permissions.includes("quittance-prime:issue");
+  const canCreate = permissions.includes("reglement-client:create");
+  const canIssueInvoice = permissions.includes("document-client:issue");
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<PaymentSortBy>("dateReglement");
@@ -162,8 +163,8 @@ export default function ReglementsEnregistresPage() {
   const [cancelReason, setCancelReason] = useState("");
   const payerSearch = usePayerSearch(payerScope, selectedPayer);
   const requestedClient = useQuery({
-    queryKey: ["crm-client", requestedPayerId],
-    queryFn: () => clientApi.getClientCrm(requestedPayerId),
+    queryKey: ["payer-client-option", requestedPayerId],
+    queryFn: () => clientApi.clientOption(requestedPayerId),
     enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
@@ -214,8 +215,8 @@ export default function ReglementsEnregistresPage() {
     if (!requestedPayerId) return;
     setPayerScope(requestedPayerType);
     if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
-    if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
-      const client = requestedClient.data.client;
+    if (requestedPayerType === "CLIENT" && requestedClient.data) {
+      const client = requestedClient.data;
       setSelectedPayer({
         type: "CLIENT",
         id: client.id,
@@ -234,7 +235,7 @@ export default function ReglementsEnregistresPage() {
         name: group.libelle,
         identifier: group.code,
         treasuryName: group.clientTresorerieNom || undefined,
-        memberCount: group.membres.length,
+        memberCount: group.nombreMembres,
       });
     }
   }, [
@@ -595,6 +596,7 @@ export default function ReglementsEnregistresPage() {
                         payment={payment}
                         canManage={canManage}
                         canIssueInvoice={canIssueInvoice}
+                        canViewPremiumReceipt={canViewPremiumReceipt}
                         pdfLoading={openingPaymentId === payment.id}
                         onDetail={() => setDetailPaymentId(payment.id)}
                         onPreview={() => void previewPayment(payment)}
@@ -641,7 +643,7 @@ export default function ReglementsEnregistresPage() {
         )}
       </section>
 
-      {paymentToReceipt && <PremiumReceiptDialog key={paymentToReceipt.id} payment={paymentToReceipt} canIssue={canCreate} onClose={() => setPaymentToReceipt(undefined)} />}
+      {paymentToReceipt && <PremiumReceiptDialog key={paymentToReceipt.id} payment={paymentToReceipt} canIssue={canIssuePremiumReceipt} onClose={() => setPaymentToReceipt(undefined)} />}
       {detailPaymentId && <ClientPaymentDetailsDialog key={detailPaymentId} paymentId={detailPaymentId} onClose={() => setDetailPaymentId(undefined)} />}
       {detailInstrument && <PaymentInstrumentDetailsDialog key={detailInstrument.instrumentId} {...detailInstrument} onClose={() => setDetailInstrument(undefined)} />}
 
@@ -732,6 +734,7 @@ function PaymentActionsMenu({
   payment,
   canManage,
   canIssueInvoice,
+  canViewPremiumReceipt,
   pdfLoading,
   onPreview,
   onPremiumReceipt,
@@ -742,6 +745,7 @@ function PaymentActionsMenu({
   payment: ClientPayment;
   canManage: boolean;
   canIssueInvoice: boolean;
+  canViewPremiumReceipt: boolean;
   pdfLoading: boolean;
   onPreview: () => void;
   onPremiumReceipt: () => void;
@@ -778,7 +782,7 @@ function PaymentActionsMenu({
           <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Fiche de règlement PDF"}
         </DropdownMenuItem>
-        {payment.statut === "VALIDE" && payment.sens !== "SORTIE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
+        {canViewPremiumReceipt && payment.statut === "VALIDE" && payment.sens !== "SORTIE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
           <FileText className="size-4" /> Quittance de prime PDF
         </DropdownMenuItem>}
         {canCreateInvoice && (

@@ -20,7 +20,7 @@ export function DashboardWorkQueue({ data, permissions }: { data: DashboardData;
       detail: "Aucune affectation compagnie enregistrée",
       icon: ReceiptText,
       href: "/app/compta/quittances?nature=SANS_QUITTANCE",
-      permissions: ["quittance:view"],
+      permissions: ["quittance-affectation:view"],
     },
     {
       label: "Créances sans document",
@@ -28,7 +28,7 @@ export function DashboardWorkQueue({ data, permissions }: { data: DashboardData;
       detail: "Solde restant, sans relevé ni facture émis",
       icon: FileClock,
       href: "/app/compta/releves-factures?tab=sources&sourceDocumentState=SANS_DOCUMENT",
-      permissions: ["quittance:view"],
+      permissions: ["document-client:view"],
     },
     {
       label: "Seuils de stock atteints",
@@ -36,7 +36,7 @@ export function DashboardWorkQueue({ data, permissions }: { data: DashboardData;
       detail: data.workload.controleStockActif ? "Seuils atteints par compagnie / usage" : "Contrôle à la saisie désactivé",
       icon: ShieldCheck,
       href: "/app/production/attestations-stock",
-      permissions: ["attestation-stock:view", "attestation-stock:manage"],
+      permissions: ["attestation-stock:view"],
     },
   ].filter((row) => row.permissions.some(permission => permissions.includes(permission)))
     .sort((left, right) => Number(right.value > 0) - Number(left.value > 0));

@@ -52,6 +52,7 @@ type ContractWorkflowDialogsProps = {
   };
   draftDialog: {
     draft?: AvenantDraftSummary;
+    canRestart: boolean;
     pending: boolean;
     onOpenChange: (open: boolean) => void;
     onRestart: () => void;
@@ -172,12 +173,12 @@ export function ContractWorkflowDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Un brouillon existe déjà</AlertDialogTitle>
             <AlertDialogDescription>
-              Un brouillon « {draftDialog.draft?.libelleTypeMouvement || draftDialog.draft?.codeTypeMouvement} » est déjà enregistré pour ce contrat. Vous pouvez continuer la saisie existante ou la supprimer et recommencer.
+              Un brouillon « {draftDialog.draft?.libelleTypeMouvement || draftDialog.draft?.codeTypeMouvement} » est déjà enregistré pour ce contrat.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={draftDialog.pending}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
+            {draftDialog.canRestart && <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={draftDialog.pending || !draftDialog.draft}
               onClick={(event) => {
@@ -186,7 +187,7 @@ export function ContractWorkflowDialogs({
               }}
             >
               {draftDialog.pending ? "Suppression..." : "Supprimer et recommencer"}
-            </AlertDialogAction>
+            </AlertDialogAction>}
             <AlertDialogAction
               disabled={draftDialog.pending || !draftDialog.draft}
               onClick={(event) => {

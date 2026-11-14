@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -52,7 +53,7 @@ import { formatTreasuryMoney } from "./treasury-format";
 export default function TresorerieComptesPage() {
   const navigate = useNavigate();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
+  const canManage = ["compte-tresorerie:create", "compte-tresorerie:update", "compte-tresorerie:configure-access"].some(code => permissions.includes(code));
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<TreasuryAccount>();
@@ -216,10 +217,10 @@ export default function TresorerieComptesPage() {
             Comptes de trésorerie et soldes comptables de l’agence.
           </p>
         </div>
-        <Button disabled={!canManage} onClick={openNewAccount}>
+        <PermissionButton permission="compte-tresorerie:create" disabled={!canManage} onClick={openNewAccount}>
           <Plus className="size-4" />
           Ajouter un compte
-        </Button>
+        </PermissionButton>
       </header>
 
       <div className="grid gap-5">
@@ -424,7 +425,7 @@ export default function TresorerieComptesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Annuler</Button>
-            <Button
+            <PermissionButton permission={editingAccount ? "compte-tresorerie:update" : "compte-tresorerie:create"}
               disabled={
                 !accountCode.trim()
                 || !accountLabel.trim()
@@ -435,7 +436,7 @@ export default function TresorerieComptesPage() {
               onClick={() => saveAccount.mutate()}
             >
               {editingAccount ? "Enregistrer" : "Créer le compte"}
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -521,9 +522,9 @@ export default function TresorerieComptesPage() {
             <Button variant="outline" onClick={() => setAssignmentAccount(undefined)}>
               Annuler
             </Button>
-            <Button disabled={saveAssignments.isPending} onClick={() => saveAssignments.mutate()}>
+            <PermissionButton permission="compte-tresorerie:configure-access" disabled={saveAssignments.isPending} onClick={() => saveAssignments.mutate()}>
               Enregistrer les accès
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -655,7 +656,7 @@ function AccountSection({
                 {canManage && (
                   <>
                     {account.natureCaisse !== "INDIVIDUELLE" && (
-                      <Button
+                      <PermissionButton permission="compte-tresorerie:update"
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -666,10 +667,10 @@ function AccountSection({
                         }}
                       >
                         <Edit3 className="size-4" />
-                      </Button>
+                      </PermissionButton>
                     )}
                     {!isCash && (
-                      <Button
+                      <PermissionButton permission="compte-tresorerie:configure-access"
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -680,10 +681,10 @@ function AccountSection({
                         }}
                       >
                         <Users className="size-4" />
-                      </Button>
+                      </PermissionButton>
                     )}
                     {account.natureCaisse !== "INDIVIDUELLE" && (
-                      <Button
+                      <PermissionButton permission="compte-tresorerie:update"
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -696,7 +697,7 @@ function AccountSection({
                         {account.actif
                           ? <PowerOff className="size-4" />
                           : <Power className="size-4" />}
-                      </Button>
+                      </PermissionButton>
                     )}
                   </>
                 )}

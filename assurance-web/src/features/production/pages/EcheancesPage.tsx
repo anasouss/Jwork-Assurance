@@ -85,7 +85,7 @@ export default function EcheancesPage() {
   const [pdfDraftId, setPdfDraftId] = useState<string | null>(null);
   const [renewalRow, setRenewalRow] = useState<EcheanceAutomobileRow | null>(null);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canRenew = permissions.includes("contrat:renew") || permissions.includes("contrat:update");
+  const canRenew = permissions.includes("contrat:renew");
   const canEditAssistance = permissions.includes("contrat:update");
   const preTermeActions = usePreTermeActions();
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({

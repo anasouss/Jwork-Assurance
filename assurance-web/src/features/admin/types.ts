@@ -45,6 +45,12 @@ export type AdminPermission = {
   description?: string | null;
   superAdminOnly: boolean;
   requiredPermissionCodes: string[];
+  resource?: string;
+  resourceLabel?: string | null;
+  action?: string | null;
+  actionLabel?: string | null;
+  sensitive?: boolean;
+  assignable?: boolean;
 };
 
 export type AdminAuditEvent = {

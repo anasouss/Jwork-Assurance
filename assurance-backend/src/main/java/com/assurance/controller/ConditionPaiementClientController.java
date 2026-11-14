@@ -32,7 +32,7 @@ public class ConditionPaiementClientController {
     private final ConditionPaiementClientService service;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_condition-paiement:view', 'PERM_client:view', 'PERM_groupe-client:view')")
     public ResponseEntity<ApiResponse<List<ConditionPaiementClientResponse>>> list(
             @RequestParam String payeurType,
             @RequestParam Long payeurId
@@ -45,7 +45,7 @@ public class ConditionPaiementClientController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('PERM_client:manage')")
+    @PreAuthorize("hasAuthority('PERM_condition-paiement:create')")
     public ResponseEntity<ApiResponse<ConditionPaiementClientResponse>> create(
             @RequestParam String payeurType,
             @RequestParam Long payeurId,
@@ -70,7 +70,7 @@ public class ConditionPaiementClientController {
     }
 
     @GetMapping("/{conditionId}/justificatif")
-    @PreAuthorize("hasAuthority('PERM_client:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_condition-paiement:view', 'PERM_client:view', 'PERM_groupe-client:view')")
     public ResponseEntity<Resource> download(@PathVariable Long conditionId) {
         ConditionPaiementClientService.DownloadedFile download = service.download(
                 TenantContext.getCurrentAgence(),

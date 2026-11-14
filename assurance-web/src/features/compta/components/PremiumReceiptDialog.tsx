@@ -27,7 +27,7 @@ export function PremiumReceiptDialog({ payment, canIssue, onClose }: {
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const canDelete = useAuthStore(state => state.user?.permissions?.includes("reglement-client:manage") ?? false);
+  const canDelete = useAuthStore(state => state.user?.permissions?.includes("quittance-prime:delete") ?? false);
   const [scope, setScope] = useState("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [opening, setOpening] = useState(false);

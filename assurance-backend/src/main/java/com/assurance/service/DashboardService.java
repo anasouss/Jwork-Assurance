@@ -5,6 +5,7 @@ import com.assurance.dto.response.DashboardResponse;
 import com.assurance.entity.AssistanceContrat;
 import com.assurance.entity.MouvementContrat;
 import com.assurance.enums.StatutMouvementContrat;
+import com.assurance.security.BusinessPermission;
 import com.assurance.repository.AssistanceContratRepository;
 import com.assurance.repository.ClientRepository;
 import com.assurance.repository.ContratRepository;
@@ -49,65 +50,68 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardResponse get(Long agenceId, LocalDate dateDu, LocalDate dateAu) {
-        QuittanceRepository.DashboardProductionTotals totals =
-                quittanceRepository.sumDashboardProduction(agenceId, dateDu, dateAu);
-        ElementFacturableRepository.DashboardAssistanceTotals assistanceTotals =
-                elementFacturableRepository.sumDashboardAssistance(agenceId, dateDu, dateAu);
-        AttestationStockDashboardResponse stock = attestationStockService.dashboard(agenceId);
+        boolean productionEnabled = BusinessPermission.has("contrat:view");
+        QuittanceRepository.DashboardProductionTotals totals = productionEnabled
+                ? quittanceRepository.sumDashboardProduction(agenceId, dateDu, dateAu) : null;
+        ElementFacturableRepository.DashboardAssistanceTotals assistanceTotals = productionEnabled
+                ? elementFacturableRepository.sumDashboardAssistance(agenceId, dateDu, dateAu) : null;
+        AttestationStockDashboardResponse stock = BusinessPermission.has("attestation-stock:view")
+                ? attestationStockService.dashboard(agenceId) : null;
         LocalDate today = LocalDate.now();
-        List<DashboardResponse.MonthlyProduction> monthly = monthlyProduction(agenceId, dateDu, dateAu);
+        List<DashboardResponse.MonthlyProduction> monthly = productionEnabled
+                ? monthlyProduction(agenceId, dateDu, dateAu) : List.of();
 
         return DashboardResponse.builder()
                 .dateDu(dateDu)
                 .dateAu(dateAu)
                 .dateReference(today)
-                .comparaison(comparison(agenceId, dateDu, dateAu,
+                .comparaison(productionEnabled ? comparison(agenceId, dateDu, dateAu,
                         valueOrZero(totals.getPrimeTotale()).add(valueOrZero(assistanceTotals.getPrimeTotale())),
-                        valueOrZero(totals.getPrimeNette()).add(valueOrZero(assistanceTotals.getPrimeNette()))))
-                .productionEvolution(productionTrend(agenceId, dateDu, dateAu, monthly))
+                        valueOrZero(totals.getPrimeNette()).add(valueOrZero(assistanceTotals.getPrimeNette()))) : null)
+                .productionEvolution(productionEnabled ? productionTrend(agenceId, dateDu, dateAu, monthly) : List.of())
                 .kpis(DashboardResponse.Kpis.builder()
-                        .primeNette(valueOrZero(totals.getPrimeNette())
-                                .add(valueOrZero(assistanceTotals.getPrimeNette())))
-                        .taxes(valueOrZero(totals.getTaxe())
+                        .primeNette(productionEnabled ? valueOrZero(totals.getPrimeNette())
+                                .add(valueOrZero(assistanceTotals.getPrimeNette())) : BigDecimal.ZERO)
+                        .taxes(productionEnabled ? valueOrZero(totals.getTaxe())
                                 .add(valueOrZero(totals.getTaxeParafiscale()))
-                                .add(valueOrZero(assistanceTotals.getTaxes())))
-                        .primeTotale(valueOrZero(totals.getPrimeTotale())
-                                .add(valueOrZero(assistanceTotals.getPrimeTotale())))
-                        .quittances(totals.getQuittances() == null ? 0L : totals.getQuittances())
-                        .mouvements(mouvementContratRepository.countByAgenceIdAndStatutAndDateEffetBetween(
-                                agenceId, StatutMouvementContrat.VALIDE, dateDu, dateAu))
-                        .contratsActifs(contratRepository.countActivePortfolioAt(agenceId, dateAu))
-                        .assistancesActives(assistanceContratRepository.countActiveAt(agenceId, dateAu))
-                        .assistancesProduites(assistanceTotals.getElementCount() == null
+                                .add(valueOrZero(assistanceTotals.getTaxes())) : BigDecimal.ZERO)
+                        .primeTotale(productionEnabled ? valueOrZero(totals.getPrimeTotale())
+                                .add(valueOrZero(assistanceTotals.getPrimeTotale())) : BigDecimal.ZERO)
+                        .quittances(!productionEnabled || totals.getQuittances() == null ? 0L : totals.getQuittances())
+                        .mouvements(productionEnabled ? mouvementContratRepository.countByAgenceIdAndStatutAndDateEffetBetween(
+                                agenceId, StatutMouvementContrat.VALIDE, dateDu, dateAu) : 0L)
+                        .contratsActifs(productionEnabled ? contratRepository.countActivePortfolioAt(agenceId, dateAu) : 0L)
+                        .assistancesActives(productionEnabled ? assistanceContratRepository.countActiveAt(agenceId, dateAu) : 0L)
+                        .assistancesProduites(!productionEnabled || assistanceTotals.getElementCount() == null
                                 ? 0L : assistanceTotals.getElementCount())
-                        .contratsBrouillon(contratRepository.countByAgenceIdAndProspectionFalseAndBrouillonTrue(agenceId))
-                        .clientsActifs(clientRepository.countByAgenceIdAndActifTrue(agenceId))
+                        .contratsBrouillon(productionEnabled ? contratRepository.countByAgenceIdAndProspectionFalseAndBrouillonTrue(agenceId) : 0L)
+                        .clientsActifs(BusinessPermission.has("client:view") ? clientRepository.countByAgenceIdAndActifTrue(agenceId) : 0L)
                         .build())
                 .workload(DashboardResponse.Workload.builder()
                         .echeancesDu(today)
                         .echeancesAu(today.plusDays(29))
-                        .echeances30Jours(contratRepository.findAutomobileEcheanceIds(
-                                agenceId, today, today.plusDays(29), null, null, null, PageRequest.of(0, 1)).getTotalElements())
-                        .quittancesAAffecter(quittanceRepository.searchForAffectation(
-                                agenceId, null, null, null, false, null, null, null, PageRequest.of(0, 1)).getTotalElements())
-                        .documentsAEmettre(documentClientService.searchSources(
+                        .echeances30Jours(productionEnabled ? contratRepository.findAutomobileEcheanceIds(
+                                agenceId, today, today.plusDays(29), null, null, null, PageRequest.of(0, 1)).getTotalElements() : 0L)
+                        .quittancesAAffecter(BusinessPermission.has("quittance-affectation:view") ? quittanceRepository.searchForAffectation(
+                                agenceId, null, null, null, false, null, null, null, PageRequest.of(0, 1)).getTotalElements() : 0L)
+                        .documentsAEmettre(BusinessPermission.has("document-client:view") ? documentClientService.searchSources(
                                 agenceId, null, null, null, null, null, null, "SANS_DOCUMENT",
-                                null, null, null, 0, 1).getPage().getTotalElements())
-                        .alertesStock(stock.getSeuils().stream()
+                                null, null, null, 0, 1).getPage().getTotalElements() : 0L)
+                        .alertesStock(stock == null ? 0L : stock.getSeuils().stream()
                                 .filter(item -> Boolean.TRUE.equals(item.getStockFaible()))
                                 .count())
-                        .controleStockActif(stock.getControleStockActif())
+                        .controleStockActif(stock != null && Boolean.TRUE.equals(stock.getControleStockActif()))
                         .build())
                 .productionMensuelle(monthly)
-                .portefeuilleParType(portfolioByType(agenceId, dateAu))
-                .portefeuilleParBranche(portfolioByBranch(agenceId, dateAu))
-                .productionParCategorie(productionByCategory(
+                .portefeuilleParType(productionEnabled ? portfolioByType(agenceId, dateAu) : List.of())
+                .portefeuilleParBranche(productionEnabled ? portfolioByBranch(agenceId, dateAu) : List.of())
+                .productionParCategorie(productionEnabled ? productionByCategory(
                         agenceId,
                         dateDu,
                         dateAu,
                         valueOrZero(assistanceTotals.getPrimeTotale())
-                ))
-                .activitesRecentes(recentActivity(agenceId, dateDu, dateAu))
+                ) : List.of())
+                .activitesRecentes(productionEnabled ? recentActivity(agenceId, dateDu, dateAu) : List.of())
                 .build();
     }
 

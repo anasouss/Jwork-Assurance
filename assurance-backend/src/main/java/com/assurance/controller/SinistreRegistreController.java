@@ -24,7 +24,7 @@ public class SinistreRegistreController {
     private final SinistreRegistreService registreService;
 
     @GetMapping("/export")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<byte[]> export(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Long clientId,

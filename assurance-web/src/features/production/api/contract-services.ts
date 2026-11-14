@@ -26,6 +26,22 @@ export const contractServiceApi = {
     );
   },
 
+  async saveEditingAssistance(contratId: string, request: UpsertAssistanceContratRequest) {
+    return unwrap(
+      await apiFetch<ApiResponse<AssistanceContrat>>(`/api/v1/contrats/drafts/${contratId}/assistances`, {
+        method: "POST", body: JSON.stringify(request),
+      })
+    );
+  },
+
+  async removeEditingAssistance(contratId: string, assistanceId: string) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/contrats/drafts/${contratId}/assistances/${assistanceId}`, {
+        method: "DELETE",
+      })
+    );
+  },
+
   async saveAssistance(contratId: string, request: UpsertAssistanceContratRequest) {
     return unwrap(
       await apiFetch<ApiResponse<AssistanceContrat>>(

@@ -20,7 +20,10 @@ import type { Intervenant, ProviderKind } from "../types";
 const initialFilters = { query: "", villeId: "", compagnieId: "ALL", specialiteId: "ALL", includeInactive: false };
 
 export default function SinistrePrestatairesPage() {
-  const canManage = useAuthStore(s => s.user?.permissions.includes("sinistre:referentiel") ?? false);
+  const permissions = useAuthStore(s => s.user?.permissions ?? []);
+  const canView = permissions.includes("prestataire-sinistre:view");
+  const canCreate = permissions.includes("prestataire-sinistre:create");
+  const canUpdate = permissions.includes("prestataire-sinistre:update");
   const [params, setParams] = useSearchParams();
   const kind: ProviderKind = params.get("type") === "EXPERT" ? "EXPERT" : "GARAGE";
   const queryClient = useQueryClient();
@@ -29,16 +32,16 @@ export default function SinistrePrestatairesPage() {
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<Intervenant | null>(null);
   const [open, setOpen] = useState(false);
-  const options = useQuery({ queryKey: sinistreKeys.providerOptions(), queryFn: sinistreApi.providerOptions, enabled: canManage });
-  const specialties = useQuery({ queryKey: sinistreKeys.specialties(), queryFn: sinistreApi.specialties, enabled: canManage });
-  const cities = useQuery({ queryKey: ["referentiel", "villes", "sinistre"], queryFn: () => referenceApi.list("villes"), enabled: canManage });
+  const options = useQuery({ queryKey: sinistreKeys.providerOptions(), queryFn: sinistreApi.providerOptions, enabled: canView });
+  const specialties = useQuery({ queryKey: sinistreKeys.specialties(), queryFn: sinistreApi.specialties, enabled: canView });
+  const cities = useQuery({ queryKey: ["referentiel", "villes", "sinistre"], queryFn: () => referenceApi.list("villes"), enabled: canView });
   const directory = useQuery({
     queryKey: [...sinistreKeys.providers(), "directory", kind, applied, page],
     queryFn: () => sinistreApi.providers({ typePrestataire: kind, query: applied.query || undefined,
       villeId: applied.villeId || undefined,
       compagnieId: applied.compagnieId === "ALL" ? undefined : applied.compagnieId,
       specialiteId: applied.specialiteId === "ALL" ? undefined : applied.specialiteId,
-      includeInactive: applied.includeInactive, page, size: 25 }), enabled: canManage,
+      includeInactive: applied.includeInactive, page, size: 25 }), enabled: canView,
   });
   const save = useMutation({ mutationFn: (request: object) => kind === "EXPERT"
     ? sinistreApi.saveExpert(editing?.id ?? null, request) : sinistreApi.saveGarage(editing?.id ?? null, request),
@@ -51,14 +54,14 @@ export default function SinistrePrestatairesPage() {
       toast.success("Prestataire enregistré");
     }, onError: error => toast.error(error.message),
   });
-  if (!canManage) return <AccessDenied />;
+  if (!canView) return <AccessDenied />;
   return <div className="grid gap-4">
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div><p className="text-sm font-medium text-sky-700 dark:text-sky-400">Sinistres</p><h1 className="mt-1 text-xl font-semibold">Prestataires</h1></div>
       <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline"><Link to="/app/sinistre"><ArrowLeft className="size-4" />Module sinistres</Link></Button>
-        <Button asChild variant="outline"><Link to="/app/sinistre/prestataires/specialites"><Settings2 className="size-4" />Spécialités et garanties</Link></Button>
-        <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" />{kind === "EXPERT" ? "Ajouter un expert" : "Ajouter un garage"}</Button>
+        {permissions.includes("specialite-prestataire:view") ? <Button asChild variant="outline"><Link to="/app/sinistre/prestataires/specialites"><Settings2 className="size-4" />Spécialités et garanties</Link></Button> : null}
+        {canCreate ? <Button onClick={() => { setEditing(null); setOpen(true); }}><Plus className="size-4" />{kind === "EXPERT" ? "Ajouter un expert" : "Ajouter un garage"}</Button> : null}
       </div>
     </header>
     <section aria-label="Filtres des prestataires" className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -101,13 +104,13 @@ export default function SinistrePrestatairesPage() {
                 <td className="max-w-72 px-3 py-3"><p className="mb-1 text-xs text-muted-foreground">{item.toutesCompagnies ? "Toutes compagnies" : "Compagnies liées uniquement"}</p>
                   <ul className="space-y-1">{item.accords?.map(a => <li key={a.compagnieId}>{a.compagnie} <span className="text-xs text-muted-foreground">· {a.actif ? (a.conventionne ? "Conventionné" : "Non conventionné") : "Inactif"}{a.dateFin ? ` · au ${a.dateFin.split("-").reverse().join("/")}` : ""}</span></li>)}</ul></td>
                 <td className="px-3 py-3"><Badge variant={item.actif ? "success" : "gray"}>{item.actif ? "Actif" : "Inactif"}</Badge></td>
-                <td className="px-3 py-3"><Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button></td>
+                <td className="px-3 py-3">{canUpdate ? <Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button> : null}</td>
               </tr>)}</tbody>
       </table></div>
       <ServerPagination className="border-t px-4 py-3" page={directory.data?.page.number ?? page} totalPages={directory.data?.page.totalPages ?? 0}
         totalElements={directory.data?.page.totalElements ?? 0} loading={directory.isFetching} onPageChange={setPage} />
     </section>
     <SinistreIntervenantDialog open={open} kind={kind} intervenant={editing} cities={cities.data ?? []} saving={save.isPending}
-      onOpenChange={setOpen} onSubmit={request => save.mutate(request)} />
+      onOpenChange={setOpen} onSubmit={request => { if (editing ? canUpdate : canCreate) save.mutate(request); }} />
   </div>;
 }

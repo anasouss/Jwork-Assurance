@@ -108,6 +108,13 @@ export const adminApi = {
     }));
   },
 
+  async assignUserRole(id: string, roleId: string) {
+    return unwrap(await apiFetch<ApiResponse<AdminUser>>(`/api/v1/admin/users/${id}/role`, {
+      method: "PUT",
+      body: JSON.stringify({ roleId }),
+    }));
+  },
+
   async deactivateUser(id: string) {
     return unwrap(await apiFetch<ApiResponse<void>>(`/api/v1/admin/users/${id}`, { method: "DELETE" }));
   },

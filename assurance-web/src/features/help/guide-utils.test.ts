@@ -44,7 +44,7 @@ describe("guide utilities", () => {
     ["/app/companies", "companies-navigation"],
     ["/app/companies/contacts", "contacts-compagnies"],
     ["/app/companies/assistance/produits", "produits-assistance-parametres"],
-    ["/app/compta/reglements/etat-encaissements", "etat-encaissements"],
+    ["/app/compta/reglements/etat-encaissements", "reglements-clients"],
     ["/app/compta/tresorerie/impayes-clients", "impayes-clients"],
     ["/app/compta/tresorerie/journal", "journal-tresorerie"],
     ["/app/compta/tresorerie/operations", "operations-tresorerie"],

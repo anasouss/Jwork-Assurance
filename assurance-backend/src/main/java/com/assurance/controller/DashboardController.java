@@ -24,7 +24,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_quittance-affectation:view')")
     public ResponseEntity<ApiResponse<DashboardResponse>> dashboard(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateAu

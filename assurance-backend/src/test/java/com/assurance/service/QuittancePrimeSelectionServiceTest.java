@@ -265,14 +265,14 @@ class QuittancePrimeSelectionServiceTest {
     }
 
     @Test
-    void archiveDeletionEndpointsRequireManagementPermission() throws Exception {
+    void archiveDeletionEndpointsRequireDedicatedDeletePermission() throws Exception {
         Class<?> controller = com.assurance.controller.ReglementClientController.class;
         assertThat(controller.getMethod("deleteLegacyPremiumReceipt", Long.class)
                 .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class).value())
-                .isEqualTo("hasAuthority('PERM_reglement-client:manage')");
+                .isEqualTo("hasAuthority('PERM_quittance-prime:delete')");
         assertThat(controller.getMethod("deletePremiumReceipt", Long.class, Long.class)
                 .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class).value())
-                .isEqualTo("hasAuthority('PERM_reglement-client:manage')");
+                .isEqualTo("hasAuthority('PERM_quittance-prime:delete')");
     }
 
     private QuittancePrimeSelection archive(ReglementClient payment, String key) throws Exception {

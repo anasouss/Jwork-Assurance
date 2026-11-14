@@ -452,6 +452,14 @@ export function ContratFormLayout({
     );
   }
 
+  if (!form.canEditForm) {
+    return <Alert variant="destructive">
+      <CircleAlert />
+      <AlertTitle>Modification non autorisée</AlertTitle>
+      <AlertDescription>Votre rôle ne permet pas de modifier ce dossier.</AlertDescription>
+    </Alert>;
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-[1440px] gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

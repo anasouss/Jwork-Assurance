@@ -47,7 +47,7 @@ export default function ProspectionPage() {
   const [convertTargetId, setConvertTargetId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ContratListItem | null>(null);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canDeleteProspection = permissions.includes("contrat:delete") || permissions.includes("contrat:update");
+  const canDeleteProspection = permissions.includes("contrat:delete");
 
   const listParams = useMemo(() => ({
     compagnieId: appliedFilters.compagnieId === "ALL" ? undefined : appliedFilters.compagnieId,

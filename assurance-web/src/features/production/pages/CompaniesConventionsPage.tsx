@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EcheanceInput, isValidEcheance } from "@/components/ui/echeance-input";
 import {
@@ -183,10 +184,10 @@ export default function CompaniesConventionsPage() {
           <h1 className="text-xl font-semibold tracking-tight">Conventions</h1>
           <p className="text-sm text-muted-foreground">Produits conventionnés disponibles pour les contrats automobile convention.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
+        <PermissionButton permission="convention:create" onClick={() => { setEditing(null); setDialogOpen(true); }}>
           <Plus className="size-4" />
           Ajouter convention
-        </Button>
+        </PermissionButton>
       </div>
 
       <div className="rounded-lg border bg-card p-4">
@@ -256,14 +257,14 @@ export default function CompaniesConventionsPage() {
                     <TableRowActions
                       label={`Actions ${convention.libelle}`}
                       actions={[
-                        {
+                        { permission: "grille-tarifaire:update",
                           label: "Configurer la grille",
                           icon: SlidersHorizontal,
                           iconTone: "primary",
                           disabled: !conventionField(convention, "grilleTarifaireId"),
                           onSelect: () => setConfiguring(convention),
                         },
-                        {
+                        { permission: "convention:update",
                           label: "Modifier",
                           icon: Edit,
                           iconTone: "primary",
@@ -358,10 +359,10 @@ export default function CompaniesConventionsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="outline" disabled={!payload.compagnieAssuranceId} onClick={() => setGrilleDialogOpen(true)}>
+                <PermissionButton permission="grille-tarifaire:create" type="button" variant="outline" disabled={!payload.compagnieAssuranceId} onClick={() => setGrilleDialogOpen(true)}>
                   <Plus className="size-4" />
                   Grille
-                </Button>
+                </PermissionButton>
               </div>
             </Field>
             <Field label="Fractionnement">
@@ -429,9 +430,9 @@ export default function CompaniesConventionsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button disabled={saveConvention.isPending} onClick={() => submitConvention(editing, payload, saveConvention.mutate)}>
+            <PermissionButton permission={editing ? "convention:update" : "convention:create"} disabled={saveConvention.isPending} onClick={() => submitConvention(editing, payload, saveConvention.mutate)}>
               Enregistrer
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

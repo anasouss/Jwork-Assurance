@@ -186,7 +186,7 @@ class BusinessActivityRecorderTest {
         agency.setId(1L);
         Utilisateur actor = Utilisateur.builder().agence(agency).prenom("Fiscal").nom("Manager").role(Role.builder()
                 .code("MANAGER")
-                .permissions(java.util.Set.of(Permission.builder().code("regle-fiscale:manage").build())).build()).build();
+                .permissions(java.util.Set.of(Permission.builder().code("regle-fiscale:create").build())).build()).build();
         when(users.findById(9L)).thenReturn(Optional.of(actor));
 
         recorder.recordGlobalReference(globalFiscalCommand());
@@ -223,7 +223,7 @@ class BusinessActivityRecorderTest {
         agency.setId(1L);
         var actor = Utilisateur.builder().agence(agency).prenom("Agency").nom("Manager")
                 .role(Role.builder().code("AGENCY_ADMIN")
-                        .permissions(java.util.Set.of(Permission.builder().code("referentiel:manage").build())).build()).build();
+                        .permissions(java.util.Set.of(Permission.builder().code("compagnie-assurance:update").build())).build()).build();
         when(users.findById(9L)).thenReturn(Optional.of(actor));
         when(agencies.getReferenceById(1L)).thenReturn(agency);
         var company = com.assurance.entity.CompagnieAssurance.builder().code("ATL").nom("Compagnie Atlas").build();
@@ -266,7 +266,7 @@ class BusinessActivityRecorderTest {
     void repeatingAnUnchangedCompanySaveIsNotAnotherActivity() {
         TenantContext.setCurrentUser(9L);
         var actor = Utilisateur.builder().role(Role.builder()
-                .permissions(java.util.Set.of(Permission.builder().code("referentiel:manage").build())).build()).build();
+                .permissions(java.util.Set.of(Permission.builder().code("compagnie-assurance:update").build())).build()).build();
         when(users.findById(9L)).thenReturn(Optional.of(actor));
         var company = com.assurance.entity.CompagnieAssurance.builder().code("ATL").nom("Compagnie Atlas").build();
         company.setId(4L);

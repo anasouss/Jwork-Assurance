@@ -18,6 +18,7 @@ public class DocumentClientPdfService {
     @Transactional(readOnly = true)
     public byte[] generate(Long agenceId, Long documentId, boolean avecSignature) {
         DocumentClient source = documentClientService.findDocument(agenceId, documentId);
+        documentClientService.requireDocumentPermission(source, "view");
         try {
             return documentClientPdfRenderer.render(source, avecSignature);
         } catch (BadRequestException exception) {

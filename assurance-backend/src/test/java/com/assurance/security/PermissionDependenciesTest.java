@@ -8,7 +8,7 @@ class PermissionDependenciesTest {
 
     @Test
     void actionRequiresItsReadPermission() {
-        assertThat(PermissionDependencies.requiredFor("sinistre:manage"))
+        assertThat(PermissionDependencies.requiredFor("sinistre:update"))
                 .containsExactly("sinistre:view");
     }
 
@@ -16,14 +16,24 @@ class PermissionDependenciesTest {
     void contractSubresourcesRequireContractReadAccess() {
         assertThat(PermissionDependencies.requiredFor("avenant:view"))
                 .containsExactly("contrat:view");
-        assertThat(PermissionDependencies.requiredFor("piece-jointe:manage"))
+        assertThat(PermissionDependencies.requiredFor("piece-jointe:upload"))
                 .containsExactly("piece-jointe:view");
     }
 
     @Test
-    void userManagementAlsoRequiresRoleReadAccess() {
-        assertThat(PermissionDependencies.requiredFor("user:manage"))
+    void roleAssignmentAlsoRequiresRoleReadAccess() {
+        assertThat(PermissionDependencies.requiredFor("user:assign-role"))
                 .containsExactlyInAnyOrder("user:view", "role:view");
+    }
+
+    @Test
+    void readAndEditNeverImplyDestructiveOrFinancialActions() {
+        assertThat(PermissionDependencies.requiredFor("contrat:update"))
+                .containsExactly("contrat:view");
+        assertThat(PermissionDependencies.requiredFor("reglement-client:view")).isEmpty();
+        assertThat(PermissionDependencies.requiredFor("sinistre-operation:create"))
+                .containsExactly("sinistre:view");
+        assertThat(PermissionDependencies.requiredFor("sinistre:manage")).isEmpty();
     }
 
     @Test

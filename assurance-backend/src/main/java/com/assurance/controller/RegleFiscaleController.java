@@ -27,19 +27,19 @@ public class RegleFiscaleController {
     private final RegleFiscaleService regleFiscaleService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_regle-fiscale:view', 'PERM_regle-fiscale:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-fiscale:view')")
     public ResponseEntity<ApiResponse<List<RegleFiscaleResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(regleFiscaleService.list()));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('PERM_regle-fiscale:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-fiscale:create')")
     public ResponseEntity<ApiResponse<RegleFiscaleResponse>> create(@Valid @RequestBody UpsertRegleFiscaleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(regleFiscaleService.create(request), "Règle fiscale créée"));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_regle-fiscale:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-fiscale:update')")
     public ResponseEntity<ApiResponse<RegleFiscaleResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpsertRegleFiscaleRequest request
@@ -48,7 +48,7 @@ public class RegleFiscaleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_regle-fiscale:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-fiscale:deactivate')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
         regleFiscaleService.deactivate(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Règle fiscale désactivée"));

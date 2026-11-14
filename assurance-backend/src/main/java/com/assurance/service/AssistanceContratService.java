@@ -147,6 +147,17 @@ public class AssistanceContratService {
     }
 
     @Transactional
+    public AssistanceContratResponse saveStandalone(Long agenceId, Long contratId, UpsertAssistanceContratRequest request) {
+        contratRepository.findByAgenceIdAndId(agenceId, contratId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));
+        boolean exists = assistanceContratRepository
+                .findFirstByContratIdAndVehiculeIdAndActifTrueOrderByCreatedAtDesc(contratId, request.getVehiculeId())
+                .isPresent();
+        com.assurance.security.BusinessPermission.require(exists ? "assistance:update" : "assistance:create");
+        return upsert(agenceId, contratId, request);
+    }
+
+    @Transactional
     public AssistanceContratResponse upsert(Long agenceId, Long contratId, UpsertAssistanceContratRequest request) {
         Contrat contrat = contratRepository.findByAgenceIdAndId(agenceId, contratId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contrat", contratId));

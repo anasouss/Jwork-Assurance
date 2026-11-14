@@ -61,6 +61,30 @@ public class TresorerieService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<com.assurance.dto.response.CompteTresorerieOptionResponse> accountOptions(Long agenceId) {
+        return accessService.visibleAccounts(agenceId, accessService.currentUserId()).stream()
+                .filter(account -> Boolean.TRUE.equals(account.getActif()))
+                .map(account -> com.assurance.dto.response.CompteTresorerieOptionResponse.builder()
+                        .id(account.getId())
+                        .code(account.getCode())
+                        .libelle(account.getLibelle())
+                        .typeCompte(account.getTypeCompte())
+                        .natureCaisse(account.getNatureCaisse())
+                        .utilisateurTitulaireId(account.getUtilisateurTitulaire() == null
+                                ? null : account.getUtilisateurTitulaire().getId())
+                        .utilisateurTitulaire(account.getUtilisateurTitulaire() == null
+                                ? null : account.getUtilisateurTitulaire().getFullName())
+                        .banqueId(account.getBanqueReference() == null ? null : account.getBanqueReference().getId())
+                        .banqueCode(account.getBanqueReference() == null ? null : account.getBanqueReference().getCode())
+                        .nomBanque(account.getBanqueReference() == null ? null : account.getBanqueReference().getLibelle())
+                        .rib(account.getRib())
+                        .devise(account.getDevise())
+                        .actif(account.getActif())
+                        .build())
+                .toList();
+    }
+
     @Transactional
     public CompteTresorerieResponse createAccount(Long agenceId, UpsertCompteTresorerieRequest request) {
         if (request.getTypeCompte() == TypeCompteTresorerie.CAISSE

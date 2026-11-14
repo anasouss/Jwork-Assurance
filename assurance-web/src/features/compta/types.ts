@@ -948,6 +948,8 @@ export type TreasuryAccount = {
   actif: boolean;
 };
 
+export type TreasuryAccountOption = Omit<TreasuryAccount, "soldeInitial" | "soldeCourant">;
+
 export type UpsertTreasuryAccountRequest = {
   code: string;
   libelle: string;

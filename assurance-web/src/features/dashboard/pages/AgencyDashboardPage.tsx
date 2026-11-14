@@ -57,6 +57,7 @@ export default function AgencyDashboardPage() {
   }
 
   const data = dashboard.data;
+  const canViewProduction = permissions.includes("contrat:view");
 
   return (
     <div className="mx-auto grid w-full max-w-[1600px] gap-6" aria-busy={dashboard.isFetching}>
@@ -70,21 +71,21 @@ export default function AgencyDashboardPage() {
           onRefresh={() => void queryClient.invalidateQueries({ queryKey: ["agency-dashboard"] })} />
       </header>
 
-      <ProductionKpis data={data} isFetching={dashboard.isFetching} />
-      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]" aria-label="Évolution de la production et portefeuille">
+      {canViewProduction && <ProductionKpis data={data} isFetching={dashboard.isFetching} />}
+      {canViewProduction && <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]" aria-label="Évolution de la production et portefeuille">
         <ProductionTrendChart rows={data.productionEvolution} dateFrom={data.dateDu} dateTo={data.dateAu} />
         <DashboardPortfolio rows={data.portefeuilleParBranche} contractTypes={data.portefeuilleParType}
           total={data.kpis.contratsActifs} activeAssistances={data.kpis.assistancesActives} date={data.dateAu} />
-      </section>
+      </section>}
 
       <section className="grid items-start gap-5 xl:grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))]" aria-label="Travail à traiter, encaissements et répartition">
         <DashboardWorkQueue data={data} permissions={permissions} />
         <DashboardCollectionSummary dateReference={data.dateReference} />
-        <ProductionCategoryBreakdown rows={data.productionParCategorie} />
+        {canViewProduction && <ProductionCategoryBreakdown rows={data.productionParCategorie} />}
       </section>
 
-      <DashboardRecentMovements rows={data.activitesRecentes} canView={permissions.includes("contrat:view")}
-        dateFrom={data.dateDu} dateTo={data.dateAu} />
+      {canViewProduction && <DashboardRecentMovements rows={data.activitesRecentes} canView={permissions.includes("contrat:view")}
+        dateFrom={data.dateDu} dateTo={data.dateAu} />}
     </div>
   );
 }

@@ -64,7 +64,7 @@ type SortDirection = "ASC" | "DESC";
 export default function ReglementsClientsPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canCreate = permissions.includes("reglement-client:create")
-    || permissions.includes("reglement-client:manage");
+    || permissions.includes("reglement-client:refund");
   const navigate = useNavigate();
   const location = useLocation();
   const multiClientDeposit = location.pathname.endsWith("/versement-multi-clients");
@@ -175,8 +175,8 @@ export default function ReglementsClientsPage() {
     || appliedFilters.branchId === "ALL"
     || !branches.isLoading;
   const requestedClient = useQuery({
-    queryKey: ["crm-client", requestedPayerId],
-    queryFn: () => clientApi.getClientCrm(requestedPayerId),
+    queryKey: ["payer-client-option", requestedPayerId],
+    queryFn: () => clientApi.clientOption(requestedPayerId),
     enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
@@ -184,8 +184,8 @@ export default function ReglementsClientsPage() {
   useEffect(() => {
     if (!requestedPayerId) return;
     if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
-    if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
-      const client = requestedClient.data.client;
+    if (requestedPayerType === "CLIENT" && requestedClient.data) {
+      const client = requestedClient.data;
       setSelectedPayer({
         type: "CLIENT",
         id: client.id,
@@ -204,7 +204,7 @@ export default function ReglementsClientsPage() {
         name: group.libelle,
         identifier: group.code,
         treasuryName: group.clientTresorerieNom || undefined,
-        memberCount: group.membres.length,
+        memberCount: group.nombreMembres,
       });
     }
   }, [
@@ -609,7 +609,7 @@ export default function ReglementsClientsPage() {
           total={selectedTotal}
           onRemove={(row) => toggle(row, false)}
           onContinue={() => navigate(paymentPath(selectedRows, true))}
-          canContinue={canCreate && selectedRows.length > 0}
+          canContinue={permissions.includes("reglement-client:create") && selectedRows.length > 0}
         />
       ) : null}
 
@@ -629,7 +629,7 @@ export default function ReglementsClientsPage() {
                 {!multiClientDeposit ? (
                 <Button
                   disabled={!canCreate || !selectedRows.length || Math.abs(selectedTotal) < 0.005
-                    || (selectedTotal < 0 && !permissions.includes("reglement-client:manage"))}
+                    || !(selectedTotal < 0 ? permissions.includes("reglement-client:refund") : permissions.includes("reglement-client:create"))}
                   onClick={() => navigate(paymentPath(selectedRows, false))}
                 >
                   <Banknote className="size-4" />

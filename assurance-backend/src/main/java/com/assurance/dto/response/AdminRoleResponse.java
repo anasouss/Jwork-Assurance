@@ -30,7 +30,9 @@ public class AdminRoleResponse {
                 .nom(role.getNom())
                 .description(role.getDescription())
                 .systemRole(role.getSystemRole())
-                .permissionIds(role.getPermissions().stream().map(Permission::getId).collect(Collectors.toSet()))
+                .permissionIds(role.getPermissions().stream()
+                        .filter(permission -> com.assurance.security.PermissionCatalog.contains(permission.getCode()))
+                        .map(Permission::getId).collect(Collectors.toSet()))
                 .permissionCodes(role.getPermissionCodes())
                 .build();
     }

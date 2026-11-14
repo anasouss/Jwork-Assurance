@@ -24,7 +24,7 @@ export default function AdminAgenciesPage() {
       agencies={agencies.data ?? []}
       loading={agencies.isLoading}
       canManage={access.canManagePlatformAgencies || access.canManageOwnAgency}
-      canCreate={access.isPlatformMode && access.canManagePlatformAgencies}
+      canCreate={access.isPlatformMode && access.canCreateAgencies}
       canEditPlatformFields={access.isPlatformMode && access.canManagePlatformAgencies}
       singleAgency={!access.isPlatformMode}
       onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "agencies"] })}

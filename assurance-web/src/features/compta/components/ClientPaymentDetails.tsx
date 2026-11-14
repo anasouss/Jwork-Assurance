@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -25,8 +26,8 @@ const INSTRUMENT_VARIANTS = {
 } as const;
 
 export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
-  const canViewTreasury = useAuthStore((state) => state.user?.permissions.includes("tresorerie:view") ?? false);
-  const canManageTreasury = useAuthStore((state) => state.user?.permissions.includes("tresorerie:manage") ?? false);
+  const canViewTreasury = useAuthStore((state) => state.user?.permissions.includes("bordereau-remise:view") ?? false);
+  const canManageTreasury = useAuthStore((state) => state.user?.permissions.some(code => code === "instrument-reglement:confirm" || code === "instrument-reglement:reject") ?? false);
   const outgoing = payment.sens === "SORTIE";
   const client = useQueryClient();
   const [operation, setOperation] = useState<{ id: string; statut: "CONFIRME" | "REJETE" }>();
@@ -134,8 +135,8 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
               {payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]}
             </Badge>
               {outgoing && canManageTreasury && payment.statut === "VALIDE" && instrument.statut === "EN_ATTENTE" && <div className="mt-2 flex gap-1">
-                <Button variant="outline" size="sm" disabled={processPayment.isPending} onClick={() => { setReason(""); setOperation({ id: instrument.id, statut: "CONFIRME" }); }}><Check className="size-4" />Confirmer le débit</Button>
-                <Button variant="ghost" size="icon" title="Rejeter le décaissement" aria-label="Rejeter le décaissement" disabled={processPayment.isPending} onClick={() => { setReason(""); setOperation({ id: instrument.id, statut: "REJETE" }); }}><X className="size-4" /></Button>
+                <PermissionButton permission="instrument-reglement:confirm" variant="outline" size="sm" disabled={processPayment.isPending} onClick={() => { setReason(""); setOperation({ id: instrument.id, statut: "CONFIRME" }); }}><Check className="size-4" />Confirmer le débit</PermissionButton>
+                <PermissionButton permission="instrument-reglement:reject" variant="ghost" size="icon" title="Rejeter le décaissement" aria-label="Rejeter le décaissement" disabled={processPayment.isPending} onClick={() => { setReason(""); setOperation({ id: instrument.id, statut: "REJETE" }); }}><X className="size-4" /></PermissionButton>
               </div>}
               {instrument.motifStatut && instrument.motifStatut.trim().toLocaleLowerCase("fr")
                 !== (payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]).toLocaleLowerCase("fr")
@@ -163,7 +164,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
         <div className="grid gap-2"><Label>Date d'opération</Label><DatePicker date={operationDate} onSelect={value => setOperationDate(toDateOnly(value) ?? "")} /></div>
         {operation?.statut === "REJETE" && <div className="grid gap-2"><Label htmlFor="refund-reason">Motif <span className="text-destructive">*</span></Label><Input id="refund-reason" maxLength={500} value={reason} onChange={event => setReason(event.target.value)} /></div>}
         <DialogFooter><Button variant="outline" disabled={processPayment.isPending} onClick={() => setOperation(undefined)}>Annuler</Button>
-          <Button disabled={processPayment.isPending || !operationDate || (operation?.statut === "REJETE" && !reason.trim())} onClick={() => processPayment.mutate()}>Confirmer</Button>
+          <PermissionButton permission={operation?.statut === "CONFIRME" ? "instrument-reglement:confirm" : "instrument-reglement:reject"} disabled={processPayment.isPending || !operationDate || (operation?.statut === "REJETE" && !reason.trim())} onClick={() => processPayment.mutate()}>Confirmer</PermissionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

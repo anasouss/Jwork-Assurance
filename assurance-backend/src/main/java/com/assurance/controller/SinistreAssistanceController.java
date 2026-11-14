@@ -21,7 +21,7 @@ public class SinistreAssistanceController {
     private final SinistreAssistanceService service;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:create', 'PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:create', 'PERM_sinistre:view')")
     public ApiResponse<List<SinistreAssistanceResponse>> available(@RequestParam Long contratId,
             @RequestParam(required = false) Long vehiculeId, @RequestParam LocalDate dateSinistre) {
         return ApiResponse.success(service.available(TenantContext.getCurrentAgence(), contratId, vehiculeId, dateSinistre));

@@ -14,7 +14,7 @@ export function ClientGroupSelect({ value, groups, onValueChange, disabled = fal
   disabled?: boolean;
 }) {
   const canCreate = useAuthStore(state => state.user?.permissions.some(permission =>
-    permission === "client:create" || permission === "client:manage") ?? false);
+    permission === "groupe-client:create") ?? false);
   const [creating, setCreating] = useState(false);
   const [createdGroups, setCreatedGroups] = useState<GroupeClient[]>([]);
   const byId = new Map([...createdGroups, ...groups].map(group => [group.id, group]));

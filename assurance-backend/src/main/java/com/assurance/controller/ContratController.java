@@ -174,7 +174,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/assistance-voyage/renouvellements")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<AssistanceVoyageCreationResponse>> renewTravelAssistance(
             @PathVariable Long id,
             @Valid @RequestBody CreateAssistanceVoyageRequest request
@@ -257,7 +257,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/assistance-automobile/renouvellements")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<AssistanceAutomobileCreationResponse>> renewAutomobileAssistance(
             @PathVariable Long id,
             @Valid @RequestBody CreateAssistanceAutomobileRequest request
@@ -287,13 +287,13 @@ public class ContratController {
     }
 
     @GetMapping("/drafts/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> getDraft(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(contratService.getDraft(TenantContext.getCurrentAgence(), id)));
     }
 
     @GetMapping("/drafts/{id}/vehicules/import-modele")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<byte[]> downloadVehicleImportTemplate(@PathVariable Long id) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=modele-import-vehicules.xlsx")
@@ -302,7 +302,7 @@ public class ContratController {
     }
 
     @GetMapping("/drafts/{id}/vehicules/export")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<byte[]> exportSubmittedVehicles(@PathVariable Long id) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=vehicules-flotte.xlsx")
@@ -311,7 +311,7 @@ public class ContratController {
     }
 
     @PostMapping(value = "/drafts/{id}/vehicules/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<VehiculeImportPreviewResponse>> previewVehicleImport(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file
@@ -322,7 +322,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> updateDraft(
             @PathVariable Long id,
             @RequestHeader(value = "X-Audit-Operation", required = false) String auditOperation,
@@ -333,7 +333,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/vehicules/{index}")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftVehicule(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -344,7 +344,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/vehicules/{index}/garanties")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftVehiculeGaranties(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -355,7 +355,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/remorques/{index}")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftRemorque(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -366,7 +366,7 @@ public class ContratController {
     }
 
     @PutMapping("/drafts/{id}/remorques/{index}/garanties")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> saveDraftRemorqueGaranties(
             @PathVariable Long id,
             @PathVariable Integer index,
@@ -377,7 +377,7 @@ public class ContratController {
     }
 
     @GetMapping("/drafts/{id}/recalcul-tarifs/preview")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<RecalculTarifsBrouillonResponse>> previewDraftTariffRecalculation(
             @PathVariable Long id
     ) {
@@ -387,7 +387,7 @@ public class ContratController {
     }
 
     @PostMapping("/drafts/{id}/recalcul-tarifs")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> applyDraftTariffRecalculation(@PathVariable Long id) {
         AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_TARIFFS_RECALCULATED);
         return ResponseEntity.ok(ApiResponse.success(
@@ -397,14 +397,14 @@ public class ContratController {
     }
 
     @PostMapping("/drafts/{id}/finaliser")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> finalizeDraft(@PathVariable Long id, @Valid @RequestBody CreateContratRequest request) {
         AuditRequestContext.setOperation(AuditOperationCode.CONTRACT_FINALIZED);
         return ResponseEntity.ok(ApiResponse.success(contratService.finalizeDraft(TenantContext.getCurrentAgence(), id, request), "Contrat cree"));
     }
 
     @PostMapping("/previsualisation-quittance")
-    @PreAuthorize("hasAuthority('PERM_contrat:create')")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittanceCreation(@RequestBody CreateContratRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 contratService.previsualiserQuittance(TenantContext.getCurrentAgence(), request)
@@ -412,7 +412,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/renouvellements/brouillon")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> createRenouvellementDraft(
             @PathVariable Long id,
             @Valid @RequestBody CreateRenouvellementDraftRequest request
@@ -428,7 +428,7 @@ public class ContratController {
     }
 
     @PostMapping("/renouvellements/{draftId}/finaliser")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:renew', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<ContratResponse>> finalizeRenouvellementDraft(
             @PathVariable Long draftId,
             @Valid @RequestBody FinalizeRenouvellementRequest request
@@ -725,14 +725,14 @@ public class ContratController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:delete', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_contrat:delete')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         contratService.deleteContrat(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Contrat supprime"));
     }
 
     @DeleteMapping("/{id}/mouvements/{mouvementId}")
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:delete', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:delete')")
     public ResponseEntity<ApiResponse<Void>> deleteMouvement(@PathVariable Long id, @PathVariable Long mouvementId) {
         contratService.deleteMouvement(TenantContext.getCurrentAgence(), id, mouvementId);
         return ResponseEntity.ok(ApiResponse.success(null, "Mouvement supprime"));
@@ -790,13 +790,13 @@ public class ContratController {
     }
 
     @GetMapping("/{id}/quittances")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:view', 'PERM_contrat:view')")
+    @PreAuthorize("hasAuthority('PERM_contrat:view')")
     public ResponseEntity<ApiResponse<List<QuittanceResponse>>> quittances(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.listQuittances(TenantContext.getCurrentAgence(), id)));
     }
 
     @PostMapping("/{id}/mouvements/previsualisation-quittance")
-    @PreAuthorize("hasAuthority('PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:create')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previsualiserQuittance(
             @PathVariable Long id,
             @Valid @RequestBody MouvementContratRequest request
@@ -805,7 +805,7 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/mouvements")
-    @PreAuthorize("hasAuthority('PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:create')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> creerMouvement(
             @PathVariable Long id,
             @Valid @RequestBody MouvementContratRequest request
@@ -813,13 +813,31 @@ public class ContratController {
         return ResponseEntity.ok(ApiResponse.success(mouvementContratService.creerMouvement(TenantContext.getCurrentAgence(), id, request), "Mouvement cree"));
     }
 
+    @PostMapping("/drafts/{id}/assistances")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
+    public ResponseEntity<ApiResponse<AssistanceContratResponse>> saveEditingAssistance(
+            @PathVariable Long id,
+            @Valid @RequestBody UpsertAssistanceContratRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                contratService.saveEditingAssistance(TenantContext.getCurrentAgence(), id, request),
+                "Assistance du dossier enregistree"));
+    }
+
+    @DeleteMapping("/drafts/{id}/assistances/{assistanceId}")
+    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
+    public ResponseEntity<ApiResponse<Void>> removeEditingAssistance(@PathVariable Long id, @PathVariable Long assistanceId) {
+        contratService.removeEditingAssistance(TenantContext.getCurrentAgence(), id, assistanceId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Assistance du dossier retiree"));
+    }
+
     @PostMapping("/{id}/assistances")
-    @PreAuthorize("hasAnyAuthority('PERM_assistance:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_assistance:create', 'PERM_assistance:update')")
     public ResponseEntity<ApiResponse<AssistanceContratResponse>> upsertAssistance(
             @PathVariable Long id,
             @Valid @RequestBody UpsertAssistanceContratRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(assistanceContratService.upsert(TenantContext.getCurrentAgence(), id, request), "Assistance enregistree"));
+        return ResponseEntity.ok(ApiResponse.success(assistanceContratService.saveStandalone(TenantContext.getCurrentAgence(), id, request), "Assistance enregistree"));
     }
 
     @GetMapping("/{id}/assistances")
@@ -833,7 +851,7 @@ public class ContratController {
     }
 
     @DeleteMapping("/{id}/assistances/{assistanceId}")
-    @PreAuthorize("hasAnyAuthority('PERM_assistance:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_assistance:deactivate')")
     public ResponseEntity<ApiResponse<Void>> deleteAssistance(@PathVariable Long id, @PathVariable Long assistanceId) {
         assistanceContratService.deactivate(TenantContext.getCurrentAgence(), id, assistanceId);
         return ResponseEntity.ok(ApiResponse.success(null, "Assistance supprimee"));
@@ -849,16 +867,16 @@ public class ContratController {
     }
 
     @PostMapping("/{id}/cartes-vertes")
-    @PreAuthorize("hasAnyAuthority('PERM_carte-verte:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_carte-verte:create', 'PERM_carte-verte:update')")
     public ResponseEntity<ApiResponse<CarteVerteResponse>> upsertCarteVerte(
             @PathVariable Long id,
             @Valid @RequestBody UpsertCarteVerteRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(carteVerteService.upsert(TenantContext.getCurrentAgence(), id, request), "Carte verte enregistree"));
+        return ResponseEntity.ok(ApiResponse.success(carteVerteService.saveStandalone(TenantContext.getCurrentAgence(), id, request), "Carte verte enregistree"));
     }
 
     @DeleteMapping("/{id}/cartes-vertes/{carteVerteId}")
-    @PreAuthorize("hasAnyAuthority('PERM_carte-verte:manage', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_carte-verte:deactivate')")
     public ResponseEntity<ApiResponse<Void>> deleteCarteVerte(@PathVariable Long id, @PathVariable Long carteVerteId) {
         carteVerteService.deactivate(TenantContext.getCurrentAgence(), id, carteVerteId);
         return ResponseEntity.ok(ApiResponse.success(null, "Carte verte supprimee"));

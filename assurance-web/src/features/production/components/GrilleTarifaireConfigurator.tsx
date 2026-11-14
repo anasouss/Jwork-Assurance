@@ -5,6 +5,7 @@ import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -433,10 +434,10 @@ export function GrilleTarifaireConfigurator({
       ) : null}
 
       <div className="flex justify-end border-t pt-4">
-        <Button type="button" disabled={!activeUsageId || configurationLoading || saveConfiguration.isPending} onClick={submitMatrix}>
+        <PermissionButton permission="grille-tarifaire:update" type="button" disabled={!activeUsageId || configurationLoading || saveConfiguration.isPending} onClick={submitMatrix}>
           <Save className="size-4" />
           Enregistrer l'usage
-        </Button>
+        </PermissionButton>
       </div>
     </div>
   );

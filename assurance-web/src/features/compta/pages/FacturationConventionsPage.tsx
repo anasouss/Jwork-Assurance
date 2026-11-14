@@ -21,10 +21,10 @@ import type { ConventionProductionFilters } from "../types";
 
 export default function FacturationConventionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
-  const canView = permissions.includes("quittance:view");
+  const canView = permissions.includes("facture-convention:view");
   const canCollect = permissions.includes("reglement-client:view");
   const navigate = useNavigate();
-  const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
+  const canIssue = permissions.includes("facture-convention:issue");
   const queryClient = useQueryClient();
   const [conventionId, setConventionId] = useState("");
   const [companyId, setCompanyId] = useState("");

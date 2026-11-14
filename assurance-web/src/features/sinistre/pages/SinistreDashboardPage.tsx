@@ -4,10 +4,10 @@ import { useAuthStore } from "@/store/auth-store";
 
 const actions = [
   { title: "Nouvelle ouverture", subtitle: "Police, véhicule et garanties impliquées.", href: "/app/sinistre/declarer", icon: FilePlus2, permissions: ["sinistre:create"], primary: true },
-  { title: "Consultation et suivi", subtitle: "Dossiers, étapes et historique.", href: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { title: "Registre des sinistres", subtitle: "Références, assurés et compagnies.", href: "/app/sinistre/registre", icon: ScrollText, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { title: "Statistiques", subtitle: "Déclarations, délais et montants.", href: "/app/sinistre/statistiques", icon: BarChart3, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { title: "Prestataires", subtitle: "Experts, garages, spécialités et accords.", href: "/app/sinistre/prestataires", icon: Users, permissions: ["sinistre:referentiel"] },
+  { title: "Consultation et suivi", subtitle: "Dossiers, étapes et historique.", href: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view"] },
+  { title: "Registre des sinistres", subtitle: "Références, assurés et compagnies.", href: "/app/sinistre/registre", icon: ScrollText, permissions: ["sinistre:view"] },
+  { title: "Statistiques", subtitle: "Déclarations, délais et montants.", href: "/app/sinistre/statistiques", icon: BarChart3, permissions: ["sinistre:view"] },
+  { title: "Prestataires", subtitle: "Experts, garages, spécialités et accords.", href: "/app/sinistre/prestataires", icon: Users, permissions: ["prestataire-sinistre:view"] },
 ];
 
 export default function SinistreDashboardPage() {

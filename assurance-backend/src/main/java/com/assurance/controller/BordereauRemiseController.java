@@ -43,7 +43,7 @@ public class BordereauRemiseController {
     private final BordereauRemisePdfService bordereauRemisePdfService;
 
     @GetMapping("/instruments-eligibles")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:view')")
     public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> eligibleInstruments(
             @RequestParam(required = false) TypeBordereauRemise type,
             @RequestParam(required = false)
@@ -66,7 +66,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping("/instruments-eligibles/selection")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:view')")
     public ResponseEntity<ApiResponse<List<ReglementClientResponse.Instrument>>> selectedEligibleInstruments(
             @RequestParam TypeBordereauRemise type,
             @Valid @RequestBody SelectionInstrumentsBordereauRequest request
@@ -79,7 +79,7 @@ public class BordereauRemiseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:view')")
     public ResponseEntity<ApiResponse<BordereauRemisePageResponse>> search(
             @RequestParam(required = false) TypeBordereauRemise type,
             @RequestParam(required = false) StatutBordereauRemise statut,
@@ -106,7 +106,7 @@ public class BordereauRemiseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:view')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> detail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.detail(
                 TenantContext.getCurrentAgence(),
@@ -115,7 +115,7 @@ public class BordereauRemiseController {
     }
 
     @GetMapping("/{id}/pdf")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:view')")
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) {
         BordereauRemiseResponse detail = bordereauRemiseService.detail(
                 TenantContext.getCurrentAgence(),
@@ -130,7 +130,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:create')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> create(
             @Valid @RequestBody CreerBordereauRemiseRequest request
     ) {
@@ -141,7 +141,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping("/{id}/instruments")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:update')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> addInstruments(
             @PathVariable Long id,
             @Valid @RequestBody SelectionInstrumentsBordereauRequest request
@@ -154,7 +154,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping("/versements-especes")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:create')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> createCashDeposit(
             @Valid @RequestBody CreerBordereauRemiseRequest request
     ) {
@@ -165,7 +165,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping("/{id}/depot")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:deposit')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> deposit(
             @PathVariable Long id,
             @Valid @RequestBody DeposerBordereauRemiseRequest request
@@ -178,7 +178,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping("/{bordereauId}/lignes/{lineId}/encaissement")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:confirm')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> settleLine(
             @PathVariable Long bordereauId,
             @PathVariable Long lineId,
@@ -193,7 +193,7 @@ public class BordereauRemiseController {
     }
 
     @PostMapping("/{bordereauId}/lignes/{lineId}/rejet")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:reject')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> rejectLine(
             @PathVariable Long bordereauId,
             @PathVariable Long lineId,
@@ -208,14 +208,14 @@ public class BordereauRemiseController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:delete')")
     public ResponseEntity<ApiResponse<Void>> deleteDraft(@PathVariable Long id) {
         bordereauRemiseService.deleteDraft(TenantContext.getCurrentAgence(), id);
         return ResponseEntity.ok(ApiResponse.success(null, "Bordereau provisoire supprimé"));
     }
 
     @DeleteMapping("/{bordereauId}/lignes/{lineId}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-remise:update')")
     public ResponseEntity<ApiResponse<BordereauRemiseResponse>> removeDraftLine(
             @PathVariable Long bordereauId,
             @PathVariable Long lineId
@@ -228,7 +228,7 @@ public class BordereauRemiseController {
     }
 
     @GetMapping("/journees-caisse-eligibles")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_bordereau-remise:view', 'PERM_instrument-reglement:view')")
     public ResponseEntity<ApiResponse<List<JourneeCaisseVersementResponse>>> eligibleCashDays() {
         return ResponseEntity.ok(ApiResponse.success(bordereauRemiseService.eligibleCashDays(
                 TenantContext.getCurrentAgence()

@@ -15,6 +15,10 @@ import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.DocumentClientRepository;
 import com.assurance.repository.EcheanceFacturationConventionRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -34,6 +38,17 @@ class DocumentClientDeletionTest {
     @Mock private EcheanceFacturationConventionRepository schedules;
     @Mock private BusinessActivityRecorder activity;
     @InjectMocks private DocumentClientService service;
+
+    @BeforeEach
+    void authorizeDeletionForLifecycleTests() {
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("actor", "unused",
+                "PERM_document-client:delete", "PERM_facture-convention:delete"));
+    }
+
+    @AfterEach
+    void clearSecurity() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     void deletesUnpaidInvoiceReleasesSchedulesAndKeepsAuditSnapshot() {

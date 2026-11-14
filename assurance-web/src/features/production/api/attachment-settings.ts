@@ -45,6 +45,15 @@ export const attachmentSettingsApi = {
     );
   },
 
+  async setTypeActive(id: string, actif: boolean) {
+    return unwrap(
+      await apiFetch<ApiResponse<void>>(`/api/v1/pieces-jointes/types/${id}/actif`, {
+        method: "PUT",
+        body: JSON.stringify({ actif }),
+      }),
+    );
+  },
+
   async deleteType(id: string) {
     return unwrap(
       await apiFetch<ApiResponse<void>>(`/api/v1/pieces-jointes/types/${id}`, {

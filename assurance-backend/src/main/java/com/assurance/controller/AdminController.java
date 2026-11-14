@@ -104,38 +104,54 @@ public class AdminController {
     }
 
     @GetMapping("/users")
+    @PreAuthorize("hasAnyAuthority('PERM_user:view', 'PERM_config:view')")
     public ResponseEntity<ApiResponse<List<AdminUtilisateurResponse>>> users() {
         return ResponseEntity.ok(ApiResponse.success(adminService.listUsers()));
     }
 
     @PostMapping("/users")
+    @PreAuthorize("hasAnyAuthority('PERM_user:create', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> createUser(@Valid @RequestBody UpsertUtilisateurRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.createUser(request), "Utilisateur cree"));
     }
 
     @PutMapping("/users/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_user:update', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> updateUser(@PathVariable Long id, @Valid @RequestBody UpsertUtilisateurRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateUser(id, request), "Utilisateur modifie"));
     }
 
+    @PutMapping("/users/{id}/role")
+    @PreAuthorize("hasAnyAuthority('PERM_user:assign-role', 'PERM_config:manage')")
+    public ResponseEntity<ApiResponse<AdminUtilisateurResponse>> assignUserRole(
+            @PathVariable Long id,
+            @Valid @RequestBody com.assurance.dto.request.AssignUserRoleRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminService.assignUserRole(id, request.roleId()), "Role utilisateur modifie"));
+    }
+
     @DeleteMapping("/users/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_user:deactivate', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<Void>> deactivateUser(@PathVariable Long id) {
         adminService.deactivateUser(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Utilisateur desactive"));
     }
 
     @PutMapping("/users/{id}/password")
+    @PreAuthorize("hasAnyAuthority('PERM_user:reset-password', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<Void>> resetUserPassword(@PathVariable Long id, @Valid @RequestBody ResetUserPasswordRequest request) {
         adminService.resetPassword(id, request);
         return ResponseEntity.ok(ApiResponse.success(null, "Mot de passe modifie"));
     }
 
     @GetMapping("/users/{id}/sessions")
+    @PreAuthorize("hasAnyAuthority('PERM_user:view', 'PERM_config:view')")
     public ResponseEntity<ApiResponse<List<SessionResponse>>> userSessions(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(adminService.listUserSessions(id)));
     }
 
     @DeleteMapping("/users/{id}/sessions/{sessionId}")
+    @PreAuthorize("hasAnyAuthority('PERM_user:revoke-session', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<Void>> revokeUserSession(
             @PathVariable Long id,
             @PathVariable Long sessionId
@@ -145,53 +161,63 @@ public class AdminController {
     }
 
     @DeleteMapping("/users/{id}/sessions")
+    @PreAuthorize("hasAnyAuthority('PERM_user:revoke-session', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<Void>> revokeAllUserSessions(@PathVariable Long id) {
         adminService.revokeAllUserSessions(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Toutes les sessions ont été révoquées"));
     }
 
     @GetMapping("/roles")
+    @PreAuthorize("hasAnyAuthority('PERM_role:view', 'PERM_config:view')")
     public ResponseEntity<ApiResponse<List<AdminRoleResponse>>> roles() {
         return ResponseEntity.ok(ApiResponse.success(adminService.listRoles()));
     }
 
     @PostMapping("/roles")
+    @PreAuthorize("hasAnyAuthority('PERM_role:create', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<AdminRoleResponse>> createRole(@Valid @RequestBody UpsertRoleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.createRole(request), "Role cree"));
     }
 
     @PutMapping("/roles/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_role:update', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<AdminRoleResponse>> updateRole(@PathVariable Long id, @Valid @RequestBody UpsertRoleRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateRole(id, request), "Role modifie"));
     }
 
     @DeleteMapping("/roles/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_role:delete', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<Void>> deleteRole(@PathVariable Long id) {
         adminService.deleteRole(id);
         return ResponseEntity.ok(ApiResponse.success(null, "Role supprime"));
     }
 
     @GetMapping("/permissions")
+    @PreAuthorize("hasAnyAuthority('PERM_role:view', 'PERM_config:view')")
     public ResponseEntity<ApiResponse<List<AdminPermissionResponse>>> permissions() {
         return ResponseEntity.ok(ApiResponse.success(adminService.listPermissions()));
     }
 
     @GetMapping("/agencies")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:view', 'PERM_config:view', 'PERM_agence:manage-self')")
     public ResponseEntity<ApiResponse<List<AdminAgenceResponse>>> agencies() {
         return ResponseEntity.ok(ApiResponse.success(adminService.listAgencies()));
     }
 
     @PostMapping("/agencies")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:create', 'PERM_config:manage')")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> createAgency(@Valid @RequestBody UpsertAgenceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.createAgency(request), "Agence creee"));
     }
 
     @PutMapping("/agencies/{id}")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:update', 'PERM_config:manage', 'PERM_agence:manage-self')")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgency(@PathVariable Long id, @Valid @RequestBody UpsertAgenceRequest request) {
         return ResponseEntity.ok(ApiResponse.success(adminService.updateAgency(id, request), "Agence modifiee"));
     }
 
     @PostMapping(value = "/agencies/{id}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_agence:update', 'PERM_config:manage', 'PERM_agence:manage-self')")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgencyLogo(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file
@@ -200,6 +226,7 @@ public class AdminController {
     }
 
     @GetMapping("/agencies/{id}/logo")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:view', 'PERM_config:view', 'PERM_agence:manage-self')")
     public ResponseEntity<Resource> agencyLogo(@PathVariable Long id) {
         AdminService.AgencyLogo logo = adminService.getAgencyLogo(id);
         return ResponseEntity.ok()
@@ -212,11 +239,13 @@ public class AdminController {
     }
 
     @DeleteMapping("/agencies/{id}/logo")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:update', 'PERM_config:manage', 'PERM_agence:manage-self')")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> deleteAgencyLogo(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(adminService.deleteAgencyLogo(id), "Logo agence supprimé"));
     }
 
     @PostMapping(value = "/agencies/{id}/signature", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PERM_agence:update', 'PERM_config:manage', 'PERM_agence:manage-self')")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> updateAgencySignature(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file
@@ -228,6 +257,7 @@ public class AdminController {
     }
 
     @GetMapping("/agencies/{id}/signature")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:view', 'PERM_config:view', 'PERM_agence:manage-self')")
     public ResponseEntity<Resource> agencySignature(@PathVariable Long id) {
         AdminService.AgencySignature signature = adminService.getAgencySignature(id);
         return ResponseEntity.ok()
@@ -240,6 +270,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/agencies/{id}/signature")
+    @PreAuthorize("hasAnyAuthority('PERM_agence:update', 'PERM_config:manage', 'PERM_agence:manage-self')")
     public ResponseEntity<ApiResponse<AdminAgenceResponse>> deleteAgencySignature(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
                 adminService.deleteAgencySignature(id),

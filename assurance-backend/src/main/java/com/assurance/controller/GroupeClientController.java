@@ -27,19 +27,26 @@ public class GroupeClientController {
     private final GroupeClientService groupeClientService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew', 'PERM_avenant:create', 'PERM_avenant:update-draft', 'PERM_avenant:rectify', 'PERM_document-client:view', 'PERM_groupe-client:view')")
     public ResponseEntity<ApiResponse<List<GroupeClientResponse>>> list() {
         return ResponseEntity.ok(ApiResponse.success(groupeClientService.list(TenantContext.getCurrentAgence())));
     }
 
+    @GetMapping("/options")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_document-client:view', 'PERM_reglement-client:view', 'PERM_instrument-reglement:view', 'PERM_bordereau-compagnie:view')")
+    public ResponseEntity<ApiResponse<List<com.assurance.dto.response.GroupeClientLookupResponse>>> lookupOptions() {
+        return ResponseEntity.ok(ApiResponse.success(
+                groupeClientService.lookupOptions(TenantContext.getCurrentAgence())));
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_client:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew', 'PERM_avenant:create', 'PERM_avenant:update-draft', 'PERM_avenant:rectify', 'PERM_document-client:view', 'PERM_groupe-client:view')")
     public ResponseEntity<ApiResponse<GroupeClientResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(groupeClientService.get(TenantContext.getCurrentAgence(), id)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    @PreAuthorize("hasAuthority('PERM_groupe-client:create')")
     public ResponseEntity<ApiResponse<GroupeClientResponse>> create(@Valid @RequestBody UpsertGroupeClientRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 groupeClientService.create(TenantContext.getCurrentAgence(), request),
@@ -48,7 +55,7 @@ public class GroupeClientController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_client:manage', 'PERM_client:create')")
+    @PreAuthorize("hasAuthority('PERM_groupe-client:update')")
     public ResponseEntity<ApiResponse<GroupeClientResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGroupeClientRequest request

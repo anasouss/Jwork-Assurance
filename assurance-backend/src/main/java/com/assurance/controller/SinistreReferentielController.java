@@ -29,7 +29,7 @@ public class SinistreReferentielController {
     private final SinistreIntervenantService intervenantService;
 
     @GetMapping("/experts")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:referentiel', 'PERM_sinistre:create')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create', 'PERM_prestataire-sinistre:view')")
     public ResponseEntity<ApiResponse<List<SinistreIntervenantResponse>>> listExperts(
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @RequestParam(required = false) Long villeId
@@ -42,7 +42,7 @@ public class SinistreReferentielController {
     }
 
     @PostMapping("/experts")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:create')")
     public ResponseEntity<ApiResponse<SinistreIntervenantResponse>> createExpert(
             @Valid @RequestBody UpsertExpertSinistreRequest request
     ) {
@@ -50,7 +50,7 @@ public class SinistreReferentielController {
     }
 
     @PutMapping("/experts/{id}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreIntervenantResponse>> updateExpert(
             @PathVariable Long id,
             @Valid @RequestBody UpsertExpertSinistreRequest request
@@ -59,7 +59,7 @@ public class SinistreReferentielController {
     }
 
     @GetMapping("/garages")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:referentiel', 'PERM_sinistre:create')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create', 'PERM_prestataire-sinistre:view')")
     public ResponseEntity<ApiResponse<List<SinistreIntervenantResponse>>> listGarages(
             @RequestParam(defaultValue = "false") boolean includeInactive
     ) {
@@ -70,7 +70,7 @@ public class SinistreReferentielController {
     }
 
     @PostMapping("/garages")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:create')")
     public ResponseEntity<ApiResponse<SinistreIntervenantResponse>> createGarage(
             @Valid @RequestBody UpsertGarageSinistreRequest request
     ) {
@@ -78,7 +78,7 @@ public class SinistreReferentielController {
     }
 
     @PutMapping("/garages/{id}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:update')")
     public ResponseEntity<ApiResponse<SinistreIntervenantResponse>> updateGarage(
             @PathVariable Long id,
             @Valid @RequestBody UpsertGarageSinistreRequest request

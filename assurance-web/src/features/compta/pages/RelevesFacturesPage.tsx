@@ -103,7 +103,9 @@ export default function RelevesFacturesPage() {
   const requestedPayerType = urlState.payerType;
   const requestedPayerId = urlState.payerId;
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canIssue = permissions.includes("quittance:create") || permissions.includes("quittance:manage");
+  const canIssue = permissions.includes("document-client:issue");
+  const canRevise = permissions.includes("document-client:revise");
+  const canCancel = permissions.includes("document-client:cancel");
   const [sourceFilters, setSourceFilters] = useState(urlState.sourceFilters);
   const [documentFilters, setDocumentFilters] = useState(urlState.documentFilters);
   const [selected, setSelected] = useState<Record<string, ClientDocumentSource>>({});
@@ -123,8 +125,8 @@ export default function RelevesFacturesPage() {
   }, [urlState]);
 
   const requestedClient = useQuery({
-    queryKey: ["crm-client", requestedPayerId],
-    queryFn: () => clientApi.getClientCrm(requestedPayerId),
+    queryKey: ["payer-client-option", requestedPayerId],
+    queryFn: () => clientApi.clientOption(requestedPayerId),
     enabled: Boolean(requestedPayerId) && requestedPayerType === "CLIENT",
     staleTime: 30_000,
   });
@@ -225,8 +227,8 @@ export default function RelevesFacturesPage() {
       return;
     }
     if (selectedPayer?.id === requestedPayerId && selectedPayer.type === requestedPayerType) return;
-    if (requestedPayerType === "CLIENT" && requestedClient.data?.client) {
-      const client = requestedClient.data.client;
+    if (requestedPayerType === "CLIENT" && requestedClient.data) {
+      const client = requestedClient.data;
       setSelectedPayer({
         type: "CLIENT",
         id: client.id,
@@ -245,7 +247,7 @@ export default function RelevesFacturesPage() {
         name: group.libelle,
         identifier: group.code,
         treasuryName: group.clientTresorerieNom || undefined,
-        memberCount: group.membres.length,
+        memberCount: group.nombreMembres,
       });
     }
   }, [
@@ -613,8 +615,8 @@ export default function RelevesFacturesPage() {
             onNext={() => updateUrl({ documentPage: urlState.documentPage + 1 })}
             onDetail={setDetailId}
             onInvoice={canIssue ? setInvoiceFromStatementId : undefined}
-            onRevise={canIssue ? setRevisionTarget : undefined}
-            onCancel={canIssue ? setCancelTarget : undefined}
+            onRevise={canRevise ? setRevisionTarget : undefined}
+            onCancel={canCancel ? setCancelTarget : undefined}
           />
         </div>
       )}
@@ -633,11 +635,11 @@ export default function RelevesFacturesPage() {
         id={detailId}
         onOpenChange={(open) => !open && setDetailId(undefined)}
         onNavigate={setDetailId}
-        onRevise={canIssue ? (document) => {
+        onRevise={canRevise ? (document) => {
           setDetailId(undefined);
           setRevisionTarget(document);
         } : undefined}
-        onCancel={canIssue ? (document) => {
+        onCancel={canCancel ? (document) => {
           setDetailId(undefined);
           setCancelTarget(document);
         } : undefined}

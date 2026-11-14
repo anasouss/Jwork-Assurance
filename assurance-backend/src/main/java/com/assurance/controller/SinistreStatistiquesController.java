@@ -20,7 +20,7 @@ public class SinistreStatistiquesController {
     private final SinistreStatistiquesService statistiquesService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage', 'PERM_sinistre:finance')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<ApiResponse<SinistreStatistiquesResponse>> get(@RequestParam(required = false) Integer annee) {
         return ResponseEntity.ok(ApiResponse.success(statistiquesService.get(TenantContext.getCurrentAgence(), annee)));
     }

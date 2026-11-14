@@ -51,7 +51,7 @@ export default function ProductionDashboardPage() {
     { title: "Registre de production", icon: FileText, href: "/app/production/registre", permission: "contrat:view" },
     { title: "Portefeuille client", icon: Users, permission: "client:view", modal: "portfolio" },
     { title: "Prospection", icon: Target, href: "/app/production/prospection", permission: "contrat:view" },
-    { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "contrat:view" },
+    { title: "Gestion du stock", icon: Archive, href: "/app/production/attestations-stock", permission: "attestation-stock:view" },
   ];
   const actions = allActions.filter((item) => !item.permission || permissions.includes(item.permission));
 

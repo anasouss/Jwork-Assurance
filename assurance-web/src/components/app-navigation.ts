@@ -19,7 +19,7 @@ import {
   UserCog,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { MODULE_PERMISSION_PREFIXES } from "@/lib/authorization";
+import { MODULE_PERMISSION_PREFIXES, permissionRequirementForPath, satisfiesPermissionRequirement } from "@/lib/authorization";
 
 export type AppModule = {
   title: string;
@@ -39,7 +39,7 @@ export type AppNavigationItem = AppModule & {
 };
 
 export const appModules: AppModule[] = [
-  { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true, permissions: ["contrat:view", "quittance:view"] },
+  { title: "Dashboard", url: "/app", icon: LayoutDashboard, exact: true, permissions: ["contrat:view", "quittance-affectation:view"] },
   { title: "Production", url: "/app/production", icon: BadgeCheck, permissionPrefixes: MODULE_PERMISSION_PREFIXES.production },
   { title: "Sinistre", url: "/app/sinistre", icon: LifeBuoy, permissionPrefixes: MODULE_PERMISSION_PREFIXES.sinistre },
   { title: "Compagnies", url: "/app/companies", icon: Building2, permissionPrefixes: MODULE_PERMISSION_PREFIXES.companies },
@@ -55,40 +55,40 @@ export const appModules: AppModule[] = [
 
 export const appNavigation: AppNavigationItem[] = [
   { module: "dashboard", title: "Vue plateforme", url: "/app/platform", icon: LayoutDashboard, platformOnly: true },
-  { module: "dashboard", title: "Vue générale", url: "/app", icon: LayoutDashboard, exact: true, permissions: ["contrat:view", "quittance:view"], requiresAgencyContext: true },
-  { module: "production", title: "Tableau de bord", url: "/app/production", icon: ShieldCheck, exact: true, permission: "contrat:view" },
-  { module: "production", title: "Ajouter dossier", url: "/app/production/ajouter-dossier", icon: FilePlus2, permission: "contrat:create" },
-  { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files, permission: "contrat:view" },
-  { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes, permission: "attestation-stock:view" },
-  { module: "production", title: "Commandes attestations", url: "/app/production/attestations-stock/commandes", icon: ClipboardList, permission: "attestation-stock:view" },
-  { module: "production", title: "Réceptions attestations", url: "/app/production/attestations-stock/receptions", icon: Truck, permission: "attestation-stock:view" },
-  { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings, permission: "referentiel:view" },
-  { module: "sinistre", title: "Module sinistres", url: "/app/sinistre", icon: LayoutDashboard, exact: true, permissionPrefixes: MODULE_PERMISSION_PREFIXES.sinistre },
-  { module: "sinistre", title: "Consultation et suivi", url: "/app/sinistre/dossiers", icon: Files, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { module: "sinistre", title: "Nouvelle ouverture", url: "/app/sinistre/declarer", icon: FilePlus2, permission: "sinistre:create" },
-  { module: "sinistre", title: "Registre des sinistres", url: "/app/sinistre/registre", icon: ScrollText, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { module: "sinistre", title: "Statistiques", url: "/app/sinistre/statistiques", icon: ClipboardList, permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"] },
-  { module: "sinistre", title: "Prestataires", url: "/app/sinistre/prestataires", icon: Users, permission: "sinistre:referentiel" },
-  { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true, permissionPrefixes: MODULE_PERMISSION_PREFIXES.companies },
-  { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2, permission: "referentiel:view" },
-  { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files, permission: "referentiel:view" },
-  { module: "companies", title: "Grilles tarifaires", url: "/app/companies/grilles-tarifaires", icon: Calculator, permissions: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"] },
-  { module: "companies", title: "Contacts", url: "/app/companies/contacts", icon: Users, permissions: ["contact-compagnie:view", "contact-compagnie:manage"] },
-  { module: "crm", title: "Clients", url: "/app/crm", icon: Users, exact: true, permission: "client:view" },
-  { module: "crm", title: "Paramètres", url: "/app/crm/parametres", icon: Settings, permission: "client:manage" },
-  { module: "compta", title: "Tableau de bord", url: "/app/compta", icon: LayoutDashboard, exact: true, permissions: ["quittance:view", "reglement-client:view", "tresorerie:view", "bordereau-compagnie:view", "reglement-compagnie:view"] },
-  { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator, permission: "quittance:view" },
-  { module: "compta", title: "Relevés et factures", url: "/app/compta/releves-factures", icon: FileText, permission: "quittance:view" },
-  { module: "compta", title: "Département conventions", url: "/app/compta/conventions", icon: ReceiptText, permissions: ["quittance:view", "reglement-client:view"] },
-  { module: "compta", title: "Encaissements en attente", url: "/app/compta/tresorerie/encaissements-en-attente", icon: Hourglass, permission: "tresorerie:view" },
-  { module: "compta", title: "Bordereaux bancaires", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText, permission: "tresorerie:view" },
-  { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2, permission: "bordereau-compagnie:view" },
-  { module: "compta", title: "Paramètres", url: "/app/compta/parametres", icon: Settings, permission: "tresorerie:view" },
-  { module: "admin", title: "Utilisateurs", url: "/app/admin/utilisateurs", icon: Users, permissions: ["user:view", "user:manage", "config:view", "config:manage"] },
-  { module: "admin", title: "Rôles & permissions", url: "/app/admin/roles", icon: UserCog, permissions: ["role:view", "role:manage", "config:view", "config:manage"] },
-  { module: "admin", title: "Audit", url: "/app/admin/audit", icon: ClipboardList, permission: "audit:view" },
-  { module: "admin", title: "Mon agence", url: "/app/admin/agence", icon: Building2, permissions: ["agence:view", "agence:manage-self", "config:view"], requiresAgencyContext: true },
-  { module: "admin", title: "Agences", url: "/app/admin/agences", icon: Building2, permissions: ["agence:view", "agence:create", "config:view", "config:manage"], platformOnly: true },
+  { module: "dashboard", title: "Vue générale", url: "/app", icon: LayoutDashboard, exact: true, permissions: ["contrat:view", "quittance-affectation:view"], requiresAgencyContext: true },
+  { module: "production", title: "Tableau de bord", url: "/app/production", icon: ShieldCheck, exact: true },
+  { module: "production", title: "Ajouter dossier", url: "/app/production/ajouter-dossier", icon: FilePlus2 },
+  { module: "production", title: "Contrats", url: "/app/production/contrats", icon: Files },
+  { module: "production", title: "Stock attestations", url: "/app/production/attestations-stock", icon: Boxes },
+  { module: "production", title: "Commandes attestations", url: "/app/production/attestations-stock/commandes", icon: ClipboardList },
+  { module: "production", title: "Réceptions attestations", url: "/app/production/attestations-stock/receptions", icon: Truck },
+  { module: "production", title: "Paramètres", url: "/app/production/parametres", icon: Settings },
+  { module: "sinistre", title: "Module sinistres", url: "/app/sinistre", icon: LayoutDashboard, exact: true },
+  { module: "sinistre", title: "Consultation et suivi", url: "/app/sinistre/dossiers", icon: Files },
+  { module: "sinistre", title: "Nouvelle ouverture", url: "/app/sinistre/declarer", icon: FilePlus2 },
+  { module: "sinistre", title: "Registre des sinistres", url: "/app/sinistre/registre", icon: ScrollText },
+  { module: "sinistre", title: "Statistiques", url: "/app/sinistre/statistiques", icon: ClipboardList },
+  { module: "sinistre", title: "Prestataires", url: "/app/sinistre/prestataires", icon: Users },
+  { module: "companies", title: "Module compagnies", url: "/app/companies", icon: Building2, exact: true },
+  { module: "companies", title: "Liste des compagnies", url: "/app/companies/liste", icon: Building2 },
+  { module: "companies", title: "Conventions", url: "/app/companies/conventions", icon: Files },
+  { module: "companies", title: "Grilles tarifaires", url: "/app/companies/grilles-tarifaires", icon: Calculator },
+  { module: "companies", title: "Contacts", url: "/app/companies/contacts", icon: Users },
+  { module: "crm", title: "Clients", url: "/app/crm", icon: Users, exact: true },
+  { module: "crm", title: "Paramètres", url: "/app/crm/parametres", icon: Settings },
+  { module: "compta", title: "Tableau de bord", url: "/app/compta", icon: LayoutDashboard, exact: true },
+  { module: "compta", title: "Affectation des quittances", url: "/app/compta/quittances", icon: Calculator },
+  { module: "compta", title: "Relevés et factures", url: "/app/compta/releves-factures", icon: FileText },
+  { module: "compta", title: "Département conventions", url: "/app/compta/conventions", icon: ReceiptText },
+  { module: "compta", title: "Encaissements en attente", url: "/app/compta/tresorerie/encaissements-en-attente", icon: Hourglass },
+  { module: "compta", title: "Bordereaux bancaires", url: "/app/compta/tresorerie/bordereaux-remise", icon: ScrollText },
+  { module: "compta", title: "Bordereaux compagnies", url: "/app/compta/bordereaux-compagnies", icon: Building2 },
+  { module: "compta", title: "Paramètres", url: "/app/compta/parametres", icon: Settings },
+  { module: "admin", title: "Utilisateurs", url: "/app/admin/utilisateurs", icon: Users },
+  { module: "admin", title: "Rôles & permissions", url: "/app/admin/roles", icon: UserCog },
+  { module: "admin", title: "Audit", url: "/app/admin/audit", icon: ClipboardList },
+  { module: "admin", title: "Mon agence", url: "/app/admin/agence", icon: Building2, requiresAgencyContext: true },
+  { module: "admin", title: "Agences", url: "/app/admin/agences", icon: Building2, platformOnly: true },
   { module: "admin", title: "Administrateurs plateforme", url: "/app/admin/administrateurs-plateforme", icon: ShieldCheck, platformOnly: true },
 ];
 
@@ -109,13 +109,14 @@ export function canSeeNavigationItem(
       return false;
     }
   }
+  if (item.permissionPrefixes?.length) {
+    return item.permissionPrefixes.some(prefix =>
+      userPermissions.some(permission => permission.startsWith(`${prefix}:`)));
+  }
+  const requirement = permissionRequirementForPath(item.url);
+  if (requirement) return satisfiesPermissionRequirement(userPermissions, requirement);
   if (item.permissions?.length) {
     return item.permissions.some((permission) => userPermissions.includes(permission));
-  }
-  if (item.permissionPrefixes?.length) {
-    return item.permissionPrefixes.some((prefix) =>
-      userPermissions.some((permission) => permission.startsWith(`${prefix}:`))
-    );
   }
   return !item.permission || userPermissions.includes(item.permission);
 }

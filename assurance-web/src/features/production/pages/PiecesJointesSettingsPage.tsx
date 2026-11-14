@@ -5,8 +5,10 @@ import { Edit2, Plus, Power, PowerOff, Search, Settings2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuthStore } from "@/store/auth-store";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -57,6 +59,7 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function PiecesJointesSettingsPage() {
+  const canChangeStatus = useAuthStore(state => state.user?.permissions.includes("type-piece-jointe:deactivate") ?? false);
   const queryClient = useQueryClient();
   const [editingRule, setEditingRule] = useState<TypePieceJointe | null>(null);
   const [selectedDocumentKey, setSelectedDocumentKey] = useState<string | null>(null);
@@ -127,7 +130,7 @@ export default function PiecesJointesSettingsPage() {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (rule: TypePieceJointe) => attachmentSettingsApi.updateType(rule.id, typeToPayload(rule, rule.actif === false)),
+    mutationFn: (rule: TypePieceJointe) => attachmentSettingsApi.setTypeActive(rule.id, rule.actif === false),
     onSuccess: async (_, rule) => {
       await queryClient.invalidateQueries({ queryKey: ["pieces-jointes-types"] });
       toast.success(rule.actif === false ? "Règle activée" : "Règle désactivée");
@@ -192,7 +195,7 @@ export default function PiecesJointesSettingsPage() {
           <h1 className="text-xl font-semibold tracking-tight">Pièces jointes</h1>
           <p className="text-sm text-muted-foreground">Un document peut être utilisé par plusieurs mouvements avec des règles différentes.</p>
         </div>
-        <Button type="button" onClick={openCreateDocument}><Plus className="size-4" />Ajouter un document</Button>
+        <PermissionButton permission="type-piece-jointe:create" type="button" onClick={openCreateDocument}><Plus className="size-4" />Ajouter un document</PermissionButton>
       </div>
 
       <Card className="border-border/70 shadow-none">
@@ -300,7 +303,7 @@ export default function PiecesJointesSettingsPage() {
                 rule={selectedDocument.rules[0]} />}
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">Chaque ligne définit un contexte dans lequel ce document est attendu.</p>
-                <Button type="button" size="sm" onClick={openCreateRule}><Plus className="size-4" />Ajouter une règle</Button>
+                <PermissionButton permission="type-piece-jointe:create" type="button" size="sm" onClick={openCreateRule}><Plus className="size-4" />Ajouter une règle</PermissionButton>
               </div>
               <div className="overflow-hidden rounded-md border">
                 <Table>
@@ -320,10 +323,10 @@ export default function PiecesJointesSettingsPage() {
                         {rule.systeme ? <Badge variant="outline">Système</Badge> : null}
                       </span></TableCell>
                       <TableCell className="text-right">
-                        <Button type="button" variant="ghost" size="icon" className="size-8" title="Modifier" onClick={() => openEditRule(rule)}><Edit2 className="size-4" /></Button>
-                        <Button type="button" variant="ghost" size="icon" className={rule.actif === false ? "size-8 text-emerald-700" : "size-8 text-destructive"} title={rule.actif === false ? "Activer" : "Désactiver"} disabled={toggleMutation.isPending && toggleMutation.variables?.id === rule.id} onClick={() => toggleMutation.mutate(rule)}>
+                        <PermissionButton permission="type-piece-jointe:update" type="button" variant="ghost" size="icon" className="size-8" title="Modifier" onClick={() => openEditRule(rule)}><Edit2 className="size-4" /></PermissionButton>
+                        <PermissionButton permission="type-piece-jointe:deactivate" type="button" variant="ghost" size="icon" className={rule.actif === false ? "size-8 text-emerald-700" : "size-8 text-destructive"} title={rule.actif === false ? "Activer" : "Désactiver"} disabled={toggleMutation.isPending && toggleMutation.variables?.id === rule.id} onClick={() => toggleMutation.mutate(rule)}>
                           {rule.actif === false ? <Power className="size-4" /> : <PowerOff className="size-4" />}
-                        </Button>
+                        </PermissionButton>
                       </TableCell>
                     </TableRow>
                   ))}</TableBody>
@@ -375,10 +378,10 @@ export default function PiecesJointesSettingsPage() {
                 </Select></Field>
                 <div className="grid content-end gap-2 pb-1 text-sm">
                   <label className="flex items-center gap-2"><Checkbox checked={form.obligatoire} onCheckedChange={(checked) => setForm((current) => ({ ...current, obligatoire: checked === true }))} />Obligatoire</label>
-                  <label className="flex items-center gap-2"><Checkbox checked={form.actif} onCheckedChange={(checked) => setForm((current) => ({ ...current, actif: checked === true }))} />Actif</label>
+                  <label className="flex items-center gap-2"><Checkbox disabled={Boolean(editingRule) && !canChangeStatus} checked={form.actif} onCheckedChange={(checked) => setForm((current) => ({ ...current, actif: checked === true }))} />Actif</label>
                 </div>
               </div>
-              <DialogFooter><Button type="button" variant="outline" onClick={closeRuleEditor}>Annuler</Button><Button type="submit" disabled={saveMutation.isPending}>{editingRule ? "Modifier" : "Ajouter"}</Button></DialogFooter>
+              <DialogFooter><Button type="button" variant="outline" onClick={closeRuleEditor}>Annuler</Button><PermissionButton permission={editingRule ? "type-piece-jointe:update" : "type-piece-jointe:create"} type="submit" disabled={saveMutation.isPending}>{editingRule ? "Modifier" : "Ajouter"}</PermissionButton></DialogFooter>
             </form>
           )}
         </DialogContent>
@@ -413,7 +416,7 @@ function DocumentPolicyEditor({ natureId, rule }: { natureId: string; rule: Type
         {owner === "CLIENT" && <><SelectItem value="CLIENT_CIN">CIN du client</SelectItem><SelectItem value="CLIENT_PASSPORT">Passeport du client</SelectItem><SelectItem value="CLIENT_PERMIS">Permis du client</SelectItem></>}
         {owner === "VEHICULE" && <SelectItem value="VEHICULE_CARTE_GRISE">Carte grise du véhicule</SelectItem>}
       </SelectContent></Select></Field>
-    <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Enregistrer</Button>
+    <PermissionButton permission="type-piece-jointe:update" type="button" variant="outline" disabled={mutation.isPending} onClick={() => mutation.mutate()}>Enregistrer</PermissionButton>
   </div>;
 }
 
@@ -450,21 +453,6 @@ function typeToForm(rule: TypePieceJointe): FormState {
     obligatoire: Boolean(rule.obligatoire),
     actif: rule.actif !== false,
     ordreAffichage: rule.ordreAffichage == null ? "" : String(rule.ordreAffichage),
-  };
-}
-
-function typeToPayload(rule: TypePieceJointe, actif: boolean): UpsertTypePieceJointeRequest {
-  return {
-    libelle: rule.naturePieceJointeLibelle ?? rule.libelle,
-    naturePieceJointeId: rule.naturePieceJointeId ?? null,
-    brancheAssuranceId: rule.brancheAssuranceId ?? null,
-    typeAssistance: rule.typeAssistance ?? null,
-    typeContrat: rule.typeContrat ?? null,
-    typeClient: rule.typeClient ?? null,
-    typeMouvementId: rule.typeMouvementId ?? null,
-    obligatoire: Boolean(rule.obligatoire),
-    actif,
-    ordreAffichage: rule.ordreAffichage ?? null,
   };
 }
 

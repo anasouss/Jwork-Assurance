@@ -55,7 +55,8 @@ export default function InstrumentsTresoreriePage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
+  const canDeposit = permissions.includes("bordereau-remise:deposit");
+  const canDelete = permissions.includes("bordereau-remise:delete");
   const type = parseTypeFilter(searchParams.get("type"));
   const status = parseStatusFilter(searchParams.get("statut"));
   const appliedSearch = searchParams.get("search") ?? "";
@@ -240,7 +241,7 @@ export default function InstrumentsTresoreriePage() {
                         <Eye className="size-4" /> Voir le détail
                       </Link>
                     </DropdownMenuItem>
-                    {slip.statut === "BROUILLON" && canManage ? (
+                    {slip.statut === "BROUILLON" && canDeposit ? (
                       <DropdownMenuItem onSelect={() => openDeposit(slip)}>
                         <CheckCircle2 className="size-4 text-blue-600 dark:text-blue-400" /> Valider le bordereau
                       </DropdownMenuItem>
@@ -253,8 +254,8 @@ export default function InstrumentsTresoreriePage() {
                       <Download className="size-4" />
                       {pdfAction?.id === slip.id && pdfAction.type === "download" ? "Téléchargement..." : "Télécharger le PDF"}
                     </DropdownMenuItem>
-                    {slip.statut === "BROUILLON" && canManage ? <DropdownMenuSeparator /> : null}
-                    {slip.statut === "BROUILLON" && canManage ? (
+                    {slip.statut === "BROUILLON" && canDelete ? <DropdownMenuSeparator /> : null}
+                    {slip.statut === "BROUILLON" && canDelete ? (
                       <DropdownMenuItem
                         variant="destructive"
                         disabled={deleteDraft.isPending}

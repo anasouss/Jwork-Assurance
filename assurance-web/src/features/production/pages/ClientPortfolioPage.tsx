@@ -31,11 +31,11 @@ const EMPTY_CONTRACTS: PortfolioContract[] = [];
 export default function ClientPortfolioPage() {
   const { clientId = "" } = useParams();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canViewDocuments = permissions.includes("quittance:view");
+  const canViewDocuments = permissions.includes("document-client:view");
   const canViewReceivables = permissions.includes("reglement-client:view");
-  const canViewTreasury = permissions.includes("tresorerie:view");
+  const canViewTreasury = permissions.includes("instrument-reglement:view");
   const canViewCompanyAccounting = permissions.includes("bordereau-compagnie:view");
-  const canViewClaims = ["sinistre:view", "sinistre:manage", "sinistre:finance"].some((permission) => permissions.includes(permission));
+  const canViewClaims = ["sinistre:view"].some((permission) => permissions.includes(permission));
   const [branchId, setBranchId] = useState("ALL");
   const [selectedContractId, setSelectedContractId] = useState("ALL");
 
@@ -155,7 +155,7 @@ export default function ClientPortfolioPage() {
 
       <PortfolioRow
         main={<ClientIdentity portfolio={portfolio} />}
-        documents={<DocumentPanel title="Documents client" description="Pièces d'identité et justificatifs." tone="blue"><ClientDocuments clientId={client.id} typeClient={client.typeClient} owner={client} /></DocumentPanel>}
+        documents={permissions.includes("document-crm:view") ? <DocumentPanel title="Documents client" description="Pièces d'identité et justificatifs." tone="blue"><ClientDocuments clientId={client.id} typeClient={client.typeClient} owner={client} /></DocumentPanel> : undefined}
       />
 
       {selectedContract ? (

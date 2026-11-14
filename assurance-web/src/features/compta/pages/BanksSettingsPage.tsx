@@ -5,6 +5,7 @@ import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -27,7 +28,7 @@ type BankDraft = Omit<BankReference, "id" | "aliases"> & {
 export default function BanksSettingsPage() {
   const queryClient = useQueryClient();
   const canManage = useAuthStore((state) => state.user?.permissions ?? [])
-    .includes("tresorerie:manage");
+    .some(code => code === "banque:create" || code === "banque:update");
   const [draft, setDraft] = useState<BankDraft>();
   const banks = useQuery({
     queryKey: ["compta", "banks", "administration"],
@@ -89,10 +90,10 @@ export default function BanksSettingsPage() {
           </p>
         </div>
         {canManage ? (
-          <Button type="button" onClick={startCreate} disabled={Boolean(draft)}>
+          <PermissionButton permission="banque:create" type="button" onClick={startCreate} disabled={Boolean(draft)}>
             <Plus className="size-4" />
             Ajouter une banque
-          </Button>
+          </PermissionButton>
         ) : null}
       </header>
 
@@ -141,13 +142,13 @@ export default function BanksSettingsPage() {
             <Button type="button" variant="outline" onClick={() => setDraft(undefined)}>
               Annuler
             </Button>
-            <Button
+            <PermissionButton permission={draft?.id ? "banque:update" : "banque:create"}
               type="button"
               disabled={!draft.code.trim() || !draft.libelle.trim() || saveBank.isPending}
               onClick={() => saveBank.mutate(draft)}
             >
               {saveBank.isPending ? "Enregistrement..." : "Enregistrer"}
-            </Button>
+            </PermissionButton>
           </div>
         </section>
       ) : null}
@@ -185,7 +186,7 @@ export default function BanksSettingsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                   {canManage ? (
-                    <Button
+                    <PermissionButton permission="banque:update"
                       type="button"
                       size="icon"
                       variant="ghost"
@@ -193,7 +194,7 @@ export default function BanksSettingsPage() {
                       onClick={() => startEdit(bank)}
                     >
                       <Pencil className="size-4" />
-                    </Button>
+                    </PermissionButton>
                   ) : null}
                 </TableCell>
               </TableRow>

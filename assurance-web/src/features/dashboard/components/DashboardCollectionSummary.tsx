@@ -10,8 +10,8 @@ import { formatTreasuryDate } from "@/features/compta/pages/treasury-format";
 
 export function DashboardCollectionSummary({ dateReference }: { dateReference: string }) {
   const user = useAuthStore(state => state.user);
-  const canReadBalances = user?.permissions.includes("quittance:view") ?? false;
-  const canReadTreasury = user?.permissions.includes("tresorerie:view") ?? false;
+  const canReadBalances = user?.permissions.includes("document-client:view") ?? false;
+  const canReadTreasury = user?.permissions.includes("instrument-reglement:view") ?? false;
   const balances = useQuery({
     queryKey: ["agency-dashboard", "collections", user?.agenceId, "balances"],
     queryFn: () => comptaApi.searchClientDocumentSources({ page: 0, size: 1 }),

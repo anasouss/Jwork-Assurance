@@ -88,13 +88,14 @@ type Instrument = ClientPayment["instruments"][number];
 function InstrumentLifecycle({ payment, instrument, onSelect }: {
   payment: ClientPayment; instrument: Instrument; onSelect: (id: string) => void;
 }) {
-  const canViewTreasury = useAuthStore(state => state.user?.permissions.includes("tresorerie:view") ?? false);
+  const canViewTreasury = useAuthStore(state => state.user?.permissions.includes("bordereau-remise:view") ?? false);
+  const canViewHistory = useAuthStore(state => state.user?.permissions.includes("instrument-reglement:view") ?? false);
   const paper = instrument.mode === "CHEQUE" || instrument.mode === "EFFET";
   const hasRejection = Boolean(instrument.dateRejet || (instrument.statut === "REJETE" && payment.statut !== "ANNULE"));
   const history = useQuery({
     queryKey: ["compta", "treasury", "bank-rejections", instrument.id, "history"],
     queryFn: () => comptaApi.bankRejectionHistory(instrument.id),
-    enabled: canViewTreasury && paper && hasRejection,
+    enabled: canViewHistory && paper && hasRejection,
     refetchOnMount: "always",
   });
   const remittance = useQuery({

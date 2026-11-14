@@ -35,11 +35,12 @@ const emptyFilters = { conventionId: "ALL", companyId: "ALL", search: "", dateDu
 export default function ConventionCollectionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canView = permissions.includes("reglement-client:view");
-  const canViewDocuments = permissions.includes("quittance:view");
-  const canCreate = canView && (permissions.includes("reglement-client:create") || permissions.includes("reglement-client:manage"));
-  const canPayRefund = permissions.includes("reglement-client:manage");
-  const canDelete = canViewDocuments && permissions.includes("quittance:manage");
-  const canCancel = canViewDocuments && (permissions.includes("quittance:create") || permissions.includes("quittance:manage"));
+  const canViewDocuments = permissions.includes("facture-convention:view");
+  const canCollect = permissions.includes("reglement-client:create");
+  const canCreate = canView && (canCollect || permissions.includes("reglement-client:refund"));
+  const canPayRefund = permissions.includes("reglement-client:refund");
+  const canDelete = canViewDocuments && permissions.includes("facture-convention:delete");
+  const canCancel = canViewDocuments && permissions.includes("facture-convention:cancel");
   const [documentAction, setDocumentAction] = useState<{ id: string; action: "delete" | "cancel" }>();
   const [openingPdf, setOpeningPdf] = useState(false);
   const navigate = useNavigate();
@@ -52,9 +53,9 @@ export default function ConventionCollectionsPage() {
   const validYear = Number.isInteger(year) && year >= 1900 && year <= 2200;
   const options = useQuery({
     queryKey: ["compta", "convention-billing-options", year],
-    queryFn: () => comptaApi.conventionBillingOptions(year), enabled: canView && canViewDocuments && validYear,
+    queryFn: () => comptaApi.conventionBillingOptions(year), enabled: canView && validYear,
   });
-  const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies, enabled: canView && canViewDocuments });
+  const companies = useQuery({ queryKey: ["compta", "companies"], queryFn: comptaApi.companies, enabled: canView });
   const convention = options.data?.find(option => option.id === filters.conventionId);
   const effectiveCompany = convention?.compagnieId ?? filters.companyId;
   const invoices = useQuery({
@@ -79,7 +80,7 @@ export default function ConventionCollectionsPage() {
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const firstPayer = selectedRows[0] ? payerKey(selectedRows[0]) : undefined;
   const eligible = rows.filter(row => row.source.documentClientId && row.soldeOuvert !== 0
-    && (row.source.montantTtc >= 0 || canPayRefund)
+    && (row.source.montantTtc < 0 ? canPayRefund : canCollect)
     && (!firstPayer || payerKey(row) === firstPayer));
   const allSelected = eligible.length > 0 && eligible.every(row => selected[row.source.documentClientId!]);
 
@@ -101,7 +102,7 @@ export default function ConventionCollectionsPage() {
   function collect(items: ClientReceivable[]) {
     if (!canCreate || !items.length || items.some(row => row.soldeOuvert === 0 || !row.source.documentClientId)
       || items.some(row => payerKey(row) !== payerKey(items[0]))) return;
-    if (items[0].source.montantTtc < 0 && !canPayRefund) return;
+    if (items[0].source.montantTtc < 0 ? !canPayRefund : !canCollect) return;
     const query = new URLSearchParams();
     items.forEach(row => query.append("selectionDocument", row.source.documentClientId!));
     navigate(`/app/compta/conventions/encaissements/nouveau?${query}`);
@@ -139,7 +140,7 @@ export default function ConventionCollectionsPage() {
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Encaissement des factures" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
-      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
+      {canView && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
         <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",
           companyId: value === "ALL" ? current.companyId : options.data?.find(option => option.id === value)?.compagnieId ?? "ALL" }))}>
           <SelectTrigger id="collection-convention"><SelectValue /></SelectTrigger>
@@ -148,7 +149,7 @@ export default function ConventionCollectionsPage() {
           </SelectContent>
         </Select>
       </div>}
-      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-company">Compagnie</Label>
+      {canView && <div className="grid gap-1.5"><Label htmlFor="collection-company">Compagnie</Label>
         <Select value={effectiveCompany} disabled={filters.conventionId !== "ALL" || companies.isPending || companies.isError}
           onValueChange={value => setFilters(current => ({ ...current, companyId: value, conventionId: "ALL", period: "ALL" }))}>
           <SelectTrigger id="collection-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
@@ -157,7 +158,7 @@ export default function ConventionCollectionsPage() {
           </SelectContent>
         </Select>
       </div>}
-      {canViewDocuments && <>
+      {canView && <>
         <div className="grid gap-1.5"><Label htmlFor="collection-year">Année du cycle</Label><Input id="collection-year" type="number" min={1900} max={2200} value={filters.year}
           onChange={event => setFilters(current => ({ ...current, year: event.target.value, period: "ALL" }))} /></div>
         <div className="grid gap-1.5"><Label htmlFor="collection-period">Période facturée</Label>
@@ -191,8 +192,8 @@ export default function ConventionCollectionsPage() {
           <Button variant="outline" size="icon" title="Actualiser" aria-label="Actualiser" disabled={invoices.isFetching} onClick={() => { setSelected({}); void invoices.refetch(); }}><RefreshCw className="size-4" /></Button>
         </div>
       </div>
-      {options.isError && canViewDocuments && <p role="alert" className="col-span-full text-sm text-destructive">{options.error.message}</p>}
-      {companies.isError && canViewDocuments && <p role="alert" className="col-span-full text-sm text-destructive">{companies.error.message}</p>}
+      {options.isError && canView && <p role="alert" className="col-span-full text-sm text-destructive">{options.error.message}</p>}
+      {companies.isError && canView && <p role="alert" className="col-span-full text-sm text-destructive">{companies.error.message}</p>}
     </section>
     <section className="overflow-hidden rounded-md border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
@@ -222,7 +223,7 @@ export default function ConventionCollectionsPage() {
                   const compatible = !firstPayer || payerKey(row) === firstPayer;
                   return <tr key={id} className="hover:bg-muted/30">
                     <td className="px-3 py-3">{canCreate && <Checkbox aria-label={`Sélectionner ${row.source.reference}`} checked={Boolean(selected[id])}
-                      disabled={row.soldeOuvert === 0 || !compatible || invoices.isFetching || (row.source.montantTtc < 0 && !canPayRefund)} onCheckedChange={checked => setSelected(current => {
+                      disabled={row.soldeOuvert === 0 || !compatible || invoices.isFetching || (row.source.montantTtc < 0 ? !canPayRefund : !canCollect)} onCheckedChange={checked => setSelected(current => {
                         const next = { ...current }; if (checked) next[id] = row; else delete next[id]; return next;
                       })} />}</td>
                     <td className="px-3 py-3 font-medium">{canViewDocuments ? <button type="button" className="text-sky-700 hover:underline disabled:opacity-50 dark:text-sky-300" title="Ouvrir la facture PDF dans un nouvel onglet" disabled={openingPdf} onClick={() => void showDocument(id)}>{row.source.reference}</button> : row.source.reference}
@@ -242,7 +243,7 @@ export default function ConventionCollectionsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-56">
                           {canViewDocuments && <DropdownMenuItem disabled={openingPdf} onSelect={() => void showDocument(id)}><Eye className="size-4" />Voir la facture PDF</DropdownMenuItem>}
-                          {canCreate && <DropdownMenuItem disabled={row.soldeOuvert === 0 || invoices.isFetching || selectedRows.length > 0 || (row.source.montantTtc < 0 && !canPayRefund)} onSelect={() => collect([row])}><Banknote className="size-4" />{row.source.montantTtc < 0 ? "Régler la ristourne" : "Encaisser la facture"}</DropdownMenuItem>}
+                          {canCreate && <DropdownMenuItem disabled={row.soldeOuvert === 0 || invoices.isFetching || selectedRows.length > 0 || (row.source.montantTtc < 0 ? !canPayRefund : !canCollect)} onSelect={() => collect([row])}><Banknote className="size-4" />{row.source.montantTtc < 0 ? "Régler la ristourne" : "Encaisser la facture"}</DropdownMenuItem>}
                           {(canCancel || canDelete) && <DropdownMenuSeparator />}
                           {canCancel && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "cancel" })}><Ban className="size-4" />Annuler la facture</DropdownMenuItem>}
                           {canDelete && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "delete" })}><Trash2 className="size-4" />Supprimer définitivement</DropdownMenuItem>}

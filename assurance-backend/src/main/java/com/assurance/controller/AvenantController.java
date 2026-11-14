@@ -84,7 +84,7 @@ public class AvenantController {
     }
 
     @PutMapping({"/brouillon", "/{code}/brouillon"})
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:draft', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:update-draft')")
     public ResponseEntity<ApiResponse<AvenantDraftResponse>> saveDraft(
             @PathVariable Long contratId,
             @PathVariable(required = false) String code,
@@ -101,7 +101,7 @@ public class AvenantController {
     }
 
     @DeleteMapping({"/brouillon", "/{code}/brouillon"})
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:draft', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:delete-draft')")
     public ResponseEntity<ApiResponse<Void>> deleteDraft(
             @PathVariable Long contratId,
             @PathVariable(required = false) String code,
@@ -125,7 +125,7 @@ public class AvenantController {
     }
 
     @PutMapping({"/{mouvementId:\\d+}/rectification", "/{mouvementId:\\d+}/{code}/rectification"})
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:rectify', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:rectify')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> rectify(
             @PathVariable Long contratId,
             @PathVariable Long mouvementId,
@@ -142,7 +142,7 @@ public class AvenantController {
     }
 
     @PostMapping("/{code}/preview")
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:create', 'PERM_avenant:rectify', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_avenant:create', 'PERM_avenant:rectify', 'PERM_avenant:update-draft')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> preview(
             @PathVariable Long contratId,
             @PathVariable String code,
@@ -157,7 +157,7 @@ public class AvenantController {
     }
 
     @PostMapping("/previsualisation-quittance")
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:create', 'PERM_avenant:rectify', 'PERM_contrat:update')")
+    @PreAuthorize("hasAnyAuthority('PERM_avenant:create', 'PERM_avenant:rectify', 'PERM_avenant:update-draft')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> previewLegacy(
             @PathVariable Long contratId,
             @RequestParam(required = false) Long mouvementId,
@@ -171,7 +171,7 @@ public class AvenantController {
     }
 
     @PostMapping("/{code}")
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:create')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> create(
             @PathVariable Long contratId,
             @PathVariable String code,
@@ -184,7 +184,7 @@ public class AvenantController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('PERM_avenant:create', 'PERM_contrat:update')")
+    @PreAuthorize("hasAuthority('PERM_avenant:create')")
     public ResponseEntity<ApiResponse<QuittanceResponse>> createLegacy(
             @PathVariable Long contratId,
             @Valid @RequestBody AvenantRequest request

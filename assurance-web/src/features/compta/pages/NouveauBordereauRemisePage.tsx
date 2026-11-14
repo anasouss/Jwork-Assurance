@@ -28,7 +28,7 @@ export default function NouveauBordereauRemisePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
+  const canManage = permissions.includes("bordereau-remise:create");
   const requestedType = searchParams.get("type");
   const initialType: RemittanceSlipType | "" = isSlipType(requestedType) ? requestedType : "";
   const selectedIds = useMemo(() => [...new Set(
@@ -46,8 +46,8 @@ export default function NouveauBordereauRemisePage() {
 
   const instrumentType = type === "CHEQUE" || type === "EFFET";
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
   });
   const selectedInstruments = useQuery({
     queryKey: ["compta", "treasury", "remittance-selection", type, selectedIds],
@@ -118,7 +118,7 @@ export default function NouveauBordereauRemisePage() {
       toast.success(`Bordereau provisoire ${created.numero} créé`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-account-options"] }),
       ]);
       try {
         const pdf = await comptaApi.remittanceSlipPdf(created.id);

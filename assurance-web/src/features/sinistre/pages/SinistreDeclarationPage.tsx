@@ -33,7 +33,7 @@ const emptyOpeningFields: OpeningFields = {
 export default function SinistreDeclarationPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const canCreateExpert = useAuthStore((state) => state.user?.permissions.includes("sinistre:referentiel") ?? false);
+  const canCreateExpert = useAuthStore((state) => state.user?.permissions.includes("prestataire-sinistre:create") ?? false);
   const [params] = useSearchParams();
   const typeDommage = parseOpeningDamage(params.get("typeDommage"));
   const contratId = params.get("contratId") ?? "";

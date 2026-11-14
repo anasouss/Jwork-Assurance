@@ -88,9 +88,10 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
   const canCreate = useAuthStore(
     (state) => state.user?.permissions?.includes("sinistre:create") ?? false,
   );
-  const canManage = useAuthStore(
-    (state) => state.user?.permissions?.includes("sinistre:manage") ?? false,
-  );
+  const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const canUpdate = permissions.includes("sinistre:update");
+  const canTransition = permissions.includes("sinistre:transition");
+  const canDelete = permissions.includes("sinistre:delete");
   const [claimToCancel, setClaimToCancel] = useState<SinistreSummary | null>(
     null,
   );
@@ -373,7 +374,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                               Consulter le dossier
                             </Link>
                           </DropdownMenuItem>
-                          {canManage && !isRegister && item.editable ? (
+                          {canUpdate && !isRegister && item.editable ? (
                             <DropdownMenuItem asChild>
                               <Link to={`/app/sinistre/dossiers/${item.id}#modifier`}>
                                 <Pencil className="size-4" />
@@ -381,7 +382,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                               </Link>
                             </DropdownMenuItem>
                           ) : null}
-                          {canManage && !isRegister && canCancelClaim(item.statut) ? (
+                          {canTransition && !isRegister && canCancelClaim(item.statut) ? (
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
@@ -391,6 +392,10 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                                 <Ban className="size-4" />
                                 Annuler le dossier
                               </DropdownMenuItem>
+                            </>
+                          ) : null}
+                          {canDelete && !isRegister && canCancelClaim(item.statut) ? (
+                            <>
                               <DropdownMenuItem
                                 variant="destructive"
                                 onSelect={() => setClaimToDelete(item)}

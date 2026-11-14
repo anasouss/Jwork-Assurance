@@ -73,7 +73,7 @@ class ReglementClientAdjustmentTest {
     @BeforeEach
     void manager() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
-                "manager", "", List.of(new SimpleGrantedAuthority("PERM_reglement-client:manage"))));
+                "manager", "", List.of(new SimpleGrantedAuthority("PERM_reglement-client:adjust"))));
     }
 
     @AfterEach

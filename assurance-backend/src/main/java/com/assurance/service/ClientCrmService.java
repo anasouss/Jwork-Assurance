@@ -76,6 +76,26 @@ public class ClientCrmService {
     }
 
     @Transactional(readOnly = true)
+    public com.assurance.dto.response.PagedResponse<com.assurance.dto.response.ClientLookupResponse> lookupOptions(
+            Long agenceId, String query, int page, int size) {
+        Page<com.assurance.entity.Client> result = clientRepository.searchCrm(agenceId,
+                query == null || query.isBlank() ? null : query.trim(), null, null, null,
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 10), 100), Sort.unsorted()));
+        return com.assurance.dto.response.PagedResponse.<com.assurance.dto.response.ClientLookupResponse>builder()
+                .items(result.getContent().stream().map(clientService::toResponse)
+                        .map(com.assurance.dto.response.ClientLookupResponse::from).toList())
+                .page(com.assurance.dto.response.PageMetadata.from(result))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public com.assurance.dto.response.ClientLookupResponse lookup(Long agenceId, Long clientId) {
+        var client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));
+        return com.assurance.dto.response.ClientLookupResponse.from(clientService.toResponse(client));
+    }
+
+    @Transactional(readOnly = true)
     public ClientCrmResponse get(Long agenceId, Long clientId) {
         com.assurance.entity.Client client = clientRepository.findByAgenceIdAndId(agenceId, clientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Client", clientId));

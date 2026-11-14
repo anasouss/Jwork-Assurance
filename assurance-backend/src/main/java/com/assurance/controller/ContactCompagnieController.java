@@ -31,7 +31,7 @@ public class ContactCompagnieController {
     private final ContactCompagnieService contactService;
 
     @GetMapping("/contacts")
-    @PreAuthorize("hasAnyAuthority('PERM_contact-compagnie:view', 'PERM_contact-compagnie:manage')")
+    @PreAuthorize("hasAuthority('PERM_contact-compagnie:view')")
     public ResponseEntity<ApiResponse<PagedResponse<ContactCompagnieResponse>>> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long compagnieId,
@@ -48,7 +48,7 @@ public class ContactCompagnieController {
     }
 
     @PostMapping("/{compagnieId}/contacts")
-    @PreAuthorize("hasAuthority('PERM_contact-compagnie:manage')")
+    @PreAuthorize("hasAuthority('PERM_contact-compagnie:create')")
     public ResponseEntity<ApiResponse<ContactCompagnieResponse>> create(
             @PathVariable Long compagnieId,
             @Valid @RequestBody UpsertContactCompagnieRequest request
@@ -59,7 +59,7 @@ public class ContactCompagnieController {
     }
 
     @PutMapping("/{compagnieId}/contacts/{contactId}")
-    @PreAuthorize("hasAuthority('PERM_contact-compagnie:manage')")
+    @PreAuthorize("hasAuthority('PERM_contact-compagnie:update')")
     public ResponseEntity<ApiResponse<ContactCompagnieResponse>> update(
             @PathVariable Long compagnieId,
             @PathVariable Long contactId,
@@ -71,7 +71,7 @@ public class ContactCompagnieController {
     }
 
     @PatchMapping("/{compagnieId}/contacts/{contactId}/statut")
-    @PreAuthorize("hasAuthority('PERM_contact-compagnie:manage')")
+    @PreAuthorize("hasAuthority('PERM_contact-compagnie:deactivate')")
     public ResponseEntity<ApiResponse<ContactCompagnieResponse>> updateStatus(
             @PathVariable Long compagnieId,
             @PathVariable Long contactId,

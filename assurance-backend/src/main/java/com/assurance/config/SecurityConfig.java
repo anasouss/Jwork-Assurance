@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -62,42 +61,6 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/api-docs/**"
                         ).permitAll()
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/v1/referentiel/grilles-tarifaires/**",
-                                "/api/v1/referentiel/lignes-grille-tarifaire/**",
-                                "/api/v1/referentiel/formules-garantie-personne/**"
-                        ).hasAnyAuthority(
-                                "PERM_grille-tarifaire:view",
-                                "PERM_grille-tarifaire:manage",
-                                "PERM_referentiel:manage"
-                        )
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/referentiel/grilles-tarifaires/**",
-                                "/api/v1/referentiel/formules-garantie-personne/**"
-                        ).hasAnyAuthority("PERM_grille-tarifaire:manage", "PERM_referentiel:manage")
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/v1/referentiel/grilles-tarifaires/**",
-                                "/api/v1/referentiel/lignes-grille-tarifaire/**",
-                                "/api/v1/referentiel/formules-garantie-personne/**"
-                        ).hasAnyAuthority("PERM_grille-tarifaire:manage", "PERM_referentiel:manage")
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/v1/referentiel/**",
-                                "/api/v1/pieces-jointes/types"
-                        ).hasAuthority("PERM_referentiel:manage")
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/v1/referentiel/**",
-                                "/api/v1/pieces-jointes/types/**"
-                        ).hasAuthority("PERM_referentiel:manage")
-                        .requestMatchers(
-                                HttpMethod.DELETE,
-                                "/api/v1/referentiel/**",
-                                "/api/v1/pieces-jointes/types/**"
-                        ).hasAuthority("PERM_referentiel:manage")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

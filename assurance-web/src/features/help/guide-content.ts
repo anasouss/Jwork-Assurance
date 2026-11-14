@@ -30,7 +30,7 @@ export const guideModules: GuideModule[] = [
         summary: "Consulter les indicateurs, les échéances et la file de travail de l’agence.",
         route: "/app",
         routePrefixes: ["/app"],
-        permissions: ["contrat:view", "quittance:view"],
+        permissions: ["contrat:view","quittance-affectation:view"],
         steps: [
           { title: "Ouvrir le tableau de bord", description: "Cliquez sur Dashboard dans l’en-tête." },
           { title: "Choisir la période", description: "Utilisez les filtres de date disponibles, puis actualisez les indicateurs." },
@@ -44,7 +44,7 @@ export const guideModules: GuideModule[] = [
         title: "Contexte plateforme et agence",
         summary: "Basculer entre la vue plateforme et une agence sans mélanger leurs données.",
         route: "/app/platform",
-        permissions: ["agence:view", "config:view"],
+        permissions: ["agence:view","config:view"],
         steps: [
           { title: "Ouvrir la vue plateforme", description: "Depuis un compte administrateur plateforme, ouvrez Dashboard sans agence active." },
           { title: "Entrer dans une agence", description: "Sélectionnez l’agence à administrer depuis la liste proposée." },
@@ -80,7 +80,7 @@ export const guideModules: GuideModule[] = [
         title: "Tableau de bord et navigation Production",
         summary: "Utiliser les sept actions du tableau de bord et les raccourcis permanents du menu latéral.",
         route: "/app/production",
-        permissions: ["contrat:view"],
+        permissions: ["contrat:view","avenant:view","assistance:view","carte-verte:view","piece-jointe:view","attestation-stock:view","vehicule:view","garantie:view","regle-fiscale:view","usage:view","marque:view","carrosserie:view","carburant:view","sous-classe:view","categorie-transport:view","categorie-client:view","groupe-usage-attestation:view","tarif-usage:view","type-piece-jointe:view"],
         prerequisites: ["Une agence doit être active. Les actions sont affichées uniquement si votre rôle possède la permission correspondante."],
         steps: [
           { title: "Créer un dossier", description: "Cliquez sur Ajouter un dossier. Choisissez ensuite Particulier, Flotte, Convention, Assistance voyage ou Assistance automobile selon le risque à enregistrer.", action: "Ajouter un dossier" },
@@ -104,7 +104,7 @@ export const guideModules: GuideModule[] = [
         title: "Prospection et devis",
         summary: "Créer, rechercher, télécharger, compléter, convertir ou supprimer un devis flotte.",
         route: "/app/production/prospection",
-        permissions: ["contrat:view", "contrat:create"],
+        permissions: ["contrat:view"],
         prerequisites: ["Le client, la compagnie, les usages et la grille tarifaire doivent être disponibles dans leurs référentiels."],
         steps: [
           { title: "Créer un devis", description: "Cliquez sur Ajouter devis, choisissez le parcours flotte, puis renseignez le client, la compagnie et les informations initiales du brouillon.", action: "Ajouter devis" },
@@ -190,7 +190,7 @@ export const guideModules: GuideModule[] = [
         summary: "Saisir un contrat mono-véhicule avec ses parties, garanties et attestations.",
         route: "/app/production/ajouter-dossier/particulier",
         routePrefixes: ["/app/production/ajouter-dossier/particulier/"],
-        permissions: ["contrat:create", "contrat:update"],
+        permissions: ["contrat:create","contrat:update"],
         prerequisites: ["Client, compagnie, catégorie client, usage et grille tarifaire configurés."],
         steps: [
           { title: "Valider le souscripteur", description: "Dans Souscripteur, recherchez une fiche existante ou saisissez Type, identité, ville, adresse et coordonnées. Enregistrez la section pour ouvrir la suivante.", action: "Enregistrer" },
@@ -216,7 +216,7 @@ export const guideModules: GuideModule[] = [
         summary: "Créer un contrat multi-véhicules, importer ou exporter le parc et contrôler chaque ligne.",
         route: "/app/production/ajouter-dossier/flotte",
         routePrefixes: ["/app/production/ajouter-dossier/flotte/", "/app/production/prospection/devis/flotte/"],
-        permissions: ["contrat:create", "contrat:update"],
+        permissions: ["contrat:create","contrat:update"],
         prerequisites: ["Le brouillon doit être de type flotte et disposer d’une grille tarifaire compatible."],
         steps: [
           { title: "Valider Souscripteur", description: "Recherchez ou créez le souscripteur entreprise, complétez RC, raison sociale, ICE, ville, adresse et contacts, puis enregistrez la section.", action: "Enregistrer" },
@@ -248,7 +248,7 @@ export const guideModules: GuideModule[] = [
         summary: "Créer un contrat rattaché à une convention et à ses conditions paramétrées.",
         route: "/app/production/ajouter-dossier/convention",
         routePrefixes: ["/app/production/ajouter-dossier/convention/"],
-        permissions: ["contrat:create", "contrat:update"],
+        permissions: ["contrat:create","contrat:update"],
         prerequisites: ["La convention doit être active, rattachée à la compagnie et configurée pour les usages concernés."],
         steps: [
           { title: "Valider le contexte d’entrée", description: "Dans Ajouter un dossier, choisissez compagnie, convention, usage et sous-classe si demandée. La grille affectée doit contenir une ligne ou formule pour cet usage.", action: "Ajouter" },
@@ -274,7 +274,7 @@ export const guideModules: GuideModule[] = [
         summary: "Créer, modifier ou renouveler une assistance voyage pour une ou plusieurs personnes assurées.",
         route: "/app/production/ajouter-dossier/assistance-voyage",
         routePatterns: ["/app/production/contrats/:contratId/assistance-voyage/modifier"],
-        permissions: ["contrat:create", "contrat:update"],
+        permissions: ["contrat:create"],
         prerequisites: ["Une compagnie d’assistance et un produit Voyage actifs doivent être sélectionnés dans Ajouter un dossier."],
         steps: [
           { title: "Enregistrer Souscripteur", description: "Choisissez Personne physique ou Personne morale, saisissez CIN/passeport ou RC, puis complétez la date de validité du document, l’identité, la ville, l’adresse et les coordonnées. Une recherche reprend la fiche existante lorsqu’elle est trouvée. Enregistrer crée un brouillon persistant visible dans Liste des dossiers puis ouvre la section suivante.", action: "Enregistrer" },
@@ -297,7 +297,7 @@ export const guideModules: GuideModule[] = [
         summary: "Créer, modifier ou renouveler une assistance rattachée à un assuré et à un véhicule.",
         route: "/app/production/ajouter-dossier/assistance-automobile",
         routePatterns: ["/app/production/contrats/:contratId/assistance-automobile/modifier"],
-        permissions: ["contrat:create", "contrat:update"],
+        permissions: ["contrat:create"],
         prerequisites: ["Une compagnie d’assistance active doit être sélectionnée dans Ajouter un dossier."],
         steps: [
           { title: "Enregistrer Souscripteur", description: "Recherchez ou saisissez le souscripteur puis cliquez sur Enregistrer. Un brouillon persistant apparaît immédiatement dans Liste des dossiers et la section suivante s’ouvre.", action: "Enregistrer" },
@@ -382,7 +382,7 @@ export const guideModules: GuideModule[] = [
         title: "Gestion des échéances",
         summary: "Rechercher les contrats arrivant à échéance et lancer leur renouvellement.",
         route: "/app/production/echeances",
-        permissions: ["contrat:view", "client:view"],
+        permissions: ["contrat:view"],
         steps: [
           { title: "Choisir la branche", description: "Sélectionnez Automobile ou Assistance. Les filtres Type contrat, Produit et le texte de recherche s’adaptent à cette branche." },
           { title: "Définir la période", description: "Renseignez Date du et Date au, puis filtrez éventuellement par Compagnie, Type contrat, Type d’assistance, Produit ou Client / contrat / produit." },
@@ -427,7 +427,7 @@ export const guideModules: GuideModule[] = [
         title: "Pièces jointes du contrat",
         summary: "Suivre les justificatifs obligatoires et joindre plusieurs fichiers au mouvement courant.",
         routePatterns: ["/app/production/contrats/:contratId/pieces-jointes"],
-        permissions: ["piece-jointe:view", "contrat:update"],
+        permissions: ["piece-jointe:view", "contrat:view"],
         steps: [
           { title: "Contrôler le contexte", description: "Vérifiez le dossier, le mouvement, la police, le type de contrat et le compteur Obligatoires complétés / attendus." },
           { title: "Ajouter un document", description: "Cliquez sur Ajouter un document, choisissez un Type de document ou Autre, puis saisissez le nom personnalisé si demandé." },
@@ -446,7 +446,7 @@ export const guideModules: GuideModule[] = [
         title: "Assistance automobile liée au contrat",
         summary: "Ajouter, modifier ou supprimer une assistance sur un véhicule éligible d’un contrat automobile.",
         routePatterns: ["/app/production/contrats/:contratId/assistance"],
-        permissions: ["assistance:manage", "contrat:update"],
+        permissions: ["assistance:view"],
         steps: [
           { title: "Choisir la compagnie", description: "Sélectionnez la Compagnie d’assistance. La liste Produit d’assistance est ensuite limitée aux produits compatibles." },
           { title: "Choisir le véhicule", description: "Sélectionnez un véhicule éligible. Un véhicule déjà lié à une assistance active n’est pas proposé pour une nouvelle ligne." },
@@ -465,7 +465,7 @@ export const guideModules: GuideModule[] = [
         title: "Cartes vertes du contrat",
         summary: "Enregistrer la carte verte d’un véhicule et suivre les cartes déjà créées.",
         routePatterns: ["/app/production/contrats/:contratId/cartes-vertes"],
-        permissions: ["carte-verte:manage", "contrat:update"],
+        permissions: ["carte-verte:view"],
         steps: [
           { title: "Choisir le véhicule", description: "Sélectionnez un véhicule éligible du contrat." },
           { title: "Saisir la carte", description: "Renseignez N° carte verte et Date d’effet, puis complétez Police N°, Date d’échéance et Montant total si disponibles." },
@@ -479,7 +479,7 @@ export const guideModules: GuideModule[] = [
         title: "Stock des attestations",
         summary: "Suivre les numéros disponibles, réservés et utilisés, gérer les seuils et contrôler la consommation.",
         route: "/app/production/attestations-stock",
-        permissions: ["attestation-stock:view", "attestation-stock:manage"],
+        permissions: ["attestation-stock:view"],
         steps: [
           { title: "Lire les indicateurs", description: "Contrôlez Total validé, Disponible, Réservée, Utilisée et Alertes seuil." },
           { title: "Analyser par compagnie", description: "Chaque graphique répartit le stock disponible par groupe d’usage. Cliquez sur un segment ou une alerte pour filtrer la liste correspondante." },
@@ -498,7 +498,7 @@ export const guideModules: GuideModule[] = [
         title: "Commandes d’attestations",
         summary: "Créer une demande, enregistrer les lots reçus puis valider leur entrée en stock.",
         route: "/app/production/attestations-stock/commandes",
-        permissions: ["attestation-stock:view", "attestation-stock:manage"],
+        permissions: ["attestation-stock:view"],
         steps: [
           { title: "Créer la commande", description: "Cliquez sur Nouvelle commande, recherchez et sélectionnez la Compagnie, renseignez Date de demande et Référence externe éventuelle." },
           { title: "Choisir les usages", description: "Cochez au moins un groupe d’usage autorisé pour la compagnie et renseignez la Quantité demandée de chaque ligne." },
@@ -518,7 +518,7 @@ export const guideModules: GuideModule[] = [
         title: "Réceptions directes d’attestations",
         summary: "Enregistrer et valider immédiatement un lot reçu sans commande préalable.",
         route: "/app/production/attestations-stock/receptions",
-        permissions: ["attestation-stock:view", "attestation-stock:manage"],
+        permissions: ["attestation-stock:view"],
         steps: [
           { title: "Filtrer l’historique", description: "Choisissez Compagnie et Année de réception ou réinitialisez les filtres." },
           { title: "Ouvrir la réception", description: "Cliquez sur Nouvelle réception, recherchez puis sélectionnez une Compagnie existante." },
@@ -538,7 +538,7 @@ export const guideModules: GuideModule[] = [
         title: "Accès aux paramètres Production",
         summary: "Choisir le bon référentiel et comprendre son effet sur les contrats.",
         route: "/app/production/parametres",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["usage:view","marque:view","carrosserie:view","carburant:view","sous-classe:view","categorie-transport:view","categorie-client:view","groupe-usage-attestation:view","tarif-usage:view","type-piece-jointe:view","garantie:view","regle-fiscale:view"],
         steps: [
           { title: "Ouvrir les paramètres", description: "Dans le menu latéral Production, cliquez sur Paramètres." },
           { title: "Choisir le domaine", description: "Règles fiscales gère les taxes; Tarifs par usage les barèmes RC; Usages les critères de saisie; Groupes stock et Catégories client l’éligibilité des attestations; Garanties le comportement tarifaire." },
@@ -552,7 +552,7 @@ export const guideModules: GuideModule[] = [
         title: "Tarifs par usage",
         summary: "Créer les barèmes RC, appliquer des ajustements datés et conserver leur historique.",
         route: "/app/production/parametres/tarifs-usage",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["tarif-usage:view"],
         prerequisites: ["Les usages et leurs critères doivent être configurés avant de créer les tarifs correspondants."],
         steps: [
           { title: "Filtrer ou sélectionner les lignes", description: "Choisissez un usage dans Filtrer usage. Cochez des tarifs pour limiter une opération groupée; sans sélection, l’opération vise l’usage filtré ou tous les tarifs actifs." },
@@ -575,7 +575,7 @@ export const guideModules: GuideModule[] = [
         title: "Usages",
         summary: "Définir les champs véhicule, le calcul RC, les attestations et les garanties personne pilotés par chaque usage.",
         route: "/app/production/parametres/usages",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["usage:view"],
         steps: [
           { title: "Ajouter un usage", description: "Cliquez sur Ajouter usage puis renseignez Code, Libellé et, si utile, Critère." },
           { title: "Lier le stock", description: "Choisissez le Groupe attestation et activez Consomme attestation lorsque la finalisation doit réserver un numéro de ce groupe." },
@@ -590,7 +590,7 @@ export const guideModules: GuideModule[] = [
         title: "Groupes stock attestations",
         summary: "Regrouper les usages de stock, limiter les compagnies et piloter l’affichage des graphiques.",
         route: "/app/production/parametres/groupes-stock-attestations",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["groupe-usage-attestation:view"],
         steps: [
           { title: "Ajouter un groupe", description: "Cliquez sur Ajouter groupe et renseignez Code et Libellé." },
           { title: "Choisir la couleur", description: "Sélectionnez la couleur utilisée pour le segment correspondant dans les graphiques de stock." },
@@ -605,7 +605,7 @@ export const guideModules: GuideModule[] = [
         title: "Catégories client",
         summary: "Définir les usages tarifaires et la famille d’attestations autorisés pour chaque catégorie de client.",
         route: "/app/production/parametres/categories-client",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["categorie-client:view"],
         steps: [
           { title: "Ajouter une catégorie", description: "Cliquez sur Ajouter catégorie puis renseignez Code et Libellé." },
           { title: "Autoriser les usages", description: "Dans Usages tarifaires autorisés, cochez les usages accessibles. Pour LOCATION, ces choix représentent les sous-usages." },
@@ -619,7 +619,7 @@ export const guideModules: GuideModule[] = [
         title: "Garanties et groupes d’exclusion",
         summary: "Configurer le type, les modes de tarification, les valeurs assurées et les incompatibilités de garanties.",
         route: "/app/production/parametres/garanties",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["garantie:view"],
         steps: [
           { title: "Créer un groupe d’exclusion", description: "Cliquez sur Groupe d’exclusion, renseignez Code, Libellé, Type VEHICULE ou PERSONNE et Actif. Deux garanties du même groupe ne pourront pas être choisies ensemble sur la même cible." },
           { title: "Identifier la garantie", description: "Cliquez sur Ajouter garantie puis renseignez Code, Libellé, Branche, Type, Ordre, Description et Groupe d’exclusion éventuel." },
@@ -643,7 +643,7 @@ export const guideModules: GuideModule[] = [
           "/app/production/parametres/carrosseries",
           "/app/production/parametres/carburants",
         ],
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["marque:view"],
         steps: [
           { title: "Choisir le référentiel", description: "Ouvrez Marques pour les constructeurs, Carrosseries pour les types de véhicule ou Carburants pour les valeurs utilisées aussi par les tarifs RC." },
           { title: "Ajouter", description: "Cliquez sur Ajouter. Pour une marque ou une carrosserie, renseignez le libellé; pour un carburant, renseignez Code et Libellé." },
@@ -657,7 +657,7 @@ export const guideModules: GuideModule[] = [
         title: "Sous-classes",
         summary: "Définir la caractéristique moteur, les exigences conducteur et l’éligibilité assistance de chaque sous-classe.",
         route: "/app/production/parametres/sous-classes",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["sous-classe:view"],
         steps: [
           { title: "Ajouter", description: "Cliquez sur Ajouter puis renseignez Code et Libellé." },
           { title: "Choisir la caractéristique moteur", description: "Sélectionnez Cylindrée ou Puissance fiscale. Ce choix détermine le champ demandé sur le véhicule." },
@@ -671,7 +671,7 @@ export const guideModules: GuideModule[] = [
         title: "Catégories transport",
         summary: "Maintenir les catégories utilisées par certains usages et leurs barèmes RC.",
         route: "/app/production/parametres/categories-transport",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["categorie-transport:view"],
         steps: [
           { title: "Ajouter une catégorie", description: "Cliquez sur Ajouter catégorie puis renseignez Code, Libellé et Description éventuelle." },
           { title: "Activer", description: "Activez la catégorie afin qu’elle soit proposée dans les usages et tarifs concernés." },
@@ -684,7 +684,7 @@ export const guideModules: GuideModule[] = [
         title: "Types de pièces jointes",
         summary: "Gérer le catalogue des documents et leurs règles selon la branche, le parcours, le client et le mouvement.",
         route: "/app/production/parametres/pieces-jointes",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["type-piece-jointe:view"],
         steps: [
           { title: "Ajouter un document", description: "Saisissez une seule fois le nom du document, puis définissez sa première règle d’utilisation." },
           { title: "Gérer ses règles", description: "Cliquez sur Gérer pour consulter ensemble tous les mouvements et contextes utilisant ce document." },
@@ -699,7 +699,7 @@ export const guideModules: GuideModule[] = [
         title: "Règles fiscales",
         summary: "Paramétrer taxes, EVCAT, TPF et CNPAC avec des périodes et périmètres contrôlés.",
         route: "/app/production/parametres/regles-fiscales",
-        permissions: ["regle-fiscale:view", "regle-fiscale:manage", "config:manage"],
+        permissions: ["regle-fiscale:view"],
         steps: [
           { title: "Ajouter une règle", description: "Cliquez sur Ajouter puis renseignez code, libellé, nature, calcul, valeur, base, catégorie, branche et date de début." },
           { title: "Définir le périmètre", description: "Sélectionnez la compagnie, la catégorie client, le type de contrat, l’usage, le groupe de stock, un type de garantie ou plusieurs garanties précises." },
@@ -726,7 +726,7 @@ export const guideModules: GuideModule[] = [
         title: "Tableau de bord et dossiers sinistre",
         summary: "Lire les indicateurs, ouvrir un dossier récent ou démarrer une déclaration.",
         route: "/app/sinistre",
-        permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"],
+        permissions: ["sinistre:view","prestataire-sinistre:view","specialite-prestataire:view"],
         steps: [
           { title: "Lire les indicateurs", description: "Contrôlez Dossiers ouverts, Actions en retard, En expertise, En attente de règlement, Provisions ouvertes et Recours de l’année. Les montants sont ceux de l’agence active." },
           { title: "Ouvrir un dossier", description: "Dans Consultation et suivi, cliquez sur le N° sinistre pour consulter le dossier et son état d’avancement." },
@@ -745,7 +745,7 @@ export const guideModules: GuideModule[] = [
         title: "Liste des dossiers sinistre",
         summary: "Rechercher, trier, consulter, annuler ou supprimer un dossier selon son état.",
         route: "/app/sinistre/dossiers",
-        permissions: ["sinistre:view", "sinistre:manage"],
+        permissions: ["sinistre:view"],
         steps: [
           { title: "Rechercher", description: "Saisissez N° sinistre, police ou assuré, puis filtrez par statut, étape de suivi et période Du/Au." },
           { title: "Limiter à un client", description: "Lorsque la liste a été ouverte depuis un portefeuille, le client est affiché en contexte. Utilisez Tout afficher pour retirer ce filtre." },
@@ -784,7 +784,7 @@ export const guideModules: GuideModule[] = [
         summary: "Gérer couvertures, intervenants, pièces, missions, provisions et opérations financières.",
         routePrefixes: ["/app/sinistre/dossiers/"],
         routePatterns: ["/app/sinistre/dossiers/:sinistreId"],
-        permissions: ["sinistre:view", "sinistre:manage", "sinistre:finance"],
+        permissions: ["sinistre:view"],
         steps: [
           { title: "Vérifier l’en-tête", description: "Contrôlez numéro de sinistre, statut, événement, contrat, client, véhicule et garanties impliquées." },
           { title: "Mettre à jour le suivi", description: "Renseignez la référence compagnie, les dommages, le mode de réparation, le garage, la responsabilité, le gestionnaire, la prochaine action, son échéance et les notes internes." },
@@ -806,7 +806,7 @@ export const guideModules: GuideModule[] = [
         summary: "Maintenir les experts, garages, spécialités et accords par compagnie.",
         route: "/app/sinistre/prestataires",
         routePrefixes: ["/app/sinistre/referentiels", "/app/sinistre/experts", "/app/sinistre/garages"],
-        permissions: ["sinistre:referentiel"],
+        permissions: ["prestataire-sinistre:view"],
         steps: [
           { title: "Rechercher", description: "Recherchez par code, nom, ville, téléphone ou e-mail." },
           { title: "Ajouter", description: "Cliquez sur Ajouter un expert, renseignez code, nom, téléphone, e-mail, adresse et ville, puis activez l’expert." },
@@ -821,7 +821,7 @@ export const guideModules: GuideModule[] = [
         title: "Garages",
         summary: "Maintenir les garages et leur conventionnement.",
         route: "/app/sinistre/prestataires?type=GARAGE",
-        permissions: ["sinistre:referentiel"],
+        permissions: ["prestataire-sinistre:view"],
         steps: [
           { title: "Rechercher", description: "Recherchez par code, nom, ville, téléphone ou e-mail." },
           { title: "Ajouter", description: "Cliquez sur Ajouter un garage, renseignez code, raison sociale, coordonnées et ville." },
@@ -842,7 +842,7 @@ export const guideModules: GuideModule[] = [
         title: "Tableau de bord Compagnies",
         summary: "Choisir le référentiel compagnie, convention, tarification, assistance ou contact à administrer.",
         route: "/app/companies",
-        permissions: ["referentiel:view", "grille-tarifaire:view", "contact-compagnie:view"],
+        permissions: ["compagnie-assurance:view","compagnie-assistance:view","convention:view","grille-tarifaire:view","contact-compagnie:view","produit-assistance:view","tarif-assistance:view","promo-assistance:view"],
         steps: [
           { title: "Administrer les assureurs", description: "Cliquez sur Liste des compagnies pour gérer l’identité, l’ordre d’affichage, la RC, l’ICE et les préfixes.", action: "Liste des compagnies" },
           { title: "Administrer les conventions", description: "Cliquez sur Conventions pour paramétrer les produits conventionnés et leur période par compagnie.", action: "Conventions" },
@@ -858,7 +858,7 @@ export const guideModules: GuideModule[] = [
         title: "Compagnies d’assurance",
         summary: "Maintenir l’identité, les préfixes documentaires et l’ordre d’affichage des assureurs.",
         route: "/app/companies/liste",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["compagnie-assurance:view"],
         steps: [
           { title: "Rechercher", description: "Filtrez par nom, code intermédiaire, ville, RC ou ICE, puis choisissez Actives, Inactives ou Tous les statuts. Triez les colonnes si nécessaire." },
           { title: "Ajouter", description: "Cliquez sur Ajouter compagnie et renseignez Nom. Complétez Code intermédiaire, Préfixe dossier, RC, ICE, téléphone, email, ville et adresse." },
@@ -873,7 +873,7 @@ export const guideModules: GuideModule[] = [
         title: "Contacts compagnie",
         summary: "Maintenir les interlocuteurs par compagnie, service et statut.",
         route: "/app/companies/contacts",
-        permissions: ["contact-compagnie:view", "contact-compagnie:manage"],
+        permissions: ["contact-compagnie:view"],
         steps: [
           { title: "Filtrer", description: "Recherchez par nom, fonction, téléphone ou e-mail, puis affinez par Compagnie, Service et Statut." },
           { title: "Ajouter un contact", description: "Cliquez sur Ajouter contact, choisissez la compagnie et le service puis complétez identité, fonction, téléphone et e-mail." },
@@ -887,7 +887,7 @@ export const guideModules: GuideModule[] = [
         title: "Conventions",
         summary: "Définir les conditions commerciales et les usages autorisés d’une convention.",
         route: "/app/companies/conventions",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["convention:view"],
         steps: [
           { title: "Rechercher", description: "Filtrez par convention, compagnie, catégorie ou grille, puis limitez éventuellement à une compagnie." },
           { title: "Ajouter une convention", description: "Cliquez sur Ajouter convention puis sélectionnez Compagnie et renseignez Code et Intitulé." },
@@ -903,7 +903,7 @@ export const guideModules: GuideModule[] = [
         title: "Grilles tarifaires",
         summary: "Configurer les garanties et tarifs sélectionnés automatiquement dans les contrats.",
         route: "/app/companies/grilles-tarifaires",
-        permissions: ["grille-tarifaire:view", "grille-tarifaire:manage", "referentiel:manage"],
+        permissions: ["grille-tarifaire:view"],
         steps: [
           { title: "Rechercher", description: "Filtrez le catalogue par texte, Compagnie, Convention, Usage et Statut." },
           { title: "Créer la grille", description: "Cliquez sur Ajouter grille, choisissez la compagnie, le libellé, les dates et le statut puis enregistrez." },
@@ -920,7 +920,7 @@ export const guideModules: GuideModule[] = [
         title: "Compagnies d’assistance",
         summary: "Maintenir les organismes proposés dans les contrats d’assistance.",
         route: "/app/companies/assistance",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["compagnie-assistance:view"],
         steps: [
           { title: "Rechercher", description: "Utilisez Filtrer compagnie puis triez Code, Compagnie, Téléphone, Email ou Actif." },
           { title: "Ajouter", description: "Cliquez sur Ajouter compagnie puis renseignez Code, Nom, Téléphone et Email." },
@@ -933,7 +933,7 @@ export const guideModules: GuideModule[] = [
         title: "Produits, tarifs et promotions d’assistance",
         summary: "Configurer les produits automobile ou voyage, leurs éligibilités et leurs versions tarifaires.",
         route: "/app/companies/assistance/produits",
-        permissions: ["referentiel:view", "referentiel:manage"],
+        permissions: ["produit-assistance:view"],
         steps: [
           { title: "Filtrer le catalogue", description: "Recherchez par produit puis affinez par Compagnie, Type et Catégorie client." },
           { title: "Ajouter un produit", description: "Cliquez sur Ajouter produit, sélectionnez Compagnie assistance et Type puis renseignez Produit et Prestations." },
@@ -957,7 +957,7 @@ export const guideModules: GuideModule[] = [
         title: "Clients et groupes",
         summary: "Rechercher, créer et enrichir une fiche client, organiser les groupes et ouvrir les espaces métier liés.",
         route: "/app/crm",
-        permissions: ["client:view", "client:create", "client:manage"],
+        permissions: ["client:view"],
         steps: [
           { title: "Rechercher un client", description: "Saisissez un nom, code ou identifiant, puis affinez avec Groupe, Origine commerciale et Collaborateur. Sélectionnez une ligne pour ouvrir la fiche." },
           { title: "Créer un client", description: "Cliquez sur Nouveau client, choisissez Personne physique ou Personne morale, complétez l’identité, les identifiants, l’adresse, les coordonnées et l’acquisition, puis enregistrez.", action: "Nouveau client" },
@@ -968,7 +968,7 @@ export const guideModules: GuideModule[] = [
           { title: "Ouvrir les espaces liés", description: "Utilisez Portefeuille client pour la production, Relevés et factures pour la comptabilité et Dossiers sinistre lorsque votre rôle autorise les sinistres." },
           { title: "Changer de fiche", description: "Depuis une fiche ouverte, cliquez sur Changer de client et sélectionnez un autre résultat sans revenir à la page précédente.", action: "Changer de client" },
         ],
-        warnings: ["Ne créez pas un doublon lorsqu’un client existe déjà sous une variante de nom; recherchez d’abord par identifiant et coordonnées.", "Les boutons de création, groupe et correction sont masqués sans les permissions client:create ou client:manage."],
+        warnings: ["Ne créez pas un doublon lorsqu’un client existe déjà sous une variante de nom; recherchez d’abord par identifiant et coordonnées.", "Chaque action dépend de sa permission : création client, modification, rattachement de groupe ou documents."],
         errors: [
           { message: "Identifiant déjà utilisé", resolution: "Recherchez la fiche existante ou corrigez l’ICE, la CIN ou l’identifiant concerné." },
           { message: "Client inaccessible", resolution: "Vérifiez l’agence active et vos permissions." },
@@ -981,7 +981,7 @@ export const guideModules: GuideModule[] = [
         summary: "Configurer les valeurs proposées lors de l’acquisition et du suivi client.",
         route: "/app/crm/parametres",
         routePrefixes: ["/app/crm/parametres/origines-commerciales"],
-        permissions: ["client:manage"],
+        permissions: ["origine-commerciale:view"],
         steps: [
           { title: "Ouvrir Paramètres", description: "Depuis CRM, ouvrez Paramètres puis Origines commerciales." },
           { title: "Ajouter", description: "Cliquez sur Ajouter, renseignez le code et le libellé, puis enregistrez." },
@@ -1000,7 +1000,7 @@ export const guideModules: GuideModule[] = [
         title: "Tableau de bord Compta",
         summary: "Choisir le bon circuit comptable sans confondre créance client, compagnie et trésorerie.",
         route: "/app/compta",
-        permissions: ["quittance:view", "reglement-client:view", "tresorerie:view", "bordereau-compagnie:view", "reglement-compagnie:view"],
+        permissions: ["quittance-affectation:view","regle-quittance:view","document-client:view","production-convention:view","facture-convention:view","reglement-client:view","instrument-reglement:view","quittance-prime:view","compte-tresorerie:view","operation-tresorerie:view","session-caisse:view","bordereau-remise:view","rapprochement-bancaire:view","banque:view","bordereau-compagnie:view","reglement-compagnie:view"],
         steps: [
           { title: "Affecter les quittances", description: "Dans Client, cliquez sur Affectation des quittances pour préparer le traitement comptable des quittances par compagnie.", action: "Affectation des quittances" },
           { title: "Créer les documents clients", description: "Cliquez sur Relevés et factures pour regrouper des éléments dus, ou sur Facturation conventions pour émettre les échéances conventionnées.", action: "Relevés et factures" },
@@ -1019,7 +1019,7 @@ export const guideModules: GuideModule[] = [
         title: "Affectation des quittances",
         summary: "Rechercher les quittances et préparer leur traitement comptable par compagnie.",
         route: "/app/compta/quittances",
-        permissions: ["quittance:view", "quittance:create", "quittance:manage"],
+        permissions: ["quittance-affectation:view"],
         steps: [
           { title: "Choisir la compagnie", description: "Sélectionnez la compagnie et les critères de recherche requis." },
           { title: "Afficher", description: "Cliquez sur l’icône Afficher pour charger les quittances éligibles." },
@@ -1036,7 +1036,7 @@ export const guideModules: GuideModule[] = [
         title: "Relevés et factures clients",
         summary: "Regrouper des éléments dus dans un document client sans enregistrer un paiement.",
         route: "/app/compta/releves-factures",
-        permissions: ["quittance:view", "quittance:create", "quittance:manage"],
+        permissions: ["document-client:view"],
         prerequisites: ["Les lignes sélectionnées doivent appartenir au même client ou groupe payeur."],
         steps: [
           { title: "Choisir la cible", description: "Sélectionnez Client ou Groupe puis recherchez le payeur." },
@@ -1055,7 +1055,7 @@ export const guideModules: GuideModule[] = [
         title: "Facturation des conventions",
         summary: "Émettre les factures à partir des échéances de facturation conventionnées.",
         route: "/app/compta/facturation-conventions",
-        permissions: ["quittance:view", "quittance:create", "quittance:manage"],
+        permissions: ["facture-convention:view"],
         steps: [
           { title: "Rechercher les échéances", description: "Filtrez par convention, payeur, période et état puis cliquez sur Rechercher." },
           { title: "Sélectionner un payeur", description: "Cochez uniquement les échéances d’un même payeur." },
@@ -1071,7 +1071,7 @@ export const guideModules: GuideModule[] = [
         summary: "Encaisser un montant, saisir ses instruments et l’affecter partiellement ou totalement aux créances.",
         route: "/app/compta/reglements",
         routePrefixes: ["/app/compta/reglements/nouveau", "/app/compta/reglements/"],
-        permissions: ["reglement-client:view", "reglement-client:create", "reglement-client:manage"],
+        permissions: ["reglement-client:view"],
         prerequisites: ["Les éléments sélectionnés doivent avoir un payeur, une agence et une devise compatibles."],
         steps: [
           { title: "Choisir la vue", description: "Dans Vue, choisissez Primes à encaisser, Règlements enregistrés ou État d’encaissement journalier. La vue choisie détermine les filtres et le tableau affichés." },
@@ -1101,7 +1101,7 @@ export const guideModules: GuideModule[] = [
         title: "Règlements enregistrés",
         summary: "Rechercher un règlement, consulter son détail, imprimer ses documents et appliquer les actions autorisées par son état.",
         route: "/app/compta/reglements/historique",
-        permissions: ["reglement-client:view", "reglement-client:manage"],
+        permissions: ["reglement-client:view"],
         steps: [
           { title: "Ouvrir la vue", description: "Dans Vue, choisissez Règlements enregistrés. Le tableau reste vide tant qu’aucun critère de recherche n’a été appliqué." },
           { title: "Rechercher", description: "Renseignez au moins un critère parmi le payeur, le déposant, le numéro ou la référence, la période, le moyen de paiement et l’état du moyen, puis cliquez sur Rechercher." },
@@ -1122,7 +1122,7 @@ export const guideModules: GuideModule[] = [
         title: "Encaissements en attente",
         summary: "Traiter espèces, chèques, effets et virements après l’enregistrement du règlement client.",
         route: "/app/compta/tresorerie/encaissements-en-attente",
-        permissions: ["tresorerie:view", "tresorerie:manage", "reglement-client:manage"],
+        permissions: ["instrument-reglement:view"],
         steps: [
           { title: "Filtrer", description: "Recherchez par mode, statut, référence, compte ou dates." },
           { title: "Choisir les journées de caisse", description: "Dans Journées de caisse à verser, filtrez par date, caisse ou caissier puis cochez une ou plusieurs journées. La sélection peut regrouper plusieurs caisses et plusieurs dates." },
@@ -1140,7 +1140,7 @@ export const guideModules: GuideModule[] = [
         title: "Rejets bancaires",
         summary: "Suivre les instruments impayés et préparer leur représentation dans un nouveau bordereau.",
         route: "/app/compta/tresorerie/impayes-clients",
-        permissions: ["tresorerie:view", "tresorerie:manage"],
+        permissions: ["instrument-reglement:view"],
         steps: [
           { title: "Rechercher", description: "Filtrez les rejets par référence, client, instrument ou état puis cliquez sur Rechercher." },
           { title: "Contrôler le rejet", description: "Vérifiez le moyen, le montant, la date de rejet, le motif et le règlement d’origine." },
@@ -1154,7 +1154,7 @@ export const guideModules: GuideModule[] = [
         summary: "Regrouper les instruments, imprimer le PDF et enregistrer la remise à la banque.",
         route: "/app/compta/tresorerie/bordereaux-remise",
         routePrefixes: ["/app/compta/tresorerie/bordereaux-remise/"],
-        permissions: ["tresorerie:view", "tresorerie:manage"],
+        permissions: ["bordereau-remise:view"],
         steps: [
           { title: "Créer", description: "Pour les chèques et effets, sélectionnez les instruments depuis Encaissements en attente. Pour les espèces, sélectionnez d’abord une ou plusieurs journées de caisse." },
           { title: "Choisir le type", description: "Sélectionnez Chèques, Effets ou Versement d’espèces." },
@@ -1174,7 +1174,7 @@ export const guideModules: GuideModule[] = [
         summary: "Créer, valider, transmettre, régler et rapprocher les bordereaux destinés aux compagnies.",
         route: "/app/compta/bordereaux-compagnies",
         routePrefixes: ["/app/compta/bordereaux-compagnies/"],
-        permissions: ["bordereau-compagnie:view", "bordereau-compagnie:create", "bordereau-compagnie:validate", "bordereau-compagnie:transmit", "bordereau-compagnie:reconcile", "reglement-compagnie:create", "reglement-compagnie:manage"],
+        permissions: ["bordereau-compagnie:view"],
         steps: [
           { title: "Créer le brouillon", description: "Cliquez sur Nouveau bordereau, choisissez compagnie, base, période et lignes, puis enregistrez." },
           { title: "Valider", description: "Ouvrez le brouillon et cliquez sur Valider après contrôle des totaux." },
@@ -1192,7 +1192,7 @@ export const guideModules: GuideModule[] = [
         summary: "Créer les comptes de trésorerie, affecter les utilisateurs et consulter les soldes.",
         route: "/app/compta/tresorerie/comptes",
         routePatterns: ["/app/compta/tresorerie/comptes/:compteId"],
-        permissions: ["tresorerie:view", "tresorerie:manage"],
+        permissions: ["compte-tresorerie:view"],
         steps: [
           { title: "Lire la synthèse", description: "Comparez Caisse centrale, Caisses individuelles et Comptes bancaires avec leurs soldes et statuts." },
           { title: "Ajouter un compte", description: "Cliquez sur Nouveau compte, choisissez Caisse ou Banque puis renseignez code, libellé, devise et solde initial selon les champs proposés." },
@@ -1208,7 +1208,7 @@ export const guideModules: GuideModule[] = [
         title: "Journal de trésorerie",
         summary: "Filtrer et contrôler les écritures de caisse et de banque.",
         route: "/app/compta/tresorerie/journal",
-        permissions: ["tresorerie:view"],
+        permissions: ["operation-tresorerie:view"],
         steps: [
           { title: "Définir les filtres", description: "Choisissez le compte, la nature/opération, le mode de paiement, la référence et la période." },
           { title: "Rechercher", description: "Cliquez sur Rechercher; Réinitialiser efface les critères." },
@@ -1221,7 +1221,7 @@ export const guideModules: GuideModule[] = [
         title: "Transferts et corrections",
         summary: "Enregistrer un transfert équilibré ou un ajustement justifié, puis annuler par contre-écriture.",
         route: "/app/compta/tresorerie/operations",
-        permissions: ["tresorerie:view", "tresorerie:manage"],
+        permissions: ["operation-tresorerie:view"],
         steps: [
           { title: "Choisir Transfert", description: "Sélectionnez Compte source et Destination. Les deux comptes doivent être différents et compatibles." },
           { title: "Choisir Ajustement", description: "Sélectionnez le Compte et le Sens de la correction: entrée ou sortie." },
@@ -1236,7 +1236,7 @@ export const guideModules: GuideModule[] = [
         title: "Rapprochement bancaire",
         summary: "Importer un relevé, contrôler les correspondances puis confirmer les encaissements.",
         route: "/app/compta/tresorerie/rapprochement-bancaire",
-        permissions: ["tresorerie:view", "tresorerie:manage"],
+        permissions: ["rapprochement-bancaire:view"],
         steps: [
           { title: "Choisir le compte", description: "Sélectionnez le compte bancaire concerné." },
           { title: "Importer", description: "Choisissez le profil d’import et le fichier de relevé, puis générez l’aperçu." },
@@ -1253,7 +1253,7 @@ export const guideModules: GuideModule[] = [
         title: "Accès aux paramètres comptables",
         summary: "Choisir entre le référentiel des banques et les règles de règlement client.",
         route: "/app/compta/parametres",
-        permissions: ["tresorerie:view", "tresorerie:manage", "reglement-client:manage"],
+        permissions: ["banque:view","reglement-client:configure","compte-tresorerie:view","regle-quittance:view"],
         steps: [
           { title: "Ouvrir Banques", description: "Maintenez les organismes bancaires et leurs alias de reconnaissance." },
           { title: "Ouvrir Règlements clients", description: "Maintenez la règle de reste non affecté utilisée lors de l’encaissement." },
@@ -1264,7 +1264,7 @@ export const guideModules: GuideModule[] = [
         title: "Banques",
         summary: "Maintenir les banques et alias utilisés dans les instruments et imports.",
         route: "/app/compta/parametres/banques",
-        permissions: ["tresorerie:view", "tresorerie:manage"],
+        permissions: ["banque:view"],
         steps: [
           { title: "Ajouter", description: "Cliquez sur Ajouter banque puis renseignez Code et Nom." },
           { title: "Définir les alias", description: "Dans Alias de recherche, saisissez les variantes reconnues lors des imports, par exemple BP, BCP ou CPM." },
@@ -1277,7 +1277,7 @@ export const guideModules: GuideModule[] = [
         title: "Paramètres des règlements clients",
         summary: "Définir la tolérance du reste à affecter lors d’un encaissement.",
         route: "/app/compta/parametres/reglements-clients",
-        permissions: ["reglement-client:manage"],
+        permissions: ["reglement-client:configure"],
         steps: [
           { title: "Lire la règle", description: "Dans Reste à affecter, consultez la limite actuellement autorisée et son effet sur l’enregistrement d’un règlement." },
           { title: "Modifier", description: "Saisissez la nouvelle valeur autorisée en respectant le format de montant affiché." },
@@ -1297,7 +1297,7 @@ export const guideModules: GuideModule[] = [
         title: "Accéder à l’administration",
         summary: "Comprendre la page d’entrée et les onglets affichés selon les permissions et le contexte agence ou plateforme.",
         route: "/app/admin",
-        permissions: ["user:view", "role:view", "audit:view", "agence:view", "config:view"],
+        permissions: ["user:view","role:view","audit:view","activity:view","agence:view","config:view"],
         steps: [
           { title: "Ouvrir Administration", description: "Cliquez sur Administration dans l’en-tête. La page redirige automatiquement vers le premier onglet autorisé." },
           { title: "Utilisateurs", description: "Gérez les comptes de l’agence, leurs rôles, leur état et leurs sessions." },
@@ -1313,7 +1313,7 @@ export const guideModules: GuideModule[] = [
         title: "Utilisateurs et sessions",
         summary: "Créer des comptes, attribuer un rôle, réinitialiser les accès et gérer les sessions.",
         route: "/app/admin/utilisateurs",
-        permissions: ["user:view", "user:manage", "config:view", "config:manage"],
+        permissions: ["user:view","config:view"],
         steps: [
           { title: "Ajouter", description: "Cliquez sur Ajouter utilisateur, choisissez l’agence et le rôle puis renseignez identité, email et mot de passe." },
           { title: "Modifier", description: "Ouvrez Actions puis Modifier pour mettre à jour le compte ou son rôle." },
@@ -1328,7 +1328,7 @@ export const guideModules: GuideModule[] = [
         summary: "Composer les droits fonctionnels d’un rôle en respectant leurs dépendances.",
         route: "/app/admin/roles",
         routePrefixes: ["/app/admin/roles/"],
-        permissions: ["role:view", "role:manage", "config:view", "config:manage"],
+        permissions: ["role:view","config:view"],
         steps: [
           { title: "Ajouter un rôle", description: "Cliquez sur Ajouter rôle puis renseignez code, nom, agence et description." },
           { title: "Choisir un module", description: "Parcourez les modules dans la colonne de gauche." },
@@ -1358,7 +1358,7 @@ export const guideModules: GuideModule[] = [
         summary: "Maintenir l’identité, les coordonnées, le logo, le cachet et les informations bancaires.",
         route: "/app/admin/agence",
         routePrefixes: ["/app/admin/agences"],
-        permissions: ["agence:view", "agence:manage-self", "agence:create", "config:view", "config:manage"],
+        permissions: ["agence:view","agence:manage-self","config:view"],
         steps: [
           { title: "Ouvrir Mon agence", description: "Consultez la fiche synthétique puis cliquez sur Modifier." },
           { title: "Mettre à jour l’identité", description: "Renseignez nom, ville, adresse, téléphone, fax et email." },
@@ -1374,7 +1374,7 @@ export const guideModules: GuideModule[] = [
         summary: "Administrer plusieurs agences et les comptes disposant d’un accès global.",
         route: "/app/admin/agences",
         routePrefixes: ["/app/admin/administrateurs-plateforme"],
-        permissions: ["agence:view", "agence:create", "config:view", "config:manage"],
+        permissions: ["agence:view","agence:manage-self","config:view"],
         steps: [
           { title: "Créer une agence", description: "En vue plateforme, cliquez sur Ajouter agence, complétez ses données puis enregistrez." },
           { title: "Modifier une agence", description: "Utilisez l’action de ligne et mettez à jour les champs autorisés." },

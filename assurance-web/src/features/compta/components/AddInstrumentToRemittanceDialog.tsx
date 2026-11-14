@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, Landmark } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth-store";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -33,6 +34,9 @@ type Props = {
 };
 
 export function AddInstrumentToRemittanceDialog({ instrument, instruments, open, onOpenChange, onAdded }: Props) {
+  const permissions = useAuthStore(state => state.user?.permissions ?? []);
+  const canCreate = permissions.includes("bordereau-remise:create");
+  const canUpdate = permissions.includes("bordereau-remise:update");
   const queryClient = useQueryClient();
   const candidates = useMemo(
     () => instruments?.length ? instruments : instrument ? [instrument] : [],
@@ -58,11 +62,11 @@ export function AddInstrumentToRemittanceDialog({ instrument, instruments, open,
       page: 0,
       size: 100,
     }),
-    enabled: open && Boolean(type),
+    enabled: open && Boolean(type) && canUpdate,
   });
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
     enabled: open,
   });
   const bankAccounts = useMemo(
@@ -226,7 +230,7 @@ export function AddInstrumentToRemittanceDialog({ instrument, instruments, open,
                     {draft.numero} · {draft.compteDestination} · {draft.nombreLignes} ligne{draft.nombreLignes > 1 ? "s" : ""}
                   </SelectItem>
                 ))}
-                <SelectItem value={CREATE_NEW}>Créer un nouveau bordereau</SelectItem>
+                {canCreate && <SelectItem value={CREATE_NEW}>Créer un nouveau bordereau</SelectItem>}
               </SelectContent>
             </Select>
           </div>
@@ -261,7 +265,7 @@ export function AddInstrumentToRemittanceDialog({ instrument, instruments, open,
         <DialogFooter>
           <Button variant="outline" disabled={save.isPending} onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button
-            disabled={selectedInstruments.length === 0 || save.isPending || (creating && (!slipDate || !accountId))}
+            disabled={selectedInstruments.length === 0 || save.isPending || (creating ? !canCreate || !slipDate || !accountId : !canUpdate)}
             onClick={() => save.mutate()}
           >
             {creating ? <FilePlus2 className="size-4" /> : <Landmark className="size-4" />}

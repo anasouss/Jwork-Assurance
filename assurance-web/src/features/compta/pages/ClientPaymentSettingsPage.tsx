@@ -15,7 +15,7 @@ const policyQueryKey = ["compta", "client-payment-policy"] as const;
 export default function ClientPaymentSettingsPage() {
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("reglement-client:manage");
+  const canManage = permissions.includes("reglement-client:configure");
   const [maximumCredit, setMaximumCredit] = useState<number>();
   const [maximumAdjustment, setMaximumAdjustment] = useState<number>();
 

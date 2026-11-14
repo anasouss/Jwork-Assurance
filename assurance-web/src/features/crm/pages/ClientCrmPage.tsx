@@ -24,6 +24,7 @@ import { toast } from "@/lib/toast";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
@@ -71,8 +72,8 @@ export default function ClientCrmPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canCreateClient = permissions.includes("client:create");
-  const canManageClients = permissions.includes("client:manage") || canCreateClient;
-  const canEditClient = permissions.includes("client:manage");
+  const canCreateGroup = permissions.includes("groupe-client:create");
+  const canEditClient = permissions.includes("client:update");
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query.trim());
@@ -145,7 +146,7 @@ export default function ClientCrmPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canManageClients ? (
+          {canCreateGroup ? (
             <Button type="button" variant="outline" onClick={() => setGroupDialogOpen(true)}>
               <Users className="size-4" />
               Nouveau groupe
@@ -193,7 +194,6 @@ export default function ClientCrmPage() {
         <ClientDetail
           detail={detailQuery.data}
           onAssignGroup={() => setAssignmentOpen(true)}
-          canManageClients={canManageClients}
           onEdit={canEditClient ? setClientToEdit : undefined}
         />
       ) : (
@@ -419,6 +419,7 @@ function ClientDialog({
   client?: ClientResponse;
 }) {
   const [draft, setDraft] = useState<ClientDraft>(() => client ? clientRecordDraft(client) : emptyClientDraft());
+  const canUploadDocuments = useAuthStore(state => state.user?.permissions.includes("document-crm:upload") ?? false);
   const [documents, setDocuments] = useState<ClientDocumentDraft[]>([]);
   const [createdClient, setCreatedClient] = useState<ClientResponse | null>(null);
   const villesQuery = useQuery({
@@ -643,17 +644,17 @@ function ClientDialog({
           </div>
         </section>}
         </fieldset>
-        {!client && <ClientDocumentDrafts typeClient={draft.typeClient} value={documents} onChange={setDocuments} disabled={createMutation.isPending} owner={draft} />}
+        {!client && canUploadDocuments && <ClientDocumentDrafts typeClient={draft.typeClient} value={documents} onChange={setDocuments} disabled={createMutation.isPending} owner={draft} />}
         <DialogFooter>
           <Button type="button" variant="outline" disabled={createMutation.isPending} onClick={() => void closeClientDialog()}>{createdClient ? "Fermer" : "Annuler"}</Button>
-          <Button
+          <PermissionButton permission={client ? "client:update" : "client:create"}
             type="button"
             className="bg-blue-600 text-white hover:bg-blue-700"
             disabled={!valid || !acquisitionValid || createMutation.isPending}
             onClick={() => createMutation.mutate()}
           >
             {createMutation.isPending ? "Enregistrement..." : client ? "Enregistrer" : createdClient ? "Envoyer les pièces restantes" : "Créer le client"}
-          </Button>
+          </PermissionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -663,14 +664,17 @@ function ClientDialog({
 function ClientDetail({
   detail,
   onAssignGroup,
-  canManageClients,
   onEdit,
 }: {
   detail: Awaited<ReturnType<typeof clientApi.getClientCrm>>;
   onAssignGroup: () => void;
-  canManageClients: boolean;
   onEdit?: (client: ClientResponse) => void;
 }) {
+  const permissions = useAuthStore(state => state.user?.permissions ?? []);
+  const canUpdateAcquisition = permissions.includes("acquisition-client:update");
+  const canAssignGroup = ["groupe-client:assign", "groupe-client:end-membership"].some(code => permissions.includes(code));
+  const canCreateCondition = permissions.includes("condition-paiement:create");
+  const canViewDocuments = permissions.includes("document-crm:view");
   const client = detail.client;
   const queryClient = useQueryClient();
   const [acquisitionOpen, setAcquisitionOpen] = useState(false);
@@ -694,7 +698,7 @@ function ClientDetail({
   });
   const canViewClaims = useAuthStore((state) => {
     const permissions = state.user?.permissions ?? [];
-    return ["sinistre:view", "sinistre:manage", "sinistre:finance"].some(
+    return ["sinistre:view"].some(
       (permission) => permissions.includes(permission),
     );
   });
@@ -744,7 +748,7 @@ function ClientDetail({
         <PortfolioSection
             title="Acquisition commerciale"
             icon={<Megaphone className="size-4" />}
-            action={canManageClients ? (
+            action={canUpdateAcquisition ? (
               <Button
                 size="sm"
                 variant="outline"
@@ -779,7 +783,7 @@ function ClientDetail({
         <PortfolioSection
             title="Organisation et groupe"
             icon={<Building2 className="size-4" />}
-            action={canManageClients ? <Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button> : undefined}
+            action={canAssignGroup ? <Button size="sm" variant="outline" onClick={onAssignGroup}>Modifier</Button> : undefined}
           >
             {detail.groupes.length ? detail.groupes.map((groupe) => (
               <div key={groupe.id} className="border-b py-3 first:pt-0 last:border-0 last:pb-0">
@@ -796,7 +800,7 @@ function ClientDetail({
         <PortfolioSection
             title="Conditions de paiement"
             icon={<CalendarClock className="size-4" />}
-            action={canManageClients ? (
+            action={canCreateCondition ? (
               <Button size="sm" variant="outline" onClick={() => setPaymentConditionOpen(true)}>
                 <Plus className="size-4" />
                 Nouvelle condition
@@ -823,9 +827,9 @@ function ClientDetail({
               </div>
             ) : <EmptyState text="Aucune autre entité liée." />}
         </PortfolioSection>}
-        <PortfolioSection title="Documents client" icon={<Paperclip className="size-4" />}>
+        {canViewDocuments && <PortfolioSection title="Documents client" icon={<Paperclip className="size-4" />}>
           <ClientDocuments clientId={client.id} typeClient={client.typeClient} owner={client} />
-        </PortfolioSection>
+        </PortfolioSection>}
       </div>
 
       <Dialog open={acquisitionOpen} onOpenChange={setAcquisitionOpen}>
@@ -844,7 +848,7 @@ function ClientDetail({
           />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setAcquisitionOpen(false)}>Annuler</Button>
-            <Button
+            <PermissionButton permission="acquisition-client:update"
               type="button"
               className="bg-blue-600 text-white hover:bg-blue-700"
               disabled={
@@ -854,7 +858,7 @@ function ClientDetail({
               onClick={() => acquisitionDraft && acquisitionMutation.mutate(acquisitionDraft)}
             >
               {acquisitionMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1065,13 +1069,13 @@ function PaymentConditionDialog({
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button
+          <PermissionButton permission="condition-paiement:create"
             type="button"
             disabled={!days || !type || !startDate || save.isPending}
             onClick={() => save.mutate()}
           >
             {save.isPending ? "Enregistrement..." : "Enregistrer"}
-          </Button>
+          </PermissionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1191,14 +1195,14 @@ function AssignmentDialog({
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Annuler</Button>
-          <Button
+          <PermissionButton permission={groupId === "INDEPENDANT" ? "groupe-client:end-membership" : "groupe-client:assign"}
             type="button"
             className="bg-blue-600 text-white hover:bg-blue-700"
             disabled={!groupId || mutation.isPending}
             onClick={() => mutation.mutate()}
           >
             Enregistrer
-          </Button>
+          </PermissionButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

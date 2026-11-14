@@ -34,7 +34,7 @@ public class SinistreDocumentController {
     private final SinistreDocumentService documentService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-document:upload')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> upload(
             @PathVariable Long sinistreId,
             @RequestParam TypeDocumentSinistre type,
@@ -66,7 +66,7 @@ public class SinistreDocumentController {
     }
 
     @GetMapping("/{documentId}/download")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<Resource> download(
             @PathVariable Long sinistreId,
             @PathVariable Long documentId
@@ -86,7 +86,7 @@ public class SinistreDocumentController {
     }
 
     @PutMapping("/{documentId}/statut")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-document:update')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> review(
             @PathVariable Long sinistreId,
             @PathVariable Long documentId,
@@ -104,7 +104,7 @@ public class SinistreDocumentController {
     }
 
     @DeleteMapping("/{documentId}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:manage')")
+    @PreAuthorize("hasAuthority('PERM_sinistre-document:delete')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> delete(
             @PathVariable Long sinistreId,
             @PathVariable Long documentId

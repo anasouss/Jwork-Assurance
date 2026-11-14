@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, Landmark, Printer, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,7 +45,9 @@ export default function BordereauRemiseDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
+  const canDelete = permissions.includes("bordereau-remise:delete");
+  const canDeposit = permissions.includes("bordereau-remise:deposit");
+  const canUpdate = permissions.includes("bordereau-remise:update");
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositDate, setDepositDate] = useState(TODAY);
   const [depositReference, setDepositReference] = useState("");
@@ -154,18 +157,18 @@ export default function BordereauRemiseDetailPage() {
             {pdfLoading ? "Génération..." : "Imprimer le PDF"}
           </Button>
           {data.statut === "BROUILLON" && <>
-            <Button
+            <PermissionButton permission="bordereau-remise:delete"
               variant="outline"
               className="text-destructive hover:text-destructive"
-              disabled={!canManage || deleteDraft.isPending}
+              disabled={!canDelete || deleteDraft.isPending}
               onClick={() => setDeleteOpen(true)}
             >
               <Trash2 className="size-4" /> Supprimer
-            </Button>
-            <Button disabled={!canManage || (instrumentSlip && data.lignes.length === 0)} onClick={() => {
+            </PermissionButton>
+            <PermissionButton permission="bordereau-remise:deposit" disabled={!canDeposit || (instrumentSlip && data.lignes.length === 0)} onClick={() => {
               setDepositReference(data.referenceBancaire ?? "");
               setDepositOpen(true);
-            }}><CheckCircle2 className="size-4" /> Valider le bordereau</Button>
+            }}><CheckCircle2 className="size-4" /> Valider le bordereau</PermissionButton>
           </>}
           {(data.operationTresorerieId || data.lignesEspeces.some((line) => line.operationTresorerieId)) && <Button asChild variant="outline"><Link to={`/app/compta/tresorerie/operations?search=${data.numero}`}><Landmark className="size-4" /> Voir les opérations</Link></Button>}
         </div>
@@ -199,8 +202,8 @@ export default function BordereauRemiseDetailPage() {
             <td className="px-4 py-3">{formatTreasuryDate(line.dateEcheance)}</td><td className="px-4 py-3 text-right font-semibold">{formatTreasuryMoney(line.montant)}</td>
             <td className="px-4 py-3"><div>{LINE_STATUS_LABELS[line.statut]}</div>{line.motifRejet && <div className="text-xs text-red-600">{line.motifRejet}</div>}</td>
             <td className="px-4 py-3 text-right">
-              {data.statut === "BROUILLON" && line.statut === "PREPAREE" && canManage ? (
-                <Button
+              {data.statut === "BROUILLON" && line.statut === "PREPAREE" && canUpdate ? (
+                <PermissionButton permission="bordereau-remise:update"
                   type="button"
                   size="icon"
                   variant="ghost"
@@ -210,7 +213,7 @@ export default function BordereauRemiseDetailPage() {
                   onClick={() => setLineToRemove(line)}
                 >
                   <Trash2 className="size-4" />
-                </Button>
+                </PermissionButton>
               ) : "-"}
             </td>
           </tr>)}
@@ -248,7 +251,7 @@ export default function BordereauRemiseDetailPage() {
         <DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>Valider le bordereau</DialogTitle><DialogDescription>{instrumentSlip ? "Les instruments passeront au statut remis en banque." : "Le transfert de la caisse vers la banque sera enregistré."}</DialogDescription></DialogHeader>
           <div className="grid gap-4"><div className="grid gap-2"><Label>Date de remise</Label><DatePicker date={depositDate} onSelect={(value) => setDepositDate(toDateOnly(value) ?? "")} /></div>
             <div className="grid gap-2"><Label htmlFor="deposit-reference">N° bordereau banque *</Label><Input id="deposit-reference" value={depositReference} onChange={(event) => setDepositReference(event.target.value)} /></div></div>
-          <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><Button disabled={!depositDate || !depositReference.trim() || deposit.isPending} onClick={() => deposit.mutate()}>{deposit.isPending ? "Validation en cours..." : "Valider le bordereau"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => setDepositOpen(false)}>Annuler</Button><PermissionButton permission="bordereau-remise:deposit" disabled={!depositDate || !depositReference.trim() || deposit.isPending} onClick={() => deposit.mutate()}>{deposit.isPending ? "Validation en cours..." : "Valider le bordereau"}</PermissionButton></DialogFooter>
         </DialogContent>
       </Dialog>
 

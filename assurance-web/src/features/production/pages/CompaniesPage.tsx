@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -35,7 +36,7 @@ export default function CompaniesPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canViewContacts = permissions.includes("contact-compagnie:view") || permissions.includes("contact-compagnie:manage");
+  const canViewContacts = permissions.includes("contact-compagnie:view");
   const compagnies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
     queryFn: () => referenceApi.list("compagnies-assurance"),
@@ -102,10 +103,10 @@ export default function CompaniesPage() {
           <h1 className="text-xl font-semibold tracking-tight">Compagnies d'assurance</h1>
           <p className="text-sm text-muted-foreground">Référentiel des assureurs utilisés en production, stock et grilles.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
+        <PermissionButton permission="compagnie-assurance:create" onClick={() => { setEditing(null); setDialogOpen(true); }}>
           <Plus className="size-4" />
           Ajouter compagnie
-        </Button>
+        </PermissionButton>
       </div>
 
       <div className="rounded-lg border bg-card p-4">
@@ -171,7 +172,7 @@ export default function CompaniesPage() {
                     <TableRowActions
                       label={`Actions ${compagnie.libelle}`}
                       actions={[
-                        {
+                        { permission: "convention:view",
                           label: "Conventions",
                           icon: Handshake,
                           onSelect: () => navigate(`/app/companies/conventions?compagnieId=${compagnie.id}`),
@@ -181,7 +182,7 @@ export default function CompaniesPage() {
                           icon: Users,
                           onSelect: () => navigate(`/app/companies/contacts?compagnieId=${compagnie.id}`),
                         }] : []),
-                        {
+                        { permission: "compagnie-assurance:update",
                           label: "Modifier",
                           icon: Edit,
                           iconTone: "primary",
@@ -287,9 +288,9 @@ export default function CompaniesPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-            <Button disabled={save.isPending} onClick={() => saveCompany(editing, payload, save.mutate)}>
+            <PermissionButton permission={editing ? "compagnie-assurance:update" : "compagnie-assurance:create"} disabled={save.isPending} onClick={() => saveCompany(editing, payload, save.mutate)}>
               {editing ? "Enregistrer" : "Ajouter"}
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

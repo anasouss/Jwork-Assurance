@@ -84,7 +84,7 @@ import type {
   ClientPaymentMode,
   ClientReceivable,
   CreateClientPaymentRequest,
-  TreasuryAccount,
+  TreasuryAccountOption,
 } from "../types";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -115,7 +115,7 @@ const paymentModes: Array<{
 export default function NouveauReglementClientPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canCreate = permissions.includes("reglement-client:create")
-    || permissions.includes("reglement-client:manage");
+    || permissions.includes("reglement-client:refund");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -158,8 +158,8 @@ export default function NouveauReglementClientPage() {
     staleTime: 0,
   });
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
   });
   const banks = useQuery({
     queryKey: ["compta", "banks", "active"],
@@ -185,7 +185,7 @@ export default function NouveauReglementClientPage() {
   const remainingAmount = round(amountDue - paymentTotal - adjustmentPlan.total);
   const unallocatedCredit = Math.max(0, round(paymentTotal - amountDue));
   const maximumAdjustment = paymentPolicy.data?.ecartReglementMaximum ?? 0;
-  const canGrantAdjustment = permissions.includes("reglement-client:manage") && !multiClientDeposit && !signedSettlement;
+  const canGrantAdjustment = permissions.includes("reglement-client:adjust") && !multiClientDeposit && !signedSettlement;
   const adjustmentInvalid = !Number.isFinite(adjustmentAmount) || adjustmentAmount < 0
     || adjustmentAmount > maximumAdjustment || adjustmentPlan.unassigned > 0
     || (adjustmentAmount > 0 && (!canGrantAdjustment || !adjustmentReason.trim()));
@@ -322,7 +322,7 @@ export default function NouveauReglementClientPage() {
     && methods.length > 0
     && paymentTotal > 0
     && amountDue > 0
-    && (!outgoing || permissions.includes("reglement-client:manage"))
+    && permissions.includes(outgoing ? "reglement-client:refund" : "reglement-client:create")
     && (!signedSettlement || (!multiClientDeposit && methods.length === 1 && Math.abs(paymentTotal - amountDue) < 0.005))
     && paymentPolicy.isSuccess
     && !creditExceedsMaximum
@@ -1060,8 +1060,8 @@ function PaymentModesMultiSelect(props: {
 }
 
 function AccountSelect(props: {
-  accounts: TreasuryAccount[];
-  type: TreasuryAccount["typeCompte"];
+  accounts: TreasuryAccountOption[];
+  type: TreasuryAccountOption["typeCompte"];
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -1318,7 +1318,7 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
   };
 }
 
-function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[], outgoing = false) {
+function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false) {
   if (numeric(method.montant) <= 0) return false;
   if (method.mode === "ESPECES") {
     return true;

@@ -10,7 +10,7 @@ export default function AdminUsersPage() {
   const queryClient = useQueryClient();
   const access = useAdminAccess();
   const users = useQuery({ queryKey: ["admin", "users"], queryFn: adminApi.users, staleTime: 30_000 });
-  const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: adminApi.roles, staleTime: 30_000 });
+  const roles = useQuery({ queryKey: ["admin", "roles"], queryFn: adminApi.roles, enabled: access.canViewRoles, staleTime: 30_000 });
   const agencies = useQuery({
     queryKey: ["admin", "agencies"],
     queryFn: adminApi.agencies,
@@ -40,7 +40,8 @@ export default function AdminUsersPage() {
       canSelectAgency={access.isPlatformMode}
       currentAgencyId={access.user?.agenceId ?? undefined}
       currentAgencyName={access.user?.agenceName ?? undefined}
-      canManage={access.canManageUsers}
+      rights={access.userRights}
+      grantablePermissionCodes={access.user?.permissions ?? []}
       currentUserId={access.user?.id}
       onChanged={() => queryClient.invalidateQueries({ queryKey: ["admin", "users"] })}
     />

@@ -25,7 +25,24 @@ type GroupeClientRequest = {
   actif?: boolean;
 };
 
+export type ClientLookupOption = Pick<ClientResponse, "id" | "codeClient" | "nomAffichage" | "cin" | "rc" | "ice" | "email" | "groupe">;
+export type GroupLookupOption = Pick<GroupeClient, "id" | "code" | "libelle" | "clientTeteNom" | "clientTresorerieNom" | "actif"> & { nombreMembres: number };
+
 export const clientApi = {
+  async clientOptions(params: { query?: string; page?: number; size?: number } = {}) {
+    return unwrap(await apiFetch<ApiResponse<{ items: ClientLookupOption[]; page: ClientPage["page"] }>>(
+      `/api/v1/clients/options${buildQueryString(params)}`
+    ));
+  },
+
+  async clientOption(clientId: string) {
+    return unwrap(await apiFetch<ApiResponse<ClientLookupOption>>(`/api/v1/clients/options/${clientId}`));
+  },
+
+  async groupOptions() {
+    return unwrap(await apiFetch<ApiResponse<GroupLookupOption[]>>("/api/v1/groupes-clients/options"));
+  },
+
   async searchClient(params: { cin?: string; passport?: string; rc?: string; carteResidence?: string }) {
     return unwrap(
       await apiFetch<ApiResponse<ClientResponse | null>>(

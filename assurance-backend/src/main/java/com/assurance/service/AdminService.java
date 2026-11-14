@@ -118,6 +118,7 @@ public class AdminService {
         user.setTelephone(blankToNull(request.getTelephone()));
         user.setActif(active);
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            requireAny(actor, "user:reset-password", "config:manage");
             user.setPassword(passwordEncoder.encode(request.getPassword()));
             refreshSessionRepository.revokeAllByUserId(id);
         }
@@ -187,7 +188,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<AdminUtilisateurResponse> listUsers() {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:view", "user:manage", "config:view");
+        requireAny(actor, "user:view", "config:view");
         Long contextAgenceId = TenantContext.getCurrentAgence();
         List<Utilisateur> users = contextAgenceId != null
                 ? utilisateurRepository.findByAgenceIdOrderByNomAscPrenomAsc(contextAgenceId)
@@ -203,7 +204,7 @@ public class AdminService {
     @Transactional
     public AdminUtilisateurResponse createUser(UpsertUtilisateurRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:manage", "config:manage");
+        requireAny(actor, "user:create", "config:manage");
         if (request.getPassword() == null || request.getPassword().isBlank()) {
             throw new BadRequestException("Mot de passe obligatoire");
         }
@@ -229,7 +230,7 @@ public class AdminService {
     @Transactional
     public AdminUtilisateurResponse updateUser(Long id, UpsertUtilisateurRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:manage", "config:manage");
+        requireAny(actor, "user:update", "config:manage");
         Utilisateur user = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
         ensureAgencyUser(user);
@@ -238,7 +239,16 @@ public class AdminService {
             throw new BadRequestException("Email deja utilise");
         }
         Agence agence = resolveManagedAgence(actor, request.getAgenceId());
-        Role role = resolveAssignableRole(actor, request.getRoleId(), agence);
+        boolean roleChanged = !Objects.equals(user.getRole().getId(), request.getRoleId())
+                || !Objects.equals(user.getAgence().getId(), agence.getId());
+        Role role = roleChanged ? resolveAssignableRole(actor, request.getRoleId(), agence) : user.getRole();
+        boolean active = request.getActif() == null || request.getActif();
+        if (active != Boolean.TRUE.equals(user.getActif())) {
+            requireAny(actor, "user:deactivate", "config:manage");
+            if (!active && id.equals(actor.getId())) {
+                throw new BadRequestException("Vous ne pouvez pas désactiver votre propre compte");
+            }
+        }
         Map<String, String> before = AdministrationActivity.userSnapshot(user);
         Long previousAgencyId = AdministrationActivity.agencyId(user);
         user.setAgence(agence);
@@ -249,6 +259,7 @@ public class AdminService {
         user.setTelephone(blankToNull(request.getTelephone()));
         user.setActif(request.getActif() == null || request.getActif());
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
+            requireAny(actor, "user:reset-password", "config:manage");
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
         return saveAgencyUser(user, before, ActivityAction.UPDATED, "Utilisateur modifié", "USER_UPDATE", previousAgencyId);
@@ -257,7 +268,7 @@ public class AdminService {
     @Transactional
     public void deactivateUser(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:manage", "config:manage");
+        requireAny(actor, "user:deactivate", "config:manage");
         if (id.equals(actor.getId())) {
             throw new BadRequestException("Vous ne pouvez pas desactiver votre propre compte");
         }
@@ -277,9 +288,24 @@ public class AdminService {
     }
 
     @Transactional
+    public AdminUtilisateurResponse assignUserRole(Long id, Long roleId) {
+        Utilisateur actor = currentUser();
+        requireAny(actor, "user:assign-role", "config:manage");
+        Utilisateur user = utilisateurRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
+        ensureAgencyUser(user);
+        ensureManagedAgence(actor, user.getAgence());
+        Role role = resolveAssignableRole(actor, roleId, user.getAgence());
+        Map<String, String> before = AdministrationActivity.userSnapshot(user);
+        user.setRole(role);
+        return saveAgencyUser(user, before, ActivityAction.UPDATED, "Rôle utilisateur modifié", "USER_ROLE_ASSIGN",
+                user.getAgence().getId());
+    }
+
+    @Transactional
     public void resetPassword(Long id, ResetUserPasswordRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:manage", "config:manage");
+        requireAny(actor, "user:reset-password", "config:manage");
         Utilisateur user = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", id));
         ensureAgencyUser(user);
@@ -292,7 +318,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<SessionResponse> listUserSessions(Long userId) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:view", "user:manage", "config:view");
+        requireAny(actor, "user:view", "config:view");
         managedAgencyUser(actor, userId);
         return refreshSessionRepository
                 .findByUserIdAndRevokedFalseAndExpiresAtAfterOrderByLastActivityAtDesc(userId, LocalDateTime.now())
@@ -304,7 +330,7 @@ public class AdminService {
     @Transactional
     public void revokeUserSession(Long userId, Long sessionId) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:manage", "config:manage");
+        requireAny(actor, "user:revoke-session", "config:manage");
         managedAgencyUser(actor, userId);
         RefreshSession session = refreshSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session", sessionId));
@@ -318,7 +344,7 @@ public class AdminService {
     @Transactional
     public void revokeAllUserSessions(Long userId) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "user:manage", "config:manage");
+        requireAny(actor, "user:revoke-session", "config:manage");
         managedAgencyUser(actor, userId);
         refreshSessionRepository.revokeAllByUserId(userId);
     }
@@ -326,7 +352,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<AdminRoleResponse> listRoles() {
         Utilisateur actor = currentUser();
-        requireAny(actor, "role:view", "role:manage", "config:view");
+        requireAny(actor, "role:view", "config:view");
         Long contextAgenceId = TenantContext.getCurrentAgence();
         List<Role> roles = contextAgenceId != null
                 ? roleRepository.findByAgenceIdOrAgenceIsNullOrderByNomAsc(contextAgenceId)
@@ -343,7 +369,7 @@ public class AdminService {
     @Transactional
     public AdminRoleResponse createRole(UpsertRoleRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "role:manage", "config:manage");
+        requireAny(actor, "role:create", "config:manage");
         Agence agence = resolveRoleAgence(actor, request.getAgenceId());
         ensureUniqueRoleCode(agence, request.getCode(), null);
         Role role = Role.builder()
@@ -362,7 +388,7 @@ public class AdminService {
     @Transactional
     public AdminRoleResponse updateRole(Long id, UpsertRoleRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "role:manage", "config:manage");
+        requireAny(actor, "role:update", "config:manage");
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", id));
         ensureAgencyRole(role);
@@ -371,6 +397,9 @@ public class AdminService {
             throw new UnauthorizedException("Role systeme non modifiable");
         }
         Agence agence = resolveRoleAgence(actor, request.getAgenceId());
+        if (!Objects.equals(role.getAgence().getId(), agence.getId()) && utilisateurRepository.existsByRoleId(id)) {
+            throw new BadRequestException("Un rôle attribué à des utilisateurs ne peut pas changer d'agence");
+        }
         ensureUniqueRoleCode(agence, request.getCode(), id);
         Map<String, String> before = AdministrationActivity.roleSnapshot(role);
         Long previousAgencyId = role.getAgence().getId();
@@ -381,7 +410,14 @@ public class AdminService {
         if (can(actor, "config:manage")) {
             role.setSystemRole(Boolean.TRUE.equals(request.getSystemRole()));
         }
-        role.setPermissions(resolvePermissions(actor, request.getPermissionIds()));
+        Set<Long> currentPermissionIds = role.getPermissions().stream()
+                .filter(permission -> com.assurance.security.PermissionCatalog.contains(permission.getCode()))
+                .map(Permission::getId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> requestedPermissionIds = request.getPermissionIds() == null ? Set.of() : request.getPermissionIds();
+        if (!currentPermissionIds.equals(requestedPermissionIds)) {
+            requireAny(actor, "role:assign-permissions", "config:manage");
+            role.setPermissions(resolvePermissions(actor, requestedPermissionIds));
+        }
         Role saved = roleRepository.save(role);
         ActivityCommand command = AdministrationActivity.role(saved, before, ActivityAction.UPDATED, "Rôle modifié", "ROLE_UPDATE");
         if (Objects.equals(previousAgencyId, saved.getAgence().getId())) activityRecorder.record(command);
@@ -392,7 +428,7 @@ public class AdminService {
     @Transactional
     public void deleteRole(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "role:manage", "config:manage");
+        requireAny(actor, "role:delete", "config:manage");
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", id));
         ensureAgencyRole(role);
@@ -412,10 +448,15 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<AdminPermissionResponse> listPermissions() {
         Utilisateur actor = currentUser();
-        requireAny(actor, "role:view", "role:manage", "config:view");
+        requireAny(actor, "role:view", "config:view");
         return permissionRepository.findAll().stream()
+                .filter(permission -> com.assurance.security.PermissionCatalog.contains(permission.getCode()))
                 .filter(permission -> !Boolean.TRUE.equals(permission.getSuperAdminOnly()))
-                .map(AdminPermissionResponse::from)
+                .map(permission -> {
+                    AdminPermissionResponse response = AdminPermissionResponse.from(permission);
+                    response.setAssignable(can(actor, "config:manage") || can(actor, permission.getCode()));
+                    return response;
+                })
                 .toList();
     }
 
@@ -475,10 +516,10 @@ public class AdminService {
     @Transactional
     public AdminAgenceResponse updateAgency(Long id, UpsertAgenceRequest request) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        requireAny(actor, "agence:update", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         Map<String, String> before = AdministrationActivity.agencySnapshot(agence);
-        boolean managesPlatformAgencies = can(actor, "agence:create") || can(actor, "config:manage");
+        boolean managesPlatformAgencies = can(actor, "agence:update") || can(actor, "config:manage");
         if (managesPlatformAgencies) {
             if (agenceRepository.existsByCodeIgnoreCaseAndIdNot(request.getCode(), id)) {
                 throw new BadRequestException("Code agence deja utilise");
@@ -507,7 +548,7 @@ public class AdminService {
     @Transactional
     public AdminAgenceResponse updateAgencyLogo(Long id, MultipartFile file) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        requireAny(actor, "agence:update", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         String previousStorageKey = agence.getLogoCheminStockage();
         boolean existed = previousStorageKey != null && !previousStorageKey.isBlank();
@@ -525,7 +566,7 @@ public class AdminService {
     @Transactional
     public AdminAgenceResponse deleteAgencyLogo(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        requireAny(actor, "agence:update", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         boolean existed = agence.getLogoCheminStockage() != null && !agence.getLogoCheminStockage().isBlank();
         agencyLogoStorageService.deleteAfterCommit(agence.getLogoCheminStockage());
@@ -555,7 +596,7 @@ public class AdminService {
     @Transactional
     public AdminAgenceResponse updateAgencySignature(Long id, MultipartFile file) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        requireAny(actor, "agence:update", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         String previousStorageKey = agence.getSignatureCheminStockage();
         boolean existed = previousStorageKey != null && !previousStorageKey.isBlank();
@@ -577,7 +618,7 @@ public class AdminService {
     @Transactional
     public AdminAgenceResponse deleteAgencySignature(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        requireAny(actor, "agence:update", "config:manage", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         boolean existed = agence.getSignatureCheminStockage() != null && !agence.getSignatureCheminStockage().isBlank();
         agencySignatureStorageService.deleteAfterCommit(agence.getSignatureCheminStockage());
@@ -592,7 +633,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public AgencySignature getAgencySignature(Long id) {
         Utilisateur actor = currentUser();
-        requireAny(actor, "agence:create", "config:manage", "agence:manage-self");
+        requireAny(actor, "agence:view", "config:view", "agence:manage-self");
         Agence agence = managedAgency(actor, id);
         if (agence.getSignatureCheminStockage() == null || agence.getSignatureCheminStockage().isBlank()) {
             throw new ResourceNotFoundException("Signature agence introuvable");
@@ -702,6 +743,7 @@ public class AdminService {
     }
 
     private Role resolveAssignableRole(Utilisateur actor, Long roleId, Agence agence) {
+        requireAny(actor, "user:assign-role", "config:manage");
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", roleId));
         if (role.getAgence() == null || "SUPER_ADMIN".equalsIgnoreCase(role.getCode())) {
@@ -710,16 +752,20 @@ public class AdminService {
         if (role.getAgence() != null && !role.getAgence().getId().equals(agence.getId())) {
             throw new BadRequestException("Le role ne correspond pas a l'agence");
         }
+        validateDelegatedPermissions(actor, role.getPermissions());
         return role;
     }
 
     private Set<Permission> resolvePermissions(Utilisateur actor, Set<Long> permissionIds) {
+        if (permissionIds != null && !permissionIds.isEmpty()) {
+            requireAny(actor, "role:assign-permissions", "config:manage");
+        }
         Set<Permission> permissions = new HashSet<>();
         for (Long permissionId : permissionIds == null ? Set.<Long>of() : permissionIds) {
             Permission permission = permissionRepository.findById(permissionId)
                     .orElseThrow(() -> new ResourceNotFoundException("Permission", permissionId));
-            if (Boolean.TRUE.equals(permission.getSuperAdminOnly())) {
-                throw new UnauthorizedException("Permission réservée à l'administration de la plateforme");
+            if (!com.assurance.security.PermissionCatalog.contains(permission.getCode())) {
+                throw new BadRequestException("Permission retirée du catalogue : " + permission.getCode());
             }
             permissions.add(permission);
         }
@@ -742,10 +788,29 @@ public class AdminService {
                 changed |= permissions.add(required);
             }
         }
+        validateDelegatedPermissions(actor, permissions);
         return permissions;
     }
 
+    private void validateDelegatedPermissions(Utilisateur actor, Set<Permission> permissions) {
+        for (Permission permission : permissions) {
+            if (!com.assurance.security.PermissionCatalog.contains(permission.getCode())) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(permission.getSuperAdminOnly())) {
+                throw new UnauthorizedException("Permission réservée à l'administration de la plateforme");
+            }
+            if (!can(actor, "config:manage") && !can(actor, permission.getCode())) {
+                throw new UnauthorizedException("Vous ne pouvez pas attribuer une permission que vous ne détenez pas : "
+                        + permission.getCode());
+            }
+        }
+    }
+
     private void ensureUniqueRoleCode(Agence agence, String code, Long currentId) {
+        if (SUPER_ADMIN_ROLE_CODE.equalsIgnoreCase(code.trim())) {
+            throw new BadRequestException("Ce code est réservé au rôle de la plateforme");
+        }
         boolean exists = agence == null
                 ? (currentId == null
                     ? roleRepository.existsByAgenceIsNullAndCodeIgnoreCase(code)

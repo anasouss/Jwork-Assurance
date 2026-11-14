@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { EcheanceInput } from "@/components/ui/echeance-input";
@@ -280,10 +281,10 @@ export default function ContratAssistancePage() {
                 <Button asChild type="button" variant="destructive">
                   <Link to="/app/production/contrats">Annuler</Link>
                 </Button>
-                <Button type="button" disabled={saveMutation.isPending || (!editingAssistance && (context?.vehiculesEligibles ?? []).length === 0)} onClick={submit}>
+                <PermissionButton permission={editingAssistance ? "assistance:update" : "assistance:create"} type="button" disabled={saveMutation.isPending || (!editingAssistance && (context?.vehiculesEligibles ?? []).length === 0)} onClick={submit}>
                   <Save className="size-4" />
                   {editingAssistance ? "Enregistrer les modifications" : "Enregistrer"}
-                </Button>
+                </PermissionButton>
               </div>
             </>
           )}
@@ -320,7 +321,7 @@ export default function ContratAssistancePage() {
                     <td className="px-3 py-2 text-right">{money(assistance.primeNette)}</td>
                     <td className="px-3 py-2 text-right">{money(assistance.primeTotale)}</td>
                     <td className="px-3 py-2 text-right">
-                      <Button
+                      <PermissionButton permission="assistance:update"
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -330,8 +331,8 @@ export default function ContratAssistancePage() {
                         onClick={() => editAssistance(assistance)}
                       >
                         <Pencil className="size-4" />
-                      </Button>
-                      <Button
+                      </PermissionButton>
+                      <PermissionButton permission="assistance:deactivate"
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -341,7 +342,7 @@ export default function ContratAssistancePage() {
                         onClick={() => setAssistanceToDelete(assistance)}
                       >
                         <Trash2 className="size-4" />
-                      </Button>
+                      </PermissionButton>
                     </td>
                   </tr>
                 )) : (

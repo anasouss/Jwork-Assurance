@@ -25,7 +25,7 @@ public class PrestataireSinistreController {
     private final SinistreIntervenantService intervenants;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:view')")
     public ApiResponse<PagedResponse<SinistreIntervenantResponse>> directory(
             @RequestParam(defaultValue = "GARAGE") TypePrestataireSinistre typePrestataire,
             @RequestParam(defaultValue = "false") boolean includeInactive,
@@ -39,7 +39,7 @@ public class PrestataireSinistreController {
     }
 
     @GetMapping("/eligibles")
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create', 'PERM_sinistre:manage', 'PERM_sinistre:finance', 'PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:view', 'PERM_sinistre:create', 'PERM_prestataire-sinistre:view')")
     public ApiResponse<List<SinistreIntervenantResponse>> eligible(
             @RequestParam TypePrestataireSinistre typePrestataire,
             @RequestParam(required = false) Long sinistreId,
@@ -54,25 +54,25 @@ public class PrestataireSinistreController {
     }
 
     @GetMapping("/options")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAnyAuthority('PERM_prestataire-sinistre:view', 'PERM_specialite-prestataire:view')")
     public ApiResponse<Map<String, List<SpecialitePrestataireResponse.Reference>>> options() {
         return ApiResponse.success(service.options());
     }
 
     @GetMapping("/specialites")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAnyAuthority('PERM_specialite-prestataire:view', 'PERM_prestataire-sinistre:view')")
     public ApiResponse<List<SpecialitePrestataireResponse>> specialties() {
         return ApiResponse.success(service.specialites(TenantContext.getCurrentAgence()));
     }
 
     @PostMapping("/specialites")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_specialite-prestataire:create')")
     public ApiResponse<SpecialitePrestataireResponse> create(@Valid @RequestBody UpsertSpecialitePrestataireRequest request) {
         return ApiResponse.success(service.saveSpecialite(TenantContext.getCurrentAgence(), null, request));
     }
 
     @PutMapping("/specialites/{id}")
-    @PreAuthorize("hasAuthority('PERM_sinistre:referentiel')")
+    @PreAuthorize("hasAuthority('PERM_specialite-prestataire:update')")
     public ApiResponse<SpecialitePrestataireResponse> update(@PathVariable Long id, @Valid @RequestBody UpsertSpecialitePrestataireRequest request) {
         return ApiResponse.success(service.saveSpecialite(TenantContext.getCurrentAgence(), id, request));
     }

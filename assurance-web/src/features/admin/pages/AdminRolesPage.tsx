@@ -38,7 +38,7 @@ export default function AdminRolesPage() {
       loading={roles.isLoading}
       permissions={permissions.data ?? []}
       agencies={availableAgencies}
-      canManage={access.canManageRoles}
+      rights={access.roleRights}
       roleId={roleId}
       onChanged={async () => {
         await queryClient.invalidateQueries({ queryKey: ["admin", "roles"] });

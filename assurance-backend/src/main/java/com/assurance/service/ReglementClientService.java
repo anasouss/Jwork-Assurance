@@ -924,14 +924,16 @@ public class ReglementClientService {
                 .map(CreerReglementClientRequest.Affectation::getMontant)
                 .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
+        com.assurance.security.BusinessPermission.require(totalAllocated.signum() < 0
+                ? "reglement-client:refund" : "reglement-client:create");
         if (totalAllocated.signum() < 0) {
             if (request.getDateReglement().isAfter(LocalDate.now())) {
                 throw new BadRequestException("La date d'un règlement de ristourne ne peut pas être future");
             }
             var authentication = SecurityContextHolder.getContext().getAuthentication();
             if (authentication == null || authentication.getAuthorities().stream()
-                    .noneMatch(authority -> "PERM_reglement-client:manage".equals(authority.getAuthority()))) {
-                throw new AccessDeniedException("La gestion des règlements est requise pour décaisser une ristourne");
+                    .noneMatch(authority -> "PERM_reglement-client:refund".equals(authority.getAuthority()))) {
+                throw new AccessDeniedException("Le droit de régler une ristourne est requis");
             }
         }
         if (signedSettlement) {
@@ -1033,8 +1035,8 @@ public class ReglementClientService {
         if (request.getEcarts() == null || request.getEcarts().isEmpty()) return;
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getAuthorities().stream()
-                .noneMatch(authority -> "PERM_reglement-client:manage".equals(authority.getAuthority()))) {
-            throw new AccessDeniedException("La gestion des règlements est requise pour accorder un écart");
+                .noneMatch(authority -> "PERM_reglement-client:adjust".equals(authority.getAuthority()))) {
+            throw new AccessDeniedException("Le droit d’accorder un écart de règlement est requis");
         }
         if (Boolean.TRUE.equals(request.getMultiPayeur())) {
             throw new BadRequestException("Accordez les écarts séparément pour chaque payeur");

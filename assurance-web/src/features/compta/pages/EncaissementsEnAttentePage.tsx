@@ -50,8 +50,8 @@ export default function EncaissementsEnAttentePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlState = collectionQueueStateFromParams(searchParams);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("tresorerie:manage");
-  const canReplacePayment = permissions.includes("reglement-client:manage");
+  const canManage = permissions.includes("bordereau-remise:create");
+  const canReplacePayment = permissions.includes("instrument-reglement:replace");
   const canViewPayment = permissions.includes("reglement-client:view");
   const canViewClient = permissions.includes("client:view");
   const queryClient = useQueryClient();
@@ -78,8 +78,8 @@ export default function EncaissementsEnAttentePage() {
   const pdfWindowRef = useRef<Window | null>(null);
   const payerSearch = usePayerSearch(mode === "ESPECES" ? undefined : payerScope, selectedPayer);
   const requestedClient = useQuery({
-    queryKey: ["crm-client", payerId],
-    queryFn: () => clientApi.getClientCrm(payerId),
+    queryKey: ["payer-client-option", payerId],
+    queryFn: () => clientApi.clientOption(payerId),
     enabled: Boolean(payerId) && payerType === "CLIENT" && mode !== "ESPECES",
     staleTime: 30_000,
   });
@@ -95,8 +95,8 @@ export default function EncaissementsEnAttentePage() {
   useEffect(() => {
     if (!payerId) return;
     if (selectedPayer?.id === payerId && selectedPayer.type === payerType) return;
-    if (payerType === "CLIENT" && requestedClient.data?.client) {
-      const client = requestedClient.data.client;
+    if (payerType === "CLIENT" && requestedClient.data) {
+      const client = requestedClient.data;
       setSelectedPayer({
         type: "CLIENT",
         id: client.id,
@@ -115,7 +115,7 @@ export default function EncaissementsEnAttentePage() {
         name: group.libelle,
         identifier: group.code,
         treasuryName: group.clientTresorerieNom || undefined,
-        memberCount: group.membres.length,
+        memberCount: group.nombreMembres,
       });
     }
   }, [
@@ -158,8 +158,8 @@ export default function EncaissementsEnAttentePage() {
     enabled: searchSubmitted && mode !== "ESPECES",
   });
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
   });
   const eligibleCashDays = useQuery({
     queryKey: ["compta", "treasury", "eligible-cash-days"],
@@ -662,7 +662,7 @@ export default function EncaissementsEnAttentePage() {
                     <InstrumentAction
                       instrument={instrument}
                       canReplace={canReplacePayment}
-                      canRemit={canManage}
+                      canRemit={canManage || permissions.includes("bordereau-remise:update")}
                       canViewPayment={canViewPayment}
                       canViewClient={canViewClient}
                       onViewPayment={() => setPaymentDetailId(instrument.reglementId)}

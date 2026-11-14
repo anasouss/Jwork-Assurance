@@ -10,7 +10,7 @@ export default function AppIndexPage() {
     return <Navigate to="/app/platform" replace />;
   }
   const permissions = user?.permissions ?? [];
-  if (!permissions.includes("contrat:view") && !permissions.includes("quittance:view")) {
+  if (!permissions.includes("contrat:view") && !permissions.includes("quittance-affectation:view")) {
     return <Navigate to={firstAccessibleAgencyPath(permissions, {
       platformAdmin: Boolean(user?.platformAdmin),
       hasAgencyContext: Boolean(user?.agenceId),

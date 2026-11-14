@@ -2,6 +2,7 @@ import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { Ban, Search } from "lucide-react";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -147,7 +148,7 @@ export function AttestationStockSearchPanel({
                   </TableCell>
                   <TableCell className="text-right">
                     {attestation.statut === "DISPONIBLE" ? (
-                      <Button
+                      <PermissionButton permission="attestation-stock:cancel"
                         type="button"
                         variant="ghost"
                         size="icon"
@@ -157,7 +158,7 @@ export function AttestationStockSearchPanel({
                       >
                         <Ban className="size-4" />
                         <span className="sr-only">Annuler l’attestation</span>
-                      </Button>
+                      </PermissionButton>
                     ) : null}
                   </TableCell>
                 </TableRow>

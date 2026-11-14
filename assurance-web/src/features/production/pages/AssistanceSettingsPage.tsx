@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast";
 import { TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -33,6 +34,7 @@ export default function AssistanceSettingsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const agenceId = useAuthStore(state => state.user?.agenceId);
+  const canChangeStatus = useAuthStore(state => state.user?.permissions.includes("compagnie-assistance:deactivate") ?? false);
   const [companySearch, setCompanySearch] = useState("");
   const [sort, setSort] = useState<{ column: AssistanceCompanySortColumn; direction: TableSortDirection }>({ column: "company", direction: "asc" });
   const [editingCompany, setEditingCompany] = useState<ReferenceOption | null>(null);
@@ -94,14 +96,14 @@ export default function AssistanceSettingsPage() {
           <p className="text-sm text-muted-foreground">Référentiel des prestataires utilisés dans la ligne assistance des contrats.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/app/companies/assistance/produits")}>
+          <PermissionButton permission="produit-assistance:view" variant="outline" onClick={() => navigate("/app/companies/assistance/produits")}>
             <Package className="size-4" />
             Produits assistance
-          </Button>
-          <Button onClick={() => { setEditingCompany(null); setCompanyDialogOpen(true); }}>
+          </PermissionButton>
+          <PermissionButton permission="compagnie-assistance:create" onClick={() => { setEditingCompany(null); setCompanyDialogOpen(true); }}>
             <Plus className="size-4" />
             Compagnie assistance
-          </Button>
+          </PermissionButton>
         </div>
       </div>
 
@@ -150,13 +152,13 @@ export default function AssistanceSettingsPage() {
                           icon: Package,
                           onSelect: () => navigate(`/app/companies/assistance/produits?compagnieId=${company.id}`),
                         },
-                        {
+                        { permission: "compagnie-assistance:update",
                           label: "Modifier",
                           icon: Edit,
                           iconTone: "primary",
                           onSelect: () => { setEditingCompany(company); setCompanyDialogOpen(true); },
                         },
-                        {
+                        { permission: "compagnie-assistance:deactivate",
                           label: "Désactiver",
                           icon: Trash2,
                           destructive: true,
@@ -219,15 +221,15 @@ export default function AssistanceSettingsPage() {
               <Input value={companyPayload.email ?? ""} onChange={(event) => setCompanyPayload((current) => ({ ...current, email: event.target.value }))} />
             </Field>
             <label className="flex min-h-9 items-center gap-2 self-end rounded-md border border-slate-300 bg-slate-50/70 px-3 text-sm dark:border-neutral-700 dark:bg-neutral-950/70">
-              <Checkbox checked={companyPayload.actif !== false} onCheckedChange={(value) => setCompanyPayload((current) => ({ ...current, actif: Boolean(value) }))} />
+              <Checkbox disabled={Boolean(editingCompany) && !canChangeStatus} checked={companyPayload.actif !== false} onCheckedChange={(value) => setCompanyPayload((current) => ({ ...current, actif: Boolean(value) }))} />
               <span>Active</span>
             </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompanyDialogOpen(false)}>Annuler</Button>
-            <Button disabled={saveCompany.isPending} onClick={() => submitCompany(editingCompany, companyPayload, saveCompany.mutate)}>
+            <PermissionButton permission={editingCompany ? "compagnie-assistance:update" : "compagnie-assistance:create"} disabled={saveCompany.isPending} onClick={() => submitCompany(editingCompany, companyPayload, saveCompany.mutate)}>
               Enregistrer
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

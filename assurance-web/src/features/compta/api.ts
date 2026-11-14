@@ -66,6 +66,7 @@ import type {
   ReplacePaymentInstrumentRequest,
   ReviseClientDocumentRequest,
   TreasuryAccount,
+  TreasuryAccountOption,
   TreasuryAccountAssignment,
   TreasuryAccessLevel,
   TreasuryUser,
@@ -1173,6 +1174,12 @@ export const comptaApi = {
     )).map(normalizeTreasuryAccount);
   },
 
+  async treasuryAccountOptions() {
+    return unwrap(await apiFetch<ApiResponse<TreasuryAccountOption[]>>(
+      "/api/v1/compta/tresorerie/comptes/options"
+    )).map(normalizeTreasuryAccount);
+  },
+
   async treasuryAdministrationAccounts() {
     return unwrap(await apiFetch<ApiResponse<TreasuryAccount[]>>(
       "/api/v1/compta/tresorerie/comptes/administration"
@@ -1556,7 +1563,7 @@ function normalizeRemittanceSlip(slip: RemittanceSlip): RemittanceSlip {
   };
 }
 
-function normalizeTreasuryAccount(account: TreasuryAccount): TreasuryAccount {
+function normalizeTreasuryAccount<T extends TreasuryAccountOption>(account: T): T {
   return {
     ...account,
     id: String(account.id),

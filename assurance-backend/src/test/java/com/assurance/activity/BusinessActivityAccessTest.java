@@ -39,9 +39,11 @@ class BusinessActivityAccessTest {
     }
 
     @Test
-    void permissionAloneDoesNotGrantBusinessHistoryToAnAgent() {
+    void explicitPermissionGrantsBusinessHistoryToAnAgencyAgent() {
         login("AGENT", 7L, Set.of("activity:view"));
-        denied();
+        when(repository.searchSummaries(any(Specification.class), any(Pageable.class))).thenReturn(Page.empty());
+        search();
+        verify(repository).searchSummaries(any(Specification.class), any(Pageable.class));
     }
 
     @Test
@@ -86,10 +88,11 @@ class BusinessActivityAccessTest {
     }
 
     @Test
-    void detailRequiresAdministratorAsWellAsPermission() {
+    void agentWithPermissionStillUsesAgencyScopedDetailLookup() {
         login("AGENT", 7L, Set.of("activity:view"));
-        assertThatThrownBy(() -> service.detail(44L)).isInstanceOf(AccessDeniedException.class);
-        verifyNoInteractions(repository);
+        assertThatThrownBy(() -> service.detail(44L)).isInstanceOf(com.assurance.exception.ResourceNotFoundException.class);
+        verify(repository).findByIdAndAgenceId(44L, 7L);
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).findById(any());
     }
 
     private void login(String role, Long agency, Set<String> permissions) {

@@ -625,6 +625,8 @@ public class DocumentClientService {
                 contratId,
                 brancheId,
                 normalizeSearch(search),
+                com.assurance.security.BusinessPermission.has("document-client:view"),
+                com.assurance.security.BusinessPermission.has("facture-convention:view"),
                 PageRequest.of(normalizePage(page), normalizeSize(size),
                         Sort.by("asc".equalsIgnoreCase(sortDirection) ? Sort.Direction.ASC : Sort.Direction.DESC,
                                 switch (sortBy) {
@@ -643,7 +645,9 @@ public class DocumentClientService {
 
     @Transactional(readOnly = true)
     public DocumentClientResponse detail(Long agenceId, Long documentId) {
-        return toResponse(findDocument(agenceId, documentId), true);
+        DocumentClient document = findDocument(agenceId, documentId);
+        requireDocumentPermission(document, "view");
+        return toResponse(document, true);
     }
 
     @Transactional
@@ -659,6 +663,7 @@ public class DocumentClientService {
     ) {
         DocumentClient statement = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, statementId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document client", statementId));
+        requireDocumentPermission(statement, "issue");
         if (statement.getTypeDocument() != TypeDocumentClient.RELEVE
                 || statement.getStatut() != StatutDocumentClient.EMIS) {
             throw new BadRequestException("Seul un relevé émis peut servir à préparer une facture");
@@ -885,6 +890,7 @@ public class DocumentClientService {
     ) {
         DocumentClient original = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
+        requireDocumentPermission(original, "revise");
         if (original.getStatut() != StatutDocumentClient.EMIS) {
             throw new BadRequestException("Seul le document émis le plus récent peut être modifié");
         }
@@ -928,6 +934,7 @@ public class DocumentClientService {
     ) {
         DocumentClient document = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
+        requireDocumentPermission(document, "cancel");
         if (document.getStatut() != StatutDocumentClient.EMIS) {
             throw new BadRequestException("Seul un document émis peut être annulé");
         }
@@ -954,6 +961,7 @@ public class DocumentClientService {
     public void delete(Long agenceId, Long documentId, AnnulerDocumentClientRequest request) {
         DocumentClient document = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document client", documentId));
+        requireDocumentPermission(document, "delete");
         String blockingReason = deletionBlockingReason(document);
         if (blockingReason != null) {
             throw new BadRequestException(blockingReason);
@@ -968,6 +976,13 @@ public class DocumentClientService {
         releaseConventionSchedules(document);
         documentClientRepository.delete(document);
         documentClientRepository.flush();
+    }
+
+    public void requireDocumentPermission(DocumentClient document, String action) {
+        boolean conventionInvoice = document.getConventionPayeur() != null
+                || document.getLignes().stream().anyMatch(line -> line.getEcheanceFacturationConvention() != null);
+        com.assurance.security.BusinessPermission.require(
+                (conventionInvoice ? "facture-convention:" : "document-client:") + action);
     }
 
     private String deletionBlockingReason(DocumentClient document) {

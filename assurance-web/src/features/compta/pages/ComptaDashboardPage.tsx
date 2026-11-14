@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { canAccessPath } from "@/lib/authorization";
 
 type ComptaAction = {
   title: string;
@@ -35,47 +36,41 @@ const groups: ComptaGroup[] = [
     title: "Client",
     actions: [
       {
-        title: "Affectation des quittances",
-        icon: ReceiptText,
-        href: "/app/compta/quittances",
-        permission: "quittance:view",
-        primary: true,
-      },
+  title: "Affectation des quittances",
+  icon: ReceiptText,
+  href: "/app/compta/quittances",
+  primary: true
+},
       {
-        title: "Relevés et factures",
-        icon: FileText,
-        href: "/app/compta/releves-factures",
-        permission: "quittance:view",
-      },
+  title: "Relevés et factures",
+  icon: FileText,
+  href: "/app/compta/releves-factures"
+},
       {
-        title: "Département conventions",
-        icon: ReceiptText,
-        href: "/app/compta/conventions",
-        permissions: ["quittance:view", "reglement-client:view"],
-      },
+  title: "Département conventions",
+  icon: ReceiptText,
+  href: "/app/compta/conventions"
+},
       {
-        title: "Règlements clients",
-        icon: WalletCards,
-        href: "/app/compta/reglements",
-        permission: "reglement-client:view",
-      },
+  title: "Règlements clients",
+  icon: WalletCards,
+  href: "/app/compta/reglements"
+},
     ],
   },
   {
     title: "Trésorerie",
     actions: [
       {
-        title: "Encaissements en attente",
-        icon: Hourglass,
-        href: "/app/compta/tresorerie/encaissements-en-attente",
-        permission: "tresorerie:view",
-      },
+  title: "Encaissements en attente",
+  icon: Hourglass,
+  href: "/app/compta/tresorerie/encaissements-en-attente"
+},
       {
-        title: "Bordereaux bancaires",
-        icon: ScrollText,
-        href: "/app/compta/tresorerie/bordereaux-remise",
-        permission: "tresorerie:view",
-      },
+  title: "Bordereaux bancaires",
+  icon: ScrollText,
+  href: "/app/compta/tresorerie/bordereaux-remise"
+},
       // {
       //   title: "Rapprochement bancaire",
       //   icon: FileCheck2,
@@ -83,28 +78,25 @@ const groups: ComptaGroup[] = [
       //   permission: "tresorerie:view",
       // },
       {
-        title: "Journal de trésorerie",
-        icon: Landmark,
-        href: "/app/compta/tresorerie/journal",
-        permission: "tresorerie:view",
-      },
+  title: "Journal de trésorerie",
+  icon: Landmark,
+  href: "/app/compta/tresorerie/journal"
+},
       {
-        title: "Rejets bancaires",
-        icon: CircleAlert,
-        href: "/app/compta/tresorerie/impayes-clients",
-        permission: "tresorerie:view",
-      },
+  title: "Rejets bancaires",
+  icon: CircleAlert,
+  href: "/app/compta/tresorerie/impayes-clients"
+},
     ],
   },
   {
     title: "Compagnie",
     actions: [
       {
-        title: "Bordereaux compagnies",
-        icon: Building2,
-        href: "/app/compta/bordereaux-compagnies",
-        permission: "bordereau-compagnie:view",
-      },
+  title: "Bordereaux compagnies",
+  icon: Building2,
+  href: "/app/compta/bordereaux-compagnies"
+},
       { title: "Rapprochement compagnie", icon: FileCheck2, disabled: true },
       { title: "Balance compagnie", icon: Scale, disabled: true },
     ],
@@ -133,8 +125,7 @@ export default function ComptaDashboardPage() {
         <div className="mx-auto grid w-full max-w-7xl divide-y">
           {groups.map((group) => {
             const actions = group.actions.filter(
-              (action) => (!action.permission || permissions.includes(action.permission))
-                && (!action.permissions || action.permissions.some(permission => permissions.includes(permission)))
+              action => !action.href || canAccessPath(permissions, action.href)
             );
             if (!actions.length) return null;
 

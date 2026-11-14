@@ -43,6 +43,13 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             select distinct d
             from DocumentClient d
             where d.agence.id = :agenceId
+              and ((:allowClients = true and d.conventionPayeur is null and not exists (
+                    select 1 from LigneDocumentClient scopeLine
+                    where scopeLine.document = d and scopeLine.echeanceFacturationConvention is not null
+              )) or (:allowConventions = true and (d.conventionPayeur is not null or exists (
+                    select 1 from LigneDocumentClient scopeLine
+                    where scopeLine.document = d and scopeLine.echeanceFacturationConvention is not null
+              ))))
               and (:type is null or d.typeDocument = :type)
               and (:statut is null or d.statut = :statut)
               and (:dateDu is null or d.dateEmission >= :dateDu)
@@ -88,8 +95,17 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
             @Param("contratId") Long contratId,
             @Param("brancheId") Long brancheId,
             @Param("search") String search,
+            @Param("allowClients") boolean allowClients,
+            @Param("allowConventions") boolean allowConventions,
             Pageable pageable
     );
+
+    default Page<DocumentClient> search(Long agenceId, TypeDocumentClient type, StatutDocumentClient statut,
+            LocalDate dateDu, LocalDate dateAu, String payeurType, Long payeurId, Long clientPortefeuilleId,
+            Long contratId, Long brancheId, String search, Pageable pageable) {
+        return search(agenceId, type, statut, dateDu, dateAu, payeurType, payeurId, clientPortefeuilleId,
+                contratId, brancheId, search, true, true, pageable);
+    }
 
     @EntityGraph(attributePaths = {
             "clientPayeur",

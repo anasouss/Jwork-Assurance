@@ -47,6 +47,19 @@ public class GroupeClientService {
     }
 
     @Transactional(readOnly = true)
+    public List<com.assurance.dto.response.GroupeClientLookupResponse> lookupOptions(Long agenceId) {
+        return groupeClientRepository.findByAgenceIdOrderByLibelleAsc(agenceId).stream()
+                .filter(group -> Boolean.TRUE.equals(group.getActif()))
+                .map(group -> new com.assurance.dto.response.GroupeClientLookupResponse(
+                        group.getId(), group.getCode(), group.getLibelle(),
+                        group.getClientTete() == null ? null : group.getClientTete().getNomAffichage(),
+                        group.getClientTresorerie() == null ? null : group.getClientTresorerie().getNomAffichage(),
+                        membreRepository.findActiveByGroupe(agenceId, group.getId(), LocalDate.now()).size(),
+                        group.getActif()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public GroupeClientResponse get(Long agenceId, Long groupeId) {
         return toResponse(agenceId, requireGroupe(agenceId, groupeId), true);
     }

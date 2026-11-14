@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
 import { ApiError } from "@/lib/api/base";
 import { attestationStockKeys, contractKeys } from "@/lib/query-keys";
@@ -45,6 +46,7 @@ export function useContratCreationForm(
   draftId?: string,
   options?: { prospectionMode?: boolean; renewalMode?: boolean; initialCategorieClientId?: string }
 ) {
+  const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -302,6 +304,10 @@ export function useContratCreationForm(
   const correctionMode = String(draftQuery.data?.statut ?? "").toUpperCase() === "ACTIVE"
     && !draftQuery.data?.prospection
     && !draftQuery.data?.brouillon;
+  const canEditForm = !draftId ? permissions.includes("contrat:create")
+    : correctionMode ? permissions.includes("contrat:update")
+    : draftQuery.data?.contratOrigineId ? permissions.includes("contrat:renew")
+    : permissions.includes("contrat:create") || permissions.includes("contrat:update");
   const correctionBlocked = correctionMode && (draftQuery.data?.mouvements ?? []).some((movement) => {
     const code = String(movement.code ?? "").trim().toUpperCase();
     const status = String(movement.statut ?? "").trim().toUpperCase();
@@ -731,6 +737,7 @@ export function useContratCreationForm(
     queryFn: () => contractCreationApi.previewDraftTariffRecalculation(draftId ?? ""),
     enabled: Boolean(
       draftId
+      && canEditForm
       && typeContrat === "FLOTTE"
       && grilleTarifaireId
       && (draftQuery.data?.garanties?.length ?? 0) > 0
@@ -1462,6 +1469,7 @@ export function useContratCreationForm(
     request,
     draftId,
     draftQuery,
+    canEditForm,
     assistanceContext,
     initialLoading,
     preview,
@@ -1811,7 +1819,7 @@ async function syncDraftVehiculeAssistance(
     if (!assistanceId) {
       return draft;
     }
-    await contractServiceApi.deleteAssistance(draftId, String(assistanceId));
+    await contractServiceApi.removeEditingAssistance(draftId, String(assistanceId));
     return contractCreationApi.getContratDraft(draftId);
   }
   if (!vehiculeId) {
@@ -1820,7 +1828,7 @@ async function syncDraftVehiculeAssistance(
   if (!assistance.compagnieAssistanceId || !assistance.produitAssistanceId) {
     throw new Error("Compagnie et produit assistance obligatoires.");
   }
-  await contractServiceApi.saveAssistance(draftId, {
+  await contractServiceApi.saveEditingAssistance(draftId, {
     vehiculeId: String(vehiculeId),
     compagnieAssistanceId: assistance.compagnieAssistanceId,
     produitAssistanceId: assistance.produitAssistanceId,

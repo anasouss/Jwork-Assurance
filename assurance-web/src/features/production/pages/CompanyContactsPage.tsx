@@ -7,6 +7,7 @@ import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +45,7 @@ export default function CompanyContactsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusTarget, setStatusTarget] = useState<CompanyContact | null>(null);
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("contact-compagnie:manage");
+  const canManage = ["contact-compagnie:create", "contact-compagnie:update", "contact-compagnie:deactivate"].some(code => permissions.includes(code));
 
   const companies = useQuery({
     queryKey: ["referentiel", "compagnies-assurance"],
@@ -126,9 +127,9 @@ export default function CompanyContactsPage() {
           <p className="text-sm text-muted-foreground">Interlocuteurs opérationnels connus par votre agence.</p>
         </div>
         {canManage ? (
-          <Button onClick={() => { setEditing(null); setDialogOpen(true); }}>
+          <PermissionButton permission="contact-compagnie:create" onClick={() => { setEditing(null); setDialogOpen(true); }}>
             <Plus className="size-4" /> Ajouter un contact
-          </Button>
+          </PermissionButton>
         ) : null}
       </div>
 
@@ -225,8 +226,8 @@ export default function CompanyContactsPage() {
                       <TableCell className="text-right">
                         {canManage ? (
                           <TableRowActions label={`Actions ${fullName(contact)}`} actions={[
-                            { label: "Modifier", icon: Edit, iconTone: "primary", onSelect: () => { setEditing(contact); setDialogOpen(true); } },
-                            { label: contact.actif ? "Désactiver" : "Réactiver", icon: contact.actif ? PowerOff : Power, iconTone: contact.actif ? "neutral" : "success", destructive: contact.actif, onSelect: () => setStatusTarget(contact) },
+                            { permission: "contact-compagnie:update", label: "Modifier", icon: Edit, iconTone: "primary", onSelect: () => { setEditing(contact); setDialogOpen(true); } },
+                            { permission: "contact-compagnie:deactivate", label: contact.actif ? "Désactiver" : "Réactiver", icon: contact.actif ? PowerOff : Power, iconTone: contact.actif ? "neutral" : "success", destructive: contact.actif, onSelect: () => setStatusTarget(contact) },
                           ]} />
                         ) : null}
                       </TableCell>

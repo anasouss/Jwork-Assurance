@@ -23,7 +23,7 @@ public class SinistreContratLookupController {
     private final SinistreContratLookupService lookupService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PERM_sinistre:create', 'PERM_sinistre:view', 'PERM_sinistre:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_sinistre:create', 'PERM_sinistre:view')")
     public ResponseEntity<ApiResponse<List<SinistreContratLookupResponse>>> search(
             @RequestParam Long brancheId,
             @RequestParam String query,

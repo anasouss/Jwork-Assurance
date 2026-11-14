@@ -70,13 +70,13 @@ public class ComptaController {
     private final DocumentClientPdfService documentClientPdfService;
 
     @GetMapping("/elements-facturables")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:view')")
     public ResponseEntity<ApiResponse<List<ElementFacturableResponse>>> elementsFacturables() {
         return ResponseEntity.ok(ApiResponse.success(elementFacturableService.list(TenantContext.getCurrentAgence())));
     }
 
     @GetMapping("/quittances")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:view')")
     public ResponseEntity<ApiResponse<AffectationQuittancePageResponse>> quittances(
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long tiersCompagnieId,
@@ -103,7 +103,7 @@ public class ComptaController {
     }
 
     @GetMapping("/quittances/compagnies-disponibles")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_quittance-affectation:view', 'PERM_bordereau-compagnie:view')")
     public ResponseEntity<ApiResponse<List<TiersCompagnieResponse>>> compagniesQuittancesDisponibles(
             @RequestParam(required = false) Long brancheId
     ) {
@@ -114,7 +114,7 @@ public class ComptaController {
     }
 
     @GetMapping("/quittances/export")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:export')")
     public ResponseEntity<byte[]> exportQuittances(
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long tiersCompagnieId,
@@ -146,7 +146,7 @@ public class ComptaController {
     }
 
     @GetMapping("/quittances/{quittanceId}/affectation")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:view')")
     public ResponseEntity<ApiResponse<AffectationQuittanceResponse>> affectation(
             @PathVariable Long quittanceId,
             @RequestParam(required = false) Boolean avecRetenue
@@ -159,7 +159,7 @@ public class ComptaController {
     }
 
     @PutMapping("/quittances/{quittanceId}/affectation")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:update')")
     public ResponseEntity<ApiResponse<AffectationQuittanceResponse>> enregistrerAffectation(
             @PathVariable Long quittanceId,
             @Valid @RequestBody EnregistrerAffectationQuittanceRequest request
@@ -176,7 +176,7 @@ public class ComptaController {
     }
 
     @PutMapping("/quittances/affectations/lot")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:update')")
     public ResponseEntity<ApiResponse<LotAffectationQuittanceResponse>> enregistrerLotAffectation(
             @Valid @RequestBody EnregistrerLotAffectationQuittanceRequest request
     ) {
@@ -191,14 +191,14 @@ public class ComptaController {
     }
 
     @DeleteMapping("/quittances/{quittanceId}/affectation")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:delete')")
     public ResponseEntity<ApiResponse<Void>> supprimerAffectation(@PathVariable Long quittanceId) {
         affectationQuittanceService.clear(TenantContext.getCurrentAgence(), quittanceId);
         return ResponseEntity.ok(ApiResponse.success(null, "Affectation supprimée"));
     }
 
     @PostMapping("/quittances/{quittanceId}/imports/previsualisation")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:import')")
     public ResponseEntity<ApiResponse<ImportAffectationQuittancePreviewResponse>> previsualiserImport(
             @PathVariable Long quittanceId,
             @RequestParam boolean avecRetenue,
@@ -213,7 +213,7 @@ public class ComptaController {
     }
 
     @PostMapping("/quittances/affectations/lot/imports/previsualisation")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_quittance-affectation:import')")
     public ResponseEntity<ApiResponse<ImportAffectationQuittancePreviewResponse>> previsualiserImportLot(
             @RequestParam List<Long> quittanceIds,
             @RequestParam boolean avecRetenue,
@@ -228,7 +228,7 @@ public class ComptaController {
     }
 
     @GetMapping("/regles-quittances")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_regle-quittance:view')")
     public ResponseEntity<ApiResponse<RegleAffectationQuittancePageResponse>> reglesQuittances(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
@@ -239,7 +239,7 @@ public class ComptaController {
     }
 
     @PostMapping("/regles-quittances")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-quittance:create')")
     public ResponseEntity<ApiResponse<RegleAffectationQuittanceResponse>> creerRegleQuittance(
             @Valid @RequestBody UpsertRegleAffectationQuittanceRequest request
     ) {
@@ -250,7 +250,7 @@ public class ComptaController {
     }
 
     @PutMapping("/regles-quittances/{ruleId}")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-quittance:update')")
     public ResponseEntity<ApiResponse<RegleAffectationQuittanceResponse>> modifierRegleQuittance(
             @PathVariable Long ruleId,
             @Valid @RequestBody UpsertRegleAffectationQuittanceRequest request
@@ -262,14 +262,14 @@ public class ComptaController {
     }
 
     @DeleteMapping("/regles-quittances/{ruleId}")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:manage', 'PERM_config:manage')")
+    @PreAuthorize("hasAuthority('PERM_regle-quittance:delete')")
     public ResponseEntity<ApiResponse<Void>> supprimerRegleQuittance(@PathVariable Long ruleId) {
         affectationQuittanceService.deleteRule(TenantContext.getCurrentAgence(), ruleId);
         return ResponseEntity.ok(ApiResponse.success(null, "Règle d'affectation supprimée"));
     }
 
     @GetMapping("/documents-clients/sources")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_document-client:view')")
     public ResponseEntity<ApiResponse<SourceDocumentClientPageResponse>> sourcesDocumentsClients(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
@@ -308,7 +308,7 @@ public class ComptaController {
     }
 
     @GetMapping("/documents-clients/sources/export")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_document-client:view')")
     public ResponseEntity<byte[]> exportSourcesDocumentsClients(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
@@ -352,7 +352,7 @@ public class ComptaController {
     }
 
     @GetMapping("/facturation-conventions/conventions")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_facture-convention:view', 'PERM_production-convention:view', 'PERM_reglement-client:view')")
     public ResponseEntity<ApiResponse<java.util.List<FacturationConventionService.ConventionOption>>> billingConventions(
             @RequestParam int annee
     ) {
@@ -360,7 +360,7 @@ public class ComptaController {
     }
 
     @GetMapping("/facturation-conventions/preparation")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:view')")
     public ResponseEntity<ApiResponse<com.assurance.dto.response.PreparationFactureConventionResponse>> prepareConventionInvoice(
             @RequestParam Long conventionId, @RequestParam int annee,
             @RequestParam(required = false) Integer periode,
@@ -373,7 +373,7 @@ public class ComptaController {
     }
 
     @PostMapping("/facturation-conventions/apercu")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:issue')")
     public ResponseEntity<ApiResponse<com.assurance.dto.response.ConventionInvoicePreviewResponse>> previewConventionInvoice(
             @Valid @RequestBody PropositionEcheanceFactureConventionRequest request
     ) {
@@ -381,7 +381,7 @@ public class ComptaController {
     }
 
     @GetMapping("/facturation-conventions/echeances")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:view')")
     public ResponseEntity<ApiResponse<EcheanceFacturationConventionPageResponse>> echeancesConvention(
             @RequestParam(required = false) StatutEcheanceFacturationConvention statut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDu,
@@ -400,7 +400,7 @@ public class ComptaController {
     }
 
     @PostMapping("/facturation-conventions/factures")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:issue')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> creerFactureConvention(
             @Valid @RequestBody CreerFactureConventionRequest request
     ) {
@@ -411,7 +411,7 @@ public class ComptaController {
     }
 
     @PostMapping("/facturation-conventions/echeance-proposee")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:issue')")
     public ResponseEntity<ApiResponse<PropositionEcheanceDocumentClientResponse>> proposerEcheanceConvention(
             @Valid @RequestBody PropositionEcheanceFactureConventionRequest request
     ) {
@@ -421,7 +421,7 @@ public class ComptaController {
     }
 
     @GetMapping("/documents-clients")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_document-client:view', 'PERM_facture-convention:view')")
     public ResponseEntity<ApiResponse<DocumentClientPageResponse>> documentsClients(
             @RequestParam(required = false) String payeurType,
             @RequestParam(required = false) Long payeurId,
@@ -458,7 +458,7 @@ public class ComptaController {
     }
 
     @PostMapping("/documents-clients")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_document-client:issue')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> creerDocumentClient(
             @Valid @RequestBody CreerDocumentClientRequest request
     ) {
@@ -471,7 +471,7 @@ public class ComptaController {
     }
 
     @PostMapping("/documents-clients/{documentId}/facture")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_document-client:issue')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> creerFactureDepuisReleve(
             @PathVariable Long documentId,
             @Valid @RequestBody CreerFactureDepuisReleveRequest request
@@ -487,7 +487,7 @@ public class ComptaController {
     }
 
     @PostMapping("/documents-clients/echeance-proposee")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_document-client:issue')")
     public ResponseEntity<ApiResponse<PropositionEcheanceDocumentClientResponse>> proposerEcheance(
             @Valid @RequestBody PropositionEcheanceDocumentClientRequest request
     ) {
@@ -497,7 +497,7 @@ public class ComptaController {
     }
 
     @GetMapping("/documents-clients/{documentId}")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_document-client:view', 'PERM_facture-convention:view')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> documentClient(@PathVariable Long documentId) {
         return ResponseEntity.ok(ApiResponse.success(
                 documentClientService.detail(TenantContext.getCurrentAgence(), documentId)
@@ -505,7 +505,7 @@ public class ComptaController {
     }
 
     @PostMapping("/documents-clients/{documentId}/annulation")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_document-client:cancel', 'PERM_facture-convention:cancel')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> annulerDocumentClient(
             @PathVariable Long documentId,
             @Valid @RequestBody AnnulerDocumentClientRequest request
@@ -517,7 +517,7 @@ public class ComptaController {
     }
 
     @DeleteMapping("/documents-clients/{documentId}")
-    @PreAuthorize("hasAuthority('PERM_quittance:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_document-client:delete', 'PERM_facture-convention:delete')")
     public ResponseEntity<ApiResponse<Void>> supprimerDocumentClient(
             @PathVariable Long documentId,
             @Valid @RequestBody AnnulerDocumentClientRequest request
@@ -527,7 +527,7 @@ public class ComptaController {
     }
 
     @PostMapping("/documents-clients/{documentId}/revision")
-    @PreAuthorize("hasAnyAuthority('PERM_quittance:create', 'PERM_quittance:manage')")
+    @PreAuthorize("hasAuthority('PERM_document-client:revise')")
     public ResponseEntity<ApiResponse<DocumentClientResponse>> modifierDocumentClient(
             @PathVariable Long documentId,
             @Valid @RequestBody ModifierDocumentClientRequest request
@@ -539,7 +539,7 @@ public class ComptaController {
     }
 
     @GetMapping("/documents-clients/{documentId}/pdf")
-    @PreAuthorize("hasAuthority('PERM_quittance:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_document-client:view', 'PERM_facture-convention:view')")
     public ResponseEntity<byte[]> documentClientPdf(
             @PathVariable Long documentId,
             @RequestParam(defaultValue = "false") boolean avecSignature

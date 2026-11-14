@@ -21,7 +21,7 @@ function initialFilters(): ConventionProductionFilters {
 }
 
 export default function ConventionProductionPage() {
-  const canView = useAuthStore(state => state.user?.permissions.includes("quittance:view") ?? false);
+  const canView = useAuthStore(state => state.user?.permissions.includes("production-convention:view") ?? false);
   const [filters, setFilters] = useState(initialFilters);
   const [applied, setApplied] = useState(filters);
   const [hasSearched, setHasSearched] = useState(false);

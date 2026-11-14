@@ -3,15 +3,15 @@ import { BadgeCheck, Boxes, Calculator, Car, FileText, Fuel, Layers3, ShieldChec
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
+import { canAccessPath } from "@/lib/authorization";
 
 const settings = [
   {
-    title: "Règles fiscales",
-    description: "Taxes, TPF, EVCAT et CNPAC par période et périmètre.",
-    href: "/app/production/parametres/regles-fiscales",
-    icon: Calculator,
-    permission: "regle-fiscale:view",
-  },
+  title: "Règles fiscales",
+  description: "Taxes, TPF, EVCAT et CNPAC par période et périmètre.",
+  href: "/app/production/parametres/regles-fiscales",
+  icon: Calculator
+},
   {
     title: "Tarifs par usage",
     description: "Barèmes RC par usage, puissance, PTC, places et sous-classe.",
@@ -82,12 +82,7 @@ const settings = [
 
 export default function ProductionSettingsPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const visibleSettings = settings.filter((item) => {
-    if (!item.permission) return true;
-    if (permissions.includes(item.permission)) return true;
-    return item.permission === "regle-fiscale:view"
-      && (permissions.includes("regle-fiscale:manage") || permissions.includes("config:manage"));
-  });
+  const visibleSettings = settings.filter(item => canAccessPath(permissions, item.href));
   return (
     <div className="grid gap-5">
       <div>

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRightLeft, History, Landmark, Scale, Search, Undo2, WalletCards } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
@@ -23,7 +24,7 @@ import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { toDateOnly } from "@/features/production/date";
 import { comptaApi } from "../api";
 import { parseAccountingAmount } from "../format";
-import type { TreasuryAccount, TreasuryOperation } from "../types";
+import type { TreasuryAccountOption, TreasuryOperation } from "../types";
 import { formatTreasuryDate, formatTreasuryMoney, TREASURY_PAGE_SIZE } from "./treasury-format";
 
 type EntryMode = "TRANSFERT" | "AJUSTEMENT";
@@ -55,8 +56,8 @@ export default function OperationsTresoreriePage() {
   const [cancellationReason, setCancellationReason] = useState("");
 
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
   });
   const operations = useQuery({
     queryKey: ["compta", "treasury-operations", initialAccountId, appliedSearch, page],
@@ -95,7 +96,7 @@ export default function OperationsTresoreriePage() {
       setReason("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury-operations"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-account-options"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury", "movements"] }),
       ]);
     },
@@ -114,7 +115,7 @@ export default function OperationsTresoreriePage() {
       setCancellationReason("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury-operations"] }),
-        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "treasury-account-options"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury", "movements"] }),
       ]);
     },
@@ -141,7 +142,7 @@ export default function OperationsTresoreriePage() {
 
       <section className="rounded-md border bg-card p-4">
         <div className="mb-4 inline-flex rounded-md border p-1">
-          <Button
+          <PermissionButton permission="operation-tresorerie:transfer"
             variant="ghost"
             className={mode === "TRANSFERT"
               ? "bg-amber-100 text-amber-950 shadow-sm hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-50"
@@ -149,8 +150,8 @@ export default function OperationsTresoreriePage() {
             onClick={() => setMode("TRANSFERT")}
           >
             <ArrowRightLeft className="size-4" /> Transférer
-          </Button>
-          <Button
+          </PermissionButton>
+          <PermissionButton permission="operation-tresorerie:adjust"
             variant="ghost"
             className={mode === "AJUSTEMENT"
               ? "bg-amber-100 text-amber-950 shadow-sm hover:bg-amber-100 dark:bg-amber-900/50 dark:text-amber-50"
@@ -158,7 +159,7 @@ export default function OperationsTresoreriePage() {
             onClick={() => setMode("AJUSTEMENT")}
           >
             <Scale className="size-4" /> Corriger le solde
-          </Button>
+          </PermissionButton>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
           {mode === "TRANSFERT"
@@ -265,9 +266,9 @@ export default function OperationsTresoreriePage() {
           </div>
         </div>
         <div className="mt-4 flex justify-end">
-          <Button disabled={!formValid || createOperation.isPending} onClick={() => createOperation.mutate()}>
+          <PermissionButton permission={mode === "TRANSFERT" ? "operation-tresorerie:transfer" : "operation-tresorerie:adjust"} disabled={!formValid || createOperation.isPending} onClick={() => createOperation.mutate()}>
             {mode === "TRANSFERT" ? "Enregistrer le transfert" : "Enregistrer la correction"}
-          </Button>
+          </PermissionButton>
         </div>
       </section>
 
@@ -328,14 +329,14 @@ export default function OperationsTresoreriePage() {
                   <TableCell>{operation.statut === "ANNULEE" ? "Annulée" : "Confirmée"}</TableCell>
                   <TableCell>
                     {operation.statut === "CONFIRMEE" && !operation.typeOperation.startsWith("ANNULATION") && (
-                      <Button
+                      <PermissionButton permission="operation-tresorerie:cancel"
                         size="icon"
                         variant="ghost"
                         title="Annuler par contre-écriture"
                         onClick={() => setOperationToCancel(operation)}
                       >
                         <Undo2 className="size-4" />
-                      </Button>
+                      </PermissionButton>
                     )}
                   </TableCell>
                 </TableRow>
@@ -382,13 +383,13 @@ export default function OperationsTresoreriePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOperationToCancel(undefined)}>Fermer</Button>
-            <Button
+            <PermissionButton permission="operation-tresorerie:cancel"
               variant="destructive"
               disabled={!cancellationReason.trim() || cancelOperation.isPending}
               onClick={() => cancelOperation.mutate()}
             >
               Créer la contre-écriture
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -407,7 +408,7 @@ function AccountSelect({
   onChange,
 }: {
   value: string;
-  accounts: TreasuryAccount[];
+  accounts: TreasuryAccountOption[];
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {

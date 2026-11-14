@@ -51,7 +51,7 @@ public class TresorerieController {
     private final OperationTresorerieService operationTresorerieService;
 
     @GetMapping("/comptes")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_compte-tresorerie:view')")
     public ResponseEntity<ApiResponse<List<CompteTresorerieResponse>>> accounts() {
         return ResponseEntity.ok(ApiResponse.success(tresorerieService.listAccounts(
                 TenantContext.getCurrentAgence(),
@@ -59,8 +59,15 @@ public class TresorerieController {
         )));
     }
 
+    @GetMapping("/comptes/options")
+    @PreAuthorize("hasAnyAuthority('PERM_compte-tresorerie:view', 'PERM_reglement-client:view', 'PERM_instrument-reglement:view', 'PERM_bordereau-remise:view', 'PERM_rapprochement-bancaire:view', 'PERM_reglement-compagnie:view', 'PERM_operation-tresorerie:view', 'PERM_session-caisse:view')")
+    public ResponseEntity<ApiResponse<List<com.assurance.dto.response.CompteTresorerieOptionResponse>>> accountOptions() {
+        return ResponseEntity.ok(ApiResponse.success(
+                tresorerieService.accountOptions(TenantContext.getCurrentAgence())));
+    }
+
     @GetMapping("/comptes/administration")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_compte-tresorerie:create', 'PERM_compte-tresorerie:update', 'PERM_compte-tresorerie:configure-access')")
     public ResponseEntity<ApiResponse<List<CompteTresorerieResponse>>> administrationAccounts() {
         return ResponseEntity.ok(ApiResponse.success(tresorerieService.listAccounts(
                 TenantContext.getCurrentAgence(),
@@ -69,7 +76,7 @@ public class TresorerieController {
     }
 
     @GetMapping("/utilisateurs")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_compte-tresorerie:create', 'PERM_compte-tresorerie:update', 'PERM_compte-tresorerie:configure-access')")
     public ResponseEntity<ApiResponse<List<UtilisateurTresorerieResponse>>> users() {
         return ResponseEntity.ok(ApiResponse.success(accessService.listAgencyUsers(
                 TenantContext.getCurrentAgence()
@@ -77,7 +84,7 @@ public class TresorerieController {
     }
 
     @GetMapping("/comptes/{accountId}/affectations")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_compte-tresorerie:configure-access')")
     public ResponseEntity<ApiResponse<List<AffectationCompteTresorerieResponse>>> assignments(
             @PathVariable Long accountId
     ) {
@@ -88,7 +95,7 @@ public class TresorerieController {
     }
 
     @PutMapping("/comptes/{accountId}/affectations")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_compte-tresorerie:configure-access')")
     public ResponseEntity<ApiResponse<List<AffectationCompteTresorerieResponse>>> saveAssignments(
             @PathVariable Long accountId,
             @Valid @RequestBody UpsertAffectationsCompteTresorerieRequest request
@@ -101,7 +108,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/comptes")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_compte-tresorerie:create')")
     public ResponseEntity<ApiResponse<CompteTresorerieResponse>> createAccount(
             @Valid @RequestBody UpsertCompteTresorerieRequest request
     ) {
@@ -112,7 +119,7 @@ public class TresorerieController {
     }
 
     @PutMapping("/comptes/{accountId}")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_compte-tresorerie:update')")
     public ResponseEntity<ApiResponse<CompteTresorerieResponse>> updateAccount(
             @PathVariable Long accountId,
             @Valid @RequestBody UpsertCompteTresorerieRequest request
@@ -125,7 +132,7 @@ public class TresorerieController {
     }
 
     @PutMapping("/comptes/{accountId}/statut")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:manage')")
+    @PreAuthorize("hasAuthority('PERM_compte-tresorerie:update')")
     public ResponseEntity<ApiResponse<CompteTresorerieResponse>> changeAccountStatus(
             @PathVariable Long accountId,
             @Valid @RequestBody ChangerStatutCompteTresorerieRequest request
@@ -140,7 +147,7 @@ public class TresorerieController {
     }
 
     @GetMapping("/mouvements")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_operation-tresorerie:view')")
     public ResponseEntity<ApiResponse<List<MouvementTresorerieResponse>>> movements() {
         return ResponseEntity.ok(ApiResponse.success(tresorerieService.listMovements(
                 TenantContext.getCurrentAgence()
@@ -148,7 +155,7 @@ public class TresorerieController {
     }
 
     @GetMapping("/journal")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_operation-tresorerie:view')")
     public ResponseEntity<ApiResponse<MouvementTresoreriePageResponse>> journal(
             @RequestParam(required = false) Long compteId,
             @RequestParam(required = false)
@@ -171,7 +178,7 @@ public class TresorerieController {
     }
 
     @GetMapping("/sessions-caisse")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_session-caisse:view')")
     public ResponseEntity<ApiResponse<List<SessionCaisseResponse>>> cashSessions() {
         return ResponseEntity.ok(ApiResponse.success(sessionCaisseService.list(
                 TenantContext.getCurrentAgence()
@@ -179,7 +186,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/sessions-caisse")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_session-caisse:open')")
     public ResponseEntity<ApiResponse<SessionCaisseResponse>> openCashSession(
             @Valid @RequestBody OuvrirSessionCaisseRequest request
     ) {
@@ -190,7 +197,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/sessions-caisse/{sessionId}/cloture")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_session-caisse:close')")
     public ResponseEntity<ApiResponse<SessionCaisseResponse>> closeCashSession(
             @PathVariable Long sessionId,
             @Valid @RequestBody CloturerSessionCaisseRequest request
@@ -203,7 +210,7 @@ public class TresorerieController {
     }
 
     @GetMapping("/operations")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_operation-tresorerie:view')")
     public ResponseEntity<ApiResponse<OperationTresoreriePageResponse>> operations(
             @RequestParam(required = false) Long compteId,
             @RequestParam(required = false) TypeOperationTresorerie type,
@@ -228,7 +235,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/operations/transferts")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_operation-tresorerie:transfer')")
     public ResponseEntity<ApiResponse<OperationTresorerieResponse>> createTransfer(
             @Valid @RequestBody CreerTransfertTresorerieRequest request
     ) {
@@ -239,7 +246,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/operations/ajustements")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_operation-tresorerie:adjust')")
     public ResponseEntity<ApiResponse<OperationTresorerieResponse>> createAdjustment(
             @Valid @RequestBody CreerAjustementTresorerieRequest request
     ) {
@@ -250,7 +257,7 @@ public class TresorerieController {
     }
 
     @PostMapping("/operations/{operationId}/annulation")
-    @PreAuthorize("hasAuthority('PERM_tresorerie:view')")
+    @PreAuthorize("hasAuthority('PERM_operation-tresorerie:cancel')")
     public ResponseEntity<ApiResponse<OperationTresorerieResponse>> cancelOperation(
             @PathVariable Long operationId,
             @Valid @RequestBody AnnulerOperationTresorerieRequest request

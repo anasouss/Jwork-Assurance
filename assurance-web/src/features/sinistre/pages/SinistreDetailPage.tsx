@@ -97,8 +97,16 @@ export default function SinistreDetailPage() {
   const { sinistreId = "" } = useParams();
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
-  const canManage = permissions.includes("sinistre:manage");
-  const canFinance = permissions.includes("sinistre:finance");
+  const canUpdate = permissions.includes("sinistre:update");
+  const canTransition = permissions.includes("sinistre:transition");
+  const canUploadDocument = permissions.includes("sinistre-document:upload");
+  const canReviewDocument = permissions.includes("sinistre-document:update");
+  const canDeleteDocument = permissions.includes("sinistre-document:delete");
+  const canCreateMission = permissions.includes("sinistre-mission:create");
+  const canUpdateMission = permissions.includes("sinistre-mission:update");
+  const canCreateProvision = permissions.includes("sinistre-provision:create");
+  const canCreateOperation = permissions.includes("sinistre-operation:create");
+  const canCancelOperation = permissions.includes("sinistre-operation:cancel");
   const [transitionOpen, setTransitionOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
@@ -125,13 +133,13 @@ export default function SinistreDetailPage() {
   const managers = useQuery({
     queryKey: sinistreKeys.managers(),
     queryFn: sinistreApi.managers,
-    enabled: canManage,
+    enabled: canUpdate,
   });
   const treasuryAccounts = useQuery({
     queryKey: sinistreKeys.treasuryAccounts(),
     queryFn: sinistreApi.treasuryAccounts,
     enabled:
-      canFinance &&
+      canCreateOperation &&
       Boolean(
         detail.data &&
           (detail.data.provisions.length > 0 ||
@@ -324,7 +332,7 @@ export default function SinistreDetailPage() {
             <History className="size-4" />
             Historique
           </Button>
-          {canManage && dossier.workflow.transitions.length > 0 ? (
+          {canTransition && dossier.workflow.transitions.length > 0 ? (
             <Button onClick={() => setTransitionOpen(true)}>
               Changer le statut
             </Button>
@@ -341,14 +349,16 @@ export default function SinistreDetailPage() {
             responsibilityVisible={
               dossier.garanties.some((item) => item.impliquee && item.responsabiliteCivile)
             }
-            editable={canManage && !locked}
+            editable={canUpdate && !locked}
             saving={update.isPending}
             onSave={(request) => update.mutate(request)}
           />
           <div className="min-w-0 xl:sticky xl:top-4">
             <DocumentsPanel
               dossier={dossier}
-              editable={canManage && !locked}
+              editable={canUploadDocument && !locked}
+              canReview={canReviewDocument && !locked}
+              canDelete={canDeleteDocument && !locked}
               reviewing={reviewDocument.isPending}
               downloading={download.isPending}
               onAdd={(type) => {
@@ -367,7 +377,7 @@ export default function SinistreDetailPage() {
         <CoverageSection
             dossier={dossier}
             assessmentVisible={coverageAssessmentVisible}
-            editable={canManage && !locked}
+            editable={canUpdate && !locked}
             saving={guarantee.isPending}
             onSave={(guarantees) => guarantee.mutate(guarantees)}
         />
@@ -376,7 +386,7 @@ export default function SinistreDetailPage() {
           summary={`${dossier.parties.length} partie(s)`}
           defaultOpen={dossier.parties.length > 0}
           action={
-            canManage && !locked ? (
+            canUpdate && !locked ? (
               <Button size="sm" onClick={() => { setEditingParty(null); setPartyOpen(true); }}>
                 <Plus className="size-4" />
                 Ajouter
@@ -411,7 +421,7 @@ export default function SinistreDetailPage() {
                           .join(" · ") || "-"}
                       </TableCell>
                       <TableCell>
-                        {canManage && !locked ? (
+                        {canUpdate && !locked ? (
                           <div className="flex gap-1">
                             <Button variant="ghost" size="icon" aria-label="Modifier" onClick={() => { setEditingParty(item); setPartyOpen(true); }}>
                               <Pencil className="size-4" />
@@ -447,7 +457,7 @@ export default function SinistreDetailPage() {
                 dossier.missionsExpertise.length > 0
               }
               action={
-                canManage && !locked ? (
+                canCreateMission && !locked ? (
                   <Button
                     size="sm"
                     onClick={() => {
@@ -479,10 +489,10 @@ export default function SinistreDetailPage() {
                     <TableRow
                       key={item.id}
                       className={
-                        canManage && !locked ? "cursor-pointer" : undefined
+                        canUpdateMission && !locked ? "cursor-pointer" : undefined
                       }
                       onClick={() => {
-                        if (canManage && !locked) {
+                        if (canUpdateMission && !locked) {
                           setEditingMission(item);
                           setMissionOpen(true);
                         }
@@ -530,7 +540,7 @@ export default function SinistreDetailPage() {
               summary={`${dossier.provisions.length} écriture(s)`}
               defaultOpen={dossier.provisions.length > 0}
               action={
-                canFinance && !locked ? (
+                canCreateProvision && !locked ? (
                   <Button size="sm" onClick={() => setFinanceMode("PROVISION")}>
                     <Plus className="size-4" />
                     Provision
@@ -580,7 +590,7 @@ export default function SinistreDetailPage() {
                 dossier.operations.length > 0 || isSettlementStage(dossier.statut)
               }
               action={
-                canFinance && !locked ? (
+                canCreateOperation && !locked ? (
                   <Button size="sm" onClick={() => setFinanceMode("OPERATION")}>
                     <Banknote className="size-4" />
                     Ajouter
@@ -638,7 +648,7 @@ export default function SinistreDetailPage() {
                       </TableCell>
                       <TableCell>{item.saisiePar}</TableCell>
                       <TableCell>
-                        {canFinance &&
+                        {canCancelOperation &&
                         !locked &&
                         item.type !== "ANNULATION" &&
                         !cancelledIds.has(item.id) ? (
@@ -904,6 +914,8 @@ function WorkflowPanel({
 function DocumentsPanel({
   dossier,
   editable,
+  canReview,
+  canDelete,
   reviewing,
   downloading,
   onAdd,
@@ -913,6 +925,8 @@ function DocumentsPanel({
 }: {
   dossier: SinistreDetail;
   editable: boolean;
+  canReview: boolean;
+  canDelete: boolean;
   reviewing: boolean;
   downloading: boolean;
   onAdd: (type?: TypeDocument) => void;
@@ -1087,7 +1101,7 @@ function DocumentsPanel({
                   >
                     <Download className="size-4" />
                   </Button>
-                  {editable && item.statut === "RECU" ? (
+                  {canReview && item.statut === "RECU" ? (
                     <>
                       <Button
                         variant="ghost"
@@ -1109,7 +1123,7 @@ function DocumentsPanel({
                       </Button>
                     </>
                   ) : null}
-                  {editable && item.statut !== "VALIDE" ? (
+                  {canDelete && item.statut !== "VALIDE" ? (
                     <Button
                       variant="ghost"
                       size="icon"

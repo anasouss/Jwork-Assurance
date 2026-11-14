@@ -70,8 +70,8 @@ export default function NouveauReglementCompagniePage() {
     })),
   });
   const accounts = useQuery({
-    queryKey: ["compta", "treasury-accounts"],
-    queryFn: comptaApi.treasuryAccounts,
+    queryKey: ["compta", "treasury-account-options"],
+    queryFn: comptaApi.treasuryAccountOptions,
   });
   const [dateReglement, setDateReglement] = useState(today);
   const [notes, setNotes] = useState("");

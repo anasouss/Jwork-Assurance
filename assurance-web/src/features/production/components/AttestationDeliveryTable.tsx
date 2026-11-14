@@ -1,6 +1,7 @@
 import { CheckCircle2, ClipboardList, Eye, PackagePlus, Truck } from "lucide-react";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { LivraisonAttestation } from "../types";
@@ -109,13 +110,13 @@ export function AttestationDeliveryTable({
                       <Eye className="size-4" />
                     </Button>
                     {source === "COMMANDE" && !livraison.validee && livraison.quantiteRecue < livraison.quantiteDemandee ? (
-                      <Button type="button" size="sm" variant="outline" onClick={() => onReceive(livraison)}>
+                      <PermissionButton permission="attestation-stock:receive" type="button" size="sm" variant="outline" onClick={() => onReceive(livraison)}>
                         <PackagePlus className="size-4" />
                         Réceptionner
-                      </Button>
+                      </PermissionButton>
                     ) : null}
                     {source === "COMMANDE" ? (
-                      <Button
+                      <PermissionButton permission="attestation-stock:validate"
                         type="button"
                         size="sm"
                         variant="outline"
@@ -124,7 +125,7 @@ export function AttestationDeliveryTable({
                       >
                         <CheckCircle2 className="size-4" />
                         Valider
-                      </Button>
+                      </PermissionButton>
                     ) : null}
                   </div>
                 </TableCell>

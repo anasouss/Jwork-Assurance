@@ -44,7 +44,7 @@ public class BusinessActivityService {
             ActivityModule module, ActivityAction action, ActivityRecordType subjectType,
             String subjectId, Long actorUserId, LocalDateTime dateFrom, LocalDateTime dateTo,
             String search, int page, int size) {
-        assertAdministrator();
+        assertActivityAccess();
         Long agencyId = TenantContext.getCurrentAgence();
         var result = repository.searchSummaries((root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -75,19 +75,18 @@ public class BusinessActivityService {
 
     @Transactional(readOnly = true)
     public BusinessActivityResponse detail(Long id) {
-        assertAdministrator();
+        assertActivityAccess();
         Long agencyId = TenantContext.getCurrentAgence();
         BusinessActivity event = (agencyId == null ? repository.findById(id) : repository.findByIdAndAgenceId(id, agencyId))
                 .orElseThrow(() -> new ResourceNotFoundException("Activite metier", id));
         return response(event);
     }
 
-    private void assertAdministrator() {
+    private void assertActivityAccess() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || !(authentication.getPrincipal() instanceof UserPrincipal user)
-                || !user.getPermissions().contains("activity:view")
-                || !("AGENCY_ADMIN".equals(user.getRoleCode()) || "SUPER_ADMIN".equals(user.getRoleCode()))) {
-            throw new AccessDeniedException("Historique metier reserve aux administrateurs");
+                || !user.getPermissions().contains("activity:view")) {
+            throw new AccessDeniedException("Permission de consultation de l’activité métier requise");
         }
         if (TenantContext.getCurrentAgence() == null
                 && !(user.getAgenceId() == null && "SUPER_ADMIN".equals(user.getRoleCode()))) {

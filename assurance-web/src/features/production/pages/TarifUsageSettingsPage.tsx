@@ -6,6 +6,7 @@ import { ServerPagination } from "@/components/shared";
 import { TableRowActions } from "@/components/shared/table-row-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -167,21 +168,21 @@ export default function TarifUsageSettingsPage() {
             <History className="size-4" />
             Historique
           </Button>
-          <Button variant="outline" onClick={() => {
+          <PermissionButton permission="tarif-usage:create" variant="outline" onClick={() => {
             setEditing(null);
             setPayload(emptyTarifUsage());
             setTarifDialogOpen(true);
           }}>
             <Plus className="size-4" />
             Ajouter tarif usage
-          </Button>
-          <Button variant="outline" onClick={() => setResetDialogOpen(true)}>
+          </PermissionButton>
+          <PermissionButton permission="tarif-usage:adjust" variant="outline" onClick={() => setResetDialogOpen(true)}>
             <RotateCcw className="size-4" />
             Réinitialiser
-          </Button>
-          <Button onClick={() => setBulkDialogOpen(true)}>
+          </PermissionButton>
+          <PermissionButton permission="tarif-usage:adjust" onClick={() => setBulkDialogOpen(true)}>
             Ajuster les tarifs
-          </Button>
+          </PermissionButton>
         </div>
       </div>
 
@@ -192,10 +193,10 @@ export default function TarifUsageSettingsPage() {
             Majoration appliquée à la prime RC lorsqu'un véhicule est déclaré avec une remorque.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setTrailerRatesDialogOpen(true)}>
+        <PermissionButton permission="usage:update" variant="outline" onClick={() => setTrailerRatesDialogOpen(true)}>
           <Percent className="size-4" />
           Paramétrer par usage
-        </Button>
+        </PermissionButton>
       </div>
 
       <Dialog open={trailerRatesDialogOpen} onOpenChange={setTrailerRatesDialogOpen}>
@@ -242,9 +243,9 @@ export default function TarifUsageSettingsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTrailerRatesDialogOpen(false)}>Annuler</Button>
-            <Button disabled={saveTrailerRates.isPending} onClick={() => saveTrailerRates.mutate()}>
+            <PermissionButton permission="usage:update" disabled={saveTrailerRates.isPending} onClick={() => saveTrailerRates.mutate()}>
               Enregistrer
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -349,7 +350,7 @@ export default function TarifUsageSettingsPage() {
             <MoneyField label="Prime par place" value={payload.primeParPlace} onChange={(value) => update({ primeParPlace: value })} />
             <Flag label="Actif" checked={payload.actif} onChange={(value) => update({ actif: value })} />
             <div className="flex items-end gap-2">
-              <Button
+              <PermissionButton permission={editing ? "tarif-usage:update" : "tarif-usage:create"}
                 disabled={save.isPending}
                 onClick={() => saveTarif(
                   editing,
@@ -361,7 +362,7 @@ export default function TarifUsageSettingsPage() {
               >
                 <Plus className="size-4" />
                 {editing ? "Modifier" : "Ajouter"}
-              </Button>
+              </PermissionButton>
               <Button variant="outline" onClick={() => setTarifDialogOpen(false)}>Annuler</Button>
             </div>
           </div>
@@ -418,12 +419,12 @@ export default function TarifUsageSettingsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBulkDialogOpen(false)}>Annuler</Button>
-            <Button
+            <PermissionButton permission="tarif-usage:adjust"
               disabled={bulk.isPending}
               onClick={() => submitTariffOperation(bulkPayload, selectedIds, filterUsageId, bulk.mutate)}
             >
               Enregistrer l'ajustement
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -448,13 +449,13 @@ export default function TarifUsageSettingsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setResetDialogOpen(false)}>Annuler</Button>
-            <Button
+            <PermissionButton permission="tarif-usage:adjust"
               disabled={bulk.isPending}
               onClick={() => submitTariffOperation(resetPayload, selectedIds, filterUsageId, bulk.mutate)}
             >
               <RotateCcw className="size-4" />
               Confirmer la réinitialisation
-            </Button>
+            </PermissionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -538,13 +539,13 @@ export default function TarifUsageSettingsPage() {
                       <TableRowActions
                         label={`Actions tarif ${text(tarif.usageCode)}`}
                         actions={[
-                          {
+                          { permission: "tarif-usage:update",
                             label: "Modifier",
                             icon: Edit,
                             iconTone: "primary",
                             onSelect: () => { setEditing(tarif); setTarifDialogOpen(true); },
                           },
-                          {
+                          { permission: "tarif-usage:delete",
                             label: "Supprimer",
                             icon: Trash2,
                             destructive: true,

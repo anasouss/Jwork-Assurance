@@ -4,6 +4,7 @@ import { Pencil, Plus } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -78,10 +79,10 @@ export default function CommercialOriginsSettingsPage() {
             Gérez les canaux, partenaires et campagnes utilisés pour attribuer l’acquisition des clients.
           </p>
         </div>
-        <Button type="button" onClick={startCreate} disabled={Boolean(draft)}>
+        <PermissionButton permission="origine-commerciale:create" type="button" onClick={startCreate} disabled={Boolean(draft)}>
           <Plus className="size-4" />
           Ajouter une origine
-        </Button>
+        </PermissionButton>
       </header>
 
       {draft ? (
@@ -130,13 +131,13 @@ export default function CommercialOriginsSettingsPage() {
           </label>
           <div className="flex justify-end gap-2 sm:col-span-2">
             <Button type="button" variant="outline" onClick={() => setDraft(undefined)}>Annuler</Button>
-            <Button
+            <PermissionButton permission={draft.id ? "origine-commerciale:update" : "origine-commerciale:create"}
               type="button"
               disabled={!draft.code.trim() || !draft.libelle.trim() || saveMutation.isPending}
               onClick={() => saveMutation.mutate(draft)}
             >
               {saveMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-            </Button>
+            </PermissionButton>
           </div>
         </section>
       ) : null}
@@ -163,7 +164,7 @@ export default function CommercialOriginsSettingsPage() {
                   <Badge variant="outline">{origin.actif ? "Active" : "Inactive"}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
+                  <PermissionButton permission="origine-commerciale:update"
                     type="button"
                     size="icon"
                     variant="ghost"
@@ -171,7 +172,7 @@ export default function CommercialOriginsSettingsPage() {
                     onClick={() => setDraft({ ...origin })}
                   >
                     <Pencil className="size-4" />
-                  </Button>
+                  </PermissionButton>
                 </TableCell>
               </TableRow>
             ))}

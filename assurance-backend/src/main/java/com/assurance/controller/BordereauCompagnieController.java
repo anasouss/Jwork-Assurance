@@ -124,7 +124,7 @@ public class BordereauCompagnieController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_bordereau-compagnie:create')")
+    @PreAuthorize("hasAuthority('PERM_bordereau-compagnie:update')")
     public ResponseEntity<ApiResponse<BordereauCompagnieResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody ModifierBordereauCompagnieRequest request
@@ -200,11 +200,14 @@ public class BordereauCompagnieController {
     }
 
     @PutMapping("/instruments/{id}/statut")
-    @PreAuthorize("hasAuthority('PERM_reglement-compagnie:manage')")
+    @PreAuthorize("hasAnyAuthority('PERM_reglement-compagnie:confirm', 'PERM_reglement-compagnie:reject')")
     public ResponseEntity<ApiResponse<ReglementCompagnieResponse>> changePaymentStatus(
             @PathVariable Long id,
             @Valid @RequestBody ChangerStatutInstrumentCompagnieRequest request
     ) {
+        com.assurance.security.BusinessPermission.require(
+                request.getStatut() == com.assurance.enums.StatutInstrumentReglement.CONFIRME
+                        ? "reglement-compagnie:confirm" : "reglement-compagnie:reject");
         return ResponseEntity.ok(ApiResponse.success(
                 reglementService.changeInstrumentStatus(
                         TenantContext.getCurrentAgence(),
@@ -216,7 +219,7 @@ public class BordereauCompagnieController {
     }
 
     @PostMapping("/reglements/{id}/annulation")
-    @PreAuthorize("hasAuthority('PERM_reglement-compagnie:manage')")
+    @PreAuthorize("hasAuthority('PERM_reglement-compagnie:cancel')")
     public ResponseEntity<ApiResponse<ReglementCompagnieResponse>> cancelPayment(
             @PathVariable Long id,
             @Valid @RequestBody AnnulerBordereauCompagnieRequest request

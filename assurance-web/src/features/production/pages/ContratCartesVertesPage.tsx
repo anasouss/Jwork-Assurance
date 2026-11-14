@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, Trash2 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/shared/permission-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -170,10 +171,10 @@ export default function ContratCartesVertesPage() {
                 <Button asChild type="button" variant="destructive">
                   <Link to="/app/production/contrats">Annuler</Link>
                 </Button>
-                <Button type="button" disabled={saveMutation.isPending || (context?.vehiculesEligibles ?? []).length === 0} onClick={submit}>
+                <PermissionButton permission="carte-verte:create" type="button" disabled={saveMutation.isPending || (context?.vehiculesEligibles ?? []).length === 0} onClick={submit}>
                   <Save className="size-4" />
                   Enregistrer
-                </Button>
+                </PermissionButton>
               </div>
             </>
           )}
@@ -230,9 +231,9 @@ function CarteVerteRow({ carte, deleting, onDelete }: { carte: CarteVerte; delet
       <td className="px-3 py-2">{formatDate(carte.dateEcheance)}</td>
       <td className="px-3 py-2 text-right">{moneyDh(carte.montant)}</td>
       <td className="px-3 py-2 text-right">
-        <Button type="button" variant="ghost" size="icon" className="size-8 text-destructive" disabled={deleting} onClick={onDelete}>
+        <PermissionButton permission="carte-verte:deactivate" type="button" variant="ghost" size="icon" className="size-8 text-destructive" disabled={deleting} onClick={onDelete}>
           <Trash2 className="size-4" />
-        </Button>
+        </PermissionButton>
       </td>
     </tr>
   );

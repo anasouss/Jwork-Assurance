@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/compta/conventions/production")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('PERM_quittance:view')")
+@PreAuthorize("hasAuthority('PERM_production-convention:view')")
 public class ConventionProductionController {
     private final ConventionProductionService service;
 
@@ -30,6 +30,7 @@ public class ConventionProductionController {
     }
 
     @GetMapping("/export")
+    @PreAuthorize("hasAuthority('PERM_production-convention:export')")
     public ResponseEntity<byte[]> export(@ModelAttribute ConventionProductionFilter filter) {
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=production-conventions.xlsx")
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))

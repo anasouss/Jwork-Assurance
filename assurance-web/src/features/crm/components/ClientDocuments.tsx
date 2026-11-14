@@ -88,7 +88,8 @@ export function ClientDocumentDrafts({ typeClient, value, onChange, disabled = f
 export function ClientDocuments({ clientId, typeClient, owner }: { clientId: string; typeClient: TypeClient; owner?: Partial<DocumentOwnerOption> }) {
   const cache = useQueryClient();
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
-  const canManage = permissions.includes("client:manage") || permissions.includes("client:create");
+  const canUpload = permissions.includes("document-crm:upload");
+  const canDelete = permissions.includes("document-crm:delete");
   const [upload, setUpload] = useState<{ previous?: PieceJointe }>();
   const [confirm, setConfirm] = useState<PieceJointe>();
   const [showArchives, setShowArchives] = useState(false);
@@ -133,13 +134,15 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
           <Tooltip><TooltipTrigger asChild>
             <Button type="button" size="icon" variant="ghost" aria-label={`Télécharger ${piece.nomFichier}`} onClick={() => download(piece)}><Download className="size-4" /></Button>
           </TooltipTrigger><TooltipContent>Télécharger</TooltipContent></Tooltip>
-          {canManage && !piece.archived && <>
+          {!piece.archived && <>
+            {canUpload && <>
             <Tooltip><TooltipTrigger asChild>
               <Button type="button" size="icon" variant="ghost" className="text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-950/40 dark:hover:text-amber-200" aria-label={`Remplacer ${piece.nomFichier}`} disabled={!types.data?.some(type => type.naturePieceJointeId === piece.naturePieceJointeId)} onClick={() => setUpload({ previous: piece })}><RefreshCw className="size-4" /></Button>
-            </TooltipTrigger><TooltipContent>Remplacer</TooltipContent></Tooltip>
+            </TooltipTrigger><TooltipContent>Remplacer</TooltipContent></Tooltip></>}
+            {canDelete && <>
             <Tooltip><TooltipTrigger asChild>
               <Button type="button" size="icon" variant="ghost" className="text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200" aria-label={`${piece.canDelete ? "Supprimer" : "Archiver"} ${piece.nomFichier}`} onClick={() => setConfirm(piece)}>{piece.canDelete ? <Trash2 className="size-4" /> : <Archive className="size-4" />}</Button>
-            </TooltipTrigger><TooltipContent>{piece.canDelete ? "Supprimer" : "Archiver"}</TooltipContent></Tooltip>
+            </TooltipTrigger><TooltipContent>{piece.canDelete ? "Supprimer" : "Archiver"}</TooltipContent></Tooltip></>}
           </>}
         </div>
       </div>
@@ -159,7 +162,7 @@ export function ClientDocuments({ clientId, typeClient, owner }: { clientId: str
   return <section className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">Documents actuels</h3>
-      {canManage && <Button type="button" size="sm" variant="outline" disabled={!types.data?.length} onClick={() => setUpload({})}><Plus className="size-4" />Ajouter un document</Button>}
+      {canUpload && <Button type="button" size="sm" variant="outline" disabled={!types.data?.length} onClick={() => setUpload({})}><Plus className="size-4" />Ajouter un document</Button>}
     </div>
     {archivedDocuments.length > 0 && <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
       <Switch checked={showArchives} onCheckedChange={setShowArchives} />

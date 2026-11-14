@@ -38,6 +38,7 @@ import java.util.List;
                 @Index(name = "idx_document_client_agence_type", columnList = "agence_id,type_document"),
                 @Index(name = "idx_document_client_client", columnList = "client_payeur_id"),
                 @Index(name = "idx_document_client_groupe", columnList = "groupe_payeur_id"),
+                @Index(name = "idx_document_client_convention", columnList = "agence_id,convention_payeur_id"),
                 @Index(name = "idx_document_client_emission", columnList = "date_emission")
         })
 @Getter
@@ -93,6 +94,10 @@ public class DocumentClient extends AuditedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupe_payeur_id")
     private GroupeClient groupePayeur;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "convention_payeur_id")
+    private Convention conventionPayeur;
 
     @Column(name = "payeur_nom", nullable = false, length = 220)
     private String payeurNom;

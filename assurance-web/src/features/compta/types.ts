@@ -258,7 +258,7 @@ export type ConventionBillingInstallment = {
   contratId: string;
   documentId?: string | null;
   payeurId: string;
-  payeurType: "CLIENT" | "GROUPE";
+  payeurType: "CLIENT" | "GROUPE" | "CONVENTION";
   payeurNom: string;
   numeroDossier?: string | null;
   numeroPolice?: string | null;
@@ -321,7 +321,7 @@ export type ConventionInvoicePreparation = {
     periodeFin?: string;
     correspondancePartielle?: boolean;
     payeurId: string;
-    payeurType: "CLIENT" | "GROUPE";
+    payeurType: "CLIENT" | "GROUPE" | "CONVENTION";
     payeurNom: string;
     blocage?: string | null;
     details: ConventionInvoicePreview["lignes"];
@@ -333,7 +333,7 @@ export type ConventionProductionFilters = {
   compagnieId?: string;
   mode?: "BUREAU" | "FACTURE";
   categorieMouvement?: "AFFAIRE_NOUVELLE" | "RENOUVELLEMENT" | "AVENANT";
-  sensPrime?: "PRIME_A_PAYER" | "RISTOURNE" | "SANS_INCIDENCE";
+  sensPrime?: "PRIME_A_PAYER" | "RISTOURNE";
   typeDate: "EFFET" | "EMISSION";
   dateDu: string;
   dateAu: string;
@@ -392,7 +392,7 @@ export type ClientDocumentSource = {
   dateSaisie: string;
   dateEffet: string;
   dateEcheance?: string | null;
-  payeurType: "CLIENT" | "GROUPE";
+  payeurType: "CLIENT" | "GROUPE" | "CONVENTION";
   payeurId: string;
   payeurNom: string;
   souscripteurId?: string | null;
@@ -481,6 +481,7 @@ export type ClientDocument = {
   conditionPaiementClientId?: string | null;
   clientPayeurId?: string | null;
   groupePayeurId?: string | null;
+  conventionPayeurId?: string | null;
   payeurNom: string;
   payeurIdentifiant?: string | null;
   payeurAdresse?: string | null;
@@ -579,7 +580,7 @@ export type PaymentAllocation = {
   id: string;
   elementFacturableId?: string | null;
   documentClientId?: string | null;
-  payeurType?: "CLIENT" | "GROUPE" | null;
+  payeurType?: "CLIENT" | "GROUPE" | "CONVENTION" | null;
   payeurId?: string | null;
   payeurNom?: string | null;
   destination?: string | null;
@@ -822,6 +823,7 @@ export type ClientPayment = {
   dateReglement: string;
   clientPayeurId?: string | null;
   groupePayeurId?: string | null;
+  conventionPayeurId?: string | null;
   payeurNom: string;
   multiPayeur: boolean;
   deposantNom?: string | null;
@@ -880,6 +882,7 @@ export type CreateClientPaymentRequest = {
   dateReglement: string;
   clientPayeurId?: string;
   groupePayeurId?: string;
+  conventionPayeurId?: string;
   multiPayeur?: boolean;
   deposantNom?: string;
   notes?: string;

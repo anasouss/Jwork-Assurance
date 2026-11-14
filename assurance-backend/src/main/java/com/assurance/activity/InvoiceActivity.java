@@ -69,6 +69,8 @@ public final class InvoiceActivity {
         List<ActivityReference> references = new ArrayList<>();
         if (document.getClientPayeur() != null) references.add(ClientActivity.reference(document.getClientPayeur()));
         if (document.getGroupePayeur() != null) references.add(ClientGroupActivity.reference(document.getGroupePayeur()));
+        if (document.getConventionPayeur() != null) references.add(ActivityReference.of(ActivityRecordType.CONVENTION,
+                document.getConventionPayeur().getId(), document.getPayeurNom()));
         if (document.getDocumentOrigine() != null) references.add(reference(document.getDocumentOrigine()));
         for (var line : document.getLignes()) {
             if (line.getQuittance() != null) references.add(ActivityReference.of(ActivityRecordType.QUITTANCE,

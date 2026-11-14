@@ -1417,6 +1417,7 @@ function normalizeClientDocument(document: ClientDocument): ClientDocument {
       : String(document.conditionPaiementClientId),
     clientPayeurId: document.clientPayeurId == null ? null : String(document.clientPayeurId),
     groupePayeurId: document.groupePayeurId == null ? null : String(document.groupePayeurId),
+    conventionPayeurId: document.conventionPayeurId == null ? null : String(document.conventionPayeurId),
     documentOrigineId: document.documentOrigineId == null
       ? null
       : String(document.documentOrigineId),
@@ -1481,6 +1482,7 @@ function normalizeClientPayment(payment: ClientPayment): ClientPayment {
     valideParId: payment.valideParId == null ? null : String(payment.valideParId),
     clientPayeurId: payment.clientPayeurId == null ? null : String(payment.clientPayeurId),
     groupePayeurId: payment.groupePayeurId == null ? null : String(payment.groupePayeurId),
+    conventionPayeurId: payment.conventionPayeurId == null ? null : String(payment.conventionPayeurId),
     instruments: payment.instruments.map(normalizePaymentInstrument),
     detail: payment.detail ? {
       ...payment.detail,

@@ -36,7 +36,8 @@ import java.util.List;
                 @Index(name = "idx_reglement_client_agence_date", columnList = "agence_id,date_reglement"),
                 @Index(name = "idx_reglement_client_agence_statut_date", columnList = "agence_id,statut,date_reglement"),
                 @Index(name = "idx_reglement_client_client", columnList = "client_payeur_id"),
-                @Index(name = "idx_reglement_client_groupe", columnList = "groupe_payeur_id")
+                @Index(name = "idx_reglement_client_groupe", columnList = "groupe_payeur_id"),
+                @Index(name = "idx_reglement_client_convention", columnList = "agence_id,convention_payeur_id")
         }
 )
 @Getter
@@ -63,6 +64,10 @@ public class ReglementClient extends AuditedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupe_payeur_id")
     private GroupeClient groupePayeur;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "convention_payeur_id")
+    private Convention conventionPayeur;
 
     @Column(name = "payeur_nom", nullable = false, length = 220)
     private String payeurNom;

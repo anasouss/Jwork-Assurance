@@ -145,6 +145,8 @@ public final class PaymentActivity {
         List<ActivityReference> references = new ArrayList<>();
         if (payment.getClientPayeur() != null) references.add(ClientActivity.reference(payment.getClientPayeur()));
         if (payment.getGroupePayeur() != null) references.add(ClientGroupActivity.reference(payment.getGroupePayeur()));
+        if (payment.getConventionPayeur() != null) references.add(ActivityReference.of(ActivityRecordType.CONVENTION,
+                payment.getConventionPayeur().getId(), payment.getPayeurNom()));
         return references;
     }
 
@@ -158,6 +160,8 @@ public final class PaymentActivity {
             if (allocation.getDocumentClient() != null) references.add(InvoiceActivity.reference(allocation.getDocumentClient()));
             if (allocation.getClientPayeur() != null) references.add(ClientActivity.reference(allocation.getClientPayeur()));
             if (allocation.getGroupePayeur() != null) references.add(ClientGroupActivity.reference(allocation.getGroupePayeur()));
+            if (allocation.getConventionPayeur() != null) references.add(ActivityReference.of(ActivityRecordType.CONVENTION,
+                    allocation.getConventionPayeur().getId(), allocation.getPayeurNomSnapshot()));
         }
         return references;
     }

@@ -139,21 +139,21 @@ export default function ConventionCollectionsPage() {
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Encaissement des factures" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
-      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-company">Compagnie</Label>
-        <Select value={effectiveCompany} disabled={filters.conventionId !== "ALL" || companies.isPending || companies.isError}
-          onValueChange={value => setFilters(current => ({ ...current, companyId: value, conventionId: "ALL", period: "ALL" }))}>
-          <SelectTrigger id="collection-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
-            {convention?.compagnieId && !companies.data?.some(company => company.id === convention.compagnieId) && <SelectItem value={convention.compagnieId}>{convention.compagnie || "-"}</SelectItem>}
-            {companies.data?.map(company => <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>}
       {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
         <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",
           companyId: value === "ALL" ? current.companyId : options.data?.find(option => option.id === value)?.compagnieId ?? "ALL" }))}>
           <SelectTrigger id="collection-convention"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="ALL">Toutes les conventions</SelectItem>
             {options.data?.filter(option => filters.companyId === "ALL" || option.compagnieId === filters.companyId).map(option => <SelectItem key={option.id} value={option.id}>{option.intitule}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>}
+      {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-company">Compagnie</Label>
+        <Select value={effectiveCompany} disabled={filters.conventionId !== "ALL" || companies.isPending || companies.isError}
+          onValueChange={value => setFilters(current => ({ ...current, companyId: value, conventionId: "ALL", period: "ALL" }))}>
+          <SelectTrigger id="collection-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
+            {convention?.compagnieId && !companies.data?.some(company => company.id === convention.compagnieId) && <SelectItem value={convention.compagnieId}>{convention.compagnie || "-"}</SelectItem>}
+            {companies.data?.map(company => <SelectItem key={company.id} value={company.id}>{company.libelle}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>}
@@ -171,9 +171,9 @@ export default function ConventionCollectionsPage() {
         <Select value={filters.movement} onValueChange={value => setFilters(current => ({ ...current, movement: value }))}>
           <SelectTrigger id="collection-movement"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
         </Select></div>
-      <div className="grid gap-1.5"><Label htmlFor="collection-premium">Sens de prime</Label>
+      <div className="grid gap-1.5"><Label htmlFor="collection-premium">Statut</Label>
         <Select value={filters.premiumDirection} onValueChange={value => setFilters(current => ({ ...current, premiumDirection: value }))}>
-          <SelectTrigger id="collection-premium"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les sens</SelectItem><SelectItem value="PRIME_A_PAYER">Prime à payer</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem><SelectItem value="SANS_INCIDENCE">Sans incidence</SelectItem></SelectContent>
+          <SelectTrigger id="collection-premium"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem></SelectContent>
         </Select></div>
       <div className="grid gap-1.5"><Label htmlFor="collection-search">N° facture / payeur</Label>
         <Input id="collection-search" value={filters.search} onChange={event => setFilters(current => ({ ...current, search: event.target.value }))}

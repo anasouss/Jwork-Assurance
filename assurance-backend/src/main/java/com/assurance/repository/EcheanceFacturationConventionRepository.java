@@ -32,6 +32,7 @@ public interface EcheanceFacturationConventionRepository
             select e from EcheanceFacturationConvention e
             where e.agence.id = :agenceId
               and e.contrat.agence.id = :agenceId
+              and e.contrat.convention.agence.id = :agenceId
               and e.contrat.convention.id = :conventionId
               and e.actif = true
               and e.statut = com.assurance.enums.StatutEcheanceFacturationConvention.A_FACTURER
@@ -68,6 +69,8 @@ public interface EcheanceFacturationConventionRepository
             select e
             from EcheanceFacturationConvention e
             where e.agence.id = :agenceId
+              and e.contrat.agence.id = :agenceId
+              and e.contrat.convention.agence.id = :agenceId
               and e.id in :ids
             order by e.periodeDebut, e.id
             """)
@@ -88,6 +91,8 @@ public interface EcheanceFacturationConventionRepository
             select e
             from EcheanceFacturationConvention e
             where e.agence.id = :agenceId
+              and e.contrat.agence.id = :agenceId
+              and e.contrat.convention.agence.id = :agenceId
               and e.id in :ids
             order by e.periodeDebut, e.id
             """)

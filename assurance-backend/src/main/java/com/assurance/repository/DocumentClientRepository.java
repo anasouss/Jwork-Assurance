@@ -50,6 +50,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               and (:payeurId is null or (
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
+                    or (:payeurType = 'CONVENTION' and d.conventionPayeur.id = :payeurId)
               ))
               and ((:clientPortefeuilleId is null and :contratId is null and :brancheId is null) or exists (
                     select 1 from LigneDocumentClient documentLine
@@ -111,8 +112,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and (:categorieMouvement is null or filteredType.categorie = :categorieMouvement)
                       and (:sensPrime is null
                         or (:sensPrime = 'PRIME_A_PAYER' and filteredLine.montantTtc > 0)
-                        or (:sensPrime = 'RISTOURNE' and filteredLine.montantTtc < 0)
-                        or (:sensPrime = 'SANS_INCIDENCE' and filteredLine.montantTtc = 0))
+                        or (:sensPrime = 'RISTOURNE' and filteredLine.montantTtc < 0))
               ))
               and (:conventionsOnly = false or exists (
                     select 1 from LigneDocumentClient conventionLine
@@ -172,6 +172,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               and (:payeurId is null or (
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
+                    or (:payeurType = 'CONVENTION' and d.conventionPayeur.id = :payeurId)
               ))
               and (
                     :search is null
@@ -196,8 +197,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and (:categorieMouvement is null or filteredType.categorie = :categorieMouvement)
                       and (:sensPrime is null
                         or (:sensPrime = 'PRIME_A_PAYER' and filteredLine.montantTtc > 0)
-                        or (:sensPrime = 'RISTOURNE' and filteredLine.montantTtc < 0)
-                        or (:sensPrime = 'SANS_INCIDENCE' and filteredLine.montantTtc = 0))
+                        or (:sensPrime = 'RISTOURNE' and filteredLine.montantTtc < 0))
               ))
               and (:conventionsOnly = false or exists (
                     select 1 from LigneDocumentClient conventionLine
@@ -257,6 +257,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
               and (:payeurId is null or (
                     (:payeurType = 'CLIENT' and d.clientPayeur.id = :payeurId and d.groupePayeur is null)
                     or (:payeurType = 'GROUPE' and d.groupePayeur.id = :payeurId)
+                    or (:payeurType = 'CONVENTION' and d.conventionPayeur.id = :payeurId)
               ))
               and (
                     :search is null

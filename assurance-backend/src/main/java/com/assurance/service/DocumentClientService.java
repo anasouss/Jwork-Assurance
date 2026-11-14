@@ -1391,6 +1391,7 @@ public class DocumentClientService {
                         : document.getConditionPaiementClient().getId())
                 .clientPayeurId(document.getClientPayeur() == null ? null : document.getClientPayeur().getId())
                 .groupePayeurId(document.getGroupePayeur() == null ? null : document.getGroupePayeur().getId())
+                .conventionPayeurId(document.getConventionPayeur() == null ? null : document.getConventionPayeur().getId())
                 .payeurNom(document.getPayeurNom())
                 .payeurIdentifiant(document.getPayeurIdentifiant())
                 .payeurAdresse(document.getPayeurAdresse())
@@ -1438,6 +1439,9 @@ public class DocumentClientService {
     }
 
     private String documentPayerKey(DocumentClient document) {
+        if (document.getConventionPayeur() != null) {
+            return "CONVENTION:" + document.getConventionPayeur().getId();
+        }
         if (document.getGroupePayeur() != null) {
             return "GROUPE:" + document.getGroupePayeur().getId();
         }

@@ -22,6 +22,7 @@ public class ReglementClientResponse {
     private LocalDate dateReglement;
     private Long clientPayeurId;
     private Long groupePayeurId;
+    private Long conventionPayeurId;
     private String payeurNom;
     private Boolean multiPayeur;
     private String deposantNom;

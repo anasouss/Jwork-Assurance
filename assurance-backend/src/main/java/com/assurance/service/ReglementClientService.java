@@ -636,6 +636,7 @@ public class ReglementClientService {
                     .documentClient(document)
                     .clientPayeur(document.getGroupePayeur() == null ? document.getClientPayeur() : null)
                     .groupePayeur(document.getGroupePayeur())
+                    .conventionPayeur(document.getConventionPayeur())
                     .payeurNomSnapshot(document.getPayeurNom())
                     .montant(amount)
                     .statut(status)
@@ -832,7 +833,11 @@ public class ReglementClientService {
                 .collect(Collectors.toMap(DocumentClient::getId, Function.identity()));
         Map<Long, Client> subscribers = loadSubscribers(elements);
         boolean multiPayer = Boolean.TRUE.equals(request.getMultiPayeur());
-        List<Payer> payers = resolvePayers(elements, documents, subscribers);
+        List<Payer> payers = resolvePayers(elements.stream()
+                .filter(element -> directElementIds.contains(element.getId())).toList(), documents, subscribers);
+        if (multiPayer && payers.stream().anyMatch(item -> item.convention() != null)) {
+            throw new BadRequestException("Réglez les factures d'une convention séparément des versements multi-clients");
+        }
         Payer payer = resolvePaymentPayer(payers, multiPayer);
         if (multiPayer) {
             validateMultiPayerDeposit(request);
@@ -963,6 +968,7 @@ public class ReglementClientService {
         payment.setDateReglement(request.getDateReglement());
         payment.setClientPayeur(payer.client());
         payment.setGroupePayeur(payer.group());
+        payment.setConventionPayeur(payer.convention());
         payment.setPayeurNom(payer.name());
         payment.setMultiPayeur(multiPayer);
         payment.setDeposantNom(multiPayer ? trimToNull(request.getDeposantNom()) : null);
@@ -992,6 +998,7 @@ public class ReglementClientService {
                         .montant(money(requestedAllocation.getMontant()))
                         .clientPayeur(allocationPayer.group() == null ? allocationPayer.client() : null)
                         .groupePayeur(allocationPayer.group())
+                        .conventionPayeur(allocationPayer.convention())
                         .payeurNomSnapshot(allocationPayer.name())
                         .statut(StatutAffectationReglement.EN_ATTENTE)
                         .build();
@@ -1422,6 +1429,7 @@ public class ReglementClientService {
                         .documentClient(source.getDocumentClient())
                         .clientPayeur(source.getClientPayeur())
                         .groupePayeur(source.getGroupePayeur())
+                        .conventionPayeur(source.getConventionPayeur())
                         .payeurNomSnapshot(source.getPayeurNomSnapshot())
                         .montant(slice)
                         .statut(replacement.getStatut() == StatutInstrumentReglement.CONFIRME
@@ -2501,7 +2509,7 @@ public class ReglementClientService {
     }
 
     private void validateMultiPayerDeposit(CreerReglementClientRequest request) {
-        if (request.getClientPayeurId() != null || request.getGroupePayeurId() != null) {
+        if (request.getClientPayeurId() != null || request.getGroupePayeurId() != null || request.getConventionPayeurId() != null) {
             throw new BadRequestException("Un versement multi-clients ne doit pas définir un payeur unique");
         }
         if (request.getDeposantNom() == null || request.getDeposantNom().isBlank()) {
@@ -2529,6 +2537,10 @@ public class ReglementClientService {
     }
 
     private Payer resolvePayer(DocumentClient document) {
+        if (document.getConventionPayeur() != null) {
+            return new Payer("V:" + document.getConventionPayeur().getId(), null, null,
+                    document.getPayeurNom(), document.getConventionPayeur());
+        }
         if (document.getGroupePayeur() != null) {
             return new Payer(
                     "G:" + document.getGroupePayeur().getId(),
@@ -2571,6 +2583,16 @@ public class ReglementClientService {
     }
 
     private void validateRequestedPayer(CreerReglementClientRequest request, Payer payer) {
+        if (payer.convention() != null) {
+            if (!Objects.equals(request.getConventionPayeurId(), payer.convention().getId())
+                    || request.getClientPayeurId() != null || request.getGroupePayeurId() != null) {
+                throw new BadRequestException("La convention payeuse ne correspond pas aux factures sélectionnées");
+            }
+            return;
+        }
+        if (request.getConventionPayeurId() != null) {
+            throw new BadRequestException("Ces créances ne sont pas facturées à une convention");
+        }
         if (payer.group() != null) {
             if (!Objects.equals(request.getGroupePayeurId(), payer.group().getId())
                     || request.getClientPayeurId() != null) {
@@ -2586,7 +2608,7 @@ public class ReglementClientService {
         if (payeurId == null) {
             return;
         }
-        if (!"CLIENT".equals(payeurType) && !"GROUPE".equals(payeurType)) {
+        if (!"CLIENT".equals(payeurType) && !"GROUPE".equals(payeurType) && !"CONVENTION".equals(payeurType)) {
             throw new BadRequestException("Sélectionnez un payeur valide");
         }
     }
@@ -2793,10 +2815,9 @@ public class ReglementClientService {
     }
 
     private SourceDocumentClientResponse toInvoiceSource(DocumentClient document) {
-        String payerType = document.getGroupePayeur() == null ? "CLIENT" : "GROUPE";
-        Long payerId = document.getGroupePayeur() == null
-                ? document.getClientPayeur().getId()
-                : document.getGroupePayeur().getId();
+        Payer payer = resolvePayer(document);
+        String payerType = payer.type();
+        Long payerId = payer.id();
         return SourceDocumentClientResponse.builder()
                 .documentClientId(document.getId())
                 .mouvement(document.getConventionFacturee() != null && document.getTotalDocument().signum() < 0
@@ -2822,10 +2843,9 @@ public class ReglementClientService {
             DocumentClient document,
             LigneDocumentClient line
     ) {
-        String payerType = document.getGroupePayeur() == null ? "CLIENT" : "GROUPE";
-        Long payerId = document.getGroupePayeur() == null
-                ? document.getClientPayeur().getId()
-                : document.getGroupePayeur().getId();
+        Payer payer = resolvePayer(document);
+        String payerType = payer.type();
+        Long payerId = payer.id();
         return SourceDocumentClientResponse.builder()
                 .elementFacturableId(line.getElementFacturable().getId())
                 .documentClientId(document.getId())
@@ -3145,6 +3165,7 @@ public class ReglementClientService {
                 .dateReglement(payment.getDateReglement())
                 .clientPayeurId(payment.getClientPayeur() == null ? null : payment.getClientPayeur().getId())
                 .groupePayeurId(payment.getGroupePayeur() == null ? null : payment.getGroupePayeur().getId())
+                .conventionPayeurId(payment.getConventionPayeur() == null ? null : payment.getConventionPayeur().getId())
                 .payeurNom(payment.getPayeurNom())
                 .multiPayeur(payment.getMultiPayeur())
                 .deposantNom(payment.getDeposantNom())
@@ -3227,8 +3248,10 @@ public class ReglementClientService {
                                         ? null : allocation.getElementFacturable().getId())
                                 .documentClientId(allocation.getDocumentClient() == null
                                         ? null : allocation.getDocumentClient().getId())
-                                .payeurType(allocation.getGroupePayeur() == null ? "CLIENT" : "GROUPE")
-                                .payeurId(allocation.getGroupePayeur() == null
+                                .payeurType(allocation.getConventionPayeur() != null ? "CONVENTION"
+                                        : allocation.getGroupePayeur() == null ? "CLIENT" : "GROUPE")
+                                .payeurId(allocation.getConventionPayeur() != null ? allocation.getConventionPayeur().getId()
+                                        : allocation.getGroupePayeur() == null
                                         ? allocation.getClientPayeur() == null
                                                 ? null : allocation.getClientPayeur().getId()
                                         : allocation.getGroupePayeur().getId())
@@ -3357,7 +3380,19 @@ public class ReglementClientService {
         }
     }
 
-    private record Payer(String key, Client client, GroupeClient group, String name) {
+    private record Payer(String key, Client client, GroupeClient group, String name,
+                         com.assurance.entity.Convention convention) {
+        private Payer(String key, Client client, GroupeClient group, String name) {
+            this(key, client, group, name, null);
+        }
+
+        private String type() {
+            return convention != null ? "CONVENTION" : group != null ? "GROUPE" : "CLIENT";
+        }
+
+        private Long id() {
+            return convention != null ? convention.getId() : group != null ? group.getId() : client.getId();
+        }
     }
 
     public record DownloadedReceipt(Resource resource, MediaType mediaType, String fileName) {

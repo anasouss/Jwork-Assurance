@@ -13,7 +13,6 @@ import com.assurance.dto.response.ConventionInvoicePreviewResponse;
 import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
 import com.assurance.entity.Contrat;
-import com.assurance.entity.ContratClient;
 import com.assurance.entity.DocumentClient;
 import com.assurance.entity.EcheanceFacturationConvention;
 import com.assurance.entity.ElementFacturable;
@@ -26,17 +25,13 @@ import com.assurance.enums.ModeReglementConvention;
 import com.assurance.enums.StatutMouvementContrat;
 import com.assurance.entity.SequenceDocumentClient;
 import com.assurance.enums.Fractionnement;
-import com.assurance.enums.ModeFacturationContrat;
-import com.assurance.enums.RoleClientContrat;
 import com.assurance.enums.StatutDocumentClient;
 import com.assurance.enums.StatutEcheanceFacturationConvention;
 import com.assurance.enums.StatutElementFacturable;
 import com.assurance.enums.TypeDocumentClient;
-import com.assurance.enums.TypePayeurPrime;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.ResourceNotFoundException;
 import com.assurance.repository.AgenceRepository;
-import com.assurance.repository.ContratClientRepository;
 import com.assurance.repository.ContratRepository;
 import com.assurance.repository.DocumentClientRepository;
 import com.assurance.repository.EcheanceFacturationConventionRepository;
@@ -70,7 +65,6 @@ public class FacturationConventionService {
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
     private final ContratRepository contratRepository;
-    private final ContratClientRepository contratClientRepository;
     private final EcheanceFacturationConventionRepository echeanceRepository;
     private final ElementFacturableRepository elementRepository;
     private final LigneDocumentClientRepository lineRepository;
@@ -139,7 +133,6 @@ public class FacturationConventionService {
         List<EcheanceFacturationConvention> schedules = periods.stream().flatMap(period ->
                 echeanceRepository.findPendingPeriod(agenceId, conventionId, period.start(), period.end()).stream()).toList();
         Set<Long> contractIds = schedules.stream().map(item -> item.getContrat().getId()).collect(Collectors.toSet());
-        Map<Long, Client> subscribers = loadSubscribers(contractIds);
         Map<Long, List<ElementFacturable>> elements = loadElements(contractIds);
         Map<Long, List<EcheanceFacturationConvention>> allSchedules = contractIds.stream().collect(Collectors.toMap(
                 Function.identity(), echeanceRepository::findByContratIdAndActifTrueOrderByNumeroPeriodeAsc));
@@ -150,7 +143,7 @@ public class FacturationConventionService {
                     .filter(element -> matchesSource(element, schedule)).toList();
             long matched = sources.stream().filter(element -> matchesProductionFilter(element, categorieMouvement, sensPrime)).count();
             if ((categorieMouvement != null || sensPrime != null) && matched == 0) continue;
-            Payer payer = resolvePayer(schedule.getContrat(), subscribers);
+            Payer payer = conventionPayer(schedule.getContrat().getConvention());
             List<ConventionInvoicePreviewResponse.Line> lines = new ArrayList<>();
             for (ElementFacturable element : sources) {
                 BigDecimal amount = elementBulletin(element) == null ? null
@@ -167,8 +160,7 @@ public class FacturationConventionService {
                 }
             }
             rows.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(),
-                    payer.group() == null ? payer.client().getId() : payer.group().getId(),
-                    payer.group() == null ? "CLIENT" : "GROUPE", payer.name(), blocked, lines,
+                    payer.id(), payer.type(), payer.name(), blocked, lines,
                     schedule.getPeriodeDebut(), schedule.getPeriodeFin(), matched > 0 && matched < sources.size()));
         }
         return new PreparationFactureConventionResponse(convention.getIntitule(), periods.get(0).start(), periods.get(periods.size() - 1).end(), rows);
@@ -185,7 +177,6 @@ public class FacturationConventionService {
         return switch (direction) {
             case PRIME_A_PAYER -> sign > 0;
             case RISTOURNE -> sign < 0;
-            case SANS_INCIDENCE -> sign == 0;
         };
     }
 
@@ -221,11 +212,16 @@ public class FacturationConventionService {
         if (selected.isEmpty()) throw new BadRequestException("Selectionnez au moins une echeance");
         EcheanceFacturationConvention first = selected.get(0);
         if (selected.stream().anyMatch(item -> !Boolean.TRUE.equals(item.getActif())
-                || item.getStatut() != StatutEcheanceFacturationConvention.A_FACTURER)) {
+                || item.getStatut() != StatutEcheanceFacturationConvention.A_FACTURER
+                || item.getDocumentClient() != null)) {
             throw new BadRequestException("Toutes les echeances doivent etre a facturer");
+        }
+        if (selected.stream().anyMatch(item -> item.getContrat().getCompagnieAssurance() == null)) {
+            throw new BadRequestException("La compagnie des contrats doit être définie");
         }
         if (first.getContrat().getConvention() == null || selected.stream().anyMatch(item -> item.getContrat().getConvention() == null
                 || !Objects.equals(first.getContrat().getConvention().getId(), item.getContrat().getConvention().getId())
+                || !Objects.equals(first.getContrat().getCompagnieAssurance().getId(), item.getContrat().getCompagnieAssurance().getId())
                 || !Objects.equals(first.getPeriodeDebut(), item.getPeriodeDebut())
                 || !Objects.equals(first.getPeriodeFin(), item.getPeriodeFin()))) {
             throw new BadRequestException("Une facture doit concerner une seule convention et une seule periode");
@@ -355,7 +351,6 @@ public class FacturationConventionService {
         Map<Long, List<EcheanceFacturationConvention>> schedulesByContract = schedules.stream()
                 .collect(Collectors.groupingBy(item -> item.getContrat().getId()));
         Map<Long, List<ElementFacturable>> elementsByContract = loadElements(schedulesByContract.keySet());
-        Map<Long, Client> subscribers = loadSubscribers(schedulesByContract.keySet());
         Map<Long, IssuedAmount> issuedAmounts = loadIssuedAmounts(schedules);
 
         String normalizedSearch = normalizeSearch(search);
@@ -373,7 +368,7 @@ public class FacturationConventionService {
                         item,
                         schedulesByContract.get(item.getContrat().getId()),
                         elementsByContract.getOrDefault(item.getContrat().getId(), List.of()),
-                        schedulePayer(item, subscribers),
+                        schedulePayer(item),
                         issuedAmounts.get(item.getId())
                 ))
                 .filter(row -> payeurId == null || Objects.equals(row.getPayeurId(), payeurId))
@@ -505,6 +500,7 @@ public class FacturationConventionService {
                 .conditionPaiementClient(ristourne ? null : paymentCondition.condition())
                 .clientPayeur(payer.client())
                 .groupePayeur(payer.group())
+                .conventionPayeur(payer.convention())
                 .payeurNom(payer.name())
                 .payeurIdentifiant(payer.identifier())
                 .payeurAdresse(payer.address())
@@ -727,8 +723,8 @@ public class FacturationConventionService {
                 .numeroBonCommande(ConventionPaymentPolicy.isAmendment(item.getMouvement()) ? null
                         : item.getMouvement() == null ? contract.getNumeroBonCommande() : item.getMouvement().getNumeroBonCommande())
                 .documentId(item.getDocumentClient() == null ? null : item.getDocumentClient().getId())
-                .payeurId(payer.group() == null ? payer.client().getId() : payer.group().getId())
-                .payeurType(payer.group() == null ? "CLIENT" : "GROUPE")
+                .payeurId(payer.id())
+                .payeurType(payer.type())
                 .payeurNom(payer.name())
                 .numeroDossier(contract.getNumeroDossier())
                 .numeroPolice(contract.getNumeroPolice())
@@ -847,67 +843,27 @@ public class FacturationConventionService {
         return result;
     }
 
-    private Map<Long, Client> loadSubscribers(Set<Long> contractIds) {
-        if (contractIds.isEmpty()) {
-            return Map.of();
-        }
-        Map<Long, Client> result = new HashMap<>();
-        for (ContratClient link : contratClientRepository.findByContratIdInAndRole(
-                contractIds, RoleClientContrat.SOUSCRIPTEUR)) {
-            Client current = result.get(link.getContrat().getId());
-            if (current == null || Boolean.TRUE.equals(link.getPrincipalPourRole())) {
-                result.put(link.getContrat().getId(), link.getClient());
-            }
-        }
-        return result;
-    }
-
-    private Payer schedulePayer(EcheanceFacturationConvention schedule, Map<Long, Client> subscribers) {
+    private Payer schedulePayer(EcheanceFacturationConvention schedule) {
         DocumentClient document = schedule.getDocumentClient();
-        if (document == null) return resolvePayer(schedule.getContrat(), subscribers);
+        if (document == null) return conventionPayer(schedule.getContrat().getConvention());
+        if (document.getConventionPayeur() != null) {
+            return new Payer("V:" + document.getConventionPayeur().getId(), null, null,
+                    document.getPayeurNom(), document.getPayeurIdentifiant(), document.getPayeurAdresse(),
+                    document.getConventionPayeur());
+        }
         return new Payer(document.getGroupePayeur() == null ? "C:" + document.getClientPayeur().getId()
                 : "G:" + document.getGroupePayeur().getId(), document.getClientPayeur(), document.getGroupePayeur(),
                 document.getPayeurNom(), document.getPayeurIdentifiant(), document.getPayeurAdresse());
     }
 
-    private Payer resolvePayer(Contrat contract, Map<Long, Client> subscribers) {
-        GroupeClient group = contract.getGroupeFacturation();
-        boolean consolidated = group != null
-                && (contract.getModeFacturation() == ModeFacturationContrat.CONSOLIDEE_GROUPE
-                || contract.getTypePayeurPrime() == TypePayeurPrime.TRESORERIE_GROUPE);
-        if (consolidated) {
-            Client treasury = group.getClientTresorerie();
-            return new Payer(
-                    "G:" + group.getId(), treasury, group,
-                    treasury == null ? group.getLibelle() : treasury.getNomAffichage(),
-                    group.getCode(), treasury == null ? null : clientAddress(treasury)
-            );
-        }
-        Client payer = contract.getPayeurPrime() == null
-                ? subscribers.get(contract.getId())
-                : contract.getPayeurPrime();
-        if (payer == null) {
-            throw new BadRequestException("Aucun payeur n'est défini pour le contrat " + contract.getNumeroDossier());
-        }
-        return new Payer(
-                "C:" + payer.getId(), payer, null, payer.getNomAffichage(),
-                firstNonBlank(payer.getCodeClient(), payer.getIce(), payer.getRc(), payer.getCin()),
-                clientAddress(payer)
-        );
+    private Payer resolveSinglePayer(List<EcheanceFacturationConvention> selected) {
+        validateSelection(selected);
+        return conventionPayer(selected.get(0).getContrat().getConvention());
     }
 
-    private Payer resolveSinglePayer(List<EcheanceFacturationConvention> selected) {
-        Set<Long> contractIds = selected.stream()
-                .map(item -> item.getContrat().getId())
-                .collect(Collectors.toSet());
-        Map<Long, Client> subscribers = loadSubscribers(contractIds);
-        List<Payer> payers = selected.stream()
-                .map(item -> resolvePayer(item.getContrat(), subscribers))
-                .toList();
-        if (payers.isEmpty() || payers.stream().map(Payer::key).distinct().count() != 1) {
-            throw new BadRequestException("Sélectionnez les lignes d'un même client ou groupe de facturation pour préparer une facture.");
-        }
-        return payers.get(0);
+    private Payer conventionPayer(Convention convention) {
+        return new Payer("V:" + convention.getId(), null, null, convention.getIntitule(),
+                convention.getCode(), convention.getAdresse(), convention);
     }
 
     private void validateInvoiceDueDate(LocalDate dueDate, LocalDate emissionDate, int maximumDays) {
@@ -984,22 +940,6 @@ public class FacturationConventionService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private String firstNonBlank(String... values) {
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String clientAddress(Client client) {
-        String city = client.getVille() == null ? null : client.getVille().getNom();
-        return client.getAdresse() == null
-                ? city
-                : city == null ? client.getAdresse() : client.getAdresse() + ", " + city;
-    }
-
     private record Period(LocalDate start, LocalDate end) {
     }
 
@@ -1016,8 +956,20 @@ public class FacturationConventionService {
             GroupeClient group,
             String name,
             String identifier,
-            String address
+            String address,
+            Convention convention
     ) {
+        private Payer(String key, Client client, GroupeClient group, String name, String identifier, String address) {
+            this(key, client, group, name, identifier, address, null);
+        }
+
+        private String type() {
+            return convention != null ? "CONVENTION" : group != null ? "GROUPE" : "CLIENT";
+        }
+
+        private Long id() {
+            return convention != null ? convention.getId() : group != null ? group.getId() : client.getId();
+        }
     }
 
     private record IssuedAmount(Amount amount, BigDecimal bulletin) {

@@ -22,6 +22,7 @@ public class CreerReglementClientRequest {
 
     private Long clientPayeurId;
     private Long groupePayeurId;
+    private Long conventionPayeurId;
 
     private Boolean multiPayeur = false;
 

@@ -131,7 +131,6 @@ public class ConventionProductionService {
                 predicates.add(switch (filter.getSensPrime()) {
                     case PRIME_A_PAYER -> cb.greaterThan(total, BigDecimal.ZERO);
                     case RISTOURNE -> cb.lessThan(total, BigDecimal.ZERO);
-                    case SANS_INCIDENCE -> cb.equal(total, BigDecimal.ZERO);
                 });
             }
             if (filter.getMode() != null) {

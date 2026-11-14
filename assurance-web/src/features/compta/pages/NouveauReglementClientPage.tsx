@@ -937,7 +937,7 @@ function SortableReceivableRow(props: {
       <td className="px-4 py-1.5">
         <div className="font-medium">{props.row.source.payeurNom}</div>
         <div className="text-xs text-muted-foreground">
-          {props.row.source.payeurType === "GROUPE" ? "Groupe" : "Client"}
+          {props.row.source.payeurType === "CONVENTION" ? "Convention" : props.row.source.payeurType === "GROUPE" ? "Groupe" : "Client"}
         </div>
       </td>
       <td className="px-4 py-1.5 font-medium">{receivableDocumentReference(props.row)}</td>
@@ -1284,6 +1284,7 @@ function buildRequest(
     dateReglement,
     clientPayeurId: !multiPayeur && source.payeurType === "CLIENT" ? source.payeurId : undefined,
     groupePayeurId: !multiPayeur && source.payeurType === "GROUPE" ? source.payeurId : undefined,
+    conventionPayeurId: !multiPayeur && source.payeurType === "CONVENTION" ? source.payeurId : undefined,
     multiPayeur,
     deposantNom: multiPayeur ? deposantNom.trim() : undefined,
     notes: notes.trim() || undefined,

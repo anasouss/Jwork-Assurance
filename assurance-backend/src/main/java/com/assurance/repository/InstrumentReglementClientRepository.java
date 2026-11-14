@@ -33,6 +33,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
               and (:mode is null or instrument.mode = :mode)
               and (:statut is null or instrument.statut = :statut)
               and (:payeurId is null
+                   or (:payeurType = 'CONVENTION' and payment.conventionPayeur.id = :payeurId)
                    or (:payeurType = 'CLIENT' and (payment.clientPayeur.id = :payeurId or exists (
                        select a.id from AffectationReglementClient a
                        where a.instrument = instrument and a.clientPayeur.id = :payeurId)))
@@ -75,6 +76,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                        com.assurance.enums.StatutInstrumentReglement.REJETE,
                        com.assurance.enums.StatutInstrumentReglement.REMPLACE)))
               and (:payeurId is null
+                   or (:payeurType = 'CONVENTION' and payment.conventionPayeur.id = :payeurId)
                    or (:payeurType = 'CLIENT' and (payment.clientPayeur.id = :payeurId or exists (
                        select a.id from AffectationReglementClient a
                        where a.instrument = instrument and a.clientPayeur.id = :payeurId)))
@@ -291,6 +293,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
               and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
               and (:dateAu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
               and (:payeurId is null
+                   or (:payeurType = 'CONVENTION' and reglement.conventionPayeur.id = :payeurId)
                    or (:payeurType = 'CLIENT' and (
                        reglement.clientPayeur.id = :payeurId
                        or exists (

@@ -26,6 +26,7 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
               and (:dateDu is null or r.dateReglement >= :dateDu)
               and (:dateAu is null or r.dateReglement <= :dateAu)
               and (:payeurId is null
+                   or (:payeurType = 'CONVENTION' and r.conventionPayeur.id = :payeurId)
                    or (:payeurType = 'CLIENT' and (
                        r.clientPayeur.id = :payeurId
                        or exists (

@@ -84,10 +84,10 @@ export default function ConventionProductionPage() {
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem>
           <SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem>
         </SelectContent></Select></div>
-      <div className="grid gap-1.5"><Label>Sens de prime</Label><Select value={filters.sensPrime ?? "ALL"}
+      <div className="grid gap-1.5"><Label>Statut</Label><Select value={filters.sensPrime ?? "ALL"}
         onValueChange={value => setFilters(current => ({ ...current, sensPrime: value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"] }))}>
-        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les sens</SelectItem>
-          <SelectItem value="PRIME_A_PAYER">Prime à payer</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem><SelectItem value="SANS_INCIDENCE">Sans incidence</SelectItem>
+        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem>
+          <SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem>
         </SelectContent></Select></div>
       <div className="grid gap-1.5"><Label>Critère de date</Label><Select value={filters.typeDate}
         onValueChange={value => setFilters(current => ({ ...current, typeDate: value as "EFFET" | "EMISSION" }))}>

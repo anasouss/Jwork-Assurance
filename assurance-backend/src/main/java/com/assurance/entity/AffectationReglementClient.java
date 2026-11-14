@@ -46,7 +46,8 @@ import java.math.BigDecimal;
                         columnList = "document_client_id,statut"
                 ),
                 @Index(name = "idx_affectation_reglement_client_payeur", columnList = "client_payeur_id"),
-                @Index(name = "idx_affectation_reglement_groupe_payeur", columnList = "groupe_payeur_id")
+                @Index(name = "idx_affectation_reglement_groupe_payeur", columnList = "groupe_payeur_id"),
+                @Index(name = "idx_affectation_reglement_convention", columnList = "convention_payeur_id")
         }
 )
 @Getter
@@ -78,6 +79,10 @@ public class AffectationReglementClient extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupe_payeur_id")
     private GroupeClient groupePayeur;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "convention_payeur_id")
+    private Convention conventionPayeur;
 
     @Column(name = "payeur_nom_snapshot", nullable = false, length = 220)
     private String payeurNomSnapshot;

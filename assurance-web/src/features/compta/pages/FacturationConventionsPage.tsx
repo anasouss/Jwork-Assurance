@@ -162,16 +162,6 @@ export default function FacturationConventionsPage() {
     <section className="border-y bg-card p-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
-          <Label htmlFor="billing-company">Compagnie</Label>
-          <Select value={effectiveCompanyId || "ALL"} disabled={issue.isPending || !!conventionId || companies.isPending || companies.isError}
-            onValueChange={value => { setCompanyId(value === "ALL" ? "" : value); setConventionId(""); setPeriodNumber("ALL"); }}>
-            <SelectTrigger id="billing-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
-              {convention?.compagnieId && !companies.data?.some(item => item.id === convention.compagnieId) ? <SelectItem value={convention.compagnieId}>{convention.compagnie || "-"}</SelectItem> : null}
-              {companies.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
           <Label htmlFor="billing-convention">Convention</Label>
           <Select value={conventionId} disabled={issue.isPending || options.isLoading} onValueChange={value => {
             setConventionId(value === "NONE" ? "" : value); setPeriodNumber("ALL");
@@ -179,6 +169,16 @@ export default function FacturationConventionsPage() {
           }}>
             <SelectTrigger id="billing-convention"><SelectValue placeholder="Sélectionner une convention" /></SelectTrigger>
             <SelectContent><SelectItem value="NONE">Aucune convention sélectionnée</SelectItem>{conventionOptions?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
+          <Label htmlFor="billing-company">Compagnie</Label>
+          <Select value={effectiveCompanyId || "ALL"} disabled={issue.isPending || !!conventionId || companies.isPending || companies.isError}
+            onValueChange={value => { setCompanyId(value === "ALL" ? "" : value); setConventionId(""); setPeriodNumber("ALL"); }}>
+            <SelectTrigger id="billing-company"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
+              {convention?.compagnieId && !companies.data?.some(item => item.id === convention.compagnieId) ? <SelectItem value={convention.compagnieId}>{convention.compagnie || "-"}</SelectItem> : null}
+              {companies.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}
+            </SelectContent>
           </Select>
         </div>
         <div className="grid w-28 shrink-0 gap-1.5">
@@ -199,9 +199,9 @@ export default function FacturationConventionsPage() {
           <Select value={movement ?? "ALL"} disabled={issue.isPending} onValueChange={value => setMovement(value === "ALL" ? undefined : value as ConventionProductionFilters["categorieMouvement"])}>
             <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
           </Select></div>
-        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Sens de prime</Label>
+        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Statut</Label>
           <Select value={premiumDirection ?? "ALL"} disabled={issue.isPending} onValueChange={value => setPremiumDirection(value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"])}>
-            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les sens</SelectItem><SelectItem value="PRIME_A_PAYER">Prime à payer</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem><SelectItem value="SANS_INCIDENCE">Sans incidence</SelectItem></SelectContent>
+            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem></SelectContent>
           </Select></div>
         <div className="flex shrink-0 gap-2">
           <Button type="button" variant="outline" size="icon" title="Actualiser" aria-label="Actualiser"

@@ -28,6 +28,7 @@ public class DocumentClientResponse {
     private Long conditionPaiementClientId;
     private Long clientPayeurId;
     private Long groupePayeurId;
+    private Long conventionPayeurId;
     private String payeurNom;
     private String payeurIdentifiant;
     private String payeurAdresse;

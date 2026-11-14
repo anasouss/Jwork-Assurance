@@ -162,19 +162,21 @@ class ReglementClientServicePolicyTest {
     }
 
     @Test
-    void mainPeriodListCanContainDifferentClientsWhileInvoicePreviewRemainsSinglePayer() {
+    void differentInsuredClientsCanShareOneConventionInvoiceAndPeriod() {
         var start = java.time.LocalDate.of(2026, 1, 1);
         var end = java.time.LocalDate.of(2026, 12, 31);
         var convention = com.assurance.entity.Convention.builder().intitule("AOSFOC")
                 .typeEcheance(com.assurance.enums.TypeEcheanceConvention.A_ECHEANCE).echeance("01/01")
                 .fractionnement(com.assurance.enums.Fractionnement.ANNUEL).build();
         convention.setId(22L);
+        var company = com.assurance.entity.CompagnieAssurance.builder().build();
+        company.setId(4L);
         var schedules = new java.util.ArrayList<com.assurance.entity.EcheanceFacturationConvention>();
         var elements = new java.util.ArrayList<ElementFacturable>();
         for (int index = 0; index < 2; index++) {
             var client = com.assurance.entity.Client.builder().nom("CLIENT " + index).build();
             client.setId(10L + index);
-            var contract = Contrat.builder().convention(convention).payeurPrime(client).modeReglement("facture")
+            var contract = Contrat.builder().convention(convention).compagnieAssurance(company).payeurPrime(client).modeReglement("facture")
                     .typeContrat(com.assurance.enums.TypeContrat.CONVENTION).montantBulletin(new BigDecimal("100.00"))
                     .dateEffet(start).dateEcheance(end).build();
             contract.setId(100L + index);
@@ -197,18 +199,33 @@ class ReglementClientServicePolicyTest {
         var result = conventionBilling.preparePeriod(7L, 22L, 2026, 1);
         assertThat(result.lignes()).hasSize(2);
         assertThat(result.lignes()).extracting(com.assurance.dto.response.PreparationFactureConventionResponse.Ligne::payeurId)
-                .containsExactly(10L, 11L);
+                .containsExactly(22L, 22L);
         assertThat(result.lignes()).allSatisfy(row -> {
+            assertThat(row.payeurType()).isEqualTo("CONVENTION");
             assertThat(row.blocage()).isNull();
             assertThat(row.details()).hasSize(1);
         });
-        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "resolveSinglePayer", schedules))
+        when(conventionScheduleRepository.findSelected(7L, List.of(300L, 301L))).thenReturn(schedules);
+        var invoice = conventionBilling.preview(7L, List.of(300L, 301L));
+        assertThat(invoice.payeur()).isEqualTo("AOSFOC");
+        assertThat(invoice.lignes()).hasSize(2);
+        assertThat(invoice.total()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    void conventionSettlementUsesItsInvoicePayerInsteadOfAnInsuredClient() {
+        var convention = com.assurance.entity.Convention.builder().intitule("AOSFOC").build();
+        convention.setId(22L);
+        var document = DocumentClient.builder().conventionPayeur(convention).payeurNom("AOSFOC").build();
+        Object payer = ReflectionTestUtils.invokeMethod(service, "resolvePayer", document);
+        assertThat((String) ReflectionTestUtils.invokeMethod(payer, "type")).isEqualTo("CONVENTION");
+        assertThat((Long) ReflectionTestUtils.invokeMethod(payer, "id")).isEqualTo(22L);
+        var request = new com.assurance.dto.request.CreerReglementClientRequest();
+        request.setConventionPayeurId(22L);
+        ReflectionTestUtils.invokeMethod(service, "validateRequestedPayer", request, payer);
+        request.setClientPayeurId(10L);
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(service, "validateRequestedPayer", request, payer))
                 .isInstanceOf(BadRequestException.class);
-        when(conventionScheduleRepository.findSelected(7L, List.of(300L))).thenReturn(List.of(schedules.get(0)));
-        var invoice = conventionBilling.preview(7L, List.of(300L));
-        assertThat(invoice.payeur()).isEqualTo("CLIENT 0");
-        assertThat(invoice.lignes()).hasSize(1);
-        assertThat(invoice.total()).isEqualByComparingTo("100.00");
     }
 
     @Test
@@ -229,21 +246,18 @@ class ReglementClientServicePolicyTest {
     }
 
     @Test
-    void billingUsesTheExistingContractPayerOrConfiguredConsolidatedGroup() {
+    void issuedSchedulesKeepTheirHistoricalClientOrGroupPayer() {
         var client = com.assurance.entity.Client.builder().nom("CLIENT A").codeClient("C001").build();
         client.setId(11L);
-        var contract = Contrat.builder().payeurPrime(client).build();
-        Object direct = ReflectionTestUtils.invokeMethod(conventionBilling, "resolvePayer", contract, java.util.Map.of());
+        var document = DocumentClient.builder().clientPayeur(client).payeurNom("CLIENT A").build();
+        var schedule = com.assurance.entity.EcheanceFacturationConvention.builder().documentClient(document).build();
+        Object direct = ReflectionTestUtils.invokeMethod(conventionBilling, "schedulePayer", schedule);
         assertThat((String) ReflectionTestUtils.invokeMethod(direct, "key")).isEqualTo("C:11");
         var group = com.assurance.entity.GroupeClient.builder().libelle("AOSFOC").code("GR001").clientTresorerie(client).build();
         group.setId(22L);
-        contract.setGroupeFacturation(group);
-        contract.setModeFacturation(com.assurance.enums.ModeFacturationContrat.CONSOLIDEE_GROUPE);
-        Object consolidated = ReflectionTestUtils.invokeMethod(conventionBilling, "resolvePayer", contract, java.util.Map.of());
+        document.setGroupePayeur(group);
+        Object consolidated = ReflectionTestUtils.invokeMethod(conventionBilling, "schedulePayer", schedule);
         assertThat((String) ReflectionTestUtils.invokeMethod(consolidated, "key")).isEqualTo("G:22");
-        contract.setModeFacturation(null);
-        Object ungrouped = ReflectionTestUtils.invokeMethod(conventionBilling, "resolvePayer", contract, java.util.Map.of());
-        assertThat((String) ReflectionTestUtils.invokeMethod(ungrouped, "key")).isEqualTo("C:11");
     }
 
     @Test
@@ -260,15 +274,26 @@ class ReglementClientServicePolicyTest {
         convention.setId(1L);
         var otherConvention = com.assurance.entity.Convention.builder().build();
         otherConvention.setId(2L);
-        var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(Contrat.builder().convention(convention).build())
+        var company = com.assurance.entity.CompagnieAssurance.builder().build();
+        company.setId(4L);
+        var first = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(Contrat.builder()
+                        .convention(convention).compagnieAssurance(company).build())
                 .periodeDebut(java.time.LocalDate.of(2026, 1, 1)).periodeFin(java.time.LocalDate.of(2026, 3, 31)).build();
-        var second = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(Contrat.builder().convention(otherConvention).build())
+        var second = com.assurance.entity.EcheanceFacturationConvention.builder().contrat(Contrat.builder()
+                        .convention(otherConvention).compagnieAssurance(company).build())
                 .periodeDebut(first.getPeriodeDebut()).periodeFin(first.getPeriodeFin()).build();
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateSelection", List.of(first, second)))
                 .isInstanceOf(BadRequestException.class);
         second.getContrat().setConvention(convention);
         second.setPeriodeDebut(java.time.LocalDate.of(2026, 4, 1));
         second.setPeriodeFin(java.time.LocalDate.of(2026, 6, 30));
+        assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateSelection", List.of(first, second)))
+                .isInstanceOf(BadRequestException.class);
+        second.setPeriodeDebut(first.getPeriodeDebut());
+        second.setPeriodeFin(first.getPeriodeFin());
+        var otherCompany = com.assurance.entity.CompagnieAssurance.builder().build();
+        otherCompany.setId(5L);
+        second.getContrat().setCompagnieAssurance(otherCompany);
         assertThatThrownBy(() -> ReflectionTestUtils.invokeMethod(conventionBilling, "validateSelection", List.of(first, second)))
                 .isInstanceOf(BadRequestException.class);
     }

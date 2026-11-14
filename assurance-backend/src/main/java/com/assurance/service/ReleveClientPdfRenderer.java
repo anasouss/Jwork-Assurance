@@ -174,7 +174,8 @@ public class ReleveClientPdfRenderer {
         Table table = new Table(UnitValue.createPercentArray(widths)).useAllAvailableWidth()
                 .setFixedLayout().setFontSize(7).setKeepTogether(false);
         table.addHeaderCell(new Cell(1, 9).setBorder(Border.NO_BORDER).setPaddingBottom(10)
-                .add(new Paragraph(source.getConventionFacturee() + "\nAnnexe de la facture N° " + source.getNumero()
+                .add(new Paragraph(source.getConventionFacturee() + (isConventionRefund(source)
+                        ? "\nAnnexe de la facture de ristourne N° " : "\nAnnexe de la facture N° ") + source.getNumero()
                         + " - du " + LONG_DATE_FORMAT.format(source.getPeriodeDebut()) + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()))
                         .setFont(bold).setFontSize(10).setTextAlignment(TextAlignment.CENTER)));
         for (String label : java.util.List.of("Police N°", "Cie", "Mouvement", "Assuré", "Véhicule",
@@ -190,7 +191,7 @@ public class ReleveClientPdfRenderer {
             addSingleLineValue(table, amount(line.getMontantBulletinConvention()), regular, 7, 3, availableWidth * widths[7] / 100, TextAlignment.RIGHT);
             addSingleLineValue(table, amount(line.getMontantTtc()), bold, 7, 3, availableWidth * widths[8] / 100, TextAlignment.RIGHT);
         });
-        table.addCell(new Cell(1, 8).add(new Paragraph("TOTAL À PAYER").setFont(bold).setFontSize(7).setMargin(0))
+        table.addCell(new Cell(1, 8).add(new Paragraph(isConventionRefund(source) ? "TOTAL RISTOURNE" : "TOTAL À PAYER").setFont(bold).setFontSize(7).setMargin(0))
                 .setBorder(BODY_BORDER).setPadding(3).setTextAlignment(TextAlignment.RIGHT));
         addSingleLineValue(table, amount(source.getTotalDocument()), bold, 7, 3, availableWidth * widths[8] / 100, TextAlignment.RIGHT);
         document.add(table);
@@ -295,7 +296,7 @@ public class ReleveClientPdfRenderer {
                     .setFontSize(10f)
                     .setFontColor(BRAND_BLUE)
                     .setMargin(0);
-            invoiceNumber.add(new com.itextpdf.layout.element.Text("Facture N° : ")
+            invoiceNumber.add(new com.itextpdf.layout.element.Text(isConventionRefund(source) ? "Facture de ristourne N° : " : "Facture N° : ")
                     .setFont(regular)
                     .setUnderline());
             invoiceNumber.add(new com.itextpdf.layout.element.Text(value(source.getNumero())).setFont(bold));
@@ -764,7 +765,8 @@ public class ReleveClientPdfRenderer {
         Table heading = new Table(new float[]{3.6f, 0.9f, 1.05f})
                 .setWidth(UnitValue.createPercentValue(100));
         heading.addCell(new Cell()
-                .add(new Paragraph("ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
+                .add(new Paragraph(isConventionRefund(source) ? "ARRÊTÉE LA PRÉSENTE FACTURE DE RISTOURNE À LA SOMME DE :"
+                        : "ARRÊTÉE LA PRÉSENTE FACTURE À LA SOMME DE :")
                         .setFont(bold)
                         .setFontSize(8.5f)
                         .setFontColor(BRAND_BLUE)
@@ -773,7 +775,7 @@ public class ReleveClientPdfRenderer {
                 .setBorder(Border.NO_BORDER)
                 .setPadding(6));
         heading.addCell(new Cell()
-                .add(new Paragraph("Total TTC :")
+                .add(new Paragraph(isConventionRefund(source) ? "Total ristourne :" : "Total TTC :")
                         .setFont(bold)
                         .setFontSize(8.5f)
                         .setFontColor(ColorConstants.WHITE)
@@ -915,6 +917,10 @@ public class ReleveClientPdfRenderer {
             return "quatre-vingts";
         }
         return "quatre-vingt-" + underHundred(remainder);
+    }
+
+    private boolean isConventionRefund(DocumentClient source) {
+        return source.getConventionFacturee() != null && source.getTotalDocument() != null && source.getTotalDocument().signum() < 0;
     }
 
     private boolean isInvoice(DocumentClient source) {

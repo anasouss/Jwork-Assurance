@@ -22,7 +22,7 @@ export function ConventionBillingSources({ rows, selected, selectionKey, loading
     <table className="w-full min-w-[1400px] text-sm">
       <thead className="bg-orange-600 text-left text-xs text-white"><tr>
         <th className="w-10 px-3 py-3"><Checkbox checked={checked} disabled={!canSelect || !compatible.length}
-          onCheckedChange={value => onTogglePage(value === true)} aria-label="Sélectionner les lignes du même payeur et de la même période" /></th>
+          onCheckedChange={value => onTogglePage(value === true)} aria-label="Sélectionner les lignes du même payeur, de la même période et du même sens" /></th>
         <th className="px-3 py-3">Client</th>
         <th className="px-3 py-3">Période</th>
         {["Quittance N°", "Police N°", "Compagnie", "Mouvement", "Assuré", "Véhicule", "Date d'effet", "Date d'expiration", "Montant bulletin", "Montant à payer"].map((label, index) =>
@@ -41,6 +41,7 @@ export function ConventionBillingSources({ rows, selected, selectionKey, loading
             <td className="px-3 py-3" rowSpan={Math.max(1, row.details.length)}>
               <div className="font-medium">{row.payeurNom}</div>
               <div className="text-xs text-muted-foreground">{row.payeurType === "GROUPE" ? "Groupe" : "Client"}</div>
+              {!row.blocage && <div className="text-xs font-medium text-muted-foreground">{billingDirection(row) < 0 ? "Facture de ristourne" : "Facture"}</div>}
               {row.correspondancePartielle && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">Échéance complète · plusieurs lignes</p>}
               {row.blocage && <p className="mt-1 text-xs text-destructive">{row.blocage}</p>}
             </td>
@@ -62,7 +63,12 @@ export function payerKey(row: ConventionBillingSource) {
 }
 
 export function billingSelectionKey(row: ConventionBillingSource) {
-  return `${payerKey(row)}:${row.periodeDebut ?? ""}:${row.periodeFin ?? ""}`;
+  return `${payerKey(row)}:${row.periodeDebut ?? ""}:${row.periodeFin ?? ""}:${billingDirection(row)}`;
+}
+
+export function billingDirection(row: ConventionBillingSource) {
+  const signs = new Set(row.details.filter(line => line.montantAPayer != null && line.montantAPayer !== 0).map(line => Math.sign(line.montantAPayer!)));
+  return signs.size === 1 ? signs.values().next().value ?? 0 : 0;
 }
 
 function money(value: number | null) {

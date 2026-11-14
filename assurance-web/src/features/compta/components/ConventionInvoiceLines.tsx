@@ -25,7 +25,7 @@ export function ConventionInvoiceLines({ preview, loading = false, emptyMessage 
         <td className="px-3 py-3 text-right tabular-nums">{line.montantBulletin == null ? "-" : formatAccountingAmount(line.montantBulletin)}</td>
         <td className="px-3 py-3 text-right font-semibold tabular-nums">{line.montantAPayer == null ? "-" : formatAccountingAmount(line.montantAPayer)}</td>
       </tr>)}</tbody>
-      {!loading && !error && preview.lignes.length > 0 && <tfoot className="border-t bg-muted/50 font-semibold"><tr><td colSpan={9} className="px-3 py-3">Total à payer (MAD)</td>
+      {!loading && !error && preview.lignes.length > 0 && <tfoot className="border-t bg-muted/50 font-semibold"><tr><td colSpan={9} className="px-3 py-3">{preview.total < 0 ? "Total ristourne" : "Total à payer"} (MAD)</td>
         <td className="px-3 py-3 text-right tabular-nums">{formatAccountingAmount(preview.total)}</td></tr></tfoot>}
     </table>
   </div>;

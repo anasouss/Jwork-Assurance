@@ -109,7 +109,7 @@ export default function FacturationConventionsPage() {
       setDueDate("");
       setNotes("");
       setSelected(new Set());
-      toast.success(`Facture ${document.numero} émise`, {
+      toast.success(`${document.totalDocument < 0 ? "Facture de ristourne" : "Facture"} ${document.numero} émise`, {
         action: { label: "Ouvrir", onClick: () => navigate(canCollect
           ? `/app/compta/conventions/encaissements?documentId=${document.id}`
           : `/app/compta/releves-factures?documentId=${document.id}`) },
@@ -130,7 +130,7 @@ export default function FacturationConventionsPage() {
     },
   });
   const compatibleSelection = selectedRows.length > 0 && selectedRows.every(row => !row.blocage && billingSelectionKey(row) === selectedPayerKey);
-  const canConfirm = canIssue && hasLines && compatibleSelection && (preview?.total ?? 0) > 0
+  const canConfirm = canIssue && hasLines && compatibleSelection && (preview?.total ?? 0) !== 0
     && !issue.isPending && !options.isFetching && !preparation.isFetching && !preparation.isError
     && !invoicePreview.isFetching && !invoicePreview.isError
     && !dueDateProposal.isFetching && !dueDateProposal.isError && Boolean(dueDateProposal.data)
@@ -252,7 +252,7 @@ export default function FacturationConventionsPage() {
     <Dialog open={issueOpen} onOpenChange={open => { if (!issue.isPending) setIssueOpen(open); }}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[min(1400px,96vw)]">
         <DialogHeader>
-          <DialogTitle>Émettre la facture convention</DialogTitle>
+          <DialogTitle>{(preview?.total ?? 0) < 0 ? "Émettre la facture de ristourne" : "Émettre la facture convention"}</DialogTitle>
           <DialogDescription>{preview ? `${preview.convention} · ${preview.payeur} · du ${shortDate(preview.periodeDebut)} au ${shortDate(preview.periodeFin)}` : "Préparation de la facture sélectionnée"}</DialogDescription>
         </DialogHeader>
         <ConventionInvoiceLines
@@ -272,7 +272,6 @@ export default function FacturationConventionsPage() {
           </div>
         </div>
         {dueDateProposal.isError && <p role="alert" className="text-sm text-destructive">{dueDateProposal.error.message}</p>}
-        {preview && preview.total <= 0 && <p role="alert" className="text-sm text-destructive">Le solde créditeur nécessite un avoir ; il ne peut pas être émis comme une facture positive.</p>}
         <DialogFooter>
           <Button type="button" variant="outline" disabled={issue.isPending} onClick={() => setIssueOpen(false)}>Annuler</Button>
           <Button type="button" disabled={!canConfirm} onClick={() => issue.mutate()}>{issue.isPending ? "Émission..." : "Émettre la facture"}</Button>

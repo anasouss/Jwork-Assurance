@@ -159,6 +159,13 @@ public class FacturationConventionService {
             }
             String blocked = lines.isEmpty() ? "Aucune source facturable"
                     : lines.stream().anyMatch(line -> line.montantAPayer() == null) ? "Montant facturable manquant" : null;
+            if (blocked == null) {
+                try {
+                    ConventionDocumentPolarity.direction(lines.stream().map(ConventionInvoicePreviewResponse.Line::montantAPayer).toList());
+                } catch (BadRequestException exception) {
+                    blocked = exception.getMessage();
+                }
+            }
             rows.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(),
                     payer.group() == null ? payer.client().getId() : payer.group().getId(),
                     payer.group() == null ? "CLIENT" : "GROUPE", payer.name(), blocked, lines,
@@ -204,6 +211,7 @@ public class FacturationConventionService {
                 lines.add(invoiceLine(element, schedule, amount.ttc()));
             }
         }
+        ConventionDocumentPolarity.direction(lines.stream().map(ConventionInvoicePreviewResponse.Line::montantAPayer).toList());
         return new com.assurance.dto.response.ConventionInvoicePreviewResponse(selected.get(0).getContrat().getConvention().getIntitule(),
                 payer.name(), selected.get(0).getPeriodeDebut(), selected.get(0).getPeriodeFin(),
                 lines.stream().map(com.assurance.dto.response.ConventionInvoicePreviewResponse.Line::montantAPayer).reduce(ZERO, BigDecimal::add), lines);
@@ -304,6 +312,9 @@ public class FacturationConventionService {
         Payer payer = resolveSinglePayer(selected);
         validateSelection(selected);
         LocalDate emissionDate = LocalDate.now();
+        if (preview(agenceId, ids).total().signum() < 0) {
+            return PropositionEcheanceDocumentClientResponse.builder().dateEmission(emissionDate).build();
+        }
         ConditionPaiementClientService.ResolvedCondition condition = conditionPaiementClientService.resolve(
                 agenceId,
                 payer.client(),
@@ -408,7 +419,8 @@ public class FacturationConventionService {
     ) {
         return businessActivityRecorder.perform(() -> createInvoiceRecord(agenceId, request), result ->
                 InvoiceActivity.command(documentClientService.findDocument(agenceId, result.getId()), Map.of(),
-                        ActivityAction.ISSUED, "Facture de convention émise", "CONVENTION_INVOICE_ISSUANCE", List.of()));
+                        ActivityAction.ISSUED, result.getTotalDocument().signum() < 0
+                                ? "Facture de ristourne émise" : "Facture de convention émise", "CONVENTION_INVOICE_ISSUANCE", List.of()));
     }
 
     private DocumentClientResponse createInvoiceRecord(Long agenceId, CreerFactureConventionRequest request) {
@@ -440,9 +452,8 @@ public class FacturationConventionService {
         if (request.getMontantAttendu() == null || currentPreview.total().compareTo(request.getMontantAttendu()) != 0) {
             throw new BadRequestException("Les montants ont change. Actualisez l'apercu avant de valider.");
         }
-        if (currentPreview.total().signum() <= 0) {
-            throw new BadRequestException("Le total de la facture doit etre positif. Un solde crediteur necessite un avoir.");
-        }
+        boolean ristourne = ConventionDocumentPolarity.direction(currentPreview.lignes().stream()
+                .map(ConventionInvoicePreviewResponse.Line::montantAPayer).toList()) < 0;
         validateIssuedBulletins(selected, schedulesByContract);
         List<InvoiceLineData> sourceLines = new ArrayList<>();
         for (EcheanceFacturationConvention schedule : selected) {
@@ -458,14 +469,17 @@ public class FacturationConventionService {
         }
 
         LocalDate emissionDate = LocalDate.now();
-        ConditionPaiementClientService.ResolvedCondition paymentCondition = conditionPaiementClientService.resolve(
+        ConditionPaiementClientService.ResolvedCondition paymentCondition = ristourne ? null : conditionPaiementClientService.resolve(
                 agenceId,
                 payer.client(),
                 payer.group(),
                 emissionDate
         );
         LocalDate dueDate = null;
-        if (paymentCondition.configured()) {
+        if (ristourne && request.getDateEcheance() != null) {
+            throw new BadRequestException("Une facture de ristourne ne porte pas d'échéance d'encaissement client");
+        }
+        if (!ristourne && paymentCondition.configured()) {
             dueDate = request.getDateEcheance() == null
                     ? emissionDate.plusDays(paymentCondition.days())
                     : request.getDateEcheance();
@@ -486,9 +500,9 @@ public class FacturationConventionService {
                 .periodeFin(selected.stream().map(EcheanceFacturationConvention::getPeriodeFin)
                         .max(LocalDate::compareTo).orElseThrow())
                 .dateEcheance(dueDate)
-                .delaiPaiementJours(paymentCondition.days())
-                .origineDelaiPaiement(paymentCondition.origin())
-                .conditionPaiementClient(paymentCondition.condition())
+                .delaiPaiementJours(ristourne ? null : paymentCondition.days())
+                .origineDelaiPaiement(ristourne ? null : paymentCondition.origin())
+                .conditionPaiementClient(ristourne ? null : paymentCondition.condition())
                 .clientPayeur(payer.client())
                 .groupePayeur(payer.group())
                 .payeurNom(payer.name())

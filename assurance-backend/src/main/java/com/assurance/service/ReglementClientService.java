@@ -673,6 +673,7 @@ public class ReglementClientService {
         if (documents.size() != documentIds.size()) {
             throw new BadRequestException("Une ou plusieurs factures sont introuvables ou annulées");
         }
+        validateConventionRefundDocuments(documents, elementIds);
         Map<Long, DocumentClient> documentsById = documents.stream()
                 .collect(Collectors.toMap(DocumentClient::getId, Function.identity()));
 
@@ -824,6 +825,7 @@ public class ReglementClientService {
         if (documents.size() != documentIds.size()) {
             throw new BadRequestException("Une ou plusieurs factures sont introuvables ou annulées");
         }
+        validateConventionRefundDocuments(documents, directElementIds);
         Map<Long, ElementFacturable> elementsById = elements.stream()
                 .collect(Collectors.toMap(ElementFacturable::getId, Function.identity()));
         Map<Long, DocumentClient> documentsById = documents.stream()
@@ -2391,6 +2393,15 @@ public class ReglementClientService {
         return banqueService.requireActive(agenceId, request.getBanqueEmettriceId());
     }
 
+    private void validateConventionRefundDocuments(List<DocumentClient> documents, Collection<Long> directElementIds) {
+        boolean refund = documents.stream().anyMatch(document -> document.getConventionFacturee() != null
+                && document.getTotalDocument().signum() < 0);
+        if (refund && (!directElementIds.isEmpty() || documents.stream().anyMatch(document ->
+                document.getConventionFacturee() == null || document.getTotalDocument().signum() >= 0))) {
+            throw new BadRequestException("Les factures de ristourne doivent être réglées séparément des factures à encaisser");
+        }
+    }
+
     private void validateAllocations(
             List<CreerReglementClientRequest.Instrument> instruments,
             Map<Long, ElementFacturable> elements,
@@ -2788,7 +2799,8 @@ public class ReglementClientService {
                 : document.getGroupePayeur().getId();
         return SourceDocumentClientResponse.builder()
                 .documentClientId(document.getId())
-                .mouvement("Facture client")
+                .mouvement(document.getConventionFacturee() != null && document.getTotalDocument().signum() < 0
+                        ? "Facture de ristourne" : "Facture client")
                 .reference(document.getNumero())
                 .dateSaisie(document.getCreatedAt().toLocalDate())
                 .dateEffet(document.getDateEmission())

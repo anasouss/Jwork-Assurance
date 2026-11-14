@@ -280,6 +280,9 @@ public class QuittancePrimeSelectionService {
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement est annulé : sa quittance ne peut pas être délivrée");
         }
+        if (payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+            throw new BadRequestException("Un décaissement ne donne pas lieu à une quittance de prime encaissée");
+        }
         return payment;
     }
 

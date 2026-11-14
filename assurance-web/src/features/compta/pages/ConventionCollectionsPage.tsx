@@ -134,7 +134,7 @@ export default function ConventionCollectionsPage() {
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Encaissement des factures" />
-    <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
       {canViewDocuments && <div className="grid gap-1.5"><Label htmlFor="collection-company">Compagnie</Label>
         <Select value={effectiveCompany} disabled={filters.conventionId !== "ALL" || companies.isPending || companies.isError}
           onValueChange={value => setFilters(current => ({ ...current, companyId: value, conventionId: "ALL", period: "ALL" }))}>
@@ -177,7 +177,7 @@ export default function ConventionCollectionsPage() {
       </div>
       <div className="grid gap-1.5"><Label>Émise du</Label><DatePicker date={filters.dateDu} onSelect={date => setFilters(current => ({ ...current, dateDu: toDateOnly(date) ?? "" }))} /></div>
       <div className="grid gap-1.5"><Label>Au</Label><DatePicker date={filters.dateAu} onSelect={date => setFilters(current => ({ ...current, dateAu: toDateOnly(date) ?? "" }))} /></div>
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 xl:col-span-4">
+      <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeSettled} onCheckedChange={checked => setFilters(current => ({ ...current, includeSettled: checked === true }))} />Inclure les factures soldées</label>
         <div className="flex gap-2">
           <Button size="icon" title="Rechercher" aria-label="Rechercher" onClick={apply}><Search className="size-4" /></Button>
@@ -187,8 +187,8 @@ export default function ConventionCollectionsPage() {
           <Button variant="outline" size="icon" title="Actualiser" aria-label="Actualiser" disabled={invoices.isFetching} onClick={() => { setSelected({}); void invoices.refetch(); }}><RefreshCw className="size-4" /></Button>
         </div>
       </div>
-      {options.isError && canViewDocuments && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-4">{options.error.message}</p>}
-      {companies.isError && canViewDocuments && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-4">{companies.error.message}</p>}
+      {options.isError && canViewDocuments && <p role="alert" className="col-span-full text-sm text-destructive">{options.error.message}</p>}
+      {companies.isError && canViewDocuments && <p role="alert" className="col-span-full text-sm text-destructive">{companies.error.message}</p>}
     </section>
     <section className="overflow-hidden rounded-md border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">

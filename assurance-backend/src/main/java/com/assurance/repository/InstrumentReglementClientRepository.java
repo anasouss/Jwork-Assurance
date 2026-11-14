@@ -159,6 +159,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             join instrument.reglement reglement
             where instrument.agence.id = :agenceId
               and reglement.dateReglement >= :dateDu
+              and reglement.sens = com.assurance.enums.SensMouvementTresorerie.ENTREE
               and reglement.dateReglement <= :dateAu
               and instrument.statut <> com.assurance.enums.StatutInstrumentReglement.REMPLACE
               and (:utilisateurId is null or reglement.creePar.id = :utilisateurId)
@@ -194,9 +195,15 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             "affectations.elementFacturable",
             "affectations.documentClient"
     })
+    @Query("""
+            select i from InstrumentReglementClient i
+            where i.agence.id = :agenceId and i.statut in :statuts
+              and i.reglement.sens = com.assurance.enums.SensMouvementTresorerie.ENTREE
+            order by i.dateEcheance asc, i.id asc
+            """)
     List<InstrumentReglementClient> findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
-            Long agenceId,
-            Collection<StatutInstrumentReglement> statuts
+            @Param("agenceId") Long agenceId,
+            @Param("statuts") Collection<StatutInstrumentReglement> statuts
     );
 
     @EntityGraph(attributePaths = {"reglement", "compteTresorerie"})
@@ -208,6 +215,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             where instrument.agence.id = :agenceId
               and reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
               and instrument.statut = com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE
+              and reglement.sens = com.assurance.enums.SensMouvementTresorerie.ENTREE
               and instrument.mode in :modes
               and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
               and (:dateAu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)

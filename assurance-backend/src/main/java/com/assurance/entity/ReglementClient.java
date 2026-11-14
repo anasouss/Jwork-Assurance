@@ -91,6 +91,11 @@ public class ReglementClient extends AuditedEntity {
     @Builder.Default
     private StatutReglementClient statut = StatutReglementClient.VALIDE;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    @Builder.Default
+    private com.assurance.enums.SensMouvementTresorerie sens = com.assurance.enums.SensMouvementTresorerie.ENTREE;
+
     @Column(name = "montant_total", nullable = false, precision = 16, scale = 2)
     private BigDecimal montantTotal;
 

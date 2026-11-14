@@ -29,6 +29,7 @@ public class ReglementClientResponse {
     private String bordereauContentType;
     private Long bordereauTailleOctets;
     private StatutReglementClient statut;
+    private com.assurance.enums.SensMouvementTresorerie sens;
     private BigDecimal montantTotal;
     private BigDecimal montantNonAffecte;
     private String notes;
@@ -77,6 +78,7 @@ public class ReglementClientResponse {
     @Getter
     @Builder
     public static class Instrument {
+        private com.assurance.enums.SensMouvementTresorerie sens;
         private Long id;
         private Long reglementId;
         private Long clientPayeurId;

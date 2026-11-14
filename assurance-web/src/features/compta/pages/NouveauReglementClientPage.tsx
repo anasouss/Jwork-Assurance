@@ -172,6 +172,9 @@ export default function NouveauReglementClientPage() {
 
   const rows = orderedRows;
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
+  const signedSettlement = rows.some(row => row.soldeOuvert < 0);
+  const outgoing = selectedTotal < -0.005;
+  const amountDue = Math.abs(round(selectedTotal));
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
   const adjustmentAmount = settlementAdjustment ?? 0;
@@ -179,10 +182,10 @@ export default function NouveauReglementClientPage() {
     elementFacturableId: row.source.elementFacturableId, documentClientId: row.source.documentClientId,
     soldeOuvert: row.soldeOuvert, montantRegle: allocatedAmounts.get(receivableTargetKey(row)) ?? 0,
   })), adjustmentAmount, adjustmentReason);
-  const remainingAmount = round(selectedTotal - paymentTotal - adjustmentPlan.total);
-  const unallocatedCredit = Math.max(0, round(paymentTotal - selectedTotal));
+  const remainingAmount = round(amountDue - paymentTotal - adjustmentPlan.total);
+  const unallocatedCredit = Math.max(0, round(paymentTotal - amountDue));
   const maximumAdjustment = paymentPolicy.data?.ecartReglementMaximum ?? 0;
-  const canGrantAdjustment = permissions.includes("reglement-client:manage") && !multiClientDeposit;
+  const canGrantAdjustment = permissions.includes("reglement-client:manage") && !multiClientDeposit && !signedSettlement;
   const adjustmentInvalid = !Number.isFinite(adjustmentAmount) || adjustmentAmount < 0
     || adjustmentAmount > maximumAdjustment || adjustmentPlan.unassigned > 0
     || (adjustmentAmount > 0 && (!canGrantAdjustment || !adjustmentReason.trim()));
@@ -231,7 +234,7 @@ export default function NouveauReglementClientPage() {
     setMethods((current) => {
       let changed = false;
       const next = current.map((method) => {
-        if (!requiresBankAccountAtEntry(method.mode) || method.compteTresorerieId) {
+        if ((!requiresBankAccountAtEntry(method.mode) && !(outgoing && method.mode !== "ESPECES")) || method.compteTresorerieId) {
           return method;
         }
         changed = true;
@@ -239,7 +242,14 @@ export default function NouveauReglementClientPage() {
       });
       return changed ? next : current;
     });
-  }, [methods, soleActiveBankAccountId]);
+  }, [methods, soleActiveBankAccountId, outgoing]);
+
+  useEffect(() => {
+    if (!signedSettlement) return;
+    setSettlementAdjustment(undefined);
+    setAdjustmentReason("");
+    setMethods(current => current.slice(0, 1).map(method => ({ ...method, montant: money(amountDue), reglementBureau: false })));
+  }, [signedSettlement, amountDue]);
 
   useEffect(() => {
     if (multiClientDeposit
@@ -311,6 +321,9 @@ export default function NouveauReglementClientPage() {
     && rows.length > 0
     && methods.length > 0
     && paymentTotal > 0
+    && amountDue > 0
+    && (!outgoing || permissions.includes("reglement-client:manage"))
+    && (!signedSettlement || (!multiClientDeposit && methods.length === 1 && Math.abs(paymentTotal - amountDue) < 0.005))
     && paymentPolicy.isSuccess
     && !creditExceedsMaximum
     && !adjustmentInvalid
@@ -321,7 +334,7 @@ export default function NouveauReglementClientPage() {
       && methods.length === 1
       && methods[0]?.mode === "VERSEMENT_BANCAIRE"
     ))
-    && methods.every((method) => methodValid(method, accounts.data ?? []));
+    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
     setMethods((current) => current.map((method) => method.key === key
@@ -331,6 +344,12 @@ export default function NouveauReglementClientPage() {
 
   function addPaymentMethod(mode: ClientPaymentMode) {
     const method = newPaymentMethod(mode);
+    if (signedSettlement) {
+      method.montant = money(amountDue);
+      setMethods([method]);
+      setEditingMethodKey(method.key);
+      return;
+    }
     setMethods((current) => {
       const lastModeIndex = current.map((item) => item.mode).lastIndexOf(mode);
       if (lastModeIndex < 0) return [...current, method];
@@ -421,7 +440,7 @@ export default function NouveauReglementClientPage() {
             {conventionCollection ? "Département conventions" : "Comptabilité"}
           </div>
           <h1 className="mt-1 text-xl font-semibold">
-            {conventionCollection ? "Encaisser les factures conventions" : "Enregistrer un règlement"}
+            {outgoing ? "Régler la ristourne" : conventionCollection ? "Encaisser les factures conventions" : "Enregistrer un règlement"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {receivables.isLoading
@@ -537,13 +556,20 @@ export default function NouveauReglementClientPage() {
                   <Landmark className="size-4 text-orange-700" /> Versement bancaire
                 </div>
               </div>
+            ) : signedSettlement ? (
+              <div className="grid gap-2"><Label>Moyen de règlement</Label>
+                <Select value={methods[0]?.mode ?? ""} onValueChange={value => { addPaymentMethod(value as ClientPaymentMode); setActivePaymentMode(value as ClientPaymentMode); }}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un moyen" /></SelectTrigger>
+                  <SelectContent>{paymentModes.map(mode => <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
             ) : (
               <PaymentModesMultiSelect
                 selectedModes={selectedPaymentModes.map((option) => option.value)}
                 onToggle={togglePaymentMode}
               />
             )}
-            {!multiClientDeposit && <div className="grid gap-2">
+            {!multiClientDeposit && !signedSettlement && <div className="grid gap-2">
               <Label htmlFor="settlement-adjustment">Écart de règlement (MAD)</Label>
               <MoneyInput id="settlement-adjustment" value={settlementAdjustment} onValueChange={setSettlementAdjustment}
                 disabled={!canGrantAdjustment || !paymentPolicy.isSuccess || maximumAdjustment === 0}
@@ -606,7 +632,7 @@ export default function NouveauReglementClientPage() {
                       key={method.key}
                       method={method}
                       number={methodNumber}
-                      complete={methodValid(method, accounts.data ?? [])}
+                      complete={methodValid(method, accounts.data ?? [], outgoing)}
                       bankLabel={(banks.data ?? []).find((bank) => bank.id === method.banqueEmettriceId)?.libelle}
                       accountLabel={(accounts.data ?? []).find((account) => account.id === method.compteTresorerieId)?.libelle}
                       onEdit={() => setEditingMethodKey(method.key)}
@@ -655,7 +681,7 @@ export default function NouveauReglementClientPage() {
                             0
                           );
                           updateMethod(method.key, {
-                            montant: money(round(Math.max(0, selectedTotal - adjustmentAmount - otherTotal))),
+                            montant: money(round(Math.max(0, amountDue - adjustmentAmount - otherTotal))),
                           });
                         }}
                       >
@@ -664,6 +690,7 @@ export default function NouveauReglementClientPage() {
                     </div>
                     <MoneyInput
                       className="text-right tabular-nums"
+                      disabled={signedSettlement}
                       value={method.montant ? numeric(method.montant) : undefined}
                       onValueChange={(value) => updateMethod(method.key, {
                         montant: value == null ? "" : String(value),
@@ -695,11 +722,11 @@ export default function NouveauReglementClientPage() {
                           />
                         </div>
                       ) : null}
-                      {requiresBankAccountAtEntry(method.mode) ? (
+                      {requiresBankAccountAtEntry(method.mode) || outgoing ? (
                         <AccountSelect
                           accounts={accounts.data ?? []}
                           type="BANQUE"
-                          label="Compte bancaire crédité"
+                          label={outgoing ? "Compte bancaire débité" : "Compte bancaire crédité"}
                           value={method.compteTresorerieId}
                           onChange={(value) => updateMethod(
                             method.key,
@@ -725,7 +752,7 @@ export default function NouveauReglementClientPage() {
                   ) : null}
 
                     <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
-                      {!multiClientDeposit ? (
+                      {!multiClientDeposit && !signedSettlement ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -751,7 +778,7 @@ export default function NouveauReglementClientPage() {
                     </div>
                   </div>
 
-                  {(method.mode === "CHEQUE" || method.mode === "EFFET") && (
+                  {!signedSettlement && (method.mode === "CHEQUE" || method.mode === "EFFET") && (
                     <div className="flex items-center gap-3 rounded-md border px-3 py-2">
                       <Switch
                         id={`office-payment-${method.key}`}
@@ -773,7 +800,7 @@ export default function NouveauReglementClientPage() {
                 </section>
                 );
               })}
-              {!multiClientDeposit && visiblePaymentMode && !visibleMethods.some((method) => method.key === editingMethodKey) ? (
+              {!multiClientDeposit && !signedSettlement && visiblePaymentMode && !visibleMethods.some((method) => method.key === editingMethodKey) ? (
                 <div className="flex justify-end bg-muted/20 px-3 py-3">
                   <Button type="button" variant="outline" size="sm" onClick={() => addPaymentMethod(visiblePaymentMode)}>
                     <Plus className="size-4" />
@@ -827,7 +854,7 @@ export default function NouveauReglementClientPage() {
             }}
           >
             <Banknote className="size-4" />
-            {multiClientDeposit ? "Enregistrer le versement" : "Enregistrer le règlement"}
+            {outgoing ? "Régler la ristourne" : multiClientDeposit ? "Enregistrer le versement" : "Enregistrer le règlement"}
           </Button>
         </div>
       </footer>
@@ -866,8 +893,8 @@ function SortableReceivableRow(props: {
 }) {
   const id = receivableTargetKey(props.row);
   const settledAmount = round(props.allocatedAmount + props.adjustmentAmount);
-  const isAllocated = settledAmount > 0.001;
-  const isFullyAllocated = settledAmount >= props.row.soldeOuvert - 0.001;
+  const isAllocated = Math.abs(settledAmount) > 0.001;
+  const isFullyAllocated = Math.abs(settledAmount) >= Math.abs(props.row.soldeOuvert) - 0.001;
   const {
     attributes,
     listeners,
@@ -1216,10 +1243,16 @@ function buildRequest(
     documentClientId: row.source.documentClientId ?? undefined,
     amount: row.soldeOuvert,
   }));
+  const signedSettlement = rows.some(row => row.soldeOuvert < 0);
   const instruments = methods.map((method) => {
     let available = numeric(method.montant);
     const affectations: CreateClientPaymentRequest["instruments"][number]["affectations"] = [];
     for (const receivable of remaining) {
+      if (signedSettlement) {
+        affectations.push({ elementFacturableId: receivable.elementFacturableId,
+          documentClientId: receivable.documentClientId, montant: round(receivable.amount) });
+        continue;
+      }
       if (available <= 0) break;
       const amount = Math.min(available, receivable.amount);
       if (amount > 0) {
@@ -1259,6 +1292,10 @@ function buildRequest(
 }
 
 function allocationByReceivable(rows: ClientReceivable[], paymentTotal: number) {
+  if (rows.some(row => row.soldeOuvert < 0)) {
+    const net = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
+    return new Map(rows.map(row => [receivableTargetKey(row), Math.abs(paymentTotal - Math.abs(net)) < 0.005 ? row.soldeOuvert : 0]));
+  }
   let available = Math.max(0, round(paymentTotal));
   return new Map(rows.map((row) => {
     const allocated = round(Math.min(available, row.soldeOuvert));
@@ -1280,12 +1317,12 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
   };
 }
 
-function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[]) {
+function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccount[], outgoing = false) {
   if (numeric(method.montant) <= 0) return false;
   if (method.mode === "ESPECES") {
     return true;
   }
-  if (requiresBankAccountAtEntry(method.mode)) {
+  if (requiresBankAccountAtEntry(method.mode) || outgoing) {
     const validBankAccount = accounts.some(
       (account) => account.id === method.compteTresorerieId
         && account.actif

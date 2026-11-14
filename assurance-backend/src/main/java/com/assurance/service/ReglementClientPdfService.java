@@ -156,7 +156,8 @@ public class ReglementClientPdfService {
         Table overview = new Table(new float[]{2.1f, 1})
                 .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(12).setKeepTogether(true);
         boolean multiPayer = Boolean.TRUE.equals(payment.getMultiPayeur());
-        overview.addCell(infoCell(multiPayer ? "REPRÉSENTANT" : "PAYEUR",
+        overview.addCell(infoCell(payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE
+                        ? "BÉNÉFICIAIRE" : multiPayer ? "REPRÉSENTANT" : "PAYEUR",
                 multiPayer ? payment.getDeposantNom() : payerIdentity(payment), regular, bold));
         overview.addCell(infoCell("OPÉRATEUR",
                 payment.getCreePar() == null ? null : payment.getCreePar().getFullName(), regular, bold));
@@ -229,7 +230,8 @@ public class ReglementClientPdfService {
         if (showDocument) {
             addHeader(table, "DOCUMENT", bold, TextAlignment.LEFT);
         }
-        addHeader(table, "PAYEUR", bold, TextAlignment.LEFT);
+        addHeader(table, payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE
+                ? "BÉNÉFICIAIRE" : "PAYEUR", bold, TextAlignment.LEFT);
         addHeader(table, "MOYENS", bold, TextAlignment.CENTER);
         addHeader(table, "STATUT", bold, TextAlignment.LEFT);
         addHeader(table, "MONTANT AFFECTÉ", bold, TextAlignment.RIGHT);
@@ -340,8 +342,9 @@ public class ReglementClientPdfService {
                     .setFont(bold).setFontSize(10).setFontColor(ColorConstants.RED)
                     .setTextAlignment(TextAlignment.CENTER).setMarginTop(12));
         } else if (pending) {
-            document.add(new Paragraph("Ce document confirme l’enregistrement du règlement. "
-                            + "Les instruments en attente ou remis en banque ne sont pas encore définitivement encaissés.")
+            document.add(new Paragraph(payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE
+                            ? "Ce document confirme l'enregistrement de la ristourne. Le décaissement des moyens en attente reste à confirmer."
+                            : "Ce document confirme l’enregistrement du règlement. Les instruments en attente ou remis en banque ne sont pas encore définitivement encaissés.")
                     .setFont(regular).setFontSize(8).setFontColor(MUTED)
                     .setBackgroundColor(SOFT_ACCENT).setPadding(8).setMarginTop(12));
         }

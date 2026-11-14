@@ -545,12 +545,12 @@ export default function ReglementsEnregistresPage() {
                 <td className="px-4 py-3"><button type="button" className="font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => setDetailPaymentId(instrument.reglementId)}>{instrument.numeroReglement}</button>
                   {instrument.statutReglement === "ANNULE" && <div className="mt-1"><PaymentStatusBadge value="ANNULE" /></div>}</td>
                 <td className="px-4 py-3">{formatDate(instrument.dateReglement)}</td>
-                <td className="max-w-64 px-4 py-3">{instrument.payeurNom}</td>
+                <td className="max-w-64 px-4 py-3">{instrument.payeurNom}{instrument.sens === "SORTIE" && <div className="mt-1 text-xs font-medium text-orange-700">Décaissement</div>}</td>
                 <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(instrument.montant)}</td>
                 <td className="px-4 py-3"><Badge variant={MODE_BADGE_VARIANTS[instrument.mode]}>{MODE_LABELS[instrument.mode]}</Badge></td>
                 <td className="px-4 py-3"><button type="button" className="font-semibold text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => setDetailInstrument({ paymentId: instrument.reglementId, instrumentId: instrument.id })}>{instrument.referenceInstrument || "-"}</button></td>
                 <td className="px-4 py-3">{formatDate(instrument.mode === "CHEQUE" || instrument.mode === "EFFET" ? instrument.dateEcheance : instrument.dateInstrument)}</td>
-                <td className="px-4 py-3 text-center"><InstrumentStatusIndicator value={instrument.statut} /></td>
+                <td className="px-4 py-3 text-center"><InstrumentStatusIndicator value={instrument.statut} outgoing={instrument.sens === "SORTIE"} /></td>
                 <td className="px-4 py-3">{instrument.banqueEmettrice || instrument.compteTresorerie || "-"}</td>
                 <td className="px-4 py-3 text-right"><Button type="button" variant="ghost" size="icon" title="Voir le moyen de règlement" aria-label={`Détails ${MODE_LABELS[instrument.mode]} ${instrument.referenceInstrument || ""}`} onClick={() => setDetailInstrument({ paymentId: instrument.reglementId, instrumentId: instrument.id })}><Eye className="size-4" /></Button></td>
               </tr>) : hasAppliedFilters && !referenceError ? (payments.data?.rows ?? []).flatMap((payment) => {
@@ -579,6 +579,7 @@ export default function ReglementsEnregistresPage() {
                   <td className="px-4 py-3">{formatDate(payment.dateReglement)}</td>
                   <td className="px-4 py-3">
                     <div className="max-w-64">{payment.payeurNom}</div>
+                    {payment.sens === "SORTIE" && <div className="mt-1 text-xs font-medium text-orange-700">Décaissement</div>}
                   </td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(payment.montantTotal)}</td>
                   <td className="px-4 py-3"><InstrumentModesSummary instruments={payment.instruments} /></td>
@@ -749,6 +750,7 @@ function PaymentActionsMenu({
   onDetail: () => void;
 }) {
   const canCreateInvoice = payment.statut === "VALIDE"
+    && payment.sens !== "SORTIE"
     && canIssueInvoice
     && !payment.multiPayeur
     && hasDirectActiveAllocations(payment);
@@ -776,7 +778,7 @@ function PaymentActionsMenu({
           <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Fiche de règlement PDF"}
         </DropdownMenuItem>
-        {payment.statut === "VALIDE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
+        {payment.statut === "VALIDE" && payment.sens !== "SORTIE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
           <FileText className="size-4" /> Quittance de prime PDF
         </DropdownMenuItem>}
         {canCreateInvoice && (
@@ -805,15 +807,17 @@ function PaymentStatusBadge({ value }: { value: ClientPayment["statut"] }) {
 function InstrumentStatusIndicator({
   value,
   count = 1,
+  outgoing = false,
 }: {
   value: PaymentInstrument["statut"];
   count?: number;
+  outgoing?: boolean;
 }) {
   const styles = INSTRUMENT_STATUS_INDICATOR_STYLES[value];
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${styles.text}`}>
       <span className={`size-2 shrink-0 rounded-full ${styles.dot}`} aria-hidden="true" />
-      {count > 1 ? `${count} × ` : ""}{INSTRUMENT_STATUS_LABELS[value]}
+      {count > 1 ? `${count} × ` : ""}{outgoing && value === "CONFIRME" ? "Décaissé" : INSTRUMENT_STATUS_LABELS[value]}
     </span>
   );
 }
@@ -835,7 +839,7 @@ function InstrumentStatusesSummary({ instruments }: { instruments: PaymentInstru
   const counts = countBy(instruments.map((instrument) => instrument.statut));
   if (counts.size === 1) {
     const [status, count] = Array.from(counts.entries())[0];
-    return <InstrumentStatusIndicator value={status as PaymentInstrument["statut"]} count={count} />;
+    return <InstrumentStatusIndicator value={status as PaymentInstrument["statut"]} count={count} outgoing={instruments[0]?.sens === "SORTIE"} />;
   }
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-purple-700 dark:text-purple-300">
@@ -868,7 +872,7 @@ function PaymentInstrumentDetails({ payment, onDetail }: { payment: ClientPaymen
                 <td className="px-3 py-2">{MODE_LABELS[instrument.mode]}</td>
                 <td className="px-3 py-2"><button type="button" className="font-medium text-sky-700 underline-offset-4 hover:underline dark:text-sky-300" onClick={() => onDetail(instrument.id)}>{instrument.referenceInstrument || "Voir le détail"}</button></td>
                 <td className="px-3 py-2">{formatDate(instrument.dateEcheance)}</td>
-                <td className="px-3 py-2 text-center"><InstrumentStatusIndicator value={instrument.statut} /></td>
+                <td className="px-3 py-2 text-center"><InstrumentStatusIndicator value={instrument.statut} outgoing={instrument.sens === "SORTIE"} /></td>
                 <td className="px-3 py-2 text-right font-semibold tabular-nums">
                   {formatAccountingAmount(instrument.montant)}
                 </td>

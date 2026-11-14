@@ -272,8 +272,8 @@ public class ReglementClientService {
                         source.getElementFacturableId(),
                         AllocationAmounts.empty()
                 )))
-                .filter(row -> row.getSoldeOuvert().signum() > 0
-                        || row.getMontantEnAttente().signum() > 0)
+                .filter(row -> row.getSoldeOuvert().signum() != 0
+                        || row.getMontantEnAttente().signum() != 0)
                 .toList();
 
         return CreanceClientPageResponse.builder()
@@ -384,8 +384,8 @@ public class ReglementClientService {
                         toInvoiceSource(document),
                         amounts.getOrDefault(document.getId(), AllocationAmounts.empty())
                 ))
-                .filter(row -> includeSettled || row.getSoldeOuvert().signum() > 0
-                        || row.getMontantEnAttente().signum() > 0)
+                .filter(row -> includeSettled || row.getSoldeOuvert().signum() != 0
+                        || row.getMontantEnAttente().signum() != 0)
                 .toList();
 
         return CreanceClientPageResponse.builder()
@@ -698,12 +698,12 @@ public class ReglementClientService {
                                     AllocationAmounts.empty()
                             )
                     ))
-                    .filter(row -> row.getSoldeOuvert().signum() > 0)
+                    .filter(row -> row.getSoldeOuvert().signum() != 0)
                     .forEach(rows::add);
         });
 
         if (rows.isEmpty()
-                || rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() <= 0)) {
+                || rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() == 0)) {
             throw new BadRequestException(
                     "Une ou plusieurs créances ne présentent plus de solde disponible"
             );
@@ -713,6 +713,9 @@ public class ReglementClientService {
                 .collect(Collectors.toSet());
         if (!Boolean.TRUE.equals(request.getMultiPayeur()) && payers.size() != 1) {
             throw new BadRequestException("Les créances sélectionnées doivent appartenir au même payeur");
+        }
+        if (Boolean.TRUE.equals(request.getMultiPayeur()) && rows.stream().anyMatch(row -> row.getSoldeOuvert().signum() < 0)) {
+            throw new BadRequestException("Les ristournes doivent être réglées séparément pour un seul bénéficiaire");
         }
         return rows;
     }
@@ -841,6 +844,16 @@ public class ReglementClientService {
                 loadDocumentAllocationAmounts(agenceId, documentIds);
         Map<Long, BigDecimal> requestedByElement = requestedAmountsByElement(requestedInstruments);
         Map<Long, BigDecimal> requestedByDocument = requestedAmountsByDocument(requestedInstruments);
+        boolean signedSettlement = requestedInstruments.stream().flatMap(instrument -> instrument.getAffectations().stream())
+                .anyMatch(allocation -> allocation.getMontant().signum() < 0);
+        if (signedSettlement && (multiPayer || requestedInstruments.size() != 1
+                || (request.getEcarts() != null && !request.getEcarts().isEmpty()))) {
+            throw new BadRequestException("Un règlement avec ristourne exige un seul bénéficiaire, un seul moyen et aucun écart");
+        }
+        if (signedSettlement && requestedInstruments.stream().flatMap(instrument -> instrument.getAffectations().stream())
+                .anyMatch(allocation -> allocation.getDocumentClientId() != null && allocation.getElementFacturableId() == null)) {
+            throw new BadRequestException("Ventilez chaque ligne de facture pour régler une sélection avec ristourne");
+        }
         Map<Long, Long> invoiceDocumentByElement = requestedInstruments.stream()
                 .flatMap(instrument -> instrument.getAffectations().stream())
                 .filter(allocation -> allocation.getElementFacturableId() != null
@@ -870,7 +883,8 @@ public class ReglementClientService {
                     : invoiceLineAmounts.get(invoiceDocumentId)
                             .getOrDefault(elementId, AllocationAmounts.empty());
             BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending()).subtract(current.adjustment());
-            if (requestedAmount.compareTo(available) > 0) {
+            if (requestedAmount.signum() != available.signum() || requestedAmount.abs().compareTo(available.abs()) > 0
+                    || (signedSettlement && requestedAmount.compareTo(available) != 0)) {
                 throw new BadRequestException("Le montant affecté dépasse le solde de la créance " + elementId);
             }
         });
@@ -881,7 +895,8 @@ public class ReglementClientService {
                     AllocationAmounts.empty()
             );
             BigDecimal available = total.subtract(current.confirmed()).subtract(current.pending()).subtract(current.adjustment());
-            if (requestedAmount.compareTo(available) > 0) {
+            if (requestedAmount.signum() != available.signum() || requestedAmount.abs().compareTo(available.abs()) > 0
+                    || (signedSettlement && requestedAmount.compareTo(available) != 0)) {
                 throw new BadRequestException(
                         "Le montant affecté dépasse le solde de la facture "
                                 + documentsById.get(documentId).getNumero()
@@ -902,7 +917,25 @@ public class ReglementClientService {
                 .map(CreerReglementClientRequest.Affectation::getMontant)
                 .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
-        if (totalAllocated.compareTo(totalPayment) > 0) {
+        if (totalAllocated.signum() < 0) {
+            if (request.getDateReglement().isAfter(LocalDate.now())) {
+                throw new BadRequestException("La date d'un règlement de ristourne ne peut pas être future");
+            }
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || authentication.getAuthorities().stream()
+                    .noneMatch(authority -> "PERM_reglement-client:manage".equals(authority.getAuthority()))) {
+                throw new AccessDeniedException("La gestion des règlements est requise pour décaisser une ristourne");
+            }
+        }
+        if (signedSettlement) {
+            Set<Long> companies = java.util.stream.Stream.concat(elements.stream(), documents.stream()
+                            .flatMap(document -> document.getLignes().stream()).map(LigneDocumentClient::getElementFacturable))
+                    .filter(Objects::nonNull).map(element -> element.getContrat().getCompagnieAssurance())
+                    .filter(Objects::nonNull).map(com.assurance.entity.CompagnieAssurance::getId).collect(Collectors.toSet());
+            if (companies.size() > 1) throw new BadRequestException("Réglez séparément les ristournes de compagnies différentes");
+        }
+        if (signedSettlement) SignedClientBalance.requireExactNet(totalAllocated, totalPayment);
+        if (!signedSettlement && totalAllocated.compareTo(totalPayment) > 0) {
             throw new BadRequestException("Le montant affecté dépasse le total des moyens de règlement");
         }
         if (multiPayer && totalAllocated.compareTo(totalPayment) != 0) {
@@ -910,7 +943,7 @@ public class ReglementClientService {
                     "Le montant du versement bancaire doit être entièrement affecté aux créances sélectionnées"
             );
         }
-        BigDecimal unallocatedCredit = money(totalPayment.subtract(totalAllocated));
+        BigDecimal unallocatedCredit = money(totalPayment.subtract(totalAllocated.abs()));
         BigDecimal maximumUnallocatedCredit = maxUnallocatedCredit(agenceId);
         if (unallocatedCredit.compareTo(maximumUnallocatedCredit) > 0) {
             throw new BadRequestException(
@@ -932,6 +965,8 @@ public class ReglementClientService {
         payment.setMultiPayeur(multiPayer);
         payment.setDeposantNom(multiPayer ? trimToNull(request.getDeposantNom()) : null);
         payment.setStatut(StatutReglementClient.VALIDE);
+        payment.setSens(totalAllocated.signum() < 0 ? com.assurance.enums.SensMouvementTresorerie.SORTIE
+                : com.assurance.enums.SensMouvementTresorerie.ENTREE);
         payment.setMontantTotal(totalPayment);
         payment.setMontantNonAffecte(unallocatedCredit);
         payment.setNotes(trimToNull(request.getNotes()));
@@ -1067,6 +1102,10 @@ public class ReglementClientService {
             throw new BadRequestException("Le règlement doit être enregistré avant de traiter son moyen de paiement");
         }
         LocalDate operationDate = request.getDateOperation() == null ? LocalDate.now() : request.getDateOperation();
+        if (instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE
+                && (operationDate.isAfter(LocalDate.now()) || operationDate.isBefore(instrument.getReglement().getDateReglement()))) {
+            throw new BadRequestException("La date du décaissement doit être comprise entre le règlement et aujourd'hui");
+        }
         if (request.getStatut() == StatutInstrumentReglement.CONFIRME) {
             confirmInstrument(agenceId, instrument, request.getCompteTresorerieId(), operationDate);
             updateRemittanceLine(
@@ -1083,7 +1122,9 @@ public class ReglementClientService {
                     operationDate,
                     request.getMotif() == null ? null : request.getMotif().trim()
             );
-            rejetSuiviService.enregistrerRejet(instrument, rejectionLine, operationDate, request.getMotif());
+            if (instrument.getReglement().getSens() != com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+                rejetSuiviService.enregistrerRejet(instrument, rejectionLine, operationDate, request.getMotif());
+            }
         } else {
             throw new BadRequestException("Cette transition de statut n'est pas autorisée");
         }
@@ -1190,6 +1231,9 @@ public class ReglementClientService {
 
     private ReglementClientResponse replaceInstrumentRecord(Long agenceId, InstrumentReglementClient replaced,
             RemplacerInstrumentReglementRequest request) {
+        if (replaced.getAffectations().stream().anyMatch(allocation -> allocation.getMontant().signum() < 0)) {
+            throw new BadRequestException("Annulez puis ressaisissez le règlement avec ristourne pour changer son moyen");
+        }
         if (Boolean.TRUE.equals(replaced.getReglement().getMultiPayeur())) {
             throw new BadRequestException(
                     "Annulez puis ressaisissez le versement multi-clients avec son nouveau bordereau"
@@ -1416,6 +1460,9 @@ public class ReglementClientService {
 
     private ReglementClientResponse representInstrumentRecord(Long agenceId, InstrumentReglementClient instrument,
             RepresenterInstrumentReglementRequest request) {
+        if (instrument.getAffectations().stream().anyMatch(allocation -> allocation.getMontant().signum() < 0)) {
+            throw new BadRequestException("Annulez puis ressaisissez le règlement avec ristourne");
+        }
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement doit être enregistré avant la représentation");
         }
@@ -1623,6 +1670,7 @@ public class ReglementClientService {
 
     private boolean bankRejectionPossible(InstrumentReglementClient instrument) {
         return instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
+                && instrument.getReglement().getSens() != com.assurance.enums.SensMouvementTresorerie.SORTIE
                 && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
                 && (instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
                 || instrument.getStatut() == StatutInstrumentReglement.CONFIRME);
@@ -1664,6 +1712,7 @@ public class ReglementClientService {
                 && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
                 && (remittanceLine == null || remittanceLine.getStatut() == StatutLigneBordereauRemise.REJETEE);
         return ReglementClientResponse.Instrument.builder()
+                .sens(instrument.getReglement().getSens())
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
                 .clientPayeurId(instrument.getReglement().getClientPayeur() == null
@@ -1698,8 +1747,9 @@ public class ReglementClientService {
                                         ? ResolutionRejetBancaire.REMPLACE : ResolutionRejetBancaire.REPRESENTE
                         : null)
                 .rejetBancairePossible(bankRejectionPossible(instrument))
-                .representationPossible(canResolve)
+                .representationPossible(canResolve && instrument.getAffectations().stream().noneMatch(allocation -> allocation.getMontant().signum() < 0))
                 .remplacementPossible((canResolve || canReplacePending)
+                        && instrument.getAffectations().stream().noneMatch(allocation -> allocation.getMontant().signum() < 0)
                         && !Boolean.TRUE.equals(instrument.getReglement().getMultiPayeur()))
                 .instrumentRemplaceId(instrument.getInstrumentRemplace() == null
                         ? null : instrument.getInstrumentRemplace().getId())
@@ -1751,10 +1801,14 @@ public class ReglementClientService {
                 .map(CreerReglementClientRequest.Affectation::getMontant)
                 .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
-        if (allocated.compareTo(money(request.getMontant())) > 0) {
+        if (allocated.abs().compareTo(money(request.getMontant())) > 0) {
             throw new BadRequestException("Une ventilation dépasse le montant de son moyen de règlement");
         }
         boolean cash = request.getMode() == ModeReglementClient.ESPECES;
+        boolean outgoing = payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE;
+        if (outgoing && Boolean.TRUE.equals(request.getReglementBureau())) {
+            throw new BadRequestException("Le règlement au bureau ne concerne pas les paiements émis par l'agence");
+        }
         CompteTresorerie account = cash
                 ? tresorerieService.findCurrentUserCashAccount(agence.getId())
                 : null;
@@ -1767,7 +1821,10 @@ public class ReglementClientService {
         if (!cash && account != null && account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
             throw new BadRequestException("Ce moyen de règlement doit être rattaché à un compte bancaire");
         }
-        if (BANK_ACCOUNT_REQUIRED_MODES.contains(request.getMode()) && account == null) {
+        if (outgoing && account != null && !"MAD".equals(account.getDevise())) {
+            throw new BadRequestException("Le compte de décaissement doit être libellé en MAD");
+        }
+        if ((BANK_ACCOUNT_REQUIRED_MODES.contains(request.getMode()) || (outgoing && !cash)) && account == null) {
             throw new BadRequestException("Sélectionnez le compte bancaire crédité");
         }
         validateInstrumentReference(request);
@@ -1880,6 +1937,9 @@ public class ReglementClientService {
 
     private MouvementTresorerie confirmFromBankStatementRecord(Long agenceId, InstrumentReglementClient instrument,
             Long accountId, LocalDate operationDate, LigneReleveBancaire bankStatementLine) {
+        if (instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+            throw new BadRequestException("Confirmez le décaissement depuis son règlement, pas depuis un rapprochement d'encaissement");
+        }
         MouvementTresorerie movement = confirmInstrument(
                 agenceId,
                 instrument,
@@ -1940,8 +2000,9 @@ public class ReglementClientService {
         }
         if (instrument.getStatut() == StatutInstrumentReglement.EN_ATTENTE) {
             ensureNotReservedByDraftRemittance(instrument);
-            if (instrument.getMode() == ModeReglementClient.CHEQUE
-                    || instrument.getMode() == ModeReglementClient.EFFET) {
+            if (instrument.getReglement().getSens() != com.assurance.enums.SensMouvementTresorerie.SORTIE
+                    && (instrument.getMode() == ModeReglementClient.CHEQUE
+                    || instrument.getMode() == ModeReglementClient.EFFET)) {
                 throw new BadRequestException(
                         "Déposez d'abord le chèque ou l'effet dans un bordereau de remise"
                 );
@@ -1953,6 +2014,11 @@ public class ReglementClientService {
         CompteTresorerie account = accountId == null
                 ? instrument.getCompteTresorerie()
                 : tresorerieService.findAccount(agenceId, accountId);
+        if (instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE
+                && instrument.getCompteTresorerie() != null
+                && !instrument.getCompteTresorerie().getId().equals(account.getId())) {
+            throw new BadRequestException("Le décaissement doit utiliser le compte bancaire prévu à la création");
+        }
         if (instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
                 && instrument.getCompteTresorerie() != null
                 && !instrument.getCompteTresorerie().getId().equals(account.getId())) {
@@ -1974,8 +2040,10 @@ public class ReglementClientService {
         instrument.getAffectations().forEach(allocation ->
                 allocation.setStatut(StatutAffectationReglement.CONFIRMEE));
         instrumentRepository.saveAndFlush(instrument);
-        rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.ENCAISSEMENT, operationDate,
-                "Encaissement confirmé");
+        if (instrument.getReglement().getSens() != com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+            rejetSuiviService.suivreOperation(instrument, TypeMouvementRejetBancaire.ENCAISSEMENT, operationDate,
+                    "Encaissement confirmé");
+        }
         return tresorerieService.recordInstrumentEntry(
                 instrument,
                 account,
@@ -2037,6 +2105,9 @@ public class ReglementClientService {
 
     private void markInstrumentRemittedRecord(Long agenceId, InstrumentReglementClient instrument,
             Long accountId, LocalDate operationDate) {
+        if (instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+            throw new BadRequestException("Un moyen émis par l'agence ne peut pas être déposé dans un bordereau d'encaissement");
+        }
         if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE) {
             throw new BadRequestException("Seul un instrument en attente peut être remis en banque");
         }
@@ -2339,6 +2410,9 @@ public class ReglementClientService {
                 throw new BadRequestException("Une créance ne peut apparaître deux fois dans le même moyen");
             }
             for (CreerReglementClientRequest.Affectation allocation : instrument.getAffectations()) {
+                if (allocation.getMontant() == null || allocation.getMontant().signum() == 0) {
+                    throw new BadRequestException("Chaque affectation doit avoir un montant non nul");
+                }
                 boolean hasElement = allocation.getElementFacturableId() != null;
                 boolean hasDocument = allocation.getDocumentClientId() != null;
                 if (!hasElement && !hasDocument) {
@@ -2765,7 +2839,7 @@ public class ReglementClientService {
                 .accessoires(money(line.getAccessoires()))
                 .montantTtc(money(line.getMontantTtc()))
                 .montantRegle(ZERO)
-                .soldeRestant(money(line.getMontantTtc()).max(ZERO))
+                .soldeRestant(money(line.getMontantTtc()))
                 .dejaFacturee(true)
                 .facturable(false)
                 .build();
@@ -2778,11 +2852,11 @@ public class ReglementClientService {
         BigDecimal total = money(source.getMontantTtc());
         BigDecimal open = remainingAfterAllocations(total, amounts);
         String status;
-        if (amounts.confirmed().add(amounts.adjustment()).compareTo(total) >= 0) {
+        if (SignedClientBalance.covered(total, amounts.confirmed().add(amounts.adjustment()))) {
             status = "PAYEE";
-        } else if (amounts.confirmed().add(amounts.pending()).add(amounts.adjustment()).compareTo(total) >= 0) {
+        } else if (SignedClientBalance.covered(total, amounts.confirmed().add(amounts.pending()).add(amounts.adjustment()))) {
             status = "COUVERTE_EN_ATTENTE";
-        } else if (amounts.confirmed().signum() > 0 || amounts.pending().signum() > 0) {
+        } else if (amounts.confirmed().signum() != 0 || amounts.pending().signum() != 0) {
             status = "PARTIELLEMENT_REGLEE";
         } else {
             status = "IMPAYEE";
@@ -2809,7 +2883,7 @@ public class ReglementClientService {
                 .map(AffectationReglementClient::getMontant)
                 .map(this::money)
                 .reduce(ZERO, BigDecimal::add);
-        payment.setMontantNonAffecte(validInstrumentTotal.subtract(activeAllocations).max(ZERO));
+        payment.setMontantNonAffecte(validInstrumentTotal.subtract(activeAllocations.abs()).max(ZERO));
         reglementRepository.save(payment);
     }
 
@@ -2824,7 +2898,7 @@ public class ReglementClientService {
             BigDecimal total = money(quittance.getElementFacturable().getPrimeTotale());
             AllocationAmounts settled = amounts.getOrDefault(elementId, AllocationAmounts.empty());
             BigDecimal confirmed = settled.confirmed().add(settled.adjustment());
-            quittance.setPayee(confirmed.compareTo(total) >= 0);
+            quittance.setPayee(SignedClientBalance.covered(total, confirmed));
         }
         quittanceRepository.saveAll(quittances);
     }
@@ -2859,7 +2933,7 @@ public class ReglementClientService {
                         elementId,
                         AllocationAmounts.empty()
                 ).confirmed().add(lineAmounts.getOrDefault(elementId, AllocationAmounts.empty()).adjustment());
-                boolean paid = confirmed.compareTo(money(line.getMontantTtc())) >= 0;
+                boolean paid = SignedClientBalance.covered(money(line.getMontantTtc()), confirmed);
                 paidByElement.merge(elementId, paid, Boolean::logicalOr);
             });
         }
@@ -3038,7 +3112,7 @@ public class ReglementClientService {
     }
 
     private BigDecimal remainingAfterAllocations(BigDecimal total, AllocationAmounts amounts) {
-        return total.subtract(amounts.confirmed()).subtract(amounts.pending()).subtract(amounts.adjustment()).max(ZERO);
+        return SignedClientBalance.remaining(total, amounts.confirmed().add(amounts.pending()).add(amounts.adjustment()));
     }
 
     private ReglementClientResponse toResponse(ReglementClient payment) {
@@ -3053,6 +3127,7 @@ public class ReglementClientService {
     ) {
         Map<Long, String> assistanceNumbers = assistanceNumbers(payment.getAgence().getId(), payment.getInstruments());
         return ReglementClientResponse.builder()
+                .sens(payment.getSens())
                 .id(payment.getId())
                 .numero(payment.getNumero())
                 .dateReglement(payment.getDateReglement())
@@ -3091,6 +3166,7 @@ public class ReglementClientService {
             Map<Long, String> assistanceNumbers
     ) {
         return ReglementClientResponse.Instrument.builder()
+                .sens(instrument.getReglement().getSens())
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
                 .clientPayeurId(instrument.getReglement().getClientPayeur() == null

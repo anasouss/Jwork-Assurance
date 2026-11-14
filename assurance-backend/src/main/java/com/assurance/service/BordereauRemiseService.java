@@ -515,6 +515,7 @@ public class BordereauRemiseService {
         for (InstrumentReglementClient instrument : instruments) {
             if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
                     || instrument.getMode() != expectedMode
+                    || instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE
                     || instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
                 throw new BadRequestException("Tous les instruments doivent être en attente et du même type");
             }

@@ -122,7 +122,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and schedule.contrat.agence.id = :agenceId
                       and (:conventionId is null or schedule.contrat.convention.id = :conventionId)
               ))
-              and (:includeSettled = true or coalesce((
+              and (:includeSettled = true or (coalesce((
                     select sum(paymentAllocation.montant)
                     from AffectationReglementClient paymentAllocation
                     where paymentAllocation.documentClient = d
@@ -134,7 +134,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
                       and exists (select 1 from LigneDocumentClient adjustedLine
                                   where adjustedLine.document = d and adjustedLine.elementFacturable = adjustment.elementFacturable)
-              ), 0) < d.totalDocument)
+              ), 0)) * sign(d.totalDocument) < abs(d.totalDocument))
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
               and (:saisieDu is null or d.createdAt >= :saisieDu)
@@ -207,7 +207,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and schedule.contrat.agence.id = :agenceId
                       and (:conventionId is null or schedule.contrat.convention.id = :conventionId)
               ))
-              and (:includeSettled = true or coalesce((
+              and (:includeSettled = true or (coalesce((
                     select sum(paymentAllocation.montant)
                     from AffectationReglementClient paymentAllocation
                     where paymentAllocation.documentClient = d
@@ -219,7 +219,7 @@ public interface DocumentClientRepository extends JpaRepository<DocumentClient, 
                       and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
                       and exists (select 1 from LigneDocumentClient adjustedLine
                                   where adjustedLine.document = d and adjustedLine.elementFacturable = adjustment.elementFacturable)
-              ), 0) < d.totalDocument)
+              ), 0)) * sign(d.totalDocument) < abs(d.totalDocument))
               and (:dateDu is null or d.dateEmission >= :dateDu)
               and (:dateAu is null or d.dateEmission <= :dateAu)
               and (:saisieDu is null or d.createdAt >= :saisieDu)

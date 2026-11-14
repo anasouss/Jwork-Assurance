@@ -85,7 +85,7 @@ public class CreerReglementClientRequest {
         private Long documentClientId;
 
         @NotNull
-        @DecimalMin(value = "0.01")
+        @Digits(integer = 14, fraction = 2)
         private BigDecimal montant;
     }
 }

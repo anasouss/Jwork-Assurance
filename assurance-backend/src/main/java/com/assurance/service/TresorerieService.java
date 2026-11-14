@@ -239,15 +239,17 @@ public class TresorerieService {
                 .instrumentReglement(instrument)
                 .ligneReleveBancaire(bankStatementLine)
                 .nature(NatureMouvementTresorerie.REGLEMENT_CLIENT)
-                .sens(SensMouvementTresorerie.ENTREE)
+                .sens(instrument.getReglement().getSens())
                 .dateOperation(operationDate)
                 .dateValeur(operationDate)
                 .montant(money(instrument.getMontant()))
                 .reference(instrument.getReferenceInstrument())
-                .libelle("Règlement client " + instrument.getReglement().getNumero())
+                .libelle((instrument.getReglement().getSens() == SensMouvementTresorerie.SORTIE
+                        ? "Ristourne client " : "Règlement client ") + instrument.getReglement().getNumero())
                 .build());
         activityRecorder.record(TreasuryActivity.movementCommand(movement,
-                "Encaissement client comptabilise", "TREASURY_CLIENT_COLLECTION"));
+                instrument.getReglement().getSens() == SensMouvementTresorerie.SORTIE
+                        ? "Ristourne client décaissée" : "Encaissement client comptabilise", "TREASURY_CLIENT_COLLECTION"));
         return movement;
     }
 
@@ -277,7 +279,8 @@ public class TresorerieService {
                 .compteTresorerie(original.getCompteTresorerie())
                 .instrumentReglement(instrument)
                 .nature(NatureMouvementTresorerie.REJET_INSTRUMENT)
-                .sens(SensMouvementTresorerie.SORTIE)
+                .sens(original.getSens() == SensMouvementTresorerie.SORTIE
+                        ? SensMouvementTresorerie.ENTREE : SensMouvementTresorerie.SORTIE)
                 .dateOperation(operationDate)
                 .dateValeur(operationDate)
                 .montant(original.getMontant())

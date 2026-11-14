@@ -494,9 +494,10 @@ public class DocumentClientService {
     }
 
     private SourceBalance sourceBalance(BigDecimal totalValue, BigDecimal paidValue, BigDecimal adjustment) {
-        BigDecimal total = money(totalValue).max(ZERO);
-        BigDecimal paid = money(paidValue).min(total).max(ZERO);
-        return new SourceBalance(paid, total.subtract(paid).subtract(adjustment).max(ZERO));
+        BigDecimal total = money(totalValue);
+        BigDecimal paid = total.signum() < 0 ? money(paidValue).max(total).min(ZERO)
+                : money(paidValue).min(total).max(ZERO);
+        return new SourceBalance(paid, SignedClientBalance.remaining(total, paid.add(adjustment)));
     }
 
     @Transactional(readOnly = true)
@@ -1256,7 +1257,7 @@ public class DocumentClientService {
         Contrat contract = element.getContrat();
         BigDecimal ttc = money(element.getPrimeTotale());
         SourceBalance balance = sourceBalance == null
-                ? new SourceBalance(ZERO, ttc.max(ZERO))
+                ? new SourceBalance(ZERO, ttc)
                 : sourceBalance;
         return SourceDocumentClientResponse.builder()
                 .elementFacturableId(element.getId())

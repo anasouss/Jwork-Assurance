@@ -139,7 +139,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                           and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
                     )
               )
-              and coalesce((
+              and (coalesce((
                     select sum(paymentAllocation.montant)
                     from AffectationReglementClient paymentAllocation
                     where paymentAllocation.elementFacturable = e
@@ -149,7 +149,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     select sum(adjustment.montant) from EcartReglementClient adjustment
                     where adjustment.elementFacturable = e and adjustment.agence.id = :agenceId
                       and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
-              ), 0) < e.primeTotale
+              ), 0)) * sign(e.primeTotale) < abs(e.primeTotale)
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and e.nature in (com.assurance.enums.NatureElementFacturable.CONTRAT, com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT)
@@ -336,7 +336,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                           and invoiceLine.document.statut = com.assurance.enums.StatutDocumentClient.EMIS
                     )
               )
-              and coalesce((
+              and (coalesce((
                     select sum(paymentAllocation.montant)
                     from AffectationReglementClient paymentAllocation
                     where paymentAllocation.elementFacturable = e
@@ -346,7 +346,7 @@ public interface ElementFacturableRepository extends JpaRepository<ElementFactur
                     select sum(adjustment.montant) from EcartReglementClient adjustment
                     where adjustment.elementFacturable = e and adjustment.agence.id = :agenceId
                       and adjustment.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
-              ), 0) < e.primeTotale
+              ), 0)) * sign(e.primeTotale) < abs(e.primeTotale)
               and not (
                     c.typeContrat = com.assurance.enums.TypeContrat.CONVENTION
                     and e.nature in (com.assurance.enums.NatureElementFacturable.CONTRAT, com.assurance.enums.NatureElementFacturable.MOUVEMENT_CONTRAT)

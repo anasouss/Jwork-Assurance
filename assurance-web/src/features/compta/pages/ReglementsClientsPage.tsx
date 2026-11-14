@@ -272,7 +272,7 @@ export default function ReglementsClientsPage() {
   const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const payerKey = !multiClientDeposit && selectedRows[0] ? sourcePayerKey(selectedRows[0]) : null;
   const pageRows = result?.rows ?? [];
-  const eligiblePageRows = pageRows.filter(isSelectableReceivable);
+  const eligiblePageRows = pageRows.filter(row => isSelectableReceivable(row) && (!multiClientDeposit || row.soldeOuvert > 0));
   const pagePayerKeys = new Set(eligiblePageRows.map(sourcePayerKey));
   const selectablePageRows = multiClientDeposit
     ? eligiblePageRows
@@ -286,6 +286,9 @@ export default function ReglementsClientsPage() {
     && selectedOnPage === selectablePageRows.length;
 
   function toggle(row: ClientReceivable, checked: boolean) {
+    if (checked && multiClientDeposit && row.soldeOuvert < 0) {
+      toast.error("Réglez la ristourne séparément pour un seul bénéficiaire"); return;
+    }
     if (checked && !isSelectableReceivable(row)) {
       return;
     }
@@ -625,11 +628,12 @@ export default function ReglementsClientsPage() {
               <div className="flex flex-wrap items-center justify-end gap-2">
                 {!multiClientDeposit ? (
                 <Button
-                  disabled={!canCreate || !selectedRows.length}
+                  disabled={!canCreate || !selectedRows.length || Math.abs(selectedTotal) < 0.005
+                    || (selectedTotal < 0 && !permissions.includes("reglement-client:manage"))}
                   onClick={() => navigate(paymentPath(selectedRows, false))}
                 >
                   <Banknote className="size-4" />
-                  Encaisser ({selectedRows.length})
+                  {selectedTotal < 0 ? "Régler la ristourne" : "Encaisser"} ({selectedRows.length})
                 </Button>
                 ) : null}
               </div>
@@ -731,7 +735,7 @@ export default function ReglementsClientsPage() {
                           </td>
                           <td className="px-3 py-3 text-right">{money(row.source.montantTtc)}</td>
                           <td className="px-3 py-3 text-right font-semibold">{money(row.soldeOuvert)}</td>
-                          <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} /></td>
+                          <td className="px-3 py-3 text-center"><StatusBadge value={row.statut} refund={row.source.montantTtc < 0} /></td>
                           <td className="px-2 py-2 text-center">
                             {row.source.documentClientId ? (
                               <Button
@@ -1041,12 +1045,12 @@ function SummaryCell({ label, value, tone = "default" }: SummaryCellProps) {
   );
 }
 
-function StatusBadge({ value }: { value: ClientReceivable["statut"] }) {
+function StatusBadge({ value, refund = false }: { value: ClientReceivable["statut"]; refund?: boolean }) {
   const labels: Record<ClientReceivable["statut"], string> = {
-    IMPAYEE: "Impayée",
+    IMPAYEE: refund ? "À régler" : "Impayée",
     PARTIELLEMENT_REGLEE: "Partielle",
-    COUVERTE_EN_ATTENTE: "Encaissement en cours",
-    PAYEE: "Payée",
+    COUVERTE_EN_ATTENTE: refund ? "Règlement en cours" : "Encaissement en cours",
+    PAYEE: refund ? "Réglée" : "Payée",
   };
   const styles: Record<ClientReceivable["statut"], string> = {
     IMPAYEE: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
@@ -1212,7 +1216,7 @@ function receivableTargetKey(row: ClientReceivable) {
 }
 
 function isSelectableReceivable(row: ClientReceivable) {
-  return row.soldeOuvert > 0 && row.statut !== "PAYEE";
+  return row.soldeOuvert !== 0 && row.statut !== "PAYEE";
 }
 
 function money(value: number) {

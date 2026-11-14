@@ -591,6 +591,7 @@ export type PaymentAllocation = {
 };
 
 export type PaymentInstrument = {
+  sens?: "ENTREE" | "SORTIE";
   id: string;
   reglementId: string;
   clientPayeurId?: string | null;
@@ -813,6 +814,7 @@ export type PremiumReceiptOptions = {
 };
 
 export type ClientPayment = {
+  sens?: "ENTREE" | "SORTIE";
   id: string;
   numero: string;
   quittancePrimeNumero?: string | null;

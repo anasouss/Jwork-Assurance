@@ -55,6 +55,7 @@ public final class PaymentActivity {
 
     private static ActivityValues header(ReglementClient payment) {
         return new ActivityValues().put("Règlement", payment.getNumero()).put("Date du règlement", payment.getDateReglement())
+                .put("Sens", payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE ? "Décaissement" : "Encaissement")
                 .put("Payeur", payment.getPayeurNom()).put("Multi-clients", payment.getMultiPayeur())
                 .put("Déposant", payment.getDeposantNom()).put("Montant total", payment.getMontantTotal())
                 .put("Montant non affecte", payment.getMontantNonAffecte())

@@ -1,10 +1,15 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { Download, Landmark } from "lucide-react";
+import { Check, Download, Landmark, X } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toDateOnly } from "@/features/production/date";
 import { downloadBlob } from "@/lib/download";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
@@ -21,6 +26,27 @@ const INSTRUMENT_VARIANTS = {
 
 export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
   const canViewTreasury = useAuthStore((state) => state.user?.permissions.includes("tresorerie:view") ?? false);
+  const canManageTreasury = useAuthStore((state) => state.user?.permissions.includes("tresorerie:manage") ?? false);
+  const outgoing = payment.sens === "SORTIE";
+  const client = useQueryClient();
+  const [operation, setOperation] = useState<{ id: string; statut: "CONFIRME" | "REJETE" }>();
+  const [operationDate, setOperationDate] = useState(() => toDateOnly(new Date())!);
+  const [reason, setReason] = useState("");
+  const processPayment = useMutation({
+    mutationFn: async () => {
+      if (!operation) throw new Error("Sélectionnez un moyen de règlement");
+      return comptaApi.changePaymentInstrumentStatus(operation.id, {
+        statut: operation.statut, dateOperation: operationDate, motif: reason.trim() || undefined,
+      });
+    },
+    onSuccess: async () => {
+      setOperation(undefined); setReason("");
+      await Promise.all(["client-payment", "client-payments", "client-receivables", "convention-invoice-receivables", "treasury"]
+        .map(key => client.invalidateQueries({ queryKey: ["compta", key] })));
+      toast.success("Décaissement mis à jour");
+    },
+    onError: error => toast.error(error.message),
+  });
   const [bordereauPdf, setBordereauPdf] = useState<{ id: string; numero?: string | null } | null>(null);
   const detail = payment.detail;
   const downloadReceipt = useMutation({
@@ -32,14 +58,14 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
   return <div className="min-w-0 space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
       <dl className="min-w-0 space-y-2 text-sm">
-        <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">Payeur :</dt><dd className="break-words font-semibold">{payment.payeurNom}</dd></div>
+        <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">{outgoing ? "Bénéficiaire :" : "Payeur :"}</dt><dd className="break-words font-semibold">{payment.payeurNom}</dd></div>
         {payment.multiPayeur && <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">Déposant :</dt><dd className="break-words">{payment.deposantNom || "-"}</dd></div>}
       </dl>
       <span className="text-xs text-muted-foreground">Montants en MAD</span>
     </div>
 
     <dl className="grid grid-cols-1 divide-y border-b sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-      <Summary label="Total perçu" value={amount(detail?.totalRegle)} />
+      <Summary label={outgoing ? "Ristourne à régler" : "Total perçu"} value={amount(detail?.totalRegle)} />
       <Summary label="Total quittances" value={amount(detail?.totalQuittances)} />
       <Summary label="Solde restant" value={amount(detail?.solde)} />
     </dl>
@@ -55,7 +81,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
             <th className="px-3 py-3 text-left">Du</th>
             <th className="px-3 py-3 text-left">Au</th>
             <th className="px-3 py-3 text-right">Montant quittance</th>
-            <th className="px-3 py-3 text-right" title="Montant reçu affecté à cette production, sans présumer de son encaissement bancaire">Montant perçu</th>
+            <th className="px-3 py-3 text-right">{outgoing ? "Montant réglé" : "Montant perçu"}</th>
             <th className="px-3 py-3 text-right">Solde</th>
           </tr></thead>
           <tbody className="divide-y">{detail?.productions.map(production => <tr key={production.key} className="hover:bg-muted/30">
@@ -79,7 +105,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
 
     <section className="min-w-0 space-y-3 border-t pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Encaissements</h2>
+        <h2 className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{outgoing ? "Décaissement" : "Encaissements"}</h2>
         {payment.bordereauNomFichier && <Button size="sm" variant="outline" disabled={downloadReceipt.isPending} onClick={() => downloadReceipt.mutate()}>
           <Download className="size-4" />{downloadReceipt.isPending ? "Téléchargement..." : "Bordereau banque"}
         </Button>}
@@ -107,6 +133,10 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
             <td className="px-3 py-3"><Badge variant={payment.statut === "ANNULE" ? "red" : INSTRUMENT_VARIANTS[instrument.statut]}>
               {payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]}
             </Badge>
+              {outgoing && canManageTreasury && payment.statut === "VALIDE" && instrument.statut === "EN_ATTENTE" && <div className="mt-2 flex gap-1">
+                <Button variant="outline" size="sm" disabled={processPayment.isPending} onClick={() => { setReason(""); setOperation({ id: instrument.id, statut: "CONFIRME" }); }}><Check className="size-4" />Confirmer le débit</Button>
+                <Button variant="ghost" size="icon" title="Rejeter le décaissement" aria-label="Rejeter le décaissement" disabled={processPayment.isPending} onClick={() => { setReason(""); setOperation({ id: instrument.id, statut: "REJETE" }); }}><X className="size-4" /></Button>
+              </div>}
               {instrument.motifStatut && instrument.motifStatut.trim().toLocaleLowerCase("fr")
                 !== (payment.statut === "ANNULE" ? "Annulé" : INSTRUMENT_LABELS[instrument.statut]).toLocaleLowerCase("fr")
                 && <div className={`mt-1 text-xs ${instrument.statut === "REJETE" ? "text-red-600" : "text-muted-foreground"}`}>{instrument.motifStatut}</div>}
@@ -127,6 +157,16 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
     {payment.notes && <section className="space-y-2 border-t pt-4"><h2 className="text-sm font-semibold">Notes</h2><p className="whitespace-pre-wrap break-words text-sm">{payment.notes}</p></section>}
     <div className="flex flex-wrap justify-between gap-2 border-t pt-3 text-xs text-muted-foreground"><span>Créé par : {payment.creePar || "-"}</span><span>Non affecté : {amount(payment.montantNonAffecte)}</span></div>
     {bordereauPdf && <RemittanceSlipPdfDialog key={bordereauPdf.id} {...bordereauPdf} onClose={() => setBordereauPdf(null)} />}
+    <Dialog open={Boolean(operation)} onOpenChange={open => { if (!open && !processPayment.isPending) setOperation(undefined); }}>
+      <DialogContent><DialogHeader><DialogTitle>{operation?.statut === "CONFIRME" ? "Confirmer le décaissement" : "Rejeter le décaissement"}</DialogTitle>
+        <DialogDescription>{payment.numero} · {payment.payeurNom}</DialogDescription></DialogHeader>
+        <div className="grid gap-2"><Label>Date d'opération</Label><DatePicker date={operationDate} onSelect={value => setOperationDate(toDateOnly(value) ?? "")} /></div>
+        {operation?.statut === "REJETE" && <div className="grid gap-2"><Label htmlFor="refund-reason">Motif <span className="text-destructive">*</span></Label><Input id="refund-reason" maxLength={500} value={reason} onChange={event => setReason(event.target.value)} /></div>}
+        <DialogFooter><Button variant="outline" disabled={processPayment.isPending} onClick={() => setOperation(undefined)}>Annuler</Button>
+          <Button disabled={processPayment.isPending || !operationDate || (operation?.statut === "REJETE" && !reason.trim())} onClick={() => processPayment.mutate()}>Confirmer</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
 

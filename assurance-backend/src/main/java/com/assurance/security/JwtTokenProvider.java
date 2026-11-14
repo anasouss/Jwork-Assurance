@@ -42,7 +42,7 @@ public class JwtTokenProvider {
                 .claim("agenceId", effectiveAgenceId)
                 .claim("sessionId", sessionId)
                 .claim("platformAdmin", isPlatformAdmin(user))
-                .claim("permissions", user.getPermissions())
+                // Authorities are loaded from the database, not from token claims.
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(cle)

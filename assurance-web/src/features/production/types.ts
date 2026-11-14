@@ -806,6 +806,7 @@ export type VehiculeResponse = VehiculeInput & {
 };
 
 export type VehicleImportPreview = {
+  importGarantiesActive?: boolean;
   totalLignes: number;
   lignesValides: number;
   lignesEnErreur: number;

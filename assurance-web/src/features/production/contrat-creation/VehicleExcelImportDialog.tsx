@@ -90,9 +90,9 @@ export function VehicleExcelImportDialog({
       const result = await contractCreationApi.previewVehicleImport(draftId, file);
       const checked = withLocalDuplicateErrors(result, existingVehicles);
       setPreview(checked);
-      setSelectedGaranties(checked.garanties ?? []);
+      setSelectedGaranties(checked.importGarantiesActive ? checked.garanties ?? [] : []);
       const imported = checked.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []);
-      if (imported[0] && checked.garanties?.length) {
+      if (checked.importGarantiesActive && imported[0] && checked.garanties?.length) {
         onPreviewGuarantees(imported, importedVehicleTarget(imported[0], 0, usages), checked.garanties);
       }
     } catch (error) {
@@ -123,7 +123,7 @@ export function VehicleExcelImportDialog({
   const apply = () => {
     if (!canImport || !preview || preview.lignesEnErreur > 0) return;
     const imported = preview.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []);
-    onApply(imported, selectedGaranties);
+    onApply(imported, preview.importGarantiesActive ? selectedGaranties : []);
     toast.success(`${imported.length} véhicule${imported.length > 1 ? "s" : ""} ajouté${imported.length > 1 ? "s" : ""}`);
     setOpen(false);
     reset();
@@ -183,10 +183,12 @@ export function VehicleExcelImportDialog({
 
             {preview ? (
               <Tabs defaultValue="vehicles" className="grid gap-3">
-                <TabsList className="w-fit">
-                  <TabsTrigger value="vehicles">Véhicules ({preview.totalLignes})</TabsTrigger>
-                  <TabsTrigger value="guarantees">Garanties ({selectedGaranties.length})</TabsTrigger>
-                </TabsList>
+                {preview.importGarantiesActive ? (
+                  <TabsList className="w-fit">
+                    <TabsTrigger value="vehicles">Véhicules ({preview.totalLignes})</TabsTrigger>
+                    <TabsTrigger value="guarantees">Garanties ({selectedGaranties.length})</TabsTrigger>
+                  </TabsList>
+                ) : null}
                 <TabsContent value="vehicles" className="mt-0 grid gap-3">
                   <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
                     <Metric label="Lignes analysées" value={preview.totalLignes} />
@@ -195,28 +197,30 @@ export function VehicleExcelImportDialog({
                   </div>
                   <VehiclePreviewTable preview={preview} />
                 </TabsContent>
-                <TabsContent value="guarantees" className="mt-0 grid gap-3">
-                  <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
-                    <Metric label="Véhicules analysés" value={preview.totalLignesGaranties} />
-                    <Metric label="Lignes valides" value={preview.lignesGarantiesValides} tone="success" />
-                    <Metric label="Lignes en erreur" value={preview.lignesGarantiesEnErreur} tone={preview.lignesGarantiesEnErreur ? "danger" : "default"} />
-                  </div>
-                  <VehicleGuaranteeImportReview
-                    preview={preview}
-                    vehicles={importedVehicles}
-                    garanties={garanties}
-                    lignes={lignes}
-                    formulesPersonne={formulesPersonne}
-                    usages={usages}
-                    grilleSelected={grilleSelected}
-                    pricingMode={pricingMode}
-                    selected={selectedGaranties}
-                    setSelected={setSelectedGaranties}
-                    calculationPreview={calculationPreview}
-                    previewing={previewingGuarantees}
-                    onRequestCalculation={(target, next) => onPreviewGuarantees(importedVehicles, target, next)}
-                  />
-                </TabsContent>
+                {preview.importGarantiesActive ? (
+                  <TabsContent value="guarantees" className="mt-0 grid gap-3">
+                    <div className="grid overflow-hidden rounded-md border sm:grid-cols-3">
+                      <Metric label="Véhicules analysés" value={preview.totalLignesGaranties} />
+                      <Metric label="Lignes valides" value={preview.lignesGarantiesValides} tone="success" />
+                      <Metric label="Lignes en erreur" value={preview.lignesGarantiesEnErreur} tone={preview.lignesGarantiesEnErreur ? "danger" : "default"} />
+                    </div>
+                    <VehicleGuaranteeImportReview
+                      preview={preview}
+                      vehicles={importedVehicles}
+                      garanties={garanties}
+                      lignes={lignes}
+                      formulesPersonne={formulesPersonne}
+                      usages={usages}
+                      grilleSelected={grilleSelected}
+                      pricingMode={pricingMode}
+                      selected={selectedGaranties}
+                      setSelected={setSelectedGaranties}
+                      calculationPreview={calculationPreview}
+                      previewing={previewingGuarantees}
+                      onRequestCalculation={(target, next) => onPreviewGuarantees(importedVehicles, target, next)}
+                    />
+                  </TabsContent>
+                ) : null}
               </Tabs>
             ) : null}
           </div>
@@ -226,12 +230,12 @@ export function VehicleExcelImportDialog({
             <Button
               type="button"
               disabled={preview
-                ? preview.lignesEnErreur > 0 || preview.lignesGarantiesEnErreur > 0 || preview.lignesValides === 0
+                ? preview.lignesEnErreur > 0 || (preview.importGarantiesActive && preview.lignesGarantiesEnErreur > 0) || preview.lignesValides === 0
                 : !file || loading}
               onClick={preview ? apply : previewFile}
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : preview ? <CheckCircle2 className="size-4" /> : <Upload className="size-4" />}
-              {preview ? "Ajouter véhicules et garanties" : "Analyser le fichier"}
+              {preview ? preview.importGarantiesActive ? "Ajouter véhicules et garanties" : "Ajouter les véhicules" : "Analyser le fichier"}
             </Button>
           </DialogFooter>
         </DialogContent>

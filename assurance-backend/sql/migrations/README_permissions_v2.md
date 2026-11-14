@@ -61,6 +61,15 @@ Do not rerun the original full permissions migration. New installations use the
 catalogue seeder; existing role grants are never broadened on application startup.
 This incremental script has not been executed or database-tested locally.
 
+Fleet Excel guarantee import is retained behind the application parameter
+`ENABLE_FLEET_EXCEL_GUARANTEE_IMPORT`, default `false`. The existing parameter
+service resolves an agency override before the global value. When disabled, the
+import template omits the guarantee sheet, preview ignores guarantee sheets in
+older files, and the frontend offers vehicle import only. Setting it to `true`
+restores the guarantee sheet and review workflow. Saved-vehicle export is unchanged.
+`20261114_fleet_excel_guarantee_import_setting.sql` registers the global default
+without overwriting existing values; fresh installations seed the same setting.
+
 - Old treasury read access migrates to read access only, not transfer, adjustment,
   cancellation or cash-session write actions that old endpoints accidentally allowed.
 - Contract modification no longer implies contract/amendment deletion, amendment

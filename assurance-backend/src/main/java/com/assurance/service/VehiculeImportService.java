@@ -112,6 +112,7 @@ public class VehiculeImportService {
     private final LigneGrilleTarifaireRepository ligneGrilleTarifaireRepository;
     private final FormuleGarantiePersonneRepository formuleGarantiePersonneRepository;
     private final AttestationStockService attestationStockService;
+    private final ParametreApplicationService parametreApplicationService;
 
     @Transactional(readOnly = true)
     public VehiculeImportPreviewResponse preview(Long agenceId, Long contratId, MultipartFile file) {
@@ -167,12 +168,16 @@ public class VehiculeImportService {
                 throw new BadRequestException("Le fichier ne contient aucun véhicule");
             }
             int valid = (int) rows.stream().filter(item -> item.getErreurs().isEmpty()).count();
-            GuaranteePreview guaranteePreview = parseGuarantees(workbook, contrat, rows);
+            boolean importGarantiesActive = isGuaranteeImportEnabled(agenceId);
+            GuaranteePreview guaranteePreview = importGarantiesActive
+                    ? parseGuarantees(workbook, contrat, rows)
+                    : new GuaranteePreview(List.of(), List.of(), 0);
             return VehiculeImportPreviewResponse.builder()
                     .totalLignes(rows.size())
                     .lignesValides(valid)
                     .lignesEnErreur(rows.size() - valid)
                     .lignes(rows)
+                    .importGarantiesActive(importGarantiesActive)
                     .totalLignesGaranties(guaranteePreview.rows().size())
                     .lignesGarantiesValides(guaranteePreview.validRows())
                     .lignesGarantiesEnErreur(guaranteePreview.rows().size() - guaranteePreview.validRows())
@@ -189,7 +194,7 @@ public class VehiculeImportService {
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
         requireFleetDraft(agenceId, contratId);
-        return createWorkbook(List.of(), List.of(), "Génération du modèle Excel impossible");
+        return createWorkbook(List.of(), List.of(), isGuaranteeImportEnabled(agenceId), "Génération du modèle Excel impossible");
     }
 
     @Transactional(readOnly = true)
@@ -202,12 +207,13 @@ public class VehiculeImportService {
             throw new BadRequestException("Aucun véhicule enregistré à exporter");
         }
         List<ContratGarantie> guarantees = contratGarantieRepository.findActiveByContratId(contratId);
-        return createWorkbook(vehicles, guarantees, "Export des véhicules impossible");
+        return createWorkbook(vehicles, guarantees, true, "Export des véhicules impossible");
     }
 
     private byte[] createWorkbook(
             List<Vehicule> vehicles,
             List<ContratGarantie> selectedGuarantees,
+            boolean includeGuarantees,
             String errorMessage
     ) {
         List<Usage> usages = generalWorkbookUsages(vehicles);
@@ -269,7 +275,9 @@ public class VehiculeImportService {
             sheet.setAutoFilter(new CellRangeAddress(0, 0, 0, TEMPLATE_HEADERS.size() - 1));
             sheet.createFreezePane(0, 1);
             sheet.setActiveCell(new CellAddress(1, 0));
-            createGuaranteeSheet(workbook, vehicles, selectedGuarantees, headerStyle, inputStyle);
+            if (includeGuarantees) {
+                createGuaranteeSheet(workbook, vehicles, selectedGuarantees, headerStyle, inputStyle);
+            }
             workbook.setSheetHidden(workbook.getSheetIndex(references), true);
             workbook.write(output);
             return output.toByteArray();
@@ -728,6 +736,10 @@ public class VehiculeImportService {
         if (value != null) {
             row.createCell(column).setCellValue(value.doubleValue());
         }
+    }
+
+    private boolean isGuaranteeImportEnabled(Long agenceId) {
+        return parametreApplicationService.getBoolean(agenceId, "ENABLE_FLEET_EXCEL_GUARANTEE_IMPORT", false);
     }
 
     private Contrat requireFleetDraft(Long agenceId, Long contratId) {

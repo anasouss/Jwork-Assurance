@@ -13,6 +13,7 @@ public class VehiculeImportPreviewResponse {
     private int lignesValides;
     private int lignesEnErreur;
     private List<Ligne> lignes;
+    private boolean importGarantiesActive;
     private int totalLignesGaranties;
     private int lignesGarantiesValides;
     private int lignesGarantiesEnErreur;

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
@@ -37,6 +38,15 @@ class FleetExcelPermissionTest {
     @AfterEach
     void clearContext() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void guaranteeImportUsesAgencySettingAndDefaultsToDisabled() {
+        ParametreApplicationService parameters = mock(ParametreApplicationService.class);
+        ReflectionTestUtils.setField(service, "parametreApplicationService", parameters);
+        when(parameters.getBoolean(1L, "ENABLE_FLEET_EXCEL_GUARANTEE_IMPORT", false)).thenReturn(true);
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(service, "isGuaranteeImportEnabled", 1L)).isTrue();
+        assertThat((Boolean) ReflectionTestUtils.invokeMethod(service, "isGuaranteeImportEnabled", 2L)).isFalse();
     }
 
     @Test

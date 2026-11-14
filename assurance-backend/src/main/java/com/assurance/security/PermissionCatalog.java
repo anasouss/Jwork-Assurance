@@ -28,7 +28,7 @@ public final class PermissionCatalog {
 
     private static Map<String, Definition> build() {
         Map<String, Definition> result = new LinkedHashMap<>();
-        resource(result, "production", "contrat", "Contrats", "view,create,update,renew,delete,recalculate-financial-history");
+        resource(result, "production", "contrat", "Contrats", "view,create,update,renew,delete,recalculate-financial-history,import,export");
         resource(result, "production", "avenant", "Avenants", "view,create,update-draft,delete-draft,rectify,delete");
         resource(result, "production", "assistance", "Assistance des contrats", "view,create,update,deactivate");
         resource(result, "production", "carte-verte", "Cartes vertes", "view,create,update,deactivate");
@@ -118,6 +118,8 @@ public final class PermissionCatalog {
     }
 
     private static String actionLabel(String resource, String action) {
+        if (resource.equals("contrat") && action.equals("import")) return "Importer les véhicules Excel";
+        if (resource.equals("contrat") && action.equals("export")) return "Exporter les véhicules Excel";
         if (resource.equals("contrat") && action.equals("delete")) return "Supprimer un contrat brouillon";
         if (resource.equals("avenant") && action.equals("delete")) return "Supprimer le dernier avenant";
         if (resource.equals("tarif-usage") && action.equals("adjust")) return "Ajuster les primes nettes";

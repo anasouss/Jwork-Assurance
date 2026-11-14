@@ -35,6 +35,7 @@ import com.assurance.repository.SousClasseRepository;
 import com.assurance.repository.TarifUsageRepository;
 import com.assurance.repository.UsageRepository;
 import com.assurance.repository.VehiculeRepository;
+import com.assurance.security.BusinessPermission;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
@@ -187,12 +188,14 @@ public class VehiculeImportService {
 
     @Transactional(readOnly = true)
     public byte[] template(Long agenceId, Long contratId) {
-        requireFleetContract(agenceId, contratId);
+        requireFleetDraft(agenceId, contratId);
         return createWorkbook(List.of(), List.of(), "Génération du modèle Excel impossible");
     }
 
     @Transactional(readOnly = true)
     public byte[] exportSubmittedVehicles(Long agenceId, Long contratId) {
+        BusinessPermission.require("contrat:view");
+        BusinessPermission.require("contrat:export");
         requireFleetContract(agenceId, contratId);
         List<Vehicule> vehicles = vehiculeRepository.findForExportByContratIdOrderByCreatedAtAsc(contratId);
         if (vehicles.isEmpty()) {
@@ -728,9 +731,16 @@ public class VehiculeImportService {
     }
 
     private Contrat requireFleetDraft(Long agenceId, Long contratId) {
+        BusinessPermission.require("contrat:view");
+        BusinessPermission.require("contrat:import");
         Contrat contrat = requireFleetContract(agenceId, contratId);
         if (!Boolean.TRUE.equals(contrat.getBrouillon()) && !Boolean.TRUE.equals(contrat.getProspection())) {
             throw new BadRequestException("L'analyse et l'import sont disponibles uniquement pendant la préparation d'un contrat flotte");
+        }
+        if (contrat.getContratOrigine() != null) {
+            BusinessPermission.require("contrat:renew");
+        } else if (!BusinessPermission.has("contrat:create")) {
+            BusinessPermission.require("contrat:update");
         }
         return contrat;
     }

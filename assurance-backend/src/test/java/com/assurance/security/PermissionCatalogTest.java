@@ -27,6 +27,16 @@ class PermissionCatalogTest {
     }
 
     @Test
+    void fleetExcelActionsAreIndependentAndRequireConsultation() {
+        assertThat(PermissionCatalog.find("contrat:import").actionLabel()).isEqualTo("Importer les véhicules Excel");
+        assertThat(PermissionCatalog.find("contrat:export").actionLabel()).isEqualTo("Exporter les véhicules Excel");
+        assertThat(PermissionDependencies.requiredFor("contrat:import")).contains("contrat:view")
+                .doesNotContain("contrat:export", "contrat:create", "contrat:update", "contrat:renew");
+        assertThat(PermissionDependencies.requiredFor("contrat:export")).contains("contrat:view")
+                .doesNotContain("contrat:import", "contrat:create", "contrat:update", "contrat:renew");
+    }
+
+    @Test
     void retiredBroadGrantsDoNotBecomeAuthorities() {
         Role role = Role.builder().permissions(Set.of(
                 Permission.builder().code("tresorerie:manage").build(),

@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, Download, FileDown, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
+import { useAuthStore } from "@/store/auth-store";
+import { VehicleExcelExportButton } from "../components/VehicleExcelExportButton";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +48,8 @@ export function VehicleExcelImportDialog({
   onPreviewGuarantees: (vehicles: VehiculeInput[], target: ContractTarget, garanties: GarantieInput[]) => void;
   onApply: (vehicles: VehiculeInput[], garanties: GarantieInput[]) => void;
 }) {
+  const canImport = useAuthStore(state => Boolean(state.user?.permissions.includes("contrat:import")
+    && state.user.permissions.includes("contrat:view")));
   const hasSubmittedVehicles = existingVehicles.some((vehicle) => vehicle.vehiculeId != null);
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -53,7 +57,6 @@ export function VehicleExcelImportDialog({
   const [selectedGaranties, setSelectedGaranties] = useState<GarantieInput[]>([]);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [exporting, setExporting] = useState(false);
 
   const reset = () => {
     setFile(null);
@@ -81,7 +84,7 @@ export function VehicleExcelImportDialog({
   };
 
   const previewFile = async () => {
-    if (!draftId || !file) return;
+    if (!draftId || !file || !canImport) return;
     setLoading(true);
     try {
       const result = await contractCreationApi.previewVehicleImport(draftId, file);
@@ -100,7 +103,7 @@ export function VehicleExcelImportDialog({
   };
 
   const downloadTemplate = async () => {
-    if (!draftId) return;
+    if (!draftId || !canImport) return;
     setDownloading(true);
     try {
       const blob = await contractCreationApi.downloadVehicleImportTemplate(draftId);
@@ -117,21 +120,8 @@ export function VehicleExcelImportDialog({
     }
   };
 
-  const exportVehicles = async () => {
-    if (!draftId) return;
-    setExporting(true);
-    try {
-      const blob = await contractCreationApi.exportSubmittedVehicles(draftId);
-      downloadBlob(blob, "vehicules-flotte.xlsx");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Export Excel impossible");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const apply = () => {
-    if (!preview || preview.lignesEnErreur > 0) return;
+    if (!canImport || !preview || preview.lignesEnErreur > 0) return;
     const imported = preview.lignes.flatMap((row) => row.vehicule ? [row.vehicule] : []);
     onApply(imported, selectedGaranties);
     toast.success(`${imported.length} véhicule${imported.length > 1 ? "s" : ""} ajouté${imported.length > 1 ? "s" : ""}`);
@@ -144,33 +134,24 @@ export function VehicleExcelImportDialog({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="bg-background text-foreground hover:bg-muted disabled:text-muted-foreground"
-          disabled={!draftId}
-          onClick={() => setOpen(true)}
-        >
-          <FileSpreadsheet className="size-4" />
-          Importer Excel
-        </Button>
-        {hasSubmittedVehicles ? (
+        {canImport ? (
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="bg-background text-foreground hover:bg-muted disabled:text-muted-foreground"
-            title="Exporter les véhicules enregistrés"
-            disabled={!draftId || exporting}
-            onClick={exportVehicles}
+            disabled={!draftId}
+            onClick={() => setOpen(true)}
           >
-            {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileDown className="size-4" />}
-            Exporter Excel
+            <FileSpreadsheet className="size-4" />
+            Importer Excel
           </Button>
         ) : null}
+        {hasSubmittedVehicles ? (
+          <VehicleExcelExportButton contratId={draftId} />
+        ) : null}
       </div>
-      <Dialog open={open} onOpenChange={(next) => {
+      <Dialog open={open && canImport} onOpenChange={(next) => {
         setOpen(next);
         if (!next) reset();
       }}>
@@ -303,15 +284,6 @@ function VehiclePreviewTable({ preview }: { preview: VehicleImportPreview }) {
       </table>
     </div>
   );
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 function Metric({ label, value, tone = "default" }: { label: string; value: number; tone?: "default" | "success" | "danger" }) {

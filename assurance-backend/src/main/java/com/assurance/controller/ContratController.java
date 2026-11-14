@@ -293,7 +293,7 @@ public class ContratController {
     }
 
     @GetMapping("/drafts/{id}/vehicules/import-modele")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
+    @PreAuthorize("hasAuthority('PERM_contrat:import') and hasAuthority('PERM_contrat:view') and hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<byte[]> downloadVehicleImportTemplate(@PathVariable Long id) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=modele-import-vehicules.xlsx")
@@ -302,7 +302,7 @@ public class ContratController {
     }
 
     @GetMapping("/drafts/{id}/vehicules/export")
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:view', 'PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
+    @PreAuthorize("hasAuthority('PERM_contrat:export') and hasAuthority('PERM_contrat:view')")
     public ResponseEntity<byte[]> exportSubmittedVehicles(@PathVariable Long id) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=vehicules-flotte.xlsx")
@@ -311,7 +311,7 @@ public class ContratController {
     }
 
     @PostMapping(value = "/drafts/{id}/vehicules/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
+    @PreAuthorize("hasAuthority('PERM_contrat:import') and hasAuthority('PERM_contrat:view') and hasAnyAuthority('PERM_contrat:create', 'PERM_contrat:update', 'PERM_contrat:renew')")
     public ResponseEntity<ApiResponse<VehiculeImportPreviewResponse>> previewVehicleImport(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file

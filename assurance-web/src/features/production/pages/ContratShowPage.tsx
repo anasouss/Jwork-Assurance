@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { contractApi } from "../api/contracts";
 import { referenceApi } from "../api/references";
 import { ProductionFormSkeleton } from "../components/ProductionFormSkeleton";
+import { VehicleExcelExportButton } from "../components/VehicleExcelExportButton";
 import { moneyAmount, numberOrZero, roundMoney, text, vehicleEngineCharacteristic } from "../utils/format";
 import type { AssistanceContrat, ClientResponse, ContratSummary, ReferenceOption } from "../types";
 import type { jsPDF as JsPDF } from "jspdf";
@@ -136,7 +137,10 @@ export default function ContratShowPage() {
         <Button asChild variant="ghost" size="sm" className="-ml-2">
           <Link to={contrat.prospection ? "/app/production/prospection" : "/app/production/contrats"}><ArrowLeft className="size-4" />Retour liste</Link>
         </Button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {contrat.typeContrat === "FLOTTE" && !mouvementId && Boolean(contrat.vehicules?.length) ? (
+            <VehicleExcelExportButton contratId={contratId} />
+          ) : null}
           <Badge variant={contrat.brouillon ? "gray" : contrat.prospection ? "info" : contrat.statut === "CANCELLED" ? "red" : contrat.statut === "SUSPENDED" ? "warning" : contrat.statut === "ACTIVE" ? "success" : "gray"}>{contrat.prospection
             ? contrat.brouillon ? "Brouillon de devis" : "Devis"
             : contrat.brouillon ? "Brouillon de contrat" : statusLabel(selectedMouvement?.statut ?? contrat.statut)}</Badge>

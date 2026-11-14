@@ -46,6 +46,21 @@ produce runtime authorities.
 
 ## Deliberate Tightening
 
+### Fleet Vehicle Excel Permissions
+
+`contrat:import` and `contrat:export` are independent actions under Production >
+Contrats. Import includes downloading the template and previewing the workbook;
+it also requires the matching contract editing/renewal right. Export requires
+consultation access and includes saved fleet vehicles and guarantees only.
+
+For an existing V2 database, review and run
+`20261114_fleet_vehicle_excel_permissions.sql` once before deploying this change.
+It preserves previous Excel access for roles already holding the base permissions.
+It creates no backups or persistent marker and does not modify business records.
+Do not rerun the original full permissions migration. New installations use the
+catalogue seeder; existing role grants are never broadened on application startup.
+This incremental script has not been executed or database-tested locally.
+
 - Old treasury read access migrates to read access only, not transfer, adjustment,
   cancellation or cash-session write actions that old endpoints accidentally allowed.
 - Contract modification no longer implies contract/amendment deletion, amendment

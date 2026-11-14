@@ -109,6 +109,12 @@ public final class PermissionExplanation {
         if (permission.code().equals("contrat:create")) {
             restrictions.add("Inclut la saisie et l'enregistrement du brouillon de création. Ne permet pas de corriger un contrat actif ni de modifier un brouillon de renouvellement.");
         }
+        if (permission.code().equals("contrat:import")) {
+            restrictions.add("Uniquement pendant la préparation d'une flotte. Demande aussi Créer ou Modifier pour un brouillon ordinaire, ou Renouveler pour un brouillon de renouvellement. L'import ne valide pas le contrat.");
+        }
+        if (permission.code().equals("contrat:export")) {
+            restrictions.add("Uniquement les véhicules et garanties enregistrés de la flotte de l'agence. Les modifications non enregistrées et les vues historiques d'un mouvement ne sont pas exportées.");
+        }
         if (permission.code().equals("attestation-stock:create")) {
             restrictions.add("Une réception directe valide immédiatement le stock : elle demande aussi les autorisations Réceptionner les lots et Valider.");
         }
@@ -124,11 +130,18 @@ public final class PermissionExplanation {
         if (permission.code().equals("sinistre:view")) {
             restrictions.add("La consultation porte sur le dossier complet, y compris son historique financier ; les écritures de provision et de règlement demandent leurs propres permissions.");
         }
-        return new Details(area.page(), allows, example(permission, area), List.copyOf(restrictions));
+        String page = switch (permission.code()) {
+            case "contrat:import" -> "Production > Création / renouvellement flotte > Véhicules > Importer Excel";
+            case "contrat:export" -> "Production > Dossier flotte ou préparation du dossier > Exporter Excel";
+            default -> area.page();
+        };
+        return new Details(page, allows, example(permission, area), List.copyOf(restrictions));
     }
 
     private static String example(PermissionCatalog.Definition permission, Area area) {
         return switch (permission.code()) {
+            case "contrat:import" -> "Analyser un fichier de dix véhicules puis les ajouter au brouillon flotte, avant de les enregistrer avec les droits de création, modification ou renouvellement appropriés.";
+            case "contrat:export" -> "Télécharger le parc enregistré depuis la fiche d'une flotte, avec Consultation et Exporter les véhicules Excel, sans disposer de Modifier.";
             case "contrat:update" -> "Corriger une information dans un contrat dont la modification directe est encore autorisée, sans le supprimer.";
             case "reglement-client:refund" -> "Régler au bénéficiaire une sélection de ristournes dont le total est négatif.";
             case "reglement-client:adjust" -> "Accorder un écart motivé sur une créance, dans la limite configurée pour l'agence.";
@@ -141,6 +154,8 @@ public final class PermissionExplanation {
 
     private static String specificAllows(PermissionCatalog.Definition permission) {
         return switch (permission.code()) {
+            case "contrat:import" -> "Télécharger le modèle Excel, analyser les véhicules et garanties du fichier, puis les ajouter au formulaire flotte avant enregistrement.";
+            case "contrat:export" -> "Télécharger le fichier Excel des véhicules et garanties enregistrés d'un dossier flotte, sans pouvoir le modifier ni importer un fichier.";
             case "contrat:view" -> "Consulter les dossiers, leur détail, le registre de production, les échéances et les documents de production accessibles par ces écrans.";
             case "contrat:create" -> "Créer un dossier et saisir ses clients, véhicules, garanties et quittances dans le parcours de création, avec enregistrement du brouillon.";
             case "contrat:update" -> "Modifier les informations d'un dossier existant lorsque la modification directe est autorisée, ou poursuivre un brouillon ordinaire.";

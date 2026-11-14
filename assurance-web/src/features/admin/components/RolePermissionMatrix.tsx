@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Info, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { PermissionDetailsDialog } from "./PermissionDetailsDialog";
 import type { AdminPermission } from "../types";
 
 type Props = {
   module: string;
   resources: readonly (readonly [string, readonly AdminPermission[]])[];
+  catalogue: AdminPermission[];
   selectedIds: string[];
   editable: boolean;
   onToggle: (permission: AdminPermission, checked: boolean) => void;
@@ -19,7 +20,9 @@ const mainProductionResources = ["contrat", "avenant", "assistance", "carte-vert
 const standardActions = ["view", "create", "update"];
 const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-export function RolePermissionMatrix({ module, resources, selectedIds, editable, onToggle, onToggleMany }: Props) {
+export function RolePermissionMatrix({ module, resources, catalogue, selectedIds, editable, onToggle, onToggleMany }: Props) {
+  const [detailPermission, setDetailPermission] = useState<AdminPermission>();
+  const detailTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [search, setSearch] = useState("");
   const [selectedOnly, setSelectedOnly] = useState(false);
   const term = normalize(search);
@@ -46,11 +49,10 @@ export function RolePermissionMatrix({ module, resources, selectedIds, editable,
           checked={selectedIds.includes(permission.id)} onCheckedChange={checked => onToggle(permission, checked === true)} />
         {!compact && <span className="break-words leading-5">{action}</span>}
       </label>
-      {permission.description && <Tooltip><TooltipTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" className="size-6 shrink-0 text-muted-foreground" aria-label={`Détails : ${label}`}>
+        <Button type="button" variant="ghost" size="icon" className="size-6 shrink-0 text-muted-foreground" aria-label={`Détails : ${label}`} title="Comprendre cette permission"
+          aria-haspopup="dialog" onClick={event => { detailTriggerRef.current = event.currentTarget; setDetailPermission(permission); }}>
           <Info className="size-3.5" />
         </Button>
-      </TooltipTrigger><TooltipContent className="max-w-72 whitespace-normal">{permission.description}</TooltipContent></Tooltip>}
     </div>;
   }
 
@@ -98,5 +100,6 @@ export function RolePermissionMatrix({ module, resources, selectedIds, editable,
       </div>
     </section>)}
     {visible.length === 0 && <p className="border-y px-3 py-8 text-center text-sm text-muted-foreground">Aucune autorisation ne correspond aux filtres.</p>}
+    <PermissionDetailsDialog permission={detailPermission} catalogue={catalogue} triggerRef={detailTriggerRef} onClose={() => setDetailPermission(undefined)} />
   </div>;
 }

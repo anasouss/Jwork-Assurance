@@ -51,6 +51,12 @@ export type AdminPermission = {
   actionLabel?: string | null;
   sensitive?: boolean;
   assignable?: boolean;
+  details?: {
+    page: string;
+    allows: string;
+    example: string;
+    restrictions: string[];
+  } | null;
 };
 
 export type AdminAuditEvent = {

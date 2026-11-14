@@ -3,6 +3,7 @@ package com.assurance.dto.response;
 import com.assurance.entity.Permission;
 import com.assurance.security.PermissionDependencies;
 import com.assurance.security.PermissionCatalog;
+import com.assurance.security.PermissionExplanation;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,6 +25,7 @@ public class AdminPermissionResponse {
     private String actionLabel;
     private Boolean sensitive;
     private Boolean assignable;
+    private PermissionExplanation.Details details;
 
     public static AdminPermissionResponse from(Permission permission) {
         PermissionCatalog.Definition definition = PermissionCatalog.find(permission.getCode());
@@ -40,6 +42,7 @@ public class AdminPermissionResponse {
                 .action(definition == null ? null : definition.action())
                 .actionLabel(definition == null ? null : definition.actionLabel())
                 .sensitive(definition != null && definition.sensitive())
+                .details(PermissionExplanation.forPermission(definition))
                 .build();
     }
 }

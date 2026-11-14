@@ -2941,7 +2941,7 @@ export function RolesPanel({
                       <h3 className="text-sm font-semibold">{moduleLabel(module)}</h3>
                       <p className="text-xs text-muted-foreground">{selectedCount} autorisation(s) sélectionnée(s)</p>
                     </div>
-                    <RolePermissionMatrix module={module} resources={resources}
+                    <RolePermissionMatrix module={module} resources={resources} catalogue={permissions}
                       selectedIds={form.permissionIds} editable={canAssignPermissions}
                       onToggle={(permission, checked) => setForm(current => ({
                         ...current,

@@ -1726,6 +1726,9 @@ public class ReferentielController {
         convention.setIntitule(request.getIntitule());
         convention.setDescription(blankToNull(request.getDescription()));
         convention.setOrganismeConventionne(blankToNull(request.getOrganismeConventionne()));
+        convention.setAdresse(blankToNull(request.getAdresse()));
+        convention.setVille(request.getVilleId() == null ? null : villeRepository.findById(request.getVilleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Ville", request.getVilleId())));
         convention.setCategorieClient(categorieClient);
         convention.setGrilleTarifaire(grille);
         convention.setDateEffet(request.getDateEffet());
@@ -1747,6 +1750,9 @@ public class ReferentielController {
                 .putValue("compagnieAssuranceId", compagnie != null ? compagnie.getId() : null)
                 .putValue("compagnieAssuranceLibelle", compagnie != null ? compagnie.getNom() : null)
                 .putValue("organismeConventionne", convention.getOrganismeConventionne())
+                .putValue("adresse", convention.getAdresse())
+                .putValue("villeId", convention.getVille() == null ? null : convention.getVille().getId())
+                .putValue("ville", convention.getVille() == null ? null : convention.getVille().getNom())
                 .putValue("categorieClientId", categorieClient != null ? categorieClient.getId() : null)
                 .putValue("categorieClientLibelle", categorieClient != null ? categorieClient.getLibelle() : null)
                 .putValue("grilleTarifaireId", grille != null ? grille.getId() : null)

@@ -118,6 +118,8 @@ public final class CompanyCatalogueActivity {
                 convention.getCode() + " - " + convention.getIntitule()),
                 new ActivityValues().put("Code", convention.getCode()).put("Intitulé", convention.getIntitule())
                         .put("Description", convention.getDescription()).put("Organisme conventionné", convention.getOrganismeConventionne())
+                        .put("Adresse", convention.getAdresse())
+                        .put("Ville", convention.getVille() == null ? null : convention.getVille().getNom())
                         .put("Compagnie", convention.getCompagnieAssurance().getNom())
                         .put("Catégorie client", convention.getCategorieClient() == null ? null : convention.getCategorieClient().getLibelle())
                         .put("Grille tarifaire", convention.getGrilleTarifaire() == null ? null : convention.getGrilleTarifaire().getLibelle())

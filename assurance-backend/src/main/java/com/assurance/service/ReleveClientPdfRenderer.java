@@ -153,14 +153,15 @@ public class ReleveClientPdfRenderer {
     }
 
     private void writeConventionSummary(Document document, DocumentClient source, PdfFont bold) {
-        Table table = new Table(UnitValue.createPercentArray(new float[]{44, 36, 20}))
+        Table table = new Table(UnitValue.createPercentArray(new float[]{80, 20}))
                 .useAllAvailableWidth().setFixedLayout();
-        addHeader(table, "DÉSIGNATION", bold);
-        addHeader(table, "PÉRIODE FACTURÉE", bold);
+        addHeader(table, "LIBELLÉ", bold);
         addHeader(table, "MONTANT", bold);
-        addValue(table, "Primes d'assurance", TextAlignment.LEFT, null);
-        addValue(table, "Du " + LONG_DATE_FORMAT.format(source.getPeriodeDebut())
-                + " au " + LONG_DATE_FORMAT.format(source.getPeriodeFin()), TextAlignment.CENTER, null);
+        String label = source.getLignes().stream().map(LigneDocumentClient::getLibelleDocument)
+                .filter(text -> text != null && !text.isBlank()).distinct().collect(Collectors.joining(" ; "));
+        addValue(table, (label.isBlank() ? "Production convention" : label) + " ("
+                + LONG_DATE_FORMAT.format(source.getPeriodeDebut()) + " au "
+                + LONG_DATE_FORMAT.format(source.getPeriodeFin()) + ")", TextAlignment.LEFT, null);
         addValue(table, amount(source.getTotalDocument()), TextAlignment.RIGHT, bold);
         document.add(table);
     }
@@ -251,6 +252,15 @@ public class ReleveClientPdfRenderer {
                 .setBackgroundColor(LIGHT_BLUE)
                 .setPadding(4));
         if (conventionInvoice) {
+            String conventionAddress = java.util.stream.Stream.of(source.getConventionAdresse(), source.getConventionVille())
+                    .filter(text -> text != null && !text.isBlank())
+                    .map(String::trim).collect(Collectors.joining("\n"));
+            if (!conventionAddress.isBlank()) {
+                recipient.addCell(new Cell()
+                        .add(new Paragraph(conventionAddress.toUpperCase(Locale.FRENCH))
+                                .setFontSize(8.5f).setTextAlignment(TextAlignment.CENTER).setMargin(0))
+                        .setBorder(TABLE_BORDER).setBorderTop(Border.NO_BORDER).setPaddings(5, 4, 5, 4));
+            }
             document.add(recipient);
             return;
         }

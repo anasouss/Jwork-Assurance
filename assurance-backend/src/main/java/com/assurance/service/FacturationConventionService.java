@@ -499,6 +499,9 @@ public class FacturationConventionService {
                 .totalDocument(ZERO)
                 .notes(trimToNull(request.getNotes()))
                 .conventionFacturee(selected.get(0).getContrat().getConvention().getIntitule())
+                .conventionAdresse(selected.get(0).getContrat().getConvention().getAdresse())
+                .conventionVille(selected.get(0).getContrat().getConvention().getVille() == null ? null
+                        : selected.get(0).getContrat().getConvention().getVille().getNom())
                 .build();
 
         BigDecimal debit = ZERO;

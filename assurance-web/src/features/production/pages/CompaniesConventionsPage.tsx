@@ -18,6 +18,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AutocompleteSelect } from "@/components/ui/autocomplete-select";
+import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 import { toDateOnly } from "../date";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -90,6 +92,13 @@ export default function CompaniesConventionsPage() {
   const conventions = useQuery({
     queryKey: ["referentiel", "conventions"],
     queryFn: () => referenceApi.list("conventions"),
+    staleTime: 60_000,
+  });
+
+  const villes = useQuery({
+    queryKey: ["referentiel", "villes"],
+    queryFn: () => referenceApi.list("villes"),
+    enabled: dialogOpen,
     staleTime: 60_000,
   });
 
@@ -276,7 +285,7 @@ export default function CompaniesConventionsPage() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null); }}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier convention" : "Ajouter convention"}</DialogTitle>
             <DialogDescription>La grille et les usages autorisés pilotent le calcul automatique des garanties convention.</DialogDescription>
@@ -370,8 +379,26 @@ export default function CompaniesConventionsPage() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Description">
+            <Field label="Description" className="md:col-span-2">
               <Input value={payload.description ?? ""} onChange={(event) => updatePayload(setPayload, { description: event.target.value })} />
+            </Field>
+            <Field label="Adresse">
+              <Textarea rows={2} maxLength={500} value={payload.adresse ?? ""} disabled={saveConvention.isPending}
+                onChange={(event) => updatePayload(setPayload, { adresse: event.target.value })} />
+            </Field>
+            <Field label="Ville" className="content-start">
+              <AutocompleteSelect value={payload.villeId ?? ""} disabled={saveConvention.isPending || villes.isPending || villes.isError}
+                placeholder="Sélectionner une ville" emptyText="Aucune ville trouvée" invalidText="Choisissez une ville existante."
+                options={[
+                  ...(villes.data ?? []).map(ville => ({ value: ville.id, label: ville.libelle })),
+                  ...(payload.villeId && editing && conventionField(editing, "villeId") === payload.villeId
+                    && !villes.data?.some(ville => ville.id === payload.villeId)
+                    ? [{ value: payload.villeId, label: conventionField(editing, "ville") || "-" }] : []),
+                ]}
+                onValueChange={value => updatePayload(setPayload, { villeId: value || undefined })} />
+              {villes.isError && <div role="alert" className="mt-1 text-sm text-destructive">
+                {villes.error.message}<Button type="button" variant="link" size="sm" onClick={() => void villes.refetch()}>Réessayer</Button>
+              </div>}
             </Field>
           </div>
 
@@ -474,6 +501,8 @@ function submitConvention(
       code: payload.code.trim(),
       intitule: payload.intitule.trim(),
       description: payload.description?.trim() || undefined,
+      adresse: payload.adresse?.trim() || undefined,
+      villeId: payload.villeId || undefined,
       echeance: payload.typeEcheance === "A_ECHEANCE" ? payload.echeance : undefined,
       actif: true,
     },
@@ -500,6 +529,8 @@ function conventionPayload(convention: ReferenceOption): UpsertConventionRequest
     intitule: convention.libelle,
     description: conventionField(convention, "description"),
     organismeConventionne: conventionField(convention, "organismeConventionne"),
+    adresse: conventionField(convention, "adresse"),
+    villeId: conventionField(convention, "villeId") || undefined,
     dateEffet: conventionField(convention, "dateEffet") || undefined,
     dateEcheance: conventionField(convention, "dateEcheance") || undefined,
     typeEcheance: conventionField(convention, "typeEcheance") === "A_ECHEANCE" ? "A_ECHEANCE" : "DATE_A_DATE",

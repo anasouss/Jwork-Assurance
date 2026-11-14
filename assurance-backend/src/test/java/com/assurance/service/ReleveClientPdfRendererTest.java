@@ -164,7 +164,8 @@ class ReleveClientPdfRendererTest {
         try (PDDocument pdf = PDDocument.load(renderer.render(source, false))) {
             PDFTextStripper firstPage = new PDFTextStripper();
             firstPage.setEndPage(1);
-            assertThat(firstPage.getText(pdf)).contains("AOSFOC", "DÉSIGNATION", "PÉRIODE FACTURÉE", "MONTANT")
+            assertThat(firstPage.getText(pdf)).contains("AOSFOC", "LIBELLÉ", "MONTANT", "Production Automobile",
+                            "01/01/2026 au 31/03/2026")
                     .doesNotContain("PAYEUR_CONFIDENTIEL", "ADRESSE_CONFIDENTIELLE", "ICE_CONFIDENTIEL");
             assertThat(new PDFTextStripper().getText(pdf)).contains("Assuré", "ASSURE_1", "POL-1", "TOTAL À PAYER")
                     .doesNotContain("CONTRAT-AN-", "Quittance N°", "(MAD)");
@@ -193,6 +194,24 @@ class ReleveClientPdfRendererTest {
         }
     }
 
+    @Test
+    void conventionRecipientUsesSavedAddressRatherThanCurrentReferenceOrPayerAddress() throws Exception {
+        DocumentClient source = conventionInvoice(1);
+        source.setConventionAdresse("AVENUE MOHAMED\nBP 1692");
+        source.setConventionVille("AGADIR");
+        var currentConvention = com.assurance.entity.Convention.builder().adresse("NOUVELLE_ADRESSE")
+                .ville(com.assurance.entity.Ville.builder().nom("NOUVELLE_VILLE").build()).build();
+        source.getLignes().get(0).setElementFacturable(ElementFacturable.builder().contrat(
+                Contrat.builder().typeContrat(com.assurance.enums.TypeContrat.CONVENTION)
+                        .convention(currentConvention).build()).build());
+        try (PDDocument pdf = PDDocument.load(renderer.render(source, false))) {
+            PDFTextStripper firstPage = new PDFTextStripper();
+            firstPage.setEndPage(1);
+            assertThat(firstPage.getText(pdf)).contains("AOSFOC", "AVENUE MOHAMED", "BP 1692", "AGADIR")
+                    .doesNotContain("NOUVELLE_ADRESSE", "NOUVELLE_VILLE", "ADRESSE_CONFIDENTIELLE");
+        }
+    }
+
     private DocumentClient conventionInvoice(int count) {
         DocumentClient source = statement(count);
         source.setTypeDocument(com.assurance.enums.TypeDocumentClient.FACTURE);
@@ -206,6 +225,7 @@ class ReleveClientPdfRendererTest {
         source.setPayeurAdresse("ADRESSE_CONFIDENTIELLE");
         source.setPayeurIce("ICE_CONFIDENTIEL");
         for (LigneDocumentClient line : source.getLignes()) {
+            line.setLibelleDocument("Production Automobile - Trimestre 1 / 2026");
             line.setAssureConvention("ASSURE_" + line.getOrdre());
             line.setNumeroQuittance("CONTRAT-AN-" + line.getOrdre());
             line.setCompagnie("MATU");

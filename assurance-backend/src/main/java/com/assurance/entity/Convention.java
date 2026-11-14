@@ -27,7 +27,8 @@ import java.util.Set;
 @Table(name = "conventions", indexes = {
         @Index(name = "idx_convention_agence", columnList = "agence_id"),
         @Index(name = "idx_convention_compagnie", columnList = "compagnie_assurance_id"),
-        @Index(name = "idx_convention_actif", columnList = "actif")
+        @Index(name = "idx_convention_actif", columnList = "actif"),
+        @Index(name = "idx_convention_ville", columnList = "ville_id")
 })
 @Getter
 @Setter
@@ -55,6 +56,13 @@ public class Convention extends BaseEntity {
 
     @Column(name = "organisme_conventionne", length = 180)
     private String organismeConventionne;
+
+    @Column(length = 500)
+    private String adresse;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ville_id")
+    private Ville ville;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categorie_client_id")

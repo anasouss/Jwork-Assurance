@@ -21,6 +21,9 @@ public class UpsertConventionRequest {
 
     private String description;
     private String organismeConventionne;
+    @jakarta.validation.constraints.Size(max = 500)
+    private String adresse;
+    private Long villeId;
     private LocalDate dateEffet;
     private LocalDate dateEcheance;
 

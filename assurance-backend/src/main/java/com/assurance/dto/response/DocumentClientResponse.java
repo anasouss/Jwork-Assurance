@@ -36,6 +36,8 @@ public class DocumentClientResponse {
     private BigDecimal totalDocument;
     private String notes;
     private String conventionFacturee;
+    private String conventionAdresse;
+    private String conventionVille;
     private Integer versionDocument;
     private Long documentOrigineId;
     private String numeroDocumentOrigine;

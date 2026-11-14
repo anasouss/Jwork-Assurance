@@ -1398,6 +1398,8 @@ public class DocumentClientService {
                 .totalDocument(document.getTotalDocument())
                 .notes(document.getNotes())
                 .conventionFacturee(document.getConventionFacturee())
+                .conventionAdresse(document.getConventionAdresse())
+                .conventionVille(document.getConventionVille())
                 .versionDocument(document.getVersionDocument())
                 .documentOrigineId(document.getDocumentOrigine() == null
                         ? null : document.getDocumentOrigine().getId())

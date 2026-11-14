@@ -16,6 +16,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class InvoiceActivityTest {
     @Test
+    void invoiceAuditIncludesConventionAddressSnapshot() {
+        DocumentClient invoice = DocumentClient.builder().conventionFacturee("AOSFOC")
+                .conventionAdresse("BP 1692").conventionVille("Agadir").build();
+        assertThat(InvoiceActivity.snapshot(invoice))
+                .containsEntry("Convention facturée", "AOSFOC")
+                .containsEntry("Adresse de la convention", "BP 1692")
+                .containsEntry("Ville de la convention", "Agadir");
+    }
+
+    @Test
     void oneInvoiceContainsLineContentAndSourceReferencesWithoutLineEvents() {
         Agence agency = Agence.builder().build();
         agency.setId(7L);

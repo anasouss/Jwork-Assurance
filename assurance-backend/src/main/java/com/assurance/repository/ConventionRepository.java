@@ -10,9 +10,9 @@ import java.util.Optional;
 public interface ConventionRepository extends JpaRepository<Convention, Long> {
     Optional<Convention> findByAgenceIdAndId(Long agenceId, Long id);
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "categorieClient", "grilleTarifaire", "usages"})
+    @EntityGraph(attributePaths = {"compagnieAssurance", "categorieClient", "grilleTarifaire", "usages", "ville"})
     List<Convention> findByAgenceIdAndActifTrueOrderByIntituleAsc(Long agenceId);
 
-    @EntityGraph(attributePaths = {"compagnieAssurance", "categorieClient", "grilleTarifaire", "usages"})
+    @EntityGraph(attributePaths = {"compagnieAssurance", "categorieClient", "grilleTarifaire", "usages", "ville"})
     List<Convention> findByAgenceIdAndCompagnieAssuranceIdAndActifTrueOrderByIntituleAsc(Long agenceId, Long compagnieAssuranceId);
 }

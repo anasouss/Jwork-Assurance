@@ -1501,6 +1501,8 @@ export type UpsertConventionRequest = {
   intitule: string;
   description?: string;
   organismeConventionne?: string;
+  adresse?: string;
+  villeId?: string;
   dateEffet?: string;
   dateEcheance?: string;
   typeEcheance: "A_ECHEANCE" | "DATE_A_DATE";

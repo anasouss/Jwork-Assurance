@@ -489,6 +489,8 @@ export type ClientDocument = {
   totalDocument: number;
   notes?: string | null;
   conventionFacturee?: string | null;
+  conventionAdresse?: string | null;
+  conventionVille?: string | null;
   versionDocument: number;
   documentOrigineId?: string | null;
   numeroDocumentOrigine?: string | null;

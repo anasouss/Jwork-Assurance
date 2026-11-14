@@ -121,6 +121,12 @@ public class DocumentClient extends AuditedEntity {
     @Column(name = "convention_facturee", length = 220)
     private String conventionFacturee;
 
+    @Column(name = "convention_adresse", length = 500)
+    private String conventionAdresse;
+
+    @Column(name = "convention_ville", length = 120)
+    private String conventionVille;
+
     @Column(name = "version_document", nullable = false)
     @Builder.Default
     private Integer versionDocument = 1;

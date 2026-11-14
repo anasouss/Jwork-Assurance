@@ -54,6 +54,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { adminApi } from "../api";
 import { AgencyImageUploadField } from "./AgencyImageUploadField";
+import { RolePermissionMatrix } from "./RolePermissionMatrix";
 import type {
   AdminAgency,
   AdminAuditEvent,
@@ -2918,7 +2919,7 @@ export function RolesPanel({
               onValueChange={setPermissionModule}
               className="grid min-w-0 items-start gap-3 md:grid-cols-[190px_minmax(0,1fr)]"
             >
-              <TabsList className="h-auto w-full items-stretch justify-start">
+              <TabsList className="h-auto w-full items-stretch justify-start md:sticky md:top-20">
                 {groupedPermissions.map(([module, resources]) => {
                   const modulePermissions = resources.flatMap(([, items]) => items);
                   const selectedCount = modulePermissions.filter((permission) => form.permissionIds.includes(permission.id)).length;
@@ -2934,67 +2935,25 @@ export function RolesPanel({
               {groupedPermissions.map(([module, resources]) => {
                 const modulePermissions = resources.flatMap(([, items]) => items);
                 const selectedCount = modulePermissions.filter((permission) => form.permissionIds.includes(permission.id)).length;
-                const allSelected = selectedCount === modulePermissions.length && modulePermissions.length > 0;
                 return (
-                  <TabsContent key={module} value={module} className="grid gap-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <h3 className="text-sm font-semibold">{moduleLabel(module)}</h3>
-                        <p className="text-xs text-muted-foreground">{selectedCount} autorisation(s) sélectionnée(s)</p>
-                      </div>
-                      <label className="flex items-center gap-2 text-sm font-medium">
-                        <Checkbox
-                          disabled={!canAssignPermissions}
-                          checked={allSelected ? true : selectedCount > 0 ? "indeterminate" : false}
-                          onCheckedChange={(checked) => setForm((current) => ({
-                            ...current,
-                            permissionIds: checked === true
-                              ? includePermissionDependencies(
-                                  [...current.permissionIds, ...modulePermissions.filter(permission => permission.assignable !== false).map((permission) => permission.id)],
-                                  permissions,
-                                )
-                              : removePermissionSelection(
-                                  current.permissionIds,
-                                  modulePermissions.filter(permission => permission.assignable !== false).map((permission) => permission.id),
-                                  permissions,
-                                ),
-                          }))}
-                        />
-                        Tout autoriser
-                      </label>
+                  <TabsContent key={module} value={module} className="min-w-0 space-y-3">
+                    <div>
+                      <h3 className="text-sm font-semibold">{moduleLabel(module)}</h3>
+                      <p className="text-xs text-muted-foreground">{selectedCount} autorisation(s) sélectionnée(s)</p>
                     </div>
-
-                    <div className="divide-y rounded-md border">
-                      {resources.map(([resource, items]) => (
-                        <section key={resource} className="grid gap-2 p-3">
-                          <div className="text-xs font-semibold uppercase text-muted-foreground">{items[0]?.resourceLabel ?? resourceLabel(resource)}</div>
-                          <div className="grid gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-                            {items.map((permission) => (
-                              <label key={permission.id} className="flex min-h-8 items-start gap-2 text-sm">
-                                <Checkbox
-                                  className="mt-0.5"
-                                  disabled={!canAssignPermissions || permission.assignable === false}
-                                  checked={form.permissionIds.includes(permission.id)}
-                                  onCheckedChange={(checked) => setForm((current) => ({
-                                    ...current,
-                                    permissionIds: updatePermissionSelection(
-                                      current.permissionIds,
-                                      permission,
-                                      checked === true,
-                                      permissions,
-                                    ),
-                                  }))}
-                                />
-                                <span className="grid gap-1">
-                                  <span className="font-medium leading-5">{permission.actionLabel ?? permission.nom}</span>
-                                  {permission.sensitive && permission.description && <span className="text-xs font-normal text-muted-foreground">{permission.description}</span>}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </section>
-                      ))}
-                    </div>
+                    <RolePermissionMatrix module={module} resources={resources}
+                      selectedIds={form.permissionIds} editable={canAssignPermissions}
+                      onToggle={(permission, checked) => setForm(current => ({
+                        ...current,
+                        permissionIds: updatePermissionSelection(current.permissionIds, permission, checked, permissions),
+                      }))}
+                      onToggleMany={(items, checked) => setForm(current => ({
+                        ...current,
+                        permissionIds: checked
+                          ? includePermissionDependencies([...current.permissionIds, ...items.map(permission => permission.id)], permissions)
+                          : removePermissionSelection(current.permissionIds, items.map(permission => permission.id), permissions),
+                      }))}
+                    />
                   </TabsContent>
                 );
               })}

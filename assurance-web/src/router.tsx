@@ -342,6 +342,10 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/crm/pages/ClientCrmPage")),
       },
       {
+        path: "crm/clients/:clientId/portail",
+        lazy: lazyRoute(() => import("@/features/crm/pages/ClientPortalPage")),
+      },
+      {
         path: "crm/parametres",
         lazy: lazyRoute(() => import("@/features/crm/pages/CrmSettingsPage")),
       },

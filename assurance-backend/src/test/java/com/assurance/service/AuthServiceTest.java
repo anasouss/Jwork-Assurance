@@ -74,6 +74,7 @@ class AuthServiceTest {
         String currentToken = "current-browser-secret";
         String nextToken = "next-browser-secret";
         Utilisateur user = user();
+        when(user.getActif()).thenReturn(true);
         RefreshSession currentSession = RefreshSession.builder()
                 .id(4L)
                 .user(user)
@@ -104,6 +105,24 @@ class AuthServiceTest {
         RefreshSession replacement = saved.getAllValues().get(1);
         assertThat(replacement.getToken()).isEqualTo(hash(nextToken));
         assertThat(replacement.getToken()).doesNotContain(nextToken);
+    }
+
+    @Test
+    void mobileRefreshCannotConsumeBrowserSession() {
+        String token = "browser-only-secret";
+        RefreshSession session = RefreshSession.builder().id(4L).user(Utilisateur.builder().actif(true).build()).mobile(false)
+                .expiresAt(LocalDateTime.now().plusDays(1)).build();
+        when(refreshSessionRepository.findByTokenForUpdate(hash(token))).thenReturn(Optional.of(session));
+        assertThatThrownBy(() -> service.refreshMobile(token, request)).isInstanceOf(UnauthorizedException.class);
+    }
+
+    @Test
+    void browserRefreshCannotConsumeMobileSession() {
+        String token = "mobile-only-secret";
+        RefreshSession session = RefreshSession.builder().id(4L).user(Utilisateur.builder().actif(true).build()).mobile(true)
+                .expiresAt(LocalDateTime.now().plusDays(1)).build();
+        when(refreshSessionRepository.findByTokenForUpdate(hash(token))).thenReturn(Optional.of(session));
+        assertThatThrownBy(() -> service.refreshToken(token, request)).isInstanceOf(UnauthorizedException.class);
     }
 
     @Test

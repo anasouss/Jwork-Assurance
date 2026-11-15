@@ -6,6 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface PieceJointeRepository extends JpaRepository<PieceJointe, Long> {
+    @org.springframework.data.jpa.repository.Query("select p from PieceJointe p where p.contrat.id = :contract and p.contrat.agence.id = :agency and (p.agence is null or p.agence.id = :agency) and (p.archived = false or p.archived is null) order by p.id desc")
+    org.springframework.data.domain.Page<PieceJointe> findPortalSources(
+            @org.springframework.data.repository.query.Param("agency") Long agency,
+            @org.springframework.data.repository.query.Param("contract") Long contract,
+            org.springframework.data.domain.Pageable pageable);
     List<PieceJointe> findByAgenceIdAndClientIdOrderByCreatedAtDesc(Long agenceId, Long clientId);
     List<PieceJointe> findByAgenceIdAndVehiculeIdOrderByCreatedAtDesc(Long agenceId, Long vehiculeId);
 

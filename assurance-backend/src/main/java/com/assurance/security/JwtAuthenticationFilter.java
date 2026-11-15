@@ -3,6 +3,9 @@ package com.assurance.security;
 import com.assurance.enums.StatutAgence;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.RefreshSessionRepository;
+import com.assurance.repository.ClientPortalSessionRepository;
+import com.assurance.service.ClientPortalAuthService;
+import com.assurance.service.MobileAuthRateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,11 +30,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserDetailsServiceImpl userDetailsService;
     private final AgenceRepository agenceRepository;
     private final RefreshSessionRepository refreshSessionRepository;
+    private final ClientPortalSessionRepository clientPortalSessionRepository;
+    private final ClientPortalAuthService clientPortalAuthService;
+    private final MobileAuthRateLimitService mobileAuthRateLimitService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
+            String path = java.util.Objects.toString(request.getServletPath(),
+                    java.util.Objects.toString(request.getRequestURI(), ""));
+            if (path.startsWith("/api/v1/client-portal") || path.startsWith("/api/v1/client-accounts")
+                    || path.startsWith("/api/v1/mobile/auth")) {
+                response.setHeader("Cache-Control", "no-store");
+                response.setHeader("Pragma", "no-cache");
+            }
+            if ("POST".equals(request.getMethod()) && (
+                    path.startsWith("/api/v1/client-portal/auth/")
+                    || path.startsWith("/api/v1/mobile/auth/"))
+                    && !mobileAuthRateLimitService.allow(request.getRemoteAddr())) {
+                response.setStatus(429);
+                response.setHeader("Retry-After", "60");
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+                response.getWriter().write("{\"success\":false,\"message\":\"Trop de tentatives. Réessayez dans une minute.\"}");
+                return;
+            }
             String jwt = resolveToken(request);
             if (StringUtils.hasText(jwt)) {
                 if (!tokenProvider.validateToken(jwt)) {
@@ -39,31 +63,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 try {
-                    Long userId = tokenProvider.getUserIdFromToken(jwt);
-                    UserDetails userDetails = userDetailsService.loadUserById(userId);
-                    Long effectiveAgenceId = tokenProvider.getAgenceIdFromToken(jwt);
-                    Long sessionId = tokenProvider.getSessionIdFromToken(jwt);
-                    if (!(userDetails instanceof UserPrincipal principal)
-                            || !isValidAgencyContext(principal, effectiveAgenceId)
-                            || sessionId == null
-                            || !refreshSessionRepository.existsValidContext(
-                                    sessionId,
-                                    userId,
-                                    effectiveAgenceId,
-                                    LocalDateTime.now()
-                            )) {
-                        rejectInvalidToken(response);
-                        return;
-                    }
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    if (tokenProvider.isClientPortalToken(jwt)) {
+                        authenticateClient(jwt, request);
+                    } else {
+                        Long userId = tokenProvider.getUserIdFromToken(jwt);
+                        UserDetails userDetails = userDetailsService.loadUserById(userId);
+                        Long effectiveAgenceId = tokenProvider.getAgenceIdFromToken(jwt);
+                        Long sessionId = tokenProvider.getSessionIdFromToken(jwt);
+                        if (!(userDetails instanceof UserPrincipal principal)
+                                || !isValidAgencyContext(principal, effectiveAgenceId)
+                                || sessionId == null
+                                || !refreshSessionRepository.existsValidContext(
+                                        sessionId,
+                                        userId,
+                                        effectiveAgenceId,
+                                        LocalDateTime.now()
+                                )) {
+                            rejectInvalidToken(response);
+                            return;
+                        }
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                    TenantContext.setCurrentUser(principal.getId());
-                    TenantContext.setCurrentAgence(effectiveAgenceId);
-                    TenantContext.setCurrentSession(sessionId);
-                    TenantContext.setCurrentUsername(principal.getUsername());
+                        TenantContext.setCurrentUser(principal.getId());
+                        TenantContext.setCurrentAgence(effectiveAgenceId);
+                        TenantContext.setCurrentSession(sessionId);
+                        TenantContext.setCurrentUsername(principal.getUsername());
+                    }
                 } catch (RuntimeException ex) {
                     rejectInvalidToken(response);
                     return;
@@ -84,6 +112,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return effectiveAgenceId == null
                 ? platformAdmin
                 : agenceRepository.existsByIdAndStatut(effectiveAgenceId, StatutAgence.ACTIVE);
+    }
+
+    private void authenticateClient(String jwt, HttpServletRequest request) {
+        Long accountId = tokenProvider.getUserIdFromToken(jwt);
+        Long agenceId = tokenProvider.getAgenceIdFromToken(jwt);
+        Long sessionId = tokenProvider.getSessionIdFromToken(jwt);
+        if (sessionId == null || agenceId == null) {
+            throw new IllegalArgumentException("Missing client session context");
+        }
+        var session = clientPortalSessionRepository.findValid(sessionId, accountId, agenceId, LocalDateTime.now())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid client session"));
+        var account = session.getAccount();
+        if (!clientPortalAuthService.available(account)) {
+            throw new IllegalArgumentException("Disabled client account");
+        }
+        var principal = new ClientPortalPrincipal(accountId, agenceId, account.getClient().getId());
+        var authentication = new UsernamePasswordAuthenticationToken(principal, null,
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("CLIENT_PORTAL")));
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        TenantContext.setCurrentAgence(agenceId);
+        // A portal account is never an employee audit actor, even if numeric IDs coincide.
     }
 
     private String resolveToken(HttpServletRequest request) {

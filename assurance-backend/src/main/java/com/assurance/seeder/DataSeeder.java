@@ -185,10 +185,9 @@ public class DataSeeder implements CommandLineRunner {
         seedParametreApplication("TAUX_RSS", "DECIMAL", "0.60", "Coefficient RC des contrats avec reduction saharienne");
         seedParametreApplication("MULTIPLICATEUR_RC_DEFAUT", "DECIMAL", "1", "Multiplicateur RC par defaut");
         seedParametreApplication("MULTIPLICATEUR_RC_TPV", "DECIMAL", "1", "Multiplicateur RC TPV par defaut");
-        seedParametreApplication("DR_MODE_VARIABLE", "BOOLEAN", "false", "Autorise le mode variable pour Defense et Recours");
-        seedParametreApplication("RVE_TAUX_ZERO_AUTORISE", "BOOLEAN", "false", "Autorise les lignes RVE a taux zero");
         seedParametreApplication("ENABLE_ATTESTATION_STOCK_CHECK", "BOOLEAN", "1", "Active le controle du stock des attestations pendant la production");
         seedParametreApplication("ENABLE_FLEET_EXCEL_GUARANTEE_IMPORT", "BOOLEAN", "false", "Active la feuille et l'import des garanties dans le modele Excel flotte");
+        seedParametreApplication("ENABLE_CLIENT_PORTAL", "BOOLEAN", "false", "Active le portail client et sa gestion dans le CRM");
 
         CategorieClient grandPublic = seedCategorieClient("GRAND_PUBLIC", "GRAND PUBLIC");
         CategorieClient location = seedCategorieClient("LOCATION", "LOCATION");

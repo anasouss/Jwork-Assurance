@@ -57,11 +57,19 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
+                                "/api/v1/mobile/auth/login",
+                                "/api/v1/mobile/auth/refresh",
+                                "/api/v1/mobile/auth/logout",
+                                "/api/v1/client-portal/auth/login",
+                                "/api/v1/client-portal/auth/refresh",
+                                "/api/v1/client-portal/auth/logout",
                                 "/actuator/health",
                                 "/swagger-ui/**",
                                 "/api-docs/**"
                         ).permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/v1/client-portal/**").hasAuthority("CLIENT_PORTAL")
+                        .anyRequest().access(new org.springframework.security.web.access.expression.WebExpressionAuthorizationManager(
+                                "isAuthenticated() and !hasAuthority('CLIENT_PORTAL')"))
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

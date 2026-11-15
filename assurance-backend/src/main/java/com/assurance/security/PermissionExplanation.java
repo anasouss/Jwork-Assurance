@@ -13,6 +13,8 @@ public final class PermissionExplanation {
     }
 
     private static final Map<String, Area> AREAS = Map.ofEntries(
+            Map.entry("client-portal-account", new Area("CRM > Comptes du portail client", "un compte de consultation client")),
+            Map.entry("client-portal-publication", new Area("CRM > Portail client > Publications", "un document ou un suivi destiné au client")),
             Map.entry("contrat", new Area("Production > Liste des dossiers / Ajouter un dossier", "un dossier automobile")),
             Map.entry("avenant", new Area("Production > Liste des dossiers > Actions > Avenant", "un changement de véhicule")),
             Map.entry("assistance", new Area("Production > Dossier > Assistance", "une assistance automobile liée à un véhicule")),
@@ -91,6 +93,10 @@ public final class PermissionExplanation {
         String allows = specificAllows(permission);
         List<String> restrictions = new ArrayList<>();
         restrictions.add("Les règles de validation et le périmètre de données restent applicables. Cette autorisation ne donne pas un accès inter-agences.");
+        if (permission.resource().startsWith("client-portal-")) {
+            restrictions.add("Le portail client est en consultation seule. La création du compte ne partage aucun dossier automatiquement. Vérifiez l'identité ou le mandat du bénéficiaire avant tout partage ; être payeur ne constitue pas une autorisation d'accès.");
+            restrictions.add("Les comptes et publications concernent uniquement l'agence courante. Les droits de consultation du contrat ou du sinistre source sont contrôlés séparément lors du partage et de la publication.");
+        }
         if (List.of("garantie", "regle-fiscale", "usage", "marque", "carrosserie", "carburant", "sous-classe",
                 "categorie-transport", "categorie-client", "groupe-usage-attestation", "tarif-usage",
                 "compagnie-assurance", "compagnie-assistance", "convention", "grille-tarifaire",
@@ -154,6 +160,14 @@ public final class PermissionExplanation {
 
     private static String specificAllows(PermissionCatalog.Definition permission) {
         return switch (permission.code()) {
+            case "client-portal-account:view" -> "Consulter les comptes clients de l'agence et leurs accès explicites aux dossiers, sans voir les mots de passe.";
+            case "client-portal-account:create" -> "Créer un compte pour un client existant avec un identifiant CIN, RC ou autre identifiant vérifié, et un mot de passe initial à changer. Aucun dossier n'est partagé automatiquement.";
+            case "client-portal-account:deactivate" -> "Désactiver ou réactiver un compte client. La désactivation révoque immédiatement ses sessions.";
+            case "client-portal-account:reset-password" -> "Définir un nouveau mot de passe initial, révoquer les sessions et imposer son changement à la prochaine connexion.";
+            case "client-portal-account:assign" -> "Partager ou retirer explicitement un contrat ou un sinistre de l'agence pour un compte client vérifié. Ne modifie pas le dossier métier et ne donne pas de droits de salarié au client.";
+            case "client-portal-publication:view" -> "Consulter les documents et messages publiés ou retirés pour un accès client.";
+            case "client-portal-publication:create" -> "Publier un document existant du dossier ou rédiger une mise à jour de sinistre destinée au client. Les notes internes ne sont pas publiées automatiquement.";
+            case "client-portal-publication:deactivate" -> "Retirer un document ou message du portail client sans supprimer le document métier d'origine.";
             case "contrat:import" -> "Télécharger le modèle Excel, analyser les véhicules et garanties du fichier, puis les ajouter au formulaire flotte avant enregistrement.";
             case "contrat:export" -> "Télécharger le fichier Excel des véhicules et garanties enregistrés d'un dossier flotte, sans pouvoir le modifier ni importer un fichier.";
             case "contrat:view" -> "Consulter les dossiers, leur détail, le registre de production, les échéances et les documents de production accessibles par ces écrans.";

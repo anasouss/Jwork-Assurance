@@ -48,6 +48,7 @@ import { clientIdentityErrors, internationalClient, primaryIdentityLabel, reside
 import { AcquisitionFields } from "@/features/crm/components/AcquisitionFields";
 import { ClientSummaryDialog } from "@/features/crm/components/ClientSummaryDialog";
 import { ClientProfileDetails } from "@/features/crm/components/ClientProfileDetails";
+import { ClientPortalLink } from "../components/ClientPortalLink";
 import { clientRecordDraft } from "../client-record";
 import { CreateClientGroupDialog } from "@/features/crm/components/CreateClientGroupDialog";
 import { ClientGroupSelect } from "@/features/crm/components/ClientGroupSelect";
@@ -727,6 +728,7 @@ function ClientDetail({
           </div>
         </div>
         <div className="flex w-full flex-wrap gap-2 xl:w-auto">
+          <ClientPortalLink clientId={client.id} />
           {onEdit && <Button type="button" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => onEdit(client)}><Pencil className="size-4" />Modifier</Button>}
           <Button asChild type="button" variant="outline" className="border-emerald-200 text-emerald-950 hover:bg-emerald-50 dark:border-emerald-900 dark:text-emerald-100 dark:hover:bg-emerald-950/30">
             <Link to={productionUrl}><FolderOpen className="size-4" />Portefeuille client</Link>

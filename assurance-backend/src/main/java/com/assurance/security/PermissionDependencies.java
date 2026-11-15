@@ -11,6 +11,8 @@ public final class PermissionDependencies {
     );
 
     private static final Map<String, Set<String>> CROSS_RESOURCE_DEPENDENCIES = Map.ofEntries(
+            Map.entry("client-portal-account:view", Set.of("client:view")),
+            Map.entry("client-portal-publication:view", Set.of("client-portal-account:view")),
             Map.entry("user:create", Set.of("user:assign-role")),
             Map.entry("user:assign-role", Set.of("role:view")),
             Map.entry("role:assign-permissions", Set.of("role:update")),

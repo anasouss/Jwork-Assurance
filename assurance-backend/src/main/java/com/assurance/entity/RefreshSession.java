@@ -54,6 +54,9 @@ public class RefreshSession {
     @Column(nullable = false)
     private Boolean revoked = false;
 
+    @Column(nullable = false)
+    private boolean mobile;
+
     @Column(name = "ip_address", length = 60)
     private String ipAddress;
 

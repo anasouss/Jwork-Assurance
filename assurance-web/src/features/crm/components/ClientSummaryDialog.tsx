@@ -12,6 +12,7 @@ import { permissionRequirementForPath, satisfiesPermissionRequirement } from "@/
 import { useAuthStore } from "@/store/auth-store";
 import { ClientDocuments } from "./ClientDocuments";
 import { ClientProfileDetails } from "./ClientProfileDetails";
+import { ClientPortalLink } from "./ClientPortalLink";
 
 export function ClientSummaryDialog({ clientId, onClose, onEdit }: {
   clientId: string;
@@ -55,6 +56,7 @@ export function ClientSummaryDialog({ clientId, onClose, onEdit }: {
           : query.isError ? <div role="alert" className="space-y-3 text-sm"><p>{query.error instanceof Error ? query.error.message : "Chargement du client impossible."}</p><Button variant="outline" onClick={() => void query.refetch()}>Réessayer</Button></div>
             : client && detail && <div className="space-y-5">
               <nav aria-label="Espaces du client" className="flex flex-wrap items-center gap-2 border-b pb-4">
+                <ClientPortalLink clientId={clientId} onClick={onClose} />
                 {onEdit && <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => onEdit(client)}><Pencil className="size-4" />Modifier</Button>}
                 {canOpen(portfolio) && <Button asChild size="sm" variant="outline"><Link to={portfolio}><FolderOpen className="size-4 text-emerald-700 dark:text-emerald-300" />Portefeuille ({detail.contrats.length})</Link></Button>}
                 {canOpen(accounting) && <Button asChild size="sm" variant="outline"><Link to={accounting}><ReceiptText className="size-4 text-orange-700 dark:text-orange-300" />Relevés et factures</Link></Button>}

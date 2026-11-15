@@ -49,6 +49,9 @@ public class AuthService {
     @Value("${jwt.refresh-token-expiration-web}")
     private long refreshTokenExpiration;
 
+    @Value("${jwt.refresh-token-expiration-mobile}")
+    private long mobileRefreshTokenExpiration;
+
     @Transactional
     public AuthSessionResult login(LoginRequest request, HttpServletRequest httpRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -64,19 +67,41 @@ public class AuthService {
 
     @Transactional
     public AuthSessionResult refreshToken(String token, HttpServletRequest httpRequest) {
+        return refreshToken(token, httpRequest, false);
+    }
+
+    @Transactional
+    public AuthSessionResult loginMobile(LoginRequest request, HttpServletRequest httpRequest) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        Utilisateur user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
+        user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
+        return createSession(user, httpRequest, null, true);
+    }
+
+    @Transactional
+    public AuthSessionResult refreshMobile(String token, HttpServletRequest httpRequest) {
+        return refreshToken(token, httpRequest, true);
+    }
+
+    private AuthSessionResult refreshToken(String token, HttpServletRequest httpRequest, boolean mobile) {
         if (token == null || token.isBlank()) {
             throw new UnauthorizedException("Refresh token missing");
         }
         RefreshSession refreshToken = refreshTokenRepository.findByTokenForUpdate(hashRefreshToken(token))
                 .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
-        if (!refreshToken.isValid()) {
+        if (!refreshToken.isValid() || refreshToken.isMobile() != mobile
+                || !Boolean.TRUE.equals(refreshToken.getUser().getActif())) {
             throw new UnauthorizedException("Refresh token expired");
         }
         Utilisateur user = refreshToken.getUser();
         Agence effectiveAgence = validPersistedContext(user, refreshToken.getEffectiveAgence());
         refreshToken.setRevoked(true);
         refreshTokenRepository.save(refreshToken);
-        return createSession(user, httpRequest, effectiveAgence);
+        return createSession(user, httpRequest, effectiveAgence, mobile);
     }
 
     @Transactional(readOnly = true)
@@ -187,6 +212,15 @@ public class AuthService {
             HttpServletRequest request,
             Agence requestedContext
     ) {
+        return createSession(user, request, requestedContext, false);
+    }
+
+    private AuthSessionResult createSession(
+            Utilisateur user,
+            HttpServletRequest request,
+            Agence requestedContext,
+            boolean mobile
+    ) {
         boolean platformAdmin = isPlatformAdmin(user);
         Agence effectiveAgence = platformAdmin ? requestedContext : user.getAgence();
         if (effectiveAgence != null && effectiveAgence.getStatut() != StatutAgence.ACTIVE) {
@@ -201,7 +235,8 @@ public class AuthService {
                 .user(user)
                 .effectiveAgence(effectiveAgence)
                 .token(hashRefreshToken(refreshTokenValue))
-                .expiresAt(LocalDateTime.now().plusSeconds(refreshTokenExpiration / 1000))
+                .mobile(mobile)
+                .expiresAt(LocalDateTime.now().plusSeconds((mobile ? mobileRefreshTokenExpiration : refreshTokenExpiration) / 1000))
                 .ipAddress(DeviceInfoParser.getClientIp(request))
                 .userAgent(DeviceInfoParser.buildUserAgent(request))
                 .deviceName(DeviceInfoParser.parseDeviceName(request))

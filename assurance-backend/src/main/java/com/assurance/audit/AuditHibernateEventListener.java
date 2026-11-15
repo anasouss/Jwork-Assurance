@@ -134,6 +134,7 @@ public class AuditHibernateEventListener implements
             "Contrat", Set.of("nombreVehicules", "nombreRemorques")
     );
     private static final Set<String> UNTRACKED_ENTITY_TYPES = Set.of(
+            "ClientPortalSession",
             "Permission",
             "NumeroDossierSequence",
             "SequenceBordereauCompagnie",

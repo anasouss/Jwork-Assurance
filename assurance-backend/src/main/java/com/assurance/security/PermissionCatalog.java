@@ -63,6 +63,8 @@ public final class PermissionCatalog {
         resource(result, "companies", "tarif-assistance", "Tarifs des produits d’assistance", "view,create,update,delete");
         resource(result, "companies", "promo-assistance", "Codes promotionnels d’assistance", "view,create,update,delete");
         resource(result, "crm", "client", "Clients", "view,create,update");
+        resource(result, "crm", "client-portal-account", "Comptes du portail client", "view,create,deactivate,reset-password,assign");
+        resource(result, "crm", "client-portal-publication", "Publications du portail client", "view,create,deactivate");
         resource(result, "crm", "groupe-client", "Groupes de clients", "view,create,update,assign,end-membership");
         resource(result, "crm", "origine-commerciale", "Origines commerciales", "view,create,update");
         resource(result, "crm", "acquisition-client", "Acquisition client", "update");
@@ -118,6 +120,9 @@ public final class PermissionCatalog {
     }
 
     private static String actionLabel(String resource, String action) {
+        if (resource.equals("client-portal-account") && action.equals("assign")) return "Partager ou retirer un dossier";
+        if (resource.equals("client-portal-publication") && action.equals("create")) return "Publier un document ou un suivi";
+        if (resource.equals("client-portal-publication") && action.equals("deactivate")) return "Retirer une publication";
         if (resource.equals("contrat") && action.equals("import")) return "Importer les véhicules Excel";
         if (resource.equals("contrat") && action.equals("export")) return "Exporter les véhicules Excel";
         if (resource.equals("contrat") && action.equals("delete")) return "Supprimer un contrat brouillon";

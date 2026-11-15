@@ -7,7 +7,7 @@ export const MODULE_PERMISSION_PREFIXES = {
   production: ["contrat", "avenant", "assistance", "carte-verte", "piece-jointe", "attestation-stock", "vehicule", "garantie", "regle-fiscale", "usage", "marque", "carrosserie", "carburant", "sous-classe", "categorie-transport", "categorie-client", "groupe-usage-attestation", "tarif-usage", "type-piece-jointe"],
   sinistre: ["sinistre", "sinistre-document", "sinistre-mission", "sinistre-provision", "sinistre-operation", "prestataire-sinistre", "specialite-prestataire"],
   companies: ["compagnie-assurance", "compagnie-assistance", "convention", "grille-tarifaire", "contact-compagnie", "produit-assistance", "tarif-assistance", "promo-assistance"],
-  crm: ["client", "groupe-client", "origine-commerciale", "acquisition-client", "condition-paiement", "document-crm"],
+  crm: ["client", "groupe-client", "origine-commerciale", "acquisition-client", "condition-paiement", "document-crm", "client-portal-account", "client-portal-publication"],
   compta: ["quittance-affectation", "regle-quittance", "document-client", "production-convention", "facture-convention", "reglement-client", "instrument-reglement", "quittance-prime", "compte-tresorerie", "operation-tresorerie", "session-caisse", "bordereau-remise", "rapprochement-bancaire", "banque", "bordereau-compagnie", "reglement-compagnie"],
   administration: ["user", "role", "audit", "activity", "agence", "config"],
 } as const;
@@ -30,6 +30,7 @@ const pagePermissionRules: readonly PagePermissionRule[] = [
   { paths: ["/app/production/prospection/devis/flotte/:draftId", "/app/production/ajouter-dossier/particulier", "/app/production/ajouter-dossier/particulier/:draftId", "/app/production/ajouter-dossier/flotte", "/app/production/ajouter-dossier/flotte/:draftId", "/app/production/ajouter-dossier/convention", "/app/production/ajouter-dossier/convention/:draftId"], requirement: { anyOf: ["contrat:create","contrat:update"] } },
   { paths: ["/app/production/renouvellements/particulier/:draftId", "/app/production/renouvellements/convention/:draftId", "/app/production/renouvellements/flotte/:draftId"], requirement: { anyOf: ["contrat:renew"] } },
   { paths: ["/app/production/portefeuille-clients/:clientId", "/app/crm"], requirement: { anyOf: ["client:view"] } },
+  { paths: ["/app/crm/clients/:clientId/portail"], requirement: { anyOf: ["client-portal-account:view"] } },
   { paths: ["/app/production/contrats/:contratId/avenants/:code"], requirement: { anyOf: ["avenant:create","avenant:update-draft","avenant:rectify"] } },
   { paths: ["/app/production/contrats/:contratId/pieces-jointes"], requirement: { anyOf: ["piece-jointe:view","contrat:view"] } },
   { paths: ["/app/production/contrats/:contratId/assistance"], requirement: { anyOf: ["assistance:view"] } },

@@ -8,6 +8,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface SinistreDocumentRepository extends JpaRepository<SinistreDocument, Long> {
+    @org.springframework.data.jpa.repository.Query("select d from SinistreDocument d where d.sinistre.id = :claim and d.sinistre.agence.id = :agency order by d.id desc")
+    org.springframework.data.domain.Page<SinistreDocument> findPortalSources(
+            @org.springframework.data.repository.query.Param("agency") Long agency,
+            @org.springframework.data.repository.query.Param("claim") Long claim,
+            org.springframework.data.domain.Pageable pageable);
 
     @EntityGraph(attributePaths = {
             "deposePar",

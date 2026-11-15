@@ -13,6 +13,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtTokenProviderTest {
     @Test
+    void portalTokensHaveAnExplicitPrincipalTypeAndNoEmployeeRole() {
+        JwtTokenProvider provider = new JwtTokenProvider();
+        ReflectionTestUtils.setField(provider, "jwtSecret", "test-secret-with-at-least-sixty-four-characters-for-token-signing-1234");
+        ReflectionTestUtils.setField(provider, "accessTokenExpiration", 900_000L);
+        provider.init();
+        String token = provider.generateClientPortalToken(12L, 7L, 42L);
+        assertThat(provider.isClientPortalToken(token)).isTrue();
+        assertThat(provider.getClaims(token)).doesNotContainKeys("role", "permissions", "platformAdmin");
+        assertThat(provider.getAgenceIdFromToken(token)).isEqualTo(7L);
+        assertThat(provider.getSessionIdFromToken(token)).isEqualTo(42L);
+    }
+
+    @Test
     void largePermissionCatalogueDoesNotIncreaseAccessTokenSize() {
         JwtTokenProvider provider = new JwtTokenProvider();
         ReflectionTestUtils.setField(provider, "jwtSecret", "test-secret-with-at-least-sixty-four-characters-for-token-signing-1234");

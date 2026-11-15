@@ -55,8 +55,25 @@ public class JwtTokenProvider {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(token);
     }
 
+    public String generateClientPortalToken(Long accountId, Long agenceId, Long sessionId) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject(String.valueOf(accountId))
+                .claim("principalType", "CLIENT_PORTAL")
+                .claim("agenceId", agenceId)
+                .claim("sessionId", sessionId)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + accessTokenExpiration))
+                .signWith(cle)
+                .compact();
+    }
+
     public Long getUserIdFromToken(String token) {
         return Long.valueOf(getClaims(token).getSubject());
+    }
+
+    public boolean isClientPortalToken(String token) {
+        return "CLIENT_PORTAL".equals(getClaims(token).get("principalType", String.class));
     }
 
     public Long getAgenceIdFromToken(String token) {

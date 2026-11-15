@@ -43,7 +43,8 @@ export const portalKeys = {
 };
 export const portalApi = {
   availability: () => get<{ enabled: boolean }>("/availability"),
-  account: (client: string) => get<PortalAccount | null>(`/for-client/${id(client)}`),
+  account: async (client: string): Promise<PortalAccount | null> =>
+    (await get<PortalAccount | null>(`/for-client/${id(client)}`)) ?? null,
   create: (clientId: string, identifiant: string, password: string) =>
     send<PortalAccount>("", "POST", { clientId, identifiant, password }),
   active: (account: string, actif: boolean) => send(`/${id(account)}/active`, "PUT", { actif }),

@@ -20,6 +20,82 @@ import jakarta.persistence.LockModeType;
 
 public interface InstrumentReglementClientRepository extends JpaRepository<InstrumentReglementClient, Long> {
 
+    String BANK_REJECTION_FILTERS = """
+            from InstrumentReglementClient instrument
+            join instrument.reglement payment
+            left join instrument.banqueEmettriceReference bank
+            where instrument.agence.id = :agenceId
+              and payment.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and instrument.mode in (com.assurance.enums.ModeReglementClient.CHEQUE,
+                                      com.assurance.enums.ModeReglementClient.EFFET)
+              and (instrument.dateRejet is not null
+                   or instrument.statut = com.assurance.enums.StatutInstrumentReglement.REJETE)
+              and (:mode is null or instrument.mode = :mode)
+              and (:bankId is null or bank.id = :bankId)
+              and (:dateDu is null or coalesce(instrument.dateRejet, instrument.dateStatut) >= :dateDu)
+              and (:dateAu is null or coalesce(instrument.dateRejet, instrument.dateStatut) <= :dateAu)
+              and (:resolution is null
+                   or (:resolution = 'A_TRAITER' and instrument.statut = com.assurance.enums.StatutInstrumentReglement.REJETE)
+                   or (:resolution = 'REMPLACE' and instrument.statut = com.assurance.enums.StatutInstrumentReglement.REMPLACE)
+                   or (:resolution = 'REPRESENTE' and instrument.statut not in (
+                       com.assurance.enums.StatutInstrumentReglement.REJETE,
+                       com.assurance.enums.StatutInstrumentReglement.REMPLACE)))
+              and (:payeurId is null
+                   or (:payeurType = 'CONVENTION' and payment.conventionPayeur.id = :payeurId)
+                   or (:payeurType = 'CLIENT' and (payment.clientPayeur.id = :payeurId or exists (
+                       select a.id from AffectationReglementClient a
+                       where a.instrument = instrument and a.clientPayeur.id = :payeurId)))
+                   or (:payeurType = 'GROUPE' and (payment.groupePayeur.id = :payeurId or exists (
+                       select a.id from AffectationReglementClient a
+                       where a.instrument = instrument and a.groupePayeur.id = :payeurId))))
+              and (:search is null
+                   or lower(payment.numero) like lower(concat('%', :search, '%'))
+                   or lower(payment.payeurNom) like lower(concat('%', :search, '%'))
+                   or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
+                   or lower(coalesce(bank.libelle, '')) like lower(concat('%', :search, '%')))
+            """;
+
+    String STATUS_FILTERS = """
+            from InstrumentReglementClient instrument
+            join instrument.reglement reglement
+            left join instrument.banqueEmettriceReference issuingBank
+            where instrument.agence.id = :agenceId
+              and reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and instrument.statut in :statuts
+              and instrument.mode in :modes
+              and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
+              and (:dateAu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
+              and (:payeurId is null
+                   or (:payeurType = 'CONVENTION' and reglement.conventionPayeur.id = :payeurId)
+                   or (:payeurType = 'CLIENT' and (
+                       reglement.clientPayeur.id = :payeurId
+                       or exists (
+                           select clientAllocation.id
+                           from AffectationReglementClient clientAllocation
+                           where clientAllocation.instrument = instrument
+                             and clientAllocation.clientPayeur.id = :payeurId
+                       )
+                   ))
+                   or (:payeurType = 'GROUPE' and (
+                       reglement.groupePayeur.id = :payeurId
+                       or exists (
+                           select groupAllocation.id
+                           from AffectationReglementClient groupAllocation
+                           where groupAllocation.instrument = instrument
+                             and groupAllocation.groupePayeur.id = :payeurId
+                       )
+                   )))
+              and (
+                    :search is null
+                    or lower(reglement.numero) like lower(concat('%', :search, '%'))
+                    or lower(reglement.payeurNom) like lower(concat('%', :search, '%'))
+                    or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
+                    or lower(coalesce(issuingBank.code, '')) like lower(concat('%', :search, '%'))
+                    or lower(coalesce(issuingBank.libelle, '')) like lower(concat('%', :search, '%'))
+              )
+            """;
+
+
     @EntityGraph(attributePaths = {"reglement", "reglement.clientPayeur", "compteTresorerie", "banqueEmettriceReference"})
     @Query("""
             select instrument
@@ -54,40 +130,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
     );
 
     @EntityGraph(attributePaths = {"reglement", "reglement.clientPayeur", "compteTresorerie", "banqueEmettriceReference"})
-    @Query("""
-            select instrument
-            from InstrumentReglementClient instrument
-            join instrument.reglement payment
-            left join instrument.banqueEmettriceReference bank
-            where instrument.agence.id = :agenceId
-              and payment.statut = com.assurance.enums.StatutReglementClient.VALIDE
-              and instrument.mode in (com.assurance.enums.ModeReglementClient.CHEQUE,
-                                      com.assurance.enums.ModeReglementClient.EFFET)
-              and (instrument.dateRejet is not null
-                   or instrument.statut = com.assurance.enums.StatutInstrumentReglement.REJETE)
-              and (:mode is null or instrument.mode = :mode)
-              and (:bankId is null or bank.id = :bankId)
-              and (:dateDu is null or coalesce(instrument.dateRejet, instrument.dateStatut) >= :dateDu)
-              and (:dateAu is null or coalesce(instrument.dateRejet, instrument.dateStatut) <= :dateAu)
-              and (:resolution is null
-                   or (:resolution = 'A_TRAITER' and instrument.statut = com.assurance.enums.StatutInstrumentReglement.REJETE)
-                   or (:resolution = 'REMPLACE' and instrument.statut = com.assurance.enums.StatutInstrumentReglement.REMPLACE)
-                   or (:resolution = 'REPRESENTE' and instrument.statut not in (
-                       com.assurance.enums.StatutInstrumentReglement.REJETE,
-                       com.assurance.enums.StatutInstrumentReglement.REMPLACE)))
-              and (:payeurId is null
-                   or (:payeurType = 'CONVENTION' and payment.conventionPayeur.id = :payeurId)
-                   or (:payeurType = 'CLIENT' and (payment.clientPayeur.id = :payeurId or exists (
-                       select a.id from AffectationReglementClient a
-                       where a.instrument = instrument and a.clientPayeur.id = :payeurId)))
-                   or (:payeurType = 'GROUPE' and (payment.groupePayeur.id = :payeurId or exists (
-                       select a.id from AffectationReglementClient a
-                       where a.instrument = instrument and a.groupePayeur.id = :payeurId))))
-              and (:search is null
-                   or lower(payment.numero) like lower(concat('%', :search, '%'))
-                   or lower(payment.payeurNom) like lower(concat('%', :search, '%'))
-                   or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
-                   or lower(coalesce(bank.libelle, '')) like lower(concat('%', :search, '%')))
+    @Query(value = "select instrument\n" + BANK_REJECTION_FILTERS + """
             order by
                 case when :sortBy = 'MODE' and :sortDirection = 'ASC' then instrument.mode end asc,
                 case when :sortBy = 'MODE' and :sortDirection = 'DESC' then instrument.mode end desc,
@@ -102,7 +145,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
                 case when :sortBy = 'RETURN_DATE' and :sortDirection = 'ASC' then coalesce(instrument.dateRejet, instrument.dateStatut) end asc,
                 case when :sortBy = 'RETURN_DATE' and :sortDirection = 'DESC' then coalesce(instrument.dateRejet, instrument.dateStatut) end desc,
                 instrument.id desc
-            """)
+            """,
+            countQuery = "select count(instrument)\n" + BANK_REJECTION_FILTERS)
     Page<InstrumentReglementClient> searchBankRejections(
             @Param("agenceId") Long agenceId,
             @Param("mode") ModeReglementClient mode,
@@ -281,45 +325,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             "reglement.clientPayeur",
             "compteTresorerie"
     })
-    @Query("""
-            select instrument
-            from InstrumentReglementClient instrument
-            join instrument.reglement reglement
-            left join instrument.banqueEmettriceReference issuingBank
-            where instrument.agence.id = :agenceId
-              and reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
-              and instrument.statut in :statuts
-              and instrument.mode in :modes
-              and (:dateDu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) >= :dateDu)
-              and (:dateAu is null or coalesce(instrument.dateEcheance, instrument.dateInstrument) <= :dateAu)
-              and (:payeurId is null
-                   or (:payeurType = 'CONVENTION' and reglement.conventionPayeur.id = :payeurId)
-                   or (:payeurType = 'CLIENT' and (
-                       reglement.clientPayeur.id = :payeurId
-                       or exists (
-                           select clientAllocation.id
-                           from AffectationReglementClient clientAllocation
-                           where clientAllocation.instrument = instrument
-                             and clientAllocation.clientPayeur.id = :payeurId
-                       )
-                   ))
-                   or (:payeurType = 'GROUPE' and (
-                       reglement.groupePayeur.id = :payeurId
-                       or exists (
-                           select groupAllocation.id
-                           from AffectationReglementClient groupAllocation
-                           where groupAllocation.instrument = instrument
-                             and groupAllocation.groupePayeur.id = :payeurId
-                       )
-                   )))
-              and (
-                    :search is null
-                    or lower(reglement.numero) like lower(concat('%', :search, '%'))
-                    or lower(reglement.payeurNom) like lower(concat('%', :search, '%'))
-                    or lower(coalesce(instrument.referenceInstrument, '')) like lower(concat('%', :search, '%'))
-                    or lower(coalesce(issuingBank.code, '')) like lower(concat('%', :search, '%'))
-                    or lower(coalesce(issuingBank.libelle, '')) like lower(concat('%', :search, '%'))
-              )
+    @Query(value = "select instrument\n" + STATUS_FILTERS + """
             order by
               case when :sortBy = 'REFERENCE' and :sortDirection = 'ASC'
                    then lower(coalesce(instrument.referenceInstrument, '')) end asc,
@@ -354,7 +360,8 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
               case when :sortBy = 'AMOUNT' and :sortDirection = 'DESC'
                    then instrument.montant end desc,
               instrument.id desc
-            """)
+            """,
+            countQuery = "select count(instrument)\n" + STATUS_FILTERS)
     Page<InstrumentReglementClient> searchByStatus(
             @Param("agenceId") Long agenceId,
             @Param("statuts") Collection<StatutInstrumentReglement> statuts,

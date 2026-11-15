@@ -1,5 +1,6 @@
 package com.assurance.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 import lombok.Data;
 
@@ -9,6 +10,7 @@ public class ApiResponse<T> {
     private boolean success;
     private String message;
     private String code;
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     private T data;
 
     public static <T> ApiResponse<T> success(T data) {

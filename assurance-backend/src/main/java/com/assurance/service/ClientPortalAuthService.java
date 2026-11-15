@@ -4,12 +4,12 @@ import com.assurance.dto.request.ClientPortalRequests;
 import com.assurance.dto.response.ClientPortalResponses;
 import com.assurance.entity.ClientPortalAccount;
 import com.assurance.entity.ClientPortalSession;
-import com.assurance.enums.StatutAgence;
 import com.assurance.exception.BadRequestException;
 import com.assurance.exception.UnauthorizedException;
 import com.assurance.repository.ClientPortalAccountRepository;
 import com.assurance.repository.ClientPortalSessionRepository;
 import com.assurance.security.ClientPortalCredentials;
+import com.assurance.security.ClientPortalAccountPolicy;
 import com.assurance.security.ClientPortalPrincipal;
 import com.assurance.security.JwtTokenProvider;
 import jakarta.annotation.PostConstruct;
@@ -139,10 +139,8 @@ public class ClientPortalAuthService {
     }
 
     public boolean available(ClientPortalAccount account) {
-        return feature.isEnabled(account.getAgence().getId())
-                && account.isActif() && Boolean.TRUE.equals(account.getClient().getActif())
-                && account.getAgence().getStatut() == StatutAgence.ACTIVE
-                && account.getAgence().getId().equals(account.getClient().getAgence().getId());
+        Long agenceId = account == null || account.getAgence() == null ? null : account.getAgence().getId();
+        return ClientPortalAccountPolicy.isAvailable(account, feature.isEnabled(agenceId));
     }
 
     private ClientPortalResponses.Tokens createSession(ClientPortalAccount account) {

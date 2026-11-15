@@ -15,6 +15,14 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
+    @Test
+    void filterDoesNotDependOnPasswordAuthenticationService() {
+        org.assertj.core.api.Assertions.assertThat(
+                java.util.Arrays.stream(JwtAuthenticationFilter.class.getDeclaredConstructors())
+                        .flatMap(constructor -> java.util.Arrays.stream(constructor.getParameterTypes())))
+                .doesNotContain(com.assurance.service.ClientPortalAuthService.class);
+    }
+
 
     @Mock
     private JwtTokenProvider tokenProvider;

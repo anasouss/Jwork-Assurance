@@ -4,7 +4,7 @@ import com.assurance.enums.StatutAgence;
 import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.RefreshSessionRepository;
 import com.assurance.repository.ClientPortalSessionRepository;
-import com.assurance.service.ClientPortalAuthService;
+import com.assurance.service.ClientPortalFeatureService;
 import com.assurance.service.MobileAuthRateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -31,7 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final AgenceRepository agenceRepository;
     private final RefreshSessionRepository refreshSessionRepository;
     private final ClientPortalSessionRepository clientPortalSessionRepository;
-    private final ClientPortalAuthService clientPortalAuthService;
+    private final ClientPortalFeatureService clientPortalFeatureService;
     private final MobileAuthRateLimitService mobileAuthRateLimitService;
 
     @Override
@@ -124,7 +124,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         var session = clientPortalSessionRepository.findValid(sessionId, accountId, agenceId, LocalDateTime.now())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid client session"));
         var account = session.getAccount();
-        if (!clientPortalAuthService.available(account)) {
+        if (!ClientPortalAccountPolicy.isAvailable(account, clientPortalFeatureService.isEnabled(agenceId))) {
             throw new IllegalArgumentException("Disabled client account");
         }
         var principal = new ClientPortalPrincipal(accountId, agenceId, account.getClient().getId());

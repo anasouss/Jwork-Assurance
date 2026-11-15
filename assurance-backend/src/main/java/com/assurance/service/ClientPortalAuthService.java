@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -51,8 +52,26 @@ public class ClientPortalAuthService {
             throw invalidCredentials();
         }
         ClientPortalAccount account = accounts.findForLogin(request.agenceCode().strip(), login).orElse(null);
-        boolean passwordValid = request.password().getBytes(StandardCharsets.UTF_8).length <= 72
-                && encoder.matches(request.password(), account == null ? dummyHash : account.getPasswordHash());
+        return authenticate(account, request.password());
+    }
+
+    @Transactional(noRollbackFor = UnauthorizedException.class)
+    public ClientPortalResponses.Tokens loginMobile(String identifier, String password) {
+        String login;
+        try {
+            login = ClientPortalCredentials.normalizeIdentifier(identifier);
+        } catch (BadRequestException invalid) {
+            encoder.matches(password, dummyHash);
+            throw invalidCredentials();
+        }
+        var candidates = accounts.findForGlobalLogin(login, PageRequest.of(0, 2));
+        // Fail closed if legacy duplicates exist before the uniqueness migration is applied.
+        return authenticate(candidates.size() == 1 ? candidates.get(0) : null, password);
+    }
+
+    private ClientPortalResponses.Tokens authenticate(ClientPortalAccount account, String password) {
+        boolean passwordValid = password.getBytes(StandardCharsets.UTF_8).length <= 72
+                && encoder.matches(password, account == null ? dummyHash : account.getPasswordHash());
         LocalDateTime now = LocalDateTime.now();
         if (account == null || !available(account)
                 || (account.getLockedUntil() != null && account.getLockedUntil().isAfter(now))) {

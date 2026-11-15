@@ -68,7 +68,10 @@ public class ClientPortalReadService {
         return paged(coverages.findForContract(p.agenceId(), contract, ClientPortalManagementService.pageable(page, size))
                 .map(g -> new ClientPortalResponses.Coverage(g.getId(), g.getVehicule() == null ? null : g.getVehicule().getId(),
                         g.getRemorque() == null ? null : g.getRemorque().getId(),
-                        g.getGarantie().getCode(), g.getGarantie().getLibelle(), g.getCapital(), g.getTauxFranchise(), g.getFranchiseMinimale())));
+                        g.getGarantie().getCode(), g.getGarantie().getLibelle(),
+                        g.getVehicule() != null ? g.getVehicule().getImmatriculation()
+                                : g.getRemorque() != null ? g.getRemorque().getImmatriculation() : null,
+                        g.getCapital(), g.getTauxFranchise(), g.getFranchiseMinimale())));
     }
 
     public PagedResponse<ClientPortalResponses.Assistance> assistances(Long contract, int page, int size) {
@@ -93,8 +96,13 @@ public class ClientPortalReadService {
     }
 
     public PagedResponse<ClientPortalResponses.Document> documents(int page, int size) {
+        return documents(null, null, page, size);
+    }
+
+    public PagedResponse<ClientPortalResponses.Document> documents(Long contratId, Long sinistreId, int page, int size) {
         ClientPortalPrincipal p = principal();
-        return paged(documents.visible(p.agenceId(), p.accountId(), ClientPortalManagementService.pageable(page, size))
+        return paged(documents.visibleForDossier(p.agenceId(), p.accountId(), contratId, sinistreId,
+                        ClientPortalManagementService.pageable(page, size))
                 .map(d -> new ClientPortalResponses.Document(d.getId(), d.getTitre(),
                         d.getAccess().getContrat() == null ? null : d.getAccess().getContrat().getId(),
                         d.getAccess().getSinistre() == null ? null : d.getAccess().getSinistre().getId(), d.getCreatedAt())));

@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "client_portal_accounts", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_portal_global_login", columnNames = {"identifiant"}),
         @UniqueConstraint(name = "uk_portal_agency_login", columnNames = {"agence_id", "identifiant"}),
         @UniqueConstraint(name = "uk_portal_agency_client", columnNames = {"agence_id", "client_id"})
 })

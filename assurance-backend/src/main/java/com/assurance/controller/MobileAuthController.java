@@ -2,9 +2,11 @@ package com.assurance.controller;
 
 import com.assurance.dto.request.ClientPortalRequests;
 import com.assurance.dto.request.LoginRequest;
+import com.assurance.dto.request.MobileLoginRequest;
 import com.assurance.dto.response.ApiResponse;
 import com.assurance.dto.response.AuthResponse;
 import com.assurance.service.AuthService;
+import com.assurance.service.MobileLoginService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,13 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class MobileAuthController {
     private final AuthService auth;
+    private final MobileLoginService mobileLogin;
+
+    @PostMapping("/sign-in")
+    public ApiResponse<MobileLoginService.Result> signIn(@Valid @RequestBody MobileLoginRequest request,
+                                                        HttpServletRequest httpRequest) {
+        return ApiResponse.success(mobileLogin.login(request, httpRequest));
+    }
 
     @PostMapping("/login")
     public ApiResponse<MobileSession> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {

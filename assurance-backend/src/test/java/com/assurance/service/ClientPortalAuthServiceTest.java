@@ -53,6 +53,36 @@ class ClientPortalAuthServiceTest {
     }
 
     @Test
+    void globalMobileLoginNormalizesIdentifierAndUsesExistingPasswordChecks() {
+        var account = account();
+        when(accounts.findForGlobalLogin(eq("AB123"), any())).thenReturn(List.of(account));
+        when(encoder.matches("wrong", "encoded")).thenReturn(false);
+        assertThatThrownBy(() -> service.loginMobile(" ab 123 ", "wrong"))
+                .isInstanceOf(UnauthorizedException.class).hasMessage("Identifiants ou session invalides");
+        assertThat(account.getFailedAttempts()).isEqualTo(1);
+        verify(accounts).save(account);
+        verifyNoInteractions(sessions);
+    }
+
+    @Test
+    void duplicateLegacyIdentifiersNeverSelectAnArbitraryAgency() {
+        when(accounts.findForGlobalLogin(eq("AB123"), any())).thenReturn(List.of(account(), account()));
+        assertThatThrownBy(() -> service.loginMobile("AB123", "password"))
+                .isInstanceOf(UnauthorizedException.class).hasMessage("Identifiants ou session invalides");
+        verify(encoder).matches("password", "dummy-password-hash");
+        verifyNoInteractions(sessions);
+    }
+
+    @Test
+    void globalMobileLoginStillHonorsFeatureFlag() {
+        when(accounts.findForGlobalLogin(eq("AB123"), any())).thenReturn(List.of(account()));
+        when(feature.isEnabled(1L)).thenReturn(false);
+        when(encoder.matches("password", "encoded")).thenReturn(true);
+        assertThatThrownBy(() -> service.loginMobile("AB123", "password")).isInstanceOf(UnauthorizedException.class);
+        verifyNoInteractions(sessions);
+    }
+
+    @Test
     void tenBadPasswordsLockAnAccount() {
         var account = account();
         account.setFailedAttempts(9);

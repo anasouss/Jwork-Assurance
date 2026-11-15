@@ -42,7 +42,7 @@ public final class ClientPortalResponses {
     }
 
     public record Coverage(Long id, Long vehiculeId, Long remorqueId, String code, String libelle,
-                           java.math.BigDecimal capital, java.math.BigDecimal tauxFranchise,
+                           String immatriculation, java.math.BigDecimal capital, java.math.BigDecimal tauxFranchise,
                            java.math.BigDecimal franchiseMinimale) {
     }
 

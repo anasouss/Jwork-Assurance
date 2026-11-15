@@ -64,8 +64,10 @@ public class ClientPortalController {
 
     @GetMapping("/documents")
     public ApiResponse<PagedResponse<ClientPortalResponses.Document>> documents(
+            @RequestParam(required = false) Long contratId,
+            @RequestParam(required = false) Long sinistreId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
-        return ApiResponse.success(service.documents(page, size));
+        return ApiResponse.success(service.documents(contratId, sinistreId, page, size));
     }
 
     @GetMapping("/documents/{id}/download")

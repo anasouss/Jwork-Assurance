@@ -66,8 +66,8 @@ public class ClientPortalManagementService {
         identifier = ClientPortalCredentials.normalizeIdentifier(identifier);
         ClientPortalCredentials.validatePassword(request.password());
         if (accounts.existsByAgenceIdAndClientId(agency, client.getId())
-                || accounts.existsByAgenceIdAndIdentifiant(agency, identifier)) {
-            throw new BadRequestException("Un compte existe déjà pour ce client ou cet identifiant dans l'agence");
+                || accounts.existsByIdentifiant(identifier)) {
+            throw new BadRequestException("Un compte existe déjà pour ce client ou cet identifiant est indisponible");
         }
         ClientPortalAccount account = new ClientPortalAccount();
         account.setAgence(client.getAgence());
@@ -78,7 +78,7 @@ public class ClientPortalManagementService {
             account = accounts.saveAndFlush(account);
         } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
             throw new com.assurance.exception.ConflictException("CLIENT_PORTAL_ACCOUNT_EXISTS",
-                    "Un compte existe déjà pour ce client ou cet identifiant dans l'agence");
+                    "Un compte existe déjà pour ce client ou cet identifiant est indisponible");
         }
         audit("ClientPortalAccount", account.getId(), "CREATE", account.getId());
         return accountResponse(account);

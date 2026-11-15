@@ -15,6 +15,12 @@ public interface ClientPortalDocumentRepository extends JpaRepository<ClientPort
     @Query("select d from ClientPortalDocument d join d.access a left join a.contrat c left join a.sinistre s left join d.pieceJointe piece left join d.sinistreDocument source where " + VISIBLE + " order by d.id desc")
     Page<ClientPortalDocument> visible(@Param("agency") Long agency, @Param("account") Long account, Pageable pageable);
 
+    @Query("select d from ClientPortalDocument d join d.access a left join a.contrat c left join a.sinistre s left join d.pieceJointe piece left join d.sinistreDocument source where "
+            + VISIBLE + " and (:contract is null or c.id = :contract) and (:claim is null or s.id = :claim) order by d.id desc")
+    Page<ClientPortalDocument> visibleForDossier(@Param("agency") Long agency, @Param("account") Long account,
+                                               @Param("contract") Long contract, @Param("claim") Long claim,
+                                               Pageable pageable);
+
     @Query("select d from ClientPortalDocument d join d.access a left join a.contrat c left join a.sinistre s left join d.pieceJointe piece left join d.sinistreDocument source where " + VISIBLE + " and d.id = :id")
     Optional<ClientPortalDocument> visible(@Param("agency") Long agency, @Param("account") Long account, @Param("id") Long id);
 

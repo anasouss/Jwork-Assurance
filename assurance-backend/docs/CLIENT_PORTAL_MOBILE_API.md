@@ -3,9 +3,10 @@
 ## Scope
 
 Includes CRM account-management screens, accessed from a client's record via
-Portail client. No React Native project,
-invitation flow, client self-registration, client uploads, payment actions,
-push notifications, or automatic publication are introduced.
+Portail client. The separate `assurance-mobile/` Expo application now provides
+read-only client, agency employee and platform monitoring spaces. No invitation
+flow, client self-registration, client uploads, payment actions, push notifications
+or automatic publication are introduced.
 
 Employee and platform-admin mobile sessions reuse existing employee identities,
 agency isolation, permissions and dashboards. Client portal accounts are separate
@@ -44,6 +45,26 @@ enforcement remains authoritative on each request.
    been run during this implementation, following the user's standing instruction.
 
 ## Staff And Super Admin Mobile Authentication
+
+The current mobile login form uses `POST /api/v1/mobile/auth/sign-in` with
+`{"identifiant":"...","password":"..."}`. No agency code or role selector.
+Email identifiers authenticate existing employees; non-email identifiers use the
+globally unique client portal identifier (CIN/RC by default). Portal identifiers
+cannot contain `@`, so namespaces are disjoint. Failed credentials never trigger
+a fallback to the other namespace. Errors remain generic; rate limits, account
+lockout, feature flags, agency eligibility and forced password change still apply.
+
+Response: `ApiResponse<{principalType:"STAFF",staff:{auth,refreshToken}}>` or
+`ApiResponse<{principalType:"CLIENT",client:{accessToken,refreshToken,tokenType,expiresIn,profile}}>`.
+Only the authenticated server response selects the mobile space. Refresh/logout
+continue using their existing principal-specific routes below.
+
+Before deploying, apply `sql/migrations/20261115_unified_mobile_login.sql`.
+It rejects legacy duplicate/invalid identifiers or inconsistent tenant links and
+adds a global unique constraint. It does not merge accounts, modify CRM identity
+records, create backups or persist migration markers. MySQL DDL auto-commits.
+Fresh databases get the same constraint from `ClientPortalAccount`. A bounded
+global authentication lookup fails closed on duplicates even before migration.
 
 `POST /api/v1/mobile/auth/login` accepts the existing employee login body:
 `{"email":"...","password":"..."}`.
@@ -91,8 +112,9 @@ Account creation body:
 If omitted, identifier defaults to CIN for a person and RC for a company, then
 passport/residence card where available. A verified staff-assigned identifier is
 also possible. Identifiers are normalized to uppercase without whitespace.
-One account per client per agency; login identifiers are unique within an agency.
-The same CIN/RC in different agencies does not merge identities or share access.
+One account per client per agency; portal login identifiers are globally unique.
+CRM records remain agency-scoped. An unavailable identifier does not reveal the
+other account or agency, merge identities, or grant shared access.
 An agency must verify the person/company representative's authority before handing
 over credentials. RC identifies the company, not a particular human representative.
 
@@ -143,6 +165,8 @@ passwords and refresh secrets are not included in explicit audit snapshots.
 
 ## Client Authentication
 
+The legacy agency-qualified client API remains supported for compatibility.
+The mobile app now uses the unified sign-in endpoint above, not this route:
 `POST /api/v1/client-portal/auth/login`:
 `{"agenceCode":"AG-001","identifiant":"AB123456","password":"..."}`.
 
@@ -173,12 +197,15 @@ Responses use ApiResponse and the shared PagedResponse/PageMetadata contract.
   active contracts expiring in 30 days and open claims.
 - /contracts: shared, non-draft/non-prospection contract summaries.
 - /contracts/{id}: contract summary and paginated current vehicles.
-- /contracts/{id}/coverages: paginated active coverage labels, target IDs,
+- /contracts/{id}/coverages: paginated active coverage labels, target IDs and
+  vehicle/trailer registration (`immatriculation`),
   capitals and franchises; no internal premium calculations.
 - /contracts/{id}/assistances: paginated active assistance references/company/product/dates.
 - /claims and /claims/{id}: curated public statuses, policy reference and business dates.
 - /claims/{id}/updates: only explicitly published messages for that account.
-- /documents: only explicitly published, currently accessible files.
+- /documents: only explicitly published, currently accessible files. Optional
+  `contratId` / `sinistreId` filters retain the same agency, account and publication
+  checks and are applied before pagination.
 - /documents/{id}/download: ownership and publication checked again before storage lookup.
 
 IDs in paths are source contract/claim IDs, not grant IDs. Document IDs are publication

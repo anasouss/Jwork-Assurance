@@ -6,6 +6,7 @@ import org.springframework.data.domain.*;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
+import java.util.List;
 
 public interface ClientPortalAccountRepository extends JpaRepository<ClientPortalAccount, Long> {
     @EntityGraph(attributePaths = {"client", "agence"})
@@ -17,6 +18,13 @@ public interface ClientPortalAccountRepository extends JpaRepository<ClientPorta
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from ClientPortalAccount a join fetch a.client join fetch a.agence where a.agence.code = :agency and a.identifiant = :login")
     Optional<ClientPortalAccount> findForLogin(@Param("agency") String agency, @Param("login") String login);
+
+    // Authentication-only global lookup; operational account reads remain agency-scoped.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from ClientPortalAccount a join fetch a.client join fetch a.agence where a.identifiant = :login order by a.id")
+    List<ClientPortalAccount> findForGlobalLogin(@Param("login") String login, Pageable pageable);
+
+    boolean existsByIdentifiant(String identifiant);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from ClientPortalAccount a where a.id = :id and a.agence.id = :agency")

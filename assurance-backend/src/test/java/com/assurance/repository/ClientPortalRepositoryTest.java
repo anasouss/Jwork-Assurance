@@ -53,10 +53,25 @@ class ClientPortalRepositoryTest {
         document.setTitre("Police");
         em.persistAndFlush(document);
         assertThat(documents.visible(agency.getId(), owner.getId(), PageRequest.of(0, 25))).hasSize(1);
+        var anotherContract = contract(agency);
+        em.flush();
+        assertThat(documents.visibleForDossier(agency.getId(), owner.getId(), contract.getId(), null,
+                PageRequest.of(0, 25))).hasSize(1);
+        assertThat(documents.visibleForDossier(agency.getId(), owner.getId(), anotherContract.getId(), null,
+                PageRequest.of(0, 25))).isEmpty();
+        assertThat(documents.visibleForDossier(agency.getId(), owner.getId(), null, Long.MAX_VALUE,
+                PageRequest.of(0, 25))).isEmpty();
+        assertThat(documents.visibleForDossier(agency.getId(), other.getId(), contract.getId(), null,
+                PageRequest.of(0, 25))).isEmpty();
+        var anotherAgency = agency("PORTAL-DOC-OTHER");
+        assertThat(documents.visibleForDossier(anotherAgency.getId(), owner.getId(), contract.getId(), null,
+                PageRequest.of(0, 25))).isEmpty();
         assertThat(documents.visible(agency.getId(), other.getId(), document.getId())).isEmpty();
         document.setPublished(false);
         em.flush();
         assertThat(documents.visible(agency.getId(), owner.getId(), document.getId())).isEmpty();
+        assertThat(documents.visibleForDossier(agency.getId(), owner.getId(), contract.getId(), null,
+                PageRequest.of(0, 25))).isEmpty();
     }
 
     @Test

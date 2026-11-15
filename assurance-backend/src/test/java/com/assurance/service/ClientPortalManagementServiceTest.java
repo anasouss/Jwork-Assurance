@@ -79,6 +79,22 @@ class ClientPortalManagementServiceTest {
     }
 
     @Test
+    void portalIdentifierCannotBeReusedByAnotherAgency() {
+        actor("client-portal-account:create");
+        var agency = Agence.builder().code("AG-1").nom("Agence").build();
+        agency.setId(1L);
+        var client = Client.builder().agence(agency).typeClient(TypeClient.PERSONNE_PHYSIQUE).cin("AB123").build();
+        client.setId(4L);
+        when(clients.findByAgenceIdAndId(1L, 4L)).thenReturn(Optional.of(client));
+        when(accounts.existsByIdentifiant("AB123")).thenReturn(true);
+        assertThatThrownBy(() -> service.create(new ClientPortalRequests.CreateAccount(4L, null, "initial-password-123")))
+                .isInstanceOf(com.assurance.exception.BadRequestException.class)
+                .hasMessage("Un compte existe déjà pour ce client ou cet identifiant est indisponible");
+        verify(accounts, never()).saveAndFlush(any());
+        verifyNoInteractions(sessions, accesses, documents, updates);
+    }
+
+    @Test
     void disablingAndPasswordResetBothRevokeSessions() {
         actor("client-portal-account:deactivate", "client-portal-account:reset-password");
         var account = new ClientPortalAccount();

@@ -58,6 +58,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/mobile/auth/login",
+                                "/api/v1/mobile/auth/sign-in",
                                 "/api/v1/mobile/auth/refresh",
                                 "/api/v1/mobile/auth/logout",
                                 "/api/v1/client-portal/auth/login",

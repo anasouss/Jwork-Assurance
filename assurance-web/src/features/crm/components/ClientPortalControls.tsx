@@ -79,7 +79,10 @@ export function PortalPasswordDialog({ client, account, onClose, onChanged }: {
   const [confirmation, setConfirmation] = useState("");
   const [validation, setValidation] = useState<string | null>(null);
   const save = useMutation({
-    mutationFn: () => account ? portalApi.password(account.id, password) : portalApi.create(client.id, identifier.trim(), password),
+    mutationFn: async () => {
+      if (account) await portalApi.password(account.id, password);
+      else await portalApi.create(client.id, identifier.trim(), password);
+    },
     gcTime: 0,
     onSuccess: async () => {
       setPassword(""); setConfirmation("");

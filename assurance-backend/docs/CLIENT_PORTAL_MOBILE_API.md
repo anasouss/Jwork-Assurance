@@ -2,7 +2,8 @@
 
 ## Scope
 
-Backend APIs only. No React Native project, web account-management screens,
+Includes CRM account-management screens, accessed from a client's record via
+Portail client. No React Native project,
 invitation flow, client self-registration, client uploads, payment actions,
 push notifications, or automatic publication are introduced.
 
@@ -11,6 +12,19 @@ agency isolation, permissions and dashboards. Client portal accounts are separat
 from employees and never receive employee roles or PERM_ authorities.
 
 ## Deployment
+
+The user confirmed that the main portal migration below has been applied.
+For the web-management feature switch, apply only
+`sql/migrations/20261115_client_portal_feature_flag.sql`.
+`ENABLE_CLIENT_PORTAL` defaults to `false` and supports agency overrides through
+the existing parameter service. Set its `valeur` to `true` with `actif = true`
+when ready. While disabled, web entry points are hidden, management endpoints
+are blocked, and client login/refresh/existing bearer sessions cannot access the
+portal. Staff/super-admin mobile authentication remains independent. Disabling
+does not delete accounts, grants or publications. Re-enabling restores eligibility
+for otherwise-valid sessions; this switch is not a permanent session-revocation action.
+The web refreshes feature availability on focus and every 30 seconds; backend
+enforcement remains authoritative on each request.
 
 1. Review and apply `sql/migrations/20261115_client_portal_mobile.sql` before deploying.
    It adds six portal/security tables and a mobile channel flag to refresh_tokens.
@@ -57,12 +71,19 @@ Staff authenticate normally and use `/api/v1/client-accounts`:
 | --- | --- | --- |
 | GET / | client-portal-account:view | Paginated agency account list |
 | GET /{id} | client-portal-account:view | Agency-scoped account detail |
+| GET /for-client/{clientId} | client-portal-account:view | Existing account or null |
 | POST / | client-portal-account:create | Create for an existing active client |
 | PUT /{id}/active | client-portal-account:deactivate | Enable/disable |
 | POST /{id}/password | client-portal-account:reset-password | Set temporary password |
 | GET /{id}/access | client-portal-account:view | Paginated explicit dossier grants |
 | POST /{id}/access | client-portal-account:assign | Grant or reactivate one dossier |
 | DELETE /access/{id} | client-portal-account:assign | Revoke the dossier and its publications |
+
+`GET /availability` returns `{enabled}` to staff holding client:view or account:view,
+even while disabled. `GET /{id}/candidates?claim=false&query=...` provides paginated,
+agency-scoped dossier choices related to the selected client; it does not grant access.
+`GET /access/{id}/sources` provides paginated source-file choices after the corresponding
+contract/claim read check. These lookup endpoints do not bypass the feature switch.
 
 Account creation body:
 `{"clientId":"55","identifiant":null,"password":"a-long-temporary-password"}`.

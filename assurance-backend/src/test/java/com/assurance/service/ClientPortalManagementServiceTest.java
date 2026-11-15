@@ -32,6 +32,9 @@ class ClientPortalManagementServiceTest {
     @Mock SinistreDocumentRepository claimDocuments;
     @Mock PasswordEncoder encoder;
     @Mock AuditEventRepository audits;
+    @Mock ClientPortalFeatureService feature;
+    @Mock ClientPortalContractCandidateRepository contractCandidates;
+    @Mock ClientPortalClaimCandidateRepository claimCandidates;
     @Spy ObjectMapper mapper = new ObjectMapper();
     @InjectMocks ClientPortalManagementService service;
 
@@ -39,6 +42,16 @@ class ClientPortalManagementServiceTest {
     void cleanup() {
         SecurityContextHolder.clearContext();
         TenantContext.clear();
+    }
+
+    @Test
+    void disabledFeatureBlocksManagementBeforeAnyDataLookup() {
+        actor("client-portal-account:view");
+        doThrow(new org.springframework.security.access.AccessDeniedException("Disabled"))
+                .when(feature).requireEnabled(1L);
+        assertThatThrownBy(() -> service.accounts(0, 25))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(accounts);
     }
 
     @Test

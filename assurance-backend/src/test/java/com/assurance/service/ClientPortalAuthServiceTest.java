@@ -27,12 +27,14 @@ class ClientPortalAuthServiceTest {
     @Mock ClientPortalSessionRepository sessions;
     @Mock PasswordEncoder encoder;
     @Mock JwtTokenProvider tokens;
+    @Mock ClientPortalFeatureService feature;
     @InjectMocks ClientPortalAuthService service;
 
     @BeforeEach
     void setup() {
         ReflectionTestUtils.setField(service, "dummyHash", "dummy-password-hash");
         ReflectionTestUtils.setField(service, "refreshExpiration", 7_776_000_000L);
+        lenient().when(feature.isEnabled(1L)).thenReturn(true);
     }
 
     @AfterEach
@@ -98,6 +100,12 @@ class ClientPortalAuthServiceTest {
         when(accounts.findForUpdate(9L, 1L)).thenReturn(Optional.of(account));
         assertThatThrownBy(() -> service.refresh("old")).isInstanceOf(UnauthorizedException.class);
         verify(sessions).revokeAll(9L);
+    }
+
+    @Test
+    void featureSwitchBlocksExistingAccounts() {
+        when(feature.isEnabled(1L)).thenReturn(false);
+        assertThat(service.available(account())).isFalse();
     }
 
     @Test

@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
@@ -160,14 +159,18 @@ export default function FacturationConventionsPage() {
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Facturation" />
-    <Tabs className="grid gap-4" value={savedView ? "saved" : "prepare"} onValueChange={value => {
-      setSelected(new Set()); setIssueOpen(false);
-      setParams(current => { const next = new URLSearchParams(current); if (value === "saved") next.set("view", "saved"); else next.delete("view"); return next; });
-    }}>
-      <TabsList aria-label="Vue de facturation"><TabsTrigger value="prepare" disabled={issue.isPending}>À facturer</TabsTrigger><TabsTrigger value="saved" disabled={issue.isPending}>Factures établies</TabsTrigger></TabsList>
-
     <section className="border-y bg-card p-4">
       <div className="flex flex-wrap items-end gap-3">
+        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[240px] sm:flex-[1_1_180px]">
+          <Label htmlFor="billing-view">Vue</Label>
+          <Select value={savedView ? "saved" : "prepare"} disabled={issue.isPending} onValueChange={value => {
+            setSelected(new Set()); setIssueOpen(false);
+            setParams(current => { const next = new URLSearchParams(current); if (value === "saved") next.set("view", "saved"); else next.delete("view"); return next; });
+          }}>
+            <SelectTrigger id="billing-view"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="prepare">À facturer</SelectItem><SelectItem value="saved">Factures établies</SelectItem></SelectContent>
+          </Select>
+        </div>
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
           <Label htmlFor="billing-convention">Convention</Label>
           <Select value={conventionId || (savedView ? "NONE" : "")} disabled={issue.isPending || options.isLoading} onValueChange={value => {
@@ -228,7 +231,7 @@ export default function FacturationConventionsPage() {
       {!savedView && convention?.blocage && <p role="alert" className="mt-3 text-sm text-destructive">{convention.blocage}</p>}
     </section>
 
-    <TabsContent value="saved" className="grid gap-3">
+    {savedView ? <div className="grid gap-3">
     {validYear && !options.isPending && !options.isError && (!conventionId || convention) ? <ConventionSavedInvoices
       key={`${conventionId}:${effectiveCompanyId}:${year}:${periodNumber}`}
       conventionId={conventionId || undefined} compagnieId={effectiveCompanyId || undefined}
@@ -236,8 +239,7 @@ export default function FacturationConventionsPage() {
       periodeAu={period?.fin ?? convention?.periodes.at(-1)?.fin ?? `${year}-12-31`}
       highlightId={highlightId}
     /> : <p role="status" className="py-8 text-center text-sm text-muted-foreground">{options.isFetching ? "Chargement des conventions…" : "Sélectionnez des critères valides."}</p>}
-    </TabsContent>
-    <TabsContent value="prepare" className="grid gap-4">
+    </div> : <div className="grid gap-4">
     <section className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -265,7 +267,7 @@ export default function FacturationConventionsPage() {
       <p className="text-sm text-muted-foreground">{selectedRows.length ? `${selectedRows[0].payeurNom} · ${selectedRows.length} échéance(s) sélectionnée(s)` : "Aucune sélection"}</p>
       <Button type="button" disabled={!canPrepare} onClick={() => setIssueOpen(true)}><FilePlus2 className="size-4" />Préparer la facture</Button>
     </section>}
-    </TabsContent>
+    </div>}
 
     <Dialog open={issueOpen} onOpenChange={open => { if (!issue.isPending) setIssueOpen(open); }}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[min(1400px,96vw)]">
@@ -296,7 +298,6 @@ export default function FacturationConventionsPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    </Tabs>
   </div>;
 }
 

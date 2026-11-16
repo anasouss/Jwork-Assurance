@@ -12,7 +12,6 @@ import { toast } from "@/lib/toast";
 import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import type { ClientDocument } from "../types";
-import { ConventionInvoiceLines } from "./ConventionInvoiceLines";
 
 export function ConventionInvoiceRevisionDialog({ id, onClose, onRevised }: {
   id: string; onClose: () => void; onRevised: (document: ClientDocument) => void;
@@ -20,13 +19,13 @@ export function ConventionInvoiceRevisionDialog({ id, onClose, onRevised }: {
   const [busy, setBusy] = useState(false);
   const detail = useQuery({ queryKey: ["compta", "client-document", id], queryFn: () => comptaApi.clientDocument(id), staleTime: 0 });
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
-    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-5xl" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy) event.preventDefault(); }}>
-      <DialogHeader><DialogTitle>Rectifier {detail.data?.numero ?? "la facture"}</DialogTitle>
+    <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy) event.preventDefault(); }}>
+      <DialogHeader className="min-w-0 shrink-0 px-6 pb-4 pt-6 pr-12"><DialogTitle>Rectifier {detail.data?.numero ?? "la facture"}</DialogTitle>
         <DialogDescription>Une nouvelle version remplace l’original sans l’effacer. Les ajouts doivent appartenir à la même convention, période et au même sens. Les échéances retirées redeviennent disponibles à la facturation.</DialogDescription>
       </DialogHeader>
-      {detail.isPending ? <p role="status">Vérification de la facture…</p>
-        : detail.isError ? <><p role="alert" className="text-destructive">{detail.error.message}</p><Button variant="outline" onClick={() => void detail.refetch()}>Réessayer</Button></>
-          : !detail.data?.rectificationAutorisee ? <><p role="alert" className="text-destructive">{detail.data?.motifBlocageRectification || "Rectification non autorisée."}</p><Button variant="outline" onClick={onClose}>Fermer</Button></>
+      {detail.isPending ? <p role="status" className="px-6 pb-6">Vérification de la facture…</p>
+        : detail.isError ? <div className="grid min-w-0 gap-3 px-6 pb-6"><p role="alert" className="break-words text-destructive">{detail.error.message}</p><Button variant="outline" onClick={() => void detail.refetch()}>Réessayer</Button></div>
+          : !detail.data?.rectificationAutorisee ? <div className="grid min-w-0 gap-3 px-6 pb-6"><p role="alert" className="break-words text-destructive">{detail.data?.motifBlocageRectification || "Rectification non autorisée."}</p><Button variant="outline" onClick={onClose}>Fermer</Button></div>
             : <RevisionForm document={detail.data} onClose={onClose} onRevised={onRevised} onPendingChange={setBusy} />}
     </DialogContent>
   </Dialog>;
@@ -71,8 +70,9 @@ function RevisionForm({ document, onClose, onRevised, onPendingChange }: {
     onError: error => { toast.error(error.message); void sources.refetch(); void preview.refetch(); },
   });
   return <>
+    <div className="grid min-h-0 min-w-0 flex-1 gap-4 overflow-y-auto px-6 pb-6">
     <h3 className="font-semibold">Lignes de la facture d’origine</h3>
-    <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-sm">
+    <div className="min-w-0 max-w-full overflow-x-auto"><table className="w-full min-w-[700px] text-sm">
       <thead className="bg-orange-600 text-left text-xs uppercase text-white"><tr>{["Conserver", "Période facturée", "Police", "Assuré", "Montant"].map(title => <th key={title} className="px-3 py-3">{title}</th>)}</tr></thead>
       <tbody className="divide-y">{document.lignes.map(line => <tr key={line.id}>
         <td className="px-3 py-3"><Checkbox aria-label={`Conserver l’échéance de la police ${line.numeroPolice}`} checked={selected.has(line.echeanceFacturationConventionId!)} disabled={mutation.isPending} onCheckedChange={checked => setSelected(current => {
@@ -83,14 +83,14 @@ function RevisionForm({ document, onClose, onRevised, onPendingChange }: {
         <td className="px-3 py-3 text-right tabular-nums">{formatAccountingAmount(line.montantTtc)}</td>
       </tr>)}</tbody>
     </table></div>
-    <section className="grid gap-3">
+    <section className="grid min-w-0 gap-3">
       <div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Lignes disponibles à ajouter</h3>
         <Button size="icon" variant="outline" title="Actualiser les lignes disponibles" aria-label="Actualiser les lignes disponibles" disabled={sources.isFetching || mutation.isPending} onClick={() => void sources.refetch()}><RefreshCw className="size-4" /></Button>
       </div>
       {sources.isPending ? <p role="status" className="text-sm text-muted-foreground">Recherche des lignes éligibles…</p>
         : sources.isError ? <p role="alert" className="text-sm text-destructive">{sources.error.message}</p>
           : !sources.data?.lignes.length ? <p className="text-sm text-muted-foreground">Aucune autre ligne éligible pour cette convention et cette période.</p>
-            : <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-sm">
+            : <div className="min-w-0 max-w-full overflow-x-auto"><table className="w-full min-w-[700px] text-sm">
               <thead className="bg-orange-600 text-left text-xs uppercase text-white"><tr>{["Ajouter", "Période facturée", "Police", "Assuré", "Montant"].map(title => <th key={title} className="px-3 py-3">{title}</th>)}</tr></thead>
               <tbody className="divide-y">{sources.data.lignes.flatMap(source => (source.details.length ? source.details : [null]).map((line, index) => <tr key={`${source.echeanceId}:${index}`}>
                 {index === 0 && <><td rowSpan={Math.max(1, source.details.length)} className="px-3 py-3"><Checkbox aria-label={`Ajouter l’échéance de ${source.details[0]?.numeroPolice ?? source.echeanceId}`} checked={selected.has(source.echeanceId)} disabled={mutation.isPending || sources.isFetching || Boolean(source.blocage)} onCheckedChange={checked => setSelected(current => {
@@ -101,24 +101,22 @@ function RevisionForm({ document, onClose, onRevised, onPendingChange }: {
               </tr>))}</tbody>
             </table></div>}
     </section>
-    {selected.size > 0 && <section className="grid gap-2 border-y py-3">
+    {selected.size > 0 && <section className="grid min-w-0 gap-2 border-y py-3" aria-live="polite" aria-atomic="true">
       {preview.isFetching ? <p role="status" className="text-sm text-muted-foreground">Calcul de la nouvelle facture…</p>
         : preview.isError ? <div role="alert"><p className="text-sm text-destructive">{preview.error.message}</p><Button variant="outline" className="mt-2" onClick={() => void preview.refetch()}>Actualiser l’aperçu</Button></div>
-          : preview.data && <>
-            <div className="flex justify-between gap-3 font-semibold"><span>Total nouvelle facture · MAD</span><span className="tabular-nums">{formatAccountingAmount(preview.data.total)}</span></div>
-            <details><summary className="cursor-pointer text-sm">Aperçu de la nouvelle facture</summary><div className="mt-3"><ConventionInvoiceLines preview={preview.data} headerTone="accounting" /></div></details>
-          </>}
+          : preview.data && <div className="flex flex-wrap items-baseline justify-between gap-3 font-semibold"><span>Total nouvelle facture</span><span className="whitespace-nowrap tabular-nums">{formatAccountingAmount(preview.data.total)} <span className="text-xs font-normal text-muted-foreground">MAD</span></span></div>}
     </section>}
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2 [&>div]:min-w-0">
       {document.dateEcheance && <div className="grid content-start gap-1.5"><Label>Date limite de paiement</Label>
         <DatePicker date={dueDate} minDate={today} maxDate={maximum} disabled={mutation.isPending} onSelect={value => setDueDate(toDateOnly(value) ?? "")} />
       </div>}
-      <div className="grid gap-1.5"><Label htmlFor="revision-notes">Notes</Label><Textarea id="revision-notes" maxLength={1000} value={notes} disabled={mutation.isPending} onChange={event => setNotes(event.target.value)} /></div>
+      <div className={`grid gap-1.5 ${document.dateEcheance ? "" : "sm:col-span-2"}`}><Label htmlFor="revision-notes">Notes</Label><Textarea id="revision-notes" maxLength={1000} value={notes} disabled={mutation.isPending} onChange={event => setNotes(event.target.value)} /></div>
       <div className="col-span-full grid gap-1.5"><Label htmlFor="revision-reason">Motif de rectification <span className="text-destructive">*</span></Label>
         <Textarea id="revision-reason" required maxLength={500} value={reason} disabled={mutation.isPending} onChange={event => setReason(event.target.value)} />
       </div>
     </div>
-    <DialogFooter><Button variant="outline" disabled={mutation.isPending} onClick={onClose}>Annuler</Button>
+    </div>
+    <DialogFooter className="shrink-0 border-t bg-background px-6 py-4"><Button variant="outline" disabled={mutation.isPending} onClick={onClose}>Annuler</Button>
       <Button disabled={!selected.size || !reason.trim() || Boolean(document.dateEcheance && !dueDate) || mutation.isPending || !preview.data || preview.isFetching || preview.isError || sources.isFetching || sources.isError} onClick={() => mutation.mutate()}><Pencil className="size-4" />{mutation.isPending ? "Rectification…" : "Établir la nouvelle version"}</Button>
     </DialogFooter>
   </>;

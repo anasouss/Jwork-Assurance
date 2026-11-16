@@ -36,22 +36,19 @@ export default function ConventionProductionPage() {
   const exportFile = useMutation({ mutationFn: () => comptaApi.exportConventionProduction(applied),
     onSuccess: blob => downloadBlob(blob, `production-conventions-${applied.dateDu}-${applied.dateAu}.xlsx`),
     onError: error => toast.error(error.message) });
-  const showConvention = applied.conventionIds?.length !== 1;
+  const showConvention = !applied.conventionId;
   const showCompany = !applied.compagnieId;
   const columns = 12 + Number(showConvention) + Number(showCompany);
-  const conventionIds = filters.conventionIds ?? [];
-  const selectedConventions = options.data?.filter(item => conventionIds.includes(item.id)) ?? [];
-  const linkedCompanies = new Set(selectedConventions.map(item => item.compagnieId).filter(Boolean));
-  const companyId = conventionIds.length ? linkedCompanies.size === 1 ? selectedConventions[0]?.compagnieId ?? undefined : undefined : filters.compagnieId;
-  const selectedConvention = selectedConventions[0];
+  const selectedConvention = options.data?.find(item => item.id === filters.conventionId);
+  const companyId = filters.conventionId ? selectedConvention?.compagnieId ?? undefined : filters.compagnieId;
 
   function apply() {
     if (!filters.dateDu || !filters.dateAu || filters.dateDu > filters.dateAu) {
       toast.error("Sélectionnez une période valide.");
       return;
     }
-    if (conventionIds.length && (options.isFetching || options.isError || selectedConventions.length !== conventionIds.length || selectedConventions.some(item => !item.compagnieId))) {
-      toast.error("Une convention sélectionnée ou sa compagnie est indisponible. Actualisez les filtres.");
+    if (filters.conventionId && (options.isFetching || options.isError || !selectedConvention?.compagnieId)) {
+      toast.error("La convention sélectionnée ou sa compagnie est indisponible. Actualisez les filtres.");
       return;
     }
     setApplied({ ...filters, compagnieId: companyId });
@@ -64,13 +61,16 @@ export default function ConventionProductionPage() {
     <ConventionWorkspaceHeader title="Consultation" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="grid min-w-0 gap-1.5"><Label htmlFor="production-conventions">Convention</Label>
-        <ProductionMultiSelect id="production-conventions" label="Conventions" allLabel="Toutes les conventions"
-          options={options.data?.map(item => ({ value: item.id, label: item.intitule })) ?? []}
-          value={conventionIds} disabled={options.isPending || options.isError}
-          onChange={value => setFilters(current => ({ ...current, conventionIds: value, compagnieId: undefined }))} />
+        <Select value={filters.conventionId ?? "ALL"} disabled={options.isPending || options.isError}
+          onValueChange={value => setFilters(current => ({ ...current, conventionId: value === "ALL" ? undefined : value, compagnieId: undefined }))}>
+          <SelectTrigger id="production-conventions"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="ALL">Toutes les conventions</SelectItem>
+            {options.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
       <div className="grid gap-1.5"><Label>Compagnie</Label><Select value={companyId ?? "ALL"}
-        disabled={conventionIds.length > 0 || companies.isPending || companies.isError}
+        disabled={!!filters.conventionId || companies.isPending || companies.isError}
         onValueChange={value => setFilters(current => ({ ...current, compagnieId: value === "ALL" ? undefined : value }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
           {companyId && selectedConvention?.compagnieId === companyId && !companies.data?.some(item => item.id === companyId)

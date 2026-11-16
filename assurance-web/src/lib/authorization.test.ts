@@ -52,6 +52,16 @@ describe("route authorization", () => {
     expect(canAccessPath(["reglement-client:view"], "/app/compta/conventions/encaissements")).toBe(true);
   });
 
+  it("registers provider domains with their dedicated consultation permission", () => {
+    const path = "/app/sinistre/prestataires/domaines";
+    expect(permissionRequirementForPath(path)).toEqual({ anyOf: ["domaine-prestataire:view"] });
+    expect(canAccessPath(["domaine-prestataire:view"], path)).toBe(true);
+    expect(canAccessPath(["domaine-prestataire:view"], `${path}/`)).toBe(true);
+    expect(canAccessPath(["domaine-prestataire:view"], "/app/sinistre")).toBe(true);
+    expect(canAccessPath(["prestataire-sinistre:view", "specialite-prestataire:view"], path)).toBe(false);
+    expect(canAccessPath([], path)).toBe(false);
+  });
+
   it("denies unregistered operational routes and retired capabilities", () => {
     expect(canAccessPath(["contrat:view"], "/app/production/unknown")).toBe(false);
     expect(canAccessPath(["tresorerie:manage"], "/app/compta/tresorerie/comptes")).toBe(false);

@@ -5,7 +5,7 @@ export type PermissionRequirement = {
 
 export const MODULE_PERMISSION_PREFIXES = {
   production: ["contrat", "avenant", "assistance", "carte-verte", "piece-jointe", "attestation-stock", "vehicule", "garantie", "regle-fiscale", "usage", "marque", "carrosserie", "carburant", "sous-classe", "categorie-transport", "categorie-client", "groupe-usage-attestation", "tarif-usage", "type-piece-jointe"],
-  sinistre: ["sinistre", "sinistre-document", "sinistre-mission", "sinistre-provision", "sinistre-operation", "prestataire-sinistre", "specialite-prestataire"],
+  sinistre: ["sinistre", "sinistre-document", "sinistre-mission", "sinistre-provision", "sinistre-operation", "prestataire-sinistre", "specialite-prestataire", "domaine-prestataire"],
   companies: ["compagnie-assurance", "compagnie-assistance", "convention", "grille-tarifaire", "contact-compagnie", "produit-assistance", "tarif-assistance", "promo-assistance"],
   crm: ["client", "groupe-client", "origine-commerciale", "acquisition-client", "condition-paiement", "document-crm", "client-portal-account", "client-portal-publication"],
   compta: ["quittance-affectation", "regle-quittance", "document-client", "production-convention", "facture-convention", "reglement-client", "instrument-reglement", "quittance-prime", "compte-tresorerie", "operation-tresorerie", "session-caisse", "bordereau-remise", "rapprochement-bancaire", "banque", "bordereau-compagnie", "reglement-compagnie"],
@@ -24,6 +24,7 @@ const pagePermissionRules: readonly PagePermissionRule[] = [
   { paths: ["/app/sinistre/declarer"], requirement: { anyOf: ["sinistre:create"] } },
   { paths: ["/app/sinistre/referentiels", "/app/sinistre/experts", "/app/sinistre/garages", "/app/sinistre/prestataires"], requirement: { anyOf: ["prestataire-sinistre:view"] } },
   { paths: ["/app/sinistre/prestataires/specialites"], requirement: { anyOf: ["specialite-prestataire:view"] } },
+  { paths: ["/app/sinistre/prestataires/domaines"], requirement: { anyOf: ["domaine-prestataire:view"] } },
   { paths: ["/app/production/ajouter-dossier", "/app/production/ajouter-dossier/assistance-voyage", "/app/production/ajouter-dossier/assistance-automobile", "/app/production/prospection/ajouter-devis"], requirement: { anyOf: ["contrat:create"] } },
   { paths: ["/app/production/contrats/:contratId/assistance-voyage/modifier", "/app/production/contrats/:contratId/assistance-automobile/modifier"], requirement: { anyOf: ["contrat:update","contrat:renew"] } },
   { paths: ["/app/production/prospection", "/app/production/contrats", "/app/production/registre", "/app/production/contrats/:contratId", "/app/production/contrats/:contratId/pdf", "/app/production/echeances"], requirement: { anyOf: ["contrat:view"] } },

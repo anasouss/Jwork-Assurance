@@ -24,6 +24,7 @@ public class PrestataireSinistreController {
     private final PrestataireSinistreService service;
     private final SinistreIntervenantService intervenants;
     private final com.assurance.service.DomaineInterventionSinistreService domaines;
+    private final com.assurance.service.PrestataireDirectoryExportService exportService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:view')")
@@ -44,6 +45,28 @@ public class PrestataireSinistreController {
         }
         return ApiResponse.success(intervenants.directory(TenantContext.getCurrentAgence(), typePrestataire,
                 includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, page, size));
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:export') and hasAuthority('PERM_prestataire-sinistre:view')")
+    public org.springframework.http.ResponseEntity<byte[]> export(
+            @RequestParam(defaultValue = "GARAGE") TypePrestataireSinistre typePrestataire,
+            @RequestParam(defaultValue = "false") boolean tousOperateurs,
+            @RequestParam(defaultValue = "false") boolean includeInactive,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Long villeId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) Long specialiteId,
+            @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long domaineId) {
+        byte[] bytes = exportService.export(TenantContext.getCurrentAgence(),
+                new com.assurance.service.PrestataireDirectoryExportService.Filters(typePrestataire, tousOperateurs,
+                        includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId));
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=prestataires.xlsx")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
     }
 
     @GetMapping("/domaines")

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, Plus, RotateCcw, Search, Settings2 } from "lucide-react";
+import { ArrowLeft, Download, LoaderCircle, Pencil, Plus, RotateCcw, Search, Settings2 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -13,22 +13,33 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { referenceApi } from "@/features/production/api/references";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "@/lib/toast";
+import { downloadBlob } from "@/lib/download";
 import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import { AutomobileProviderCells } from "../components/AutomobileProviderCells";
 import { DoctorProviderCells } from "../components/DoctorProviderCells";
-import type { Intervenant, ProviderKind } from "../types";
+import type { Intervenant, ProviderDirectoryFilters, ProviderKind } from "../types";
 import { providerTypes, providerTypeLabel } from "../provider-types";
 
 type OperatorFilter = ProviderKind | "ALL";
 const initialFilters = { query: "", villeId: "", compagnieId: "ALL", specialiteId: "ALL", domaineId: "ALL", typePrestataire: "ALL" as OperatorFilter, includeInactive: false };
+
+function directoryParams(filters: typeof initialFilters): ProviderDirectoryFilters {
+  return { typePrestataire: filters.typePrestataire === "ALL" ? undefined : filters.typePrestataire,
+    tousOperateurs: filters.typePrestataire === "ALL", includeInactive: filters.includeInactive,
+    query: filters.query || undefined, villeId: filters.villeId || undefined,
+    compagnieId: filters.compagnieId === "ALL" ? undefined : filters.compagnieId,
+    specialiteId: filters.specialiteId === "ALL" ? undefined : filters.specialiteId,
+    domaineId: filters.domaineId === "ALL" ? undefined : filters.domaineId };
+}
 
 export default function SinistrePrestatairesPage() {
   const permissions = useAuthStore(s => s.user?.permissions ?? []);
   const canView = permissions.includes("prestataire-sinistre:view");
   const canCreate = permissions.includes("prestataire-sinistre:create");
   const canUpdate = permissions.includes("prestataire-sinistre:update");
+  const canExport = permissions.includes("prestataire-sinistre:export");
   const [params, setParams] = useSearchParams();
   const initialKind: OperatorFilter = providerTypes.find(type => type.value === params.get("type"))?.value ?? "ALL";
   const queryClient = useQueryClient();
@@ -48,9 +59,9 @@ export default function SinistrePrestatairesPage() {
   const automobile = (appliedDomain?.brancheCode ?? appliedDomain?.code) === "AUTOMOBILE";
   const doctor = !automobile && applied.typePrestataire === "MEDECIN";
   const compact = automobile || doctor;
-  const columns = doctor ? 5 + Number(canUpdate) : automobile ? 7 + Number(canUpdate) : 9;
+  const columns = doctor ? 5 + Number(canUpdate) : automobile ? 8 + Number(canUpdate) : 9;
   const headers = doctor ? ["Médecin", "Ville", "Adresse", "Contact", "Spécialité", ...(canUpdate ? ["Action"] : [])]
-    : automobile ? ["Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", ...(canUpdate ? ["Action"] : [])]
+    : automobile ? ["Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", "Statut", ...(canUpdate ? ["Action"] : [])]
     : ["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut", "Action"];
   const operatorTypes = providerTypes.filter(type => !domain || domain.operateurs.includes(type.value));
   const operatorSpecialties = specialties.data?.filter(s => s.actif && (!domain || (domain.operateurs.includes(s.typePrestataire) && s.domaines.some(d => d.id === domain.id)))) ?? [];
@@ -58,13 +69,12 @@ export default function SinistrePrestatairesPage() {
   const cities = useQuery({ queryKey: ["referentiel", "villes", "sinistre"], queryFn: () => referenceApi.list("villes"), enabled: canView });
   const directory = useQuery({
     queryKey: [...sinistreKeys.providers(), "directory", applied, page],
-    queryFn: () => sinistreApi.providers({ typePrestataire: applied.typePrestataire === "ALL" ? undefined : applied.typePrestataire,
-      tousOperateurs: applied.typePrestataire === "ALL", query: applied.query || undefined,
-      villeId: applied.villeId || undefined,
-      compagnieId: applied.compagnieId === "ALL" ? undefined : applied.compagnieId,
-      specialiteId: applied.specialiteId === "ALL" ? undefined : applied.specialiteId,
-      domaineId: applied.domaineId === "ALL" ? undefined : applied.domaineId,
-      includeInactive: applied.includeInactive, page, size: 25 }), enabled: canView,
+    queryFn: () => sinistreApi.providers({ ...directoryParams(applied), page, size: 25 }), enabled: canView,
+  });
+  const exportFile = useMutation({
+    mutationFn: (request: { params: ProviderDirectoryFilters; filename: string }) => sinistreApi.exportProviders(request.params),
+    onSuccess: (blob, request) => downloadBlob(blob, request.filename),
+    onError: error => toast.error(error.message),
   });
   const save = useMutation({ mutationFn: (request: object) => dialogKind === "EXPERT"
     ? sinistreApi.saveExpert(editing?.id ?? null, request) : dialogKind === "GARAGE" ? sinistreApi.saveGarage(editing?.id ?? null, request)
@@ -135,7 +145,12 @@ export default function SinistrePrestatairesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2 xl:col-span-5">
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeInactive} onCheckedChange={checked => setFilters(f => ({ ...f, includeInactive: checked === true }))} />Inclure les inactifs</label>
         <div className="flex gap-2"><Button size="icon" title="Rechercher" aria-label="Rechercher" disabled={domains.isPending || domains.isError || specialties.isPending || specialties.isError} onClick={apply}><Search className="size-4" /></Button>
-          <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => { setFilters(initialFilters); setApplied(initialFilters); setPage(0); setParams({ type: "ALL" }, { replace: true }); }}><RotateCcw className="size-4" /></Button></div>
+          <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => { setFilters(initialFilters); setApplied(initialFilters); setPage(0); setParams({ type: "ALL" }, { replace: true }); }}><RotateCcw className="size-4" /></Button>
+          {canExport && <Button variant="outline" disabled={exportFile.isPending || directory.isFetching || directory.isError || !directory.data?.page.totalElements}
+            onClick={() => exportFile.mutate({ params: directoryParams(applied), filename: `prestataires-${automobile ? "automobile" : doctor ? "medecins" : "annuaire"}.xlsx` })}>
+            {exportFile.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}Exporter Excel
+          </Button>}
+        </div>
       </div>
       {(options.isError || specialties.isError || cities.isError || domains.isError) && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-5">Impossible de charger les filtres.</p>}
     </section>

@@ -52,7 +52,7 @@ public final class PermissionCatalog {
         resource(result, "sinistre", "sinistre-mission", "Missions d’expertise", "create,update");
         resource(result, "sinistre", "sinistre-provision", "Provisions des sinistres", "create");
         resource(result, "sinistre", "sinistre-operation", "Opérations financières des sinistres", "create,cancel");
-        resource(result, "sinistre", "prestataire-sinistre", "Prestataires de sinistres", "view,create,update");
+        resource(result, "sinistre", "prestataire-sinistre", "Prestataires de sinistres", "view,create,update,export");
         resource(result, "sinistre", "domaine-prestataire", "Domaines d’intervention des prestataires", "view,create,update");
         resource(result, "sinistre", "specialite-prestataire", "Spécialités des prestataires", "view,create,update");
         resource(result, "companies", "compagnie-assurance", "Compagnies d’assurance", "view,create,update");

@@ -29,12 +29,11 @@ export function AutomobileProviderCells({ item, compagnieId, specialiteId }: {
         {a.tousUsages ? "Tous les usages" : a.usages.map(u => u.libelle).join(", ") || "-"}
       </li>)}</ul> : "-"}
     </td>
-    <td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}
-      {!item.actif && <Badge className="ml-2" variant="gray">Inactif</Badge>}
-    </td>
+    <td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}</td>
     <td className="whitespace-nowrap px-3 py-3">{item.telephone ? <a className="hover:underline" href={`tel:${item.telephone}`}>{item.telephone}</a> : "-"}</td>
     <td className="max-w-56 break-all px-3 py-3">{item.email ? <a className="hover:underline" href={`mailto:${item.email}`}>{item.email}</a> : "-"}</td>
     <td className="max-w-72 break-words px-3 py-3">{item.adresse || "-"}</td>
     <td className="max-w-40 break-words px-3 py-3">{item.ville || "-"}</td>
+    <td className="px-3 py-3"><Badge variant={item.actif ? "success" : "gray"}>{item.actif ? "Actif" : "Inactif"}</Badge></td>
   </>;
 }

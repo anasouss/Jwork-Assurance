@@ -27,6 +27,7 @@ import type {
   TypeDocument,
   ProviderEligibilityContext,
   ProviderKind,
+  ProviderDirectoryFilters,
   ProviderDomain,
   ProviderReference,
   ProviderSpecialty,
@@ -66,8 +67,11 @@ export const sinistreApi = {
   async assistances(contratId: string, vehiculeId: string | undefined, dateSinistre: string) {
     return unwrap(await apiFetch<ApiResponse<ClaimAssistance[]>>(`/api/v1/sinistres/assistances${buildQueryString({ contratId, vehiculeId, dateSinistre })}`));
   },
-  async providers(params: { typePrestataire?: ProviderKind; tousOperateurs?: boolean; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; brancheId?: string; domaineId?: string; page: number; size: number }) {
+  async providers(params: ProviderDirectoryFilters & { page: number; size: number }) {
     return unwrap(await apiFetch<ApiResponse<PagedResponse<Intervenant>>>(`/api/v1/sinistres/prestataires${buildQueryString(params)}`));
+  },
+  exportProviders(params: ProviderDirectoryFilters) {
+    return apiFetchBlob(`/api/v1/sinistres/prestataires/export${buildQueryString(params)}`);
   },
   async providerOptions() {
     return unwrap(await apiFetch<ApiResponse<{ compagnies: ProviderReference[]; garanties: ProviderReference[]; branches: ProviderReference[]; usages: ProviderReference[] }>>("/api/v1/sinistres/prestataires/options"));

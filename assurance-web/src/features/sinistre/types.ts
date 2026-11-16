@@ -456,6 +456,17 @@ export type Intervenant = {
 };
 
 export type ProviderKind = "EXPERT" | "GARAGE" | "MEDECIN" | "CLINIQUE" | "PHARMACIE" | "RADIOLOGIE" | "KINESITHERAPIE";
+export type ProviderDirectoryFilters = {
+  typePrestataire?: ProviderKind;
+  tousOperateurs?: boolean;
+  includeInactive: boolean;
+  query?: string;
+  villeId?: string;
+  compagnieId?: string;
+  specialiteId?: string;
+  brancheId?: string;
+  domaineId?: string;
+};
 export type ProviderDomain = {
   id: string; code: string; libelle: string; actif: boolean; brancheId: string; branche: string; operateurs: ProviderKind[];
   brancheCode?: string;

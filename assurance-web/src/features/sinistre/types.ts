@@ -468,6 +468,8 @@ export type ProviderSpecialty = {
 };
 export type ProviderAgreement = {
   compagnieId: string; compagnie?: string; actif: boolean; conventionne: boolean;
+  tousUsages: boolean;
+  usages: ProviderReference[];
   dateDebut?: string | null; dateFin?: string | null;
 };
 export type ProviderEligibilityContext = {

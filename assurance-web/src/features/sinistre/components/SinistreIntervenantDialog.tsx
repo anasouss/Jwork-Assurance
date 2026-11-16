@@ -78,7 +78,7 @@ export function SinistreIntervenantDialog({
       toutesCompagnies: intervenant?.toutesCompagnies ?? true,
       specialiteIds: intervenant?.specialites?.map(s => s.id) ?? (initialSpecialiteId ? [initialSpecialiteId] : []),
       domaineIds: intervenant?.domaines?.map(d => d.id) ?? (initialDomaineId ? [initialDomaineId] : []),
-      accords: intervenant?.accords?.map(a => ({ ...a })) ?? [],
+      accords: intervenant?.accords?.map(a => ({ ...a, tousUsages: a.tousUsages ?? true, usages: a.usages ?? [] })) ?? [],
     });
   }, [intervenant, open, initialDomaineId, initialSpecialiteId]);
 
@@ -98,7 +98,9 @@ export function SinistreIntervenantDialog({
       toutesCompagnies: form.toutesCompagnies,
       specialiteIds: form.specialiteIds,
       domaineIds: form.domaineIds,
-      accords: form.accords,
+      accords: form.accords.map(a => ({ compagnieId: a.compagnieId, actif: a.actif, conventionne: a.conventionne,
+        dateDebut: a.dateDebut, dateFin: a.dateFin,
+        ...(kind === "GARAGE" ? { tousUsages: a.tousUsages, usageIds: a.usages.map(u => u.id) } : {}) })),
     });
   }
 
@@ -202,9 +204,20 @@ export function SinistreIntervenantDialog({
               <Field label="Du"><DatePicker date={agreement.dateDebut ?? ""} onSelect={date => change({ dateDebut: toDateOnly(date) ?? null })} /></Field>
               <Field label="Au"><DatePicker date={agreement.dateFin ?? ""} onSelect={date => change({ dateFin: toDateOnly(date) ?? null })} /></Field>
               <Button type="button" variant="ghost" size="icon" title="Retirer l'accord" aria-label="Retirer l'accord" onClick={() => update("accords", form.accords.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
+              {kind === "GARAGE" && <fieldset className="grid gap-3 sm:col-span-2 lg:col-span-6">
+                <legend className="mb-2 text-sm font-medium">Usages autorisés</legend>
+                <label className="flex items-center gap-2 text-sm"><Checkbox checked={agreement.tousUsages} onCheckedChange={value => change({ tousUsages: value === true, usages: value === true ? [] : agreement.usages })} />Tous les usages</label>
+                {!agreement.tousUsages && <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+                  {[...(options.data?.usages ?? []), ...agreement.usages.filter(u => !options.data?.usages.some(option => option.id === u.id))].map(usage => <label key={usage.id} className="flex items-start gap-2 text-sm">
+                    <Checkbox checked={agreement.usages.some(u => u.id === usage.id)} onCheckedChange={value => change({ usages: value === true ? [...agreement.usages, usage] : agreement.usages.filter(u => u.id !== usage.id) })} />
+                    <span>{usage.libelle}</span>
+                  </label>)}
+                </div>}
+                {!agreement.tousUsages && !agreement.usages.length && <p className="text-sm text-destructive">Sélectionnez au moins un usage.</p>}
+              </fieldset>}
             </div>;
           })}
-          <Button type="button" variant="outline" className="justify-self-start" disabled={options.isPending || options.isError || form.accords.some(a => !a.compagnieId)} onClick={() => update("accords", [...form.accords, { compagnieId: "", actif: true, conventionne: false }])}><Plus className="size-4" />Ajouter une compagnie</Button>
+          <Button type="button" variant="outline" className="justify-self-start" disabled={options.isPending || options.isError || form.accords.some(a => !a.compagnieId)} onClick={() => update("accords", [...form.accords, { compagnieId: "", actif: true, conventionne: false, tousUsages: true, usages: [] }])}><Plus className="size-4" />Ajouter une compagnie</Button>
         </fieldset>
         {(options.isError || specialties.isError) && <p role="alert" className="text-sm text-destructive">{options.error?.message || specialties.error?.message}</p>}
         <DialogFooter>
@@ -213,7 +226,9 @@ export function SinistreIntervenantDialog({
           </Button>
           <Button
             disabled={!form.code.trim() || !form.nom.trim() || saving || options.isPending || specialties.isPending || options.isError || specialties.isError || domains.isPending || domains.isError
-              || (!form.toutesCompagnies && !form.accords.length) || form.accords.some(a => !a.compagnieId || (a.dateDebut && a.dateFin && a.dateDebut > a.dateFin))}
+              || (!form.toutesCompagnies && !form.accords.length) || form.accords.some(a => !a.compagnieId
+                || (kind === "GARAGE" && !a.tousUsages && !a.usages.length)
+                || (a.dateDebut && a.dateFin && a.dateDebut > a.dateFin))}
             onClick={submit}
           >
             Enregistrer

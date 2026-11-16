@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -76,4 +77,8 @@ public class SinistreCouverture extends BaseEntity {
 
     @Column(name = "usage_libelle", length = 160)
     private String usageLibelle;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usage_id")
+    private Usage usage;
 }

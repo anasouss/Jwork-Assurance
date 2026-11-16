@@ -29,6 +29,12 @@ public class ConfigurationPrestataireRequest {
 
         private boolean actif = true;
         private boolean conventionne;
+
+        private Boolean tousUsages;
+
+        @Size(max = 500)
+        private List<@NotNull Long> usageIds;
+
         private LocalDate dateDebut;
         private LocalDate dateFin;
     }

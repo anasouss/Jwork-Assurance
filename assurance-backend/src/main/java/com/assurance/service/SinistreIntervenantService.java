@@ -182,7 +182,10 @@ public class SinistreIntervenantService {
     private List<SinistreIntervenantResponse.Accord> accordResponses(java.util.Set<com.assurance.entity.AccordPrestataireSinistre> agreements) {
         return agreements.stream().sorted(java.util.Comparator.comparing(a -> a.getCompagnie().getNom()))
                 .map(a -> new SinistreIntervenantResponse.Accord(a.getCompagnie().getId(), a.getCompagnie().getNom(),
-                        a.isActif(), a.isConventionne(), a.getDateDebut(), a.getDateFin())).toList();
+                        a.isActif(), a.isConventionne(), a.getDateDebut(), a.getDateFin(), a.isTousUsages(),
+                        a.getUsages().stream().sorted(java.util.Comparator.comparing(com.assurance.entity.Usage::getCode))
+                                .map(u -> new com.assurance.dto.response.SpecialitePrestataireResponse.Reference(
+                                        u.getId(), u.getCode() + " · " + u.getLibelle())).toList())).toList();
     }
 
     private List<com.assurance.dto.response.SpecialitePrestataireResponse.Reference> domainResponses(java.util.Set<com.assurance.entity.DomaineInterventionSinistre> items) {

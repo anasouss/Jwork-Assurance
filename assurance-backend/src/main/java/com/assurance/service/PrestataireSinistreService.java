@@ -34,6 +34,7 @@ public class PrestataireSinistreService {
     private final SinistreGarantieRepository sinistreGarantieRepository;
     private final SinistreCouvertureService couvertureService;
     private final BusinessActivityRecorder activityRecorder;
+    private final UsageRepository usageRepository;
 
     @Transactional(readOnly = true)
     public Map<String, List<SpecialitePrestataireResponse.Reference>> options() {
@@ -42,6 +43,9 @@ public class PrestataireSinistreService {
                 "branches", brancheRepository.findAll(org.springframework.data.domain.Sort.by("libelle")).stream()
                         .filter(b -> Boolean.TRUE.equals(b.getActif()))
                         .map(b -> new SpecialitePrestataireResponse.Reference(b.getId(), b.getLibelle())).toList(),
+                "usages", usageRepository.findAll(org.springframework.data.domain.Sort.by("code")).stream()
+                        .filter(u -> Boolean.TRUE.equals(u.getActif()))
+                        .map(u -> new SpecialitePrestataireResponse.Reference(u.getId(), u.getCode() + " · " + u.getLibelle())).toList(),
                 "garanties", garantieRepository.findAll(org.springframework.data.domain.Sort.by("code")).stream()
                         .map(g -> new SpecialitePrestataireResponse.Reference(g.getId(), g.getCode() + " · " + g.getLibelle())).toList());
     }
@@ -183,12 +187,37 @@ public class PrestataireSinistreService {
             agreement.setConventionne(row.isConventionne());
             agreement.setDateDebut(row.getDateDebut());
             agreement.setDateFin(row.getDateFin());
+            configureUsages(agreement, row, type);
         }
         agreements.removeIf(a -> !companies.contains(a.getCompagnie().getId()));
     }
 
+    private void configureUsages(AccordPrestataireSinistre agreement, ConfigurationPrestataireRequest.Accord row,
+                                 TypePrestataireSinistre type) {
+        if (type != TypePrestataireSinistre.GARAGE) {
+            if (Boolean.FALSE.equals(row.getTousUsages()) || (row.getUsageIds() != null && !row.getUsageIds().isEmpty())) {
+                throw new BadRequestException("La restriction par usage est réservée aux accords des garages");
+            }
+            return;
+        }
+        if (row.getTousUsages() != null) agreement.setTousUsages(row.getTousUsages());
+        if (row.getUsageIds() != null) {
+            Set<Long> ids = new LinkedHashSet<>(row.getUsageIds());
+            List<Usage> resolved = usageRepository.findAllById(ids);
+            if (resolved.size() != ids.size()) throw new BadRequestException("Un usage sélectionné est introuvable");
+            Set<Long> existing = agreement.getUsages().stream().map(BaseEntity::getId).collect(Collectors.toSet());
+            if (resolved.stream().anyMatch(u -> !Boolean.TRUE.equals(u.getActif()) && !existing.contains(u.getId()))) {
+                throw new BadRequestException("Un usage sélectionné est inactif");
+            }
+            agreement.getUsages().clear();
+            agreement.getUsages().addAll(resolved);
+        }
+        if (agreement.isTousUsages()) agreement.getUsages().clear();
+        else if (agreement.getUsages().isEmpty()) throw new BadRequestException("Sélectionnez au moins un usage pour cet accord");
+    }
+
     public record Eligibility(Long agenceId, Long compagnieId, Set<Long> garantieIds,
-            LocalDate dateIntervention, ModeReparationSinistre modeReparation) {
+            LocalDate dateIntervention, ModeReparationSinistre modeReparation, Long usageId) {
     }
 
     public Eligibility context(Long agenceId, Long sinistreId, Long contratId, Long vehiculeId, LocalDate dateSinistre,
@@ -205,14 +234,18 @@ public class PrestataireSinistreService {
         if (!covered.containsAll(selected)) throw new BadRequestException("Une garantie ne couvre pas le risque sélectionné");
         return new Eligibility(agenceId, coverage.contrat().getCompagnieAssurance() == null ? null
                 : coverage.contrat().getCompagnieAssurance().getId(), selected,
-                dateIntervention == null ? LocalDate.now() : dateIntervention, mode);
+                dateIntervention == null ? LocalDate.now() : dateIntervention, mode,
+                coverage.vehiculeSnapshot() == null || coverage.vehiculeSnapshot().getUsage() == null
+                        ? null : coverage.vehiculeSnapshot().getUsage().getId());
     }
 
     private Eligibility context(Sinistre claim, LocalDate date, ModeReparationSinistre mode) {
         Set<Long> ids = sinistreGarantieRepository.findForDetailOrderByConfiguredDisplay(claim.getId()).stream()
                 .filter(SinistreGarantie::isImpliquee).map(g -> g.getGarantie().getId()).collect(Collectors.toSet());
         return new Eligibility(claim.getAgence().getId(), claim.getCompagnieAssurance() == null ? null
-                : claim.getCompagnieAssurance().getId(), ids, date == null ? LocalDate.now() : date, mode);
+                : claim.getCompagnieAssurance().getId(), ids, date == null ? LocalDate.now() : date, mode,
+                claim.getCouverture() == null || claim.getCouverture().getUsage() == null
+                        ? null : claim.getCouverture().getUsage().getId());
     }
 
     private Set<Long> requiredGuarantees(Eligibility context, TypePrestataireSinistre type) {
@@ -228,6 +261,8 @@ public class PrestataireSinistreService {
     private boolean activeAgreement(AccordPrestataireSinistre agreement, Eligibility context) {
         return Objects.equals(agreement.getAgence().getId(), context.agenceId()) && agreement.isActif()
                 && Objects.equals(agreement.getCompagnie().getId(), context.compagnieId())
+                && (agreement.getGarage() == null || agreement.isTousUsages() || (context.usageId() != null
+                        && agreement.getUsages().stream().anyMatch(u -> u.getId().equals(context.usageId()))))
                 && (agreement.getDateDebut() == null || !agreement.getDateDebut().isAfter(context.dateIntervention()))
                 && (agreement.getDateFin() == null || !agreement.getDateFin().isBefore(context.dateIntervention()));
     }
@@ -258,10 +293,10 @@ public class PrestataireSinistreService {
         if (!Objects.equals(garage.getAgence().getId(), context.agenceId()) || !garage.isActif()
                 || !eligible(garage.isToutesCompagnies(), garage.getAccords(), garage.getSpecialites(), context,
                         requiredGuarantees(context, TypePrestataireSinistre.GARAGE))) {
-            throw new BadRequestException("Ce garage n'est pas compatible avec la compagnie et les garanties du sinistre");
+            throw new BadRequestException("Ce garage n'est pas compatible avec la compagnie, l'usage et les garanties du sinistre");
         }
         if (mode == ModeReparationSinistre.PEC && !approved(garage.getAccords(), context)) {
-            throw new BadRequestException("La PEC exige un accord conventionné actif avec la compagnie du sinistre");
+            throw new BadRequestException("La PEC exige un accord conventionné actif pour la compagnie et l'usage du véhicule sinistré");
         }
     }
 

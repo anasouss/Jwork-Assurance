@@ -70,7 +70,7 @@ export const sinistreApi = {
     return unwrap(await apiFetch<ApiResponse<PagedResponse<Intervenant>>>(`/api/v1/sinistres/prestataires${buildQueryString(params)}`));
   },
   async providerOptions() {
-    return unwrap(await apiFetch<ApiResponse<{ compagnies: ProviderReference[]; garanties: ProviderReference[]; branches: ProviderReference[] }>>("/api/v1/sinistres/prestataires/options"));
+    return unwrap(await apiFetch<ApiResponse<{ compagnies: ProviderReference[]; garanties: ProviderReference[]; branches: ProviderReference[]; usages: ProviderReference[] }>>("/api/v1/sinistres/prestataires/options"));
   },
   async specialties() {
     return unwrap(await apiFetch<ApiResponse<ProviderSpecialty[]>>("/api/v1/sinistres/prestataires/specialites"));

@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "accords_prestataires_sinistre", uniqueConstraints = {
@@ -43,6 +45,16 @@ public class AccordPrestataireSinistre extends BaseEntity {
 
     @Column(nullable = false)
     private boolean conventionne;
+
+    @Builder.Default
+    @Column(name = "tous_usages", nullable = false)
+    private boolean tousUsages = true;
+
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "accords_prestataires_usages", joinColumns = @JoinColumn(name = "accord_id"),
+            inverseJoinColumns = @JoinColumn(name = "usage_id"))
+    private Set<Usage> usages = new LinkedHashSet<>();
 
     @Column(name = "date_debut")
     private LocalDate dateDebut;

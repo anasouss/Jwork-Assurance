@@ -407,6 +407,7 @@ public class SinistreService {
                 .usageLibelle(vehicule == null || vehicule.getUsage() == null
                         ? null
                         : vehicule.getUsage().getLibelle())
+                .usage(vehicule == null ? null : vehicule.getUsage())
                 .build();
     }
 

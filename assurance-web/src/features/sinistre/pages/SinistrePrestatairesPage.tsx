@@ -122,14 +122,21 @@ export default function SinistrePrestatairesPage() {
     </section>
     <section className="min-w-0 overflow-hidden rounded-md border bg-card">
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm">
-        <thead className="bg-sky-700 text-left text-xs uppercase text-white"><tr>{["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Compagnies et accords", "Statut", "Action"].map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
-        <tbody className="divide-y">{directory.isPending ? <TableRowsSkeleton colSpan={8} rows={6} />
-          : directory.isError ? <tr><td colSpan={8} className="p-8 text-center"><p role="alert" className="text-destructive">{directory.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void directory.refetch()}>Réessayer</Button></td></tr>
-            : !directory.data.items.length ? <tr><td colSpan={8} className="p-10 text-center text-muted-foreground">Aucun prestataire pour ces critères.</td></tr>
+        <thead className="bg-sky-700 text-left text-xs uppercase text-white"><tr>{["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut", "Action"].map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
+        <tbody className="divide-y">{directory.isPending ? <TableRowsSkeleton colSpan={9} rows={6} />
+          : directory.isError ? <tr><td colSpan={9} className="p-8 text-center"><p role="alert" className="text-destructive">{directory.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void directory.refetch()}>Réessayer</Button></td></tr>
+            : !directory.data.items.length ? <tr><td colSpan={9} className="p-10 text-center text-muted-foreground">Aucun prestataire pour ces critères.</td></tr>
               : directory.data.items.map(item => <tr key={`${item.typePrestataire}:${item.id}`} className="align-top hover:bg-muted/30">
                 <td className="px-3 py-3 font-medium">{item.code}</td><td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}<p className="mt-1 text-xs font-normal text-muted-foreground">{item.typePrestataire ? providerTypeLabel(item.typePrestataire) : ""} · {item.domaines?.map(d => d.libelle).join(", ") || "-"}</p><p className="mt-1 text-xs font-normal text-muted-foreground">{item.adresse}</p></td>
                 <td className="px-3 py-3">{item.telephone || "-"}<p className="text-xs text-muted-foreground">{item.email}</p></td><td className="px-3 py-3">{item.ville || "-"}</td>
                 <td className="max-w-64 px-3 py-3"><div className="flex flex-wrap gap-1">{item.specialites?.map(s => <Badge key={s.id} variant={s.actif ? "info" : "gray"}>{s.libelle}</Badge>)}{!item.specialites?.length && "-"}</div></td>
+                <td className="max-w-72 px-3 py-3">{item.typePrestataire !== "GARAGE" ? "-" : <ul className="space-y-2">
+                  {item.accords?.filter(a => applied.compagnieId === "ALL" || a.compagnieId === applied.compagnieId).map(a => <li key={a.compagnieId}>
+                    <span className="block text-xs text-muted-foreground">{a.compagnie}</span>
+                    {a.tousUsages ? "Tous les usages" : a.usages?.map(u => u.libelle).join(", ") || "-"}
+                  </li>)}
+                  {!item.accords?.some(a => applied.compagnieId === "ALL" || a.compagnieId === applied.compagnieId) && <li>-</li>}
+                </ul>}</td>
                 <td className="max-w-72 px-3 py-3"><p className="mb-1 text-xs text-muted-foreground">{item.toutesCompagnies ? "Toutes compagnies" : "Compagnies liées uniquement"}</p>
                   <ul className="space-y-1">{item.accords?.map(a => <li key={a.compagnieId}>{a.compagnie} <span className="text-xs text-muted-foreground">· {a.actif ? (a.conventionne ? "Conventionné" : "Non conventionné") : "Inactif"}{a.dateFin ? ` · au ${a.dateFin.split("-").reverse().join("/")}` : ""}</span></li>)}</ul></td>
                 <td className="px-3 py-3"><Badge variant={item.actif ? "success" : "gray"}>{item.actif ? "Actif" : "Inactif"}</Badge></td>

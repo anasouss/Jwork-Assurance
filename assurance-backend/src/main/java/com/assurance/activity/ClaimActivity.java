@@ -306,7 +306,10 @@ public final class ClaimActivity {
                         .map(com.assurance.dto.response.SpecialitePrestataireResponse::libelle).sorted().collect(java.util.stream.Collectors.joining(", ")))
                 .put("Accords compagnies", person.getAccords() == null ? "" : person.getAccords().stream()
                         .map(a -> a.compagnie() + " / " + (a.conventionne() ? "Conventionné" : "Non conventionné")
-                                + " / " + a.actif() + " / " + a.dateDebut() + " / " + a.dateFin())
+                                + " / " + a.actif() + " / " + a.dateDebut() + " / " + a.dateFin()
+                                + " / Usages : " + (a.tousUsages() ? "Tous" : a.usages().stream()
+                                        .map(com.assurance.dto.response.SpecialitePrestataireResponse.Reference::libelle)
+                                        .sorted().collect(java.util.stream.Collectors.joining(", "))))
                         .sorted().collect(java.util.stream.Collectors.joining(" ; "))).snapshot();
     }
 

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { useAuthStore } from "@/store/auth-store";
 import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
+import { ProductionMultiSelect } from "../components/ProductionMultiSelect";
 import { downloadBlob } from "@/lib/download";
 import { toast } from "@/lib/toast";
 import { toDateOnly } from "@/features/production/date";
@@ -35,19 +36,22 @@ export default function ConventionProductionPage() {
   const exportFile = useMutation({ mutationFn: () => comptaApi.exportConventionProduction(applied),
     onSuccess: blob => downloadBlob(blob, `production-conventions-${applied.dateDu}-${applied.dateAu}.xlsx`),
     onError: error => toast.error(error.message) });
-  const showConvention = !applied.conventionId;
+  const showConvention = applied.conventionIds?.length !== 1;
   const showCompany = !applied.compagnieId;
   const columns = 12 + Number(showConvention) + Number(showCompany);
-  const selectedConvention = options.data?.find(item => item.id === filters.conventionId);
-  const companyId = filters.conventionId ? selectedConvention?.compagnieId ?? undefined : filters.compagnieId;
+  const conventionIds = filters.conventionIds ?? [];
+  const selectedConventions = options.data?.filter(item => conventionIds.includes(item.id)) ?? [];
+  const linkedCompanies = new Set(selectedConventions.map(item => item.compagnieId).filter(Boolean));
+  const companyId = conventionIds.length ? linkedCompanies.size === 1 ? selectedConventions[0]?.compagnieId ?? undefined : undefined : filters.compagnieId;
+  const selectedConvention = selectedConventions[0];
 
   function apply() {
     if (!filters.dateDu || !filters.dateAu || filters.dateDu > filters.dateAu) {
       toast.error("Sélectionnez une période valide.");
       return;
     }
-    if (filters.conventionId && !selectedConvention?.compagnieId) {
-      toast.error("La compagnie liée à cette convention est indisponible.");
+    if (conventionIds.length && (options.isFetching || options.isError || selectedConventions.length !== conventionIds.length || selectedConventions.some(item => !item.compagnieId))) {
+      toast.error("Une convention sélectionnée ou sa compagnie est indisponible. Actualisez les filtres.");
       return;
     }
     setApplied({ ...filters, compagnieId: companyId });
@@ -59,31 +63,28 @@ export default function ConventionProductionPage() {
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Consultation" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div className="grid gap-1.5"><Label>Convention</Label><Select value={filters.conventionId ?? "ALL"}
-        disabled={options.isPending || options.isError}
-        onValueChange={value => {
-          const convention = options.data?.find(item => item.id === value);
-          setFilters(current => ({ ...current, conventionId: value === "ALL" ? undefined : value,
-            compagnieId: value === "ALL" ? undefined : convention?.compagnieId ?? undefined }));
-        }}>
-        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les conventions</SelectItem>
-          {options.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent></Select></div>
+      <div className="grid min-w-0 gap-1.5"><Label htmlFor="production-conventions">Convention</Label>
+        <ProductionMultiSelect id="production-conventions" label="Conventions" allLabel="Toutes les conventions"
+          options={options.data?.map(item => ({ value: item.id, label: item.intitule })) ?? []}
+          value={conventionIds} disabled={options.isPending || options.isError}
+          onChange={value => setFilters(current => ({ ...current, conventionIds: value, compagnieId: undefined }))} />
+      </div>
       <div className="grid gap-1.5"><Label>Compagnie</Label><Select value={companyId ?? "ALL"}
-        disabled={!!filters.conventionId || companies.isPending || companies.isError}
+        disabled={conventionIds.length > 0 || companies.isPending || companies.isError}
         onValueChange={value => setFilters(current => ({ ...current, compagnieId: value === "ALL" ? undefined : value }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les compagnies</SelectItem>
-          {selectedConvention?.compagnieId && !companies.data?.some(item => item.id === selectedConvention.compagnieId)
-            ? <SelectItem value={selectedConvention.compagnieId}>{selectedConvention.compagnie || "-"}</SelectItem> : null}
+          {companyId && selectedConvention?.compagnieId === companyId && !companies.data?.some(item => item.id === companyId)
+            ? <SelectItem value={companyId}>{selectedConvention?.compagnie || "-"}</SelectItem> : null}
           {companies.data?.map(item => <SelectItem key={item.id} value={item.id}>{item.libelle}</SelectItem>)}</SelectContent></Select></div>
       <div className="grid gap-1.5"><Label>Mode</Label><Select value={filters.mode ?? "ALL"}
         onValueChange={value => setFilters(current => ({ ...current, mode: value === "ALL" ? undefined : value as "BUREAU" | "FACTURE" }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Bureau et facture</SelectItem>
           <SelectItem value="BUREAU">Bureau</SelectItem><SelectItem value="FACTURE">Facture</SelectItem></SelectContent></Select></div>
-      <div className="grid gap-1.5"><Label>Mouvement</Label><Select value={filters.categorieMouvement ?? "ALL"}
-        onValueChange={value => setFilters(current => ({ ...current, categorieMouvement: value === "ALL" ? undefined : value as ConventionProductionFilters["categorieMouvement"] }))}>
-        <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem>
-          <SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem>
-        </SelectContent></Select></div>
+      <div className="grid min-w-0 gap-1.5"><Label htmlFor="production-movements">Mouvement</Label>
+        <ProductionMultiSelect<NonNullable<ConventionProductionFilters["categorieMouvement"]>> id="production-movements" label="Mouvements" allLabel="Tous les mouvements"
+          options={[{ value: "AFFAIRE_NOUVELLE", label: "Affaire nouvelle" }, { value: "RENOUVELLEMENT", label: "Renouvellement / Terme" }, { value: "AVENANT", label: "Avenant" }]}
+          value={filters.categoriesMouvement ?? []} onChange={value => setFilters(current => ({ ...current, categoriesMouvement: value }))} />
+      </div>
       <div className="grid gap-1.5"><Label>Statut</Label><Select value={filters.sensPrime ?? "ALL"}
         onValueChange={value => setFilters(current => ({ ...current, sensPrime: value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"] }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem>
@@ -92,7 +93,7 @@ export default function ConventionProductionPage() {
       <div className="grid gap-1.5"><Label>Critère de date</Label><Select value={filters.typeDate}
         onValueChange={value => setFilters(current => ({ ...current, typeDate: value as "EFFET" | "EMISSION" }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EFFET">Date d'effet</SelectItem>
-          <SelectItem value="EMISSION">Date d'émission de la quittance</SelectItem></SelectContent></Select></div>
+          <SelectItem value="EMISSION">Date d'émission</SelectItem></SelectContent></Select></div>
       <div className="grid gap-1.5"><Label>Du</Label><DatePicker date={filters.dateDu}
         onSelect={date => setFilters(current => ({ ...current, dateDu: toDateOnly(date) ?? "" }))} /></div>
       <div className="grid gap-1.5"><Label>Au</Label><DatePicker date={filters.dateAu}

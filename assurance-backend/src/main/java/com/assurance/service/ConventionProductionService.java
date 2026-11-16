@@ -54,7 +54,7 @@ public class ConventionProductionService {
             var numberStyle = workbook.createCellStyle();
             numberStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
             var headers = new ArrayList<String>();
-            if (filter.getConventionId() == null) headers.add("Convention");
+            if (filter.selectedConventionIds().size() != 1) headers.add("Convention");
             headers.add("Quittance N°");
             if (filter.getCompagnieId() == null) headers.add("Cie");
             headers.addAll(List.of("Police N°", "Mouvement", "Assure", "Vehicule", "Date d'effet", "Date d'expiration",
@@ -64,7 +64,7 @@ public class ConventionProductionService {
             int index = 1;
             for (var source : rows) {
                 List<Object> values = new ArrayList<>();
-                if (filter.getConventionId() == null) values.add(source.convention());
+                if (filter.selectedConventionIds().size() != 1) values.add(source.convention());
                 values.add(source.numeroQuittance());
                 if (filter.getCompagnieId() == null) values.add(source.compagnie());
                 values.addAll(java.util.Arrays.asList(source.numeroPolice(), source.mouvement(), source.assure(), source.vehicule(),
@@ -91,22 +91,26 @@ public class ConventionProductionService {
     }
 
     private Specification<ElementFacturable> specification(Long agency, ConventionProductionFilter filter) {
-        if (filter.getConventionId() != null) {
-            var convention = conventions.findByAgenceIdAndId(agency, filter.getConventionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Convention", filter.getConventionId()));
+        var conventionIds = filter.selectedConventionIds();
+        var movementCategories = filter.selectedMovementCategories();
+        var linkedCompanies = new java.util.HashSet<Long>();
+        for (Long conventionId : conventionIds) {
+            var convention = conventions.findByAgenceIdAndId(agency, conventionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Convention", conventionId));
             if (convention.getCompagnieAssurance() == null) throw new BadRequestException("La compagnie de cette convention n'est pas renseignée");
             Long linkedCompany = convention.getCompagnieAssurance().getId();
             if (filter.getCompagnieId() != null && !filter.getCompagnieId().equals(linkedCompany)) {
                 throw new BadRequestException("La compagnie sélectionnée ne correspond pas à la convention");
             }
-            filter.setCompagnieId(linkedCompany);
+            linkedCompanies.add(linkedCompany);
         }
+        if (linkedCompanies.size() == 1) filter.setCompagnieId(linkedCompanies.iterator().next());
         if (filter.getDateDu() == null || filter.getDateAu() == null || filter.getDateDu().isAfter(filter.getDateAu())) {
             throw new BadRequestException("Selectionnez une periode de production valide");
         }
         if (!List.of("EFFET", "EMISSION").contains(filter.getTypeDate())) throw new BadRequestException("Critere de date invalide");
-        if (filter.getCategorieMouvement() != null && !List.of(CategorieMouvementContrat.AFFAIRE_NOUVELLE,
-                CategorieMouvementContrat.RENOUVELLEMENT, CategorieMouvementContrat.AVENANT).contains(filter.getCategorieMouvement())) {
+        if (!List.of(CategorieMouvementContrat.AFFAIRE_NOUVELLE,
+                CategorieMouvementContrat.RENOUVELLEMENT, CategorieMouvementContrat.AVENANT).containsAll(movementCategories)) {
             throw new BadRequestException("Sélectionnez un mouvement de production valide");
         }
         return (root, query, cb) -> {
@@ -121,10 +125,10 @@ public class ConventionProductionService {
             predicates.add(root.get("nature").in(NatureElementFacturable.CONTRAT, NatureElementFacturable.MOUVEMENT_CONTRAT));
             predicates.add(cb.isTrue(root.get("actif")));
             predicates.add(cb.not(root.get("statut").in(StatutElementFacturable.BROUILLON, StatutElementFacturable.ANNULE)));
-            if (filter.getConventionId() != null) predicates.add(cb.equal(contract.get("convention").get("id"), filter.getConventionId()));
+            if (!conventionIds.isEmpty()) predicates.add(contract.get("convention").get("id").in(conventionIds));
             if (filter.getCompagnieId() != null) predicates.add(cb.equal(contract.get("compagnieAssurance").get("id"), filter.getCompagnieId()));
-            if (filter.getCategorieMouvement() != null) {
-                predicates.add(cb.equal(movement.get("typeMouvement").get("categorie"), filter.getCategorieMouvement()));
+            if (!movementCategories.isEmpty()) {
+                predicates.add(movement.get("typeMouvement").get("categorie").in(movementCategories));
             }
             if (filter.getSensPrime() != null) {
                 var total = root.<BigDecimal>get("primeTotale");

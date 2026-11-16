@@ -164,13 +164,17 @@ export const comptaApi = {
 
   async conventionProduction(params: ConventionProductionFilters & { page: number; size: number }) {
     const result = unwrap(await apiFetch<ApiResponse<ConventionProductionPage>>(
-      `/api/v1/compta/conventions/production${buildQueryString(params)}`
+      `/api/v1/compta/conventions/production${buildQueryString({ ...params,
+        conventionIds: params.conventionIds?.join(",") || undefined,
+        categoriesMouvement: params.categoriesMouvement?.join(",") || undefined })}`
     ));
     return { ...result, rows: result.rows.map(row => ({ ...row, id: String(row.id) })) };
   },
 
   exportConventionProduction(params: ConventionProductionFilters) {
-    return apiFetchBlob(`/api/v1/compta/conventions/production/export${buildQueryString(params)}`);
+    return apiFetchBlob(`/api/v1/compta/conventions/production/export${buildQueryString({ ...params,
+      conventionIds: params.conventionIds?.join(",") || undefined,
+      categoriesMouvement: params.categoriesMouvement?.join(",") || undefined })}`);
   },
 
   async conventionBillingInstallments(params: {

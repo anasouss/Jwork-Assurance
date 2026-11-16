@@ -30,7 +30,6 @@ export default function FacturationConventionsPage() {
   const queryClient = useQueryClient();
   const [conventionId, setConventionId] = useState("");
   const [companyId, setCompanyId] = useState("");
-  const [movement, setMovement] = useState<ConventionProductionFilters["categorieMouvement"]>();
   const [premiumDirection, setPremiumDirection] = useState<ConventionProductionFilters["sensPrime"]>();
   const [year, setYear] = useState(new Date().getFullYear());
   const [periodNumber, setPeriodNumber] = useState("ALL");
@@ -50,11 +49,11 @@ export default function FacturationConventionsPage() {
   const conventionOptions = options.data?.filter(item => !companyId || item.compagnieId === companyId);
   const period = convention?.periodes.find(item => String(item.numero) === periodNumber);
   const readyScope = Boolean(canView && validYear && convention && (periodNumber === "ALL" || period) && !convention.blocage);
-  const scope = `${conventionId}:${year}:${periodNumber}:${effectiveCompanyId}:${movement}:${premiumDirection}`;
+  const scope = `${conventionId}:${year}:${periodNumber}:${effectiveCompanyId}:${premiumDirection}`;
   const preparation = useQuery({
-    queryKey: ["compta", "convention-billing-preparation", conventionId, year, periodNumber, effectiveCompanyId, movement, premiumDirection],
+    queryKey: ["compta", "convention-billing-preparation", conventionId, year, periodNumber, effectiveCompanyId, premiumDirection],
     queryFn: () => comptaApi.prepareConventionInvoice({ conventionId, annee: year, periode: periodNumber === "ALL" ? undefined : Number(periodNumber),
-      compagnieId: effectiveCompanyId || undefined, categorieMouvement: movement, sensPrime: premiumDirection }),
+      compagnieId: effectiveCompanyId || undefined, sensPrime: premiumDirection }),
     enabled: readyScope && !savedView,
     staleTime: 0,
   });
@@ -205,14 +204,10 @@ export default function FacturationConventionsPage() {
             </SelectItem>)}</SelectContent>
           </Select>
         </div>
-        {!savedView && <><div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Mouvement</Label>
-          <Select value={movement ?? "ALL"} disabled={issue.isPending} onValueChange={value => setMovement(value === "ALL" ? undefined : value as ConventionProductionFilters["categorieMouvement"])}>
-            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
-          </Select></div>
-        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Statut</Label>
+        {!savedView && <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Statut</Label>
           <Select value={premiumDirection ?? "ALL"} disabled={issue.isPending} onValueChange={value => setPremiumDirection(value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"])}>
             <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem></SelectContent>
-          </Select></div></>}
+          </Select></div>}
         {!savedView && <div className="flex shrink-0 gap-2">
           <Button type="button" variant="outline" size="icon" title="Actualiser" aria-label="Actualiser"
             disabled={issue.isPending || options.isFetching || preparation.isFetching} onClick={() => {
@@ -220,7 +215,7 @@ export default function FacturationConventionsPage() {
               if (readyScope) void preparation.refetch();
             }}><RefreshCw className="size-4" /></Button>
           <Button type="button" variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" disabled={issue.isPending}
-            onClick={() => { setConventionId(""); setCompanyId(""); setMovement(undefined); setPremiumDirection(undefined); setPeriodNumber("ALL"); setYear(new Date().getFullYear()); }}>
+            onClick={() => { setConventionId(""); setCompanyId(""); setPremiumDirection(undefined); setPeriodNumber("ALL"); setYear(new Date().getFullYear()); }}>
             <RotateCcw className="size-4" />
           </Button>
         </div>}

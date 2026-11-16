@@ -330,9 +330,11 @@ export type ConventionInvoicePreparation = {
 
 export type ConventionProductionFilters = {
   conventionId?: string;
+  conventionIds?: string[];
   compagnieId?: string;
   mode?: "BUREAU" | "FACTURE";
   categorieMouvement?: "AFFAIRE_NOUVELLE" | "RENOUVELLEMENT" | "AVENANT";
+  categoriesMouvement?: ("AFFAIRE_NOUVELLE" | "RENOUVELLEMENT" | "AVENANT")[];
   sensPrime?: "PRIME_A_PAYER" | "RISTOURNE";
   typeDate: "EFFET" | "EMISSION";
   dateDu: string;

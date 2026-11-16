@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FilePlus2, RefreshCw, RotateCcw } from "lucide-react";
 import { toast } from "@/lib/toast";
@@ -10,10 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
 import { ConventionInvoiceLines } from "../components/ConventionInvoiceLines";
+import { ConventionSavedInvoices } from "../components/ConventionSavedInvoices";
 import { AccessDenied } from "@/components/shared";
 import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
 import { ConventionBillingSources, billingSelectionKey, type ConventionBillingSource } from "../components/ConventionBillingSources";
@@ -22,8 +24,9 @@ import type { ConventionProductionFilters } from "../types";
 export default function FacturationConventionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canView = permissions.includes("facture-convention:view");
-  const canCollect = permissions.includes("reglement-client:view");
-  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const savedView = params.get("view") === "saved";
+  const [highlightId, setHighlightId] = useState<string>();
   const canIssue = permissions.includes("facture-convention:issue");
   const queryClient = useQueryClient();
   const [conventionId, setConventionId] = useState("");
@@ -53,7 +56,7 @@ export default function FacturationConventionsPage() {
     queryKey: ["compta", "convention-billing-preparation", conventionId, year, periodNumber, effectiveCompanyId, movement, premiumDirection],
     queryFn: () => comptaApi.prepareConventionInvoice({ conventionId, annee: year, periode: periodNumber === "ALL" ? undefined : Number(periodNumber),
       compagnieId: effectiveCompanyId || undefined, categorieMouvement: movement, sensPrime: premiumDirection }),
-    enabled: readyScope,
+    enabled: readyScope && !savedView,
     staleTime: 0,
   });
   const rows = readyScope ? preparation.data?.lignes ?? [] : [];
@@ -109,16 +112,15 @@ export default function FacturationConventionsPage() {
       setDueDate("");
       setNotes("");
       setSelected(new Set());
-      toast.success(`${document.totalDocument < 0 ? "Facture de ristourne" : "Facture"} ${document.numero} émise`, {
-        action: { label: "Ouvrir", onClick: () => navigate(canCollect
-          ? `/app/compta/conventions/encaissements?documentId=${document.id}`
-          : `/app/compta/releves-factures?documentId=${document.id}`) },
-      });
+      setHighlightId(document.id);
+      setParams(current => { const next = new URLSearchParams(current); next.set("view", "saved"); return next; });
+      toast.success(`${document.totalDocument < 0 ? "Facture de ristourne" : "Facture"} ${document.numero} émise`);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing-preparation"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "convention-billing"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "client-documents"] }),
         queryClient.invalidateQueries({ queryKey: ["compta", "convention-invoice-receivables"] }),
+        queryClient.invalidateQueries({ queryKey: ["compta", "convention-invoices"] }),
       ]);
     },
     onError: error => {
@@ -158,17 +160,22 @@ export default function FacturationConventionsPage() {
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Facturation" />
+    <Tabs className="grid gap-4" value={savedView ? "saved" : "prepare"} onValueChange={value => {
+      setSelected(new Set()); setIssueOpen(false);
+      setParams(current => { const next = new URLSearchParams(current); if (value === "saved") next.set("view", "saved"); else next.delete("view"); return next; });
+    }}>
+      <TabsList aria-label="Vue de facturation"><TabsTrigger value="prepare" disabled={issue.isPending}>À facturer</TabsTrigger><TabsTrigger value="saved" disabled={issue.isPending}>Factures établies</TabsTrigger></TabsList>
 
     <section className="border-y bg-card p-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
           <Label htmlFor="billing-convention">Convention</Label>
-          <Select value={conventionId} disabled={issue.isPending || options.isLoading} onValueChange={value => {
+          <Select value={conventionId || (savedView ? "NONE" : "")} disabled={issue.isPending || options.isLoading} onValueChange={value => {
             setConventionId(value === "NONE" ? "" : value); setPeriodNumber("ALL");
             if (value !== "NONE") setCompanyId(options.data?.find(item => item.id === value)?.compagnieId ?? "");
           }}>
             <SelectTrigger id="billing-convention"><SelectValue placeholder="Sélectionner une convention" /></SelectTrigger>
-            <SelectContent><SelectItem value="NONE">Aucune convention sélectionnée</SelectItem>{conventionOptions?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
+            <SelectContent><SelectItem value="NONE">{savedView ? "Toutes les conventions" : "Aucune convention sélectionnée"}</SelectItem>{conventionOptions?.map(item => <SelectItem key={item.id} value={item.id}>{item.intitule}</SelectItem>)}</SelectContent>
           </Select>
         </div>
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[320px] sm:flex-[1_1_220px]">
@@ -187,7 +194,7 @@ export default function FacturationConventionsPage() {
             onChange={event => { setYear(Number(event.target.value)); setPeriodNumber("ALL"); }} />
         </div>
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[440px] sm:flex-[1.5_1_320px]">
-          <Label htmlFor="billing-period">Période à facturer</Label>
+          <Label htmlFor="billing-period">{savedView ? "Période facturée" : "Période à facturer"}</Label>
           <Select value={periodNumber} disabled={issue.isPending || !convention?.periodes.length} onValueChange={setPeriodNumber}>
             <SelectTrigger id="billing-period"><SelectValue placeholder="Sélectionner une période" /></SelectTrigger>
             <SelectContent><SelectItem value="ALL">Toutes les périodes</SelectItem>{convention?.periodes.map(item => <SelectItem key={item.numero} value={String(item.numero)}>
@@ -195,15 +202,15 @@ export default function FacturationConventionsPage() {
             </SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Mouvement</Label>
+        {!savedView && <><div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Mouvement</Label>
           <Select value={movement ?? "ALL"} disabled={issue.isPending} onValueChange={value => setMovement(value === "ALL" ? undefined : value as ConventionProductionFilters["categorieMouvement"])}>
             <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
           </Select></div>
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[280px] sm:flex-[1_1_200px]"><Label>Statut</Label>
           <Select value={premiumDirection ?? "ALL"} disabled={issue.isPending} onValueChange={value => setPremiumDirection(value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"])}>
             <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem></SelectContent>
-          </Select></div>
-        <div className="flex shrink-0 gap-2">
+          </Select></div></>}
+        {!savedView && <div className="flex shrink-0 gap-2">
           <Button type="button" variant="outline" size="icon" title="Actualiser" aria-label="Actualiser"
             disabled={issue.isPending || options.isFetching || preparation.isFetching} onClick={() => {
               void options.refetch();
@@ -213,14 +220,24 @@ export default function FacturationConventionsPage() {
             onClick={() => { setConventionId(""); setCompanyId(""); setMovement(undefined); setPremiumDirection(undefined); setPeriodNumber("ALL"); setYear(new Date().getFullYear()); }}>
             <RotateCcw className="size-4" />
           </Button>
-        </div>
+        </div>}
       </div>
       {!validYear && <p role="alert" className="mt-3 text-sm text-destructive">Sélectionnez une année entre 1900 et 2200.</p>}
       {options.isError && <p role="alert" className="mt-3 text-sm text-destructive">{options.error.message}</p>}
       {companies.isError && <p role="alert" className="mt-3 text-sm text-destructive">{companies.error.message}</p>}
-      {convention?.blocage && <p role="alert" className="mt-3 text-sm text-destructive">{convention.blocage}</p>}
+      {!savedView && convention?.blocage && <p role="alert" className="mt-3 text-sm text-destructive">{convention.blocage}</p>}
     </section>
 
+    <TabsContent value="saved" className="grid gap-3">
+    {validYear && !options.isPending && !options.isError && (!conventionId || convention) ? <ConventionSavedInvoices
+      key={`${conventionId}:${effectiveCompanyId}:${year}:${periodNumber}`}
+      conventionId={conventionId || undefined} compagnieId={effectiveCompanyId || undefined}
+      periodeDu={period?.debut ?? convention?.periodes[0]?.debut ?? `${year}-01-01`}
+      periodeAu={period?.fin ?? convention?.periodes.at(-1)?.fin ?? `${year}-12-31`}
+      highlightId={highlightId}
+    /> : <p role="status" className="py-8 text-center text-sm text-muted-foreground">{options.isFetching ? "Chargement des conventions…" : "Sélectionnez des critères valides."}</p>}
+    </TabsContent>
+    <TabsContent value="prepare" className="grid gap-4">
     <section className="grid gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -240,7 +257,7 @@ export default function FacturationConventionsPage() {
         emptyMessage={readyScope ? "Aucune ligne à facturer pour ces critères." : "Sélectionnez une convention."}
       />
       {readyScope && !preparation.isPending && !preparation.isError && !rows.length && <div>
-        <Button asChild variant="outline"><Link to={canCollect ? "/app/compta/conventions/encaissements" : "/app/compta/releves-factures"}>Consulter les factures émises</Link></Button>
+        <Button variant="outline" onClick={() => setParams(current => { const next = new URLSearchParams(current); next.set("view", "saved"); return next; })}>Consulter les factures établies</Button>
       </div>}
     </section>
 
@@ -248,6 +265,7 @@ export default function FacturationConventionsPage() {
       <p className="text-sm text-muted-foreground">{selectedRows.length ? `${selectedRows[0].payeurNom} · ${selectedRows.length} échéance(s) sélectionnée(s)` : "Aucune sélection"}</p>
       <Button type="button" disabled={!canPrepare} onClick={() => setIssueOpen(true)}><FilePlus2 className="size-4" />Préparer la facture</Button>
     </section>}
+    </TabsContent>
 
     <Dialog open={issueOpen} onOpenChange={open => { if (!issue.isPending) setIssueOpen(open); }}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-[min(1400px,96vw)]">
@@ -278,6 +296,7 @@ export default function FacturationConventionsPage() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </Tabs>
   </div>;
 }
 

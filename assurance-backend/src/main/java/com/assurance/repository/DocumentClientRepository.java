@@ -19,6 +19,38 @@ import java.util.Optional;
 
 public interface DocumentClientRepository extends JpaRepository<DocumentClient, Long> {
 
+    @EntityGraph(attributePaths = { "clientPayeur", "groupePayeur", "conventionPayeur", "documentOrigine", "documentRemplacement" })
+    @Query("""
+            select d from DocumentClient d
+            left join d.conventionPayeur convention
+            where d.agence.id = :agenceId
+              and d.typeDocument = com.assurance.enums.TypeDocumentClient.FACTURE
+              and (d.conventionPayeur is not null or exists (
+                  select 1 from LigneDocumentClient l where l.document = d
+                    and l.echeanceFacturationConvention is not null))
+              and (:conventionId is null or convention.id = :conventionId or exists (
+                  select 1 from LigneDocumentClient l where l.document = d
+                    and l.echeanceFacturationConvention.contrat.convention.id = :conventionId))
+              and (:compagnieId is null or convention.compagnieAssurance.id = :compagnieId or exists (
+                  select 1 from LigneDocumentClient l where l.document = d
+                    and l.elementFacturable.contrat.compagnieAssurance.id = :compagnieId))
+              and (:periodeDu is null or d.periodeDebut >= :periodeDu)
+              and (:periodeAu is null or d.periodeFin <= :periodeAu)
+              and (:statut is null or d.statut = :statut)
+              and (:search is null or lower(d.numero) like concat('%', :search, '%')
+                    or lower(d.payeurNom) like concat('%', :search, '%'))
+            """)
+    Page<DocumentClient> searchConventionInvoices(
+            @Param("agenceId") Long agenceId,
+            @Param("conventionId") Long conventionId,
+            @Param("compagnieId") Long compagnieId,
+            @Param("periodeDu") LocalDate periodeDu,
+            @Param("periodeAu") LocalDate periodeAu,
+            @Param("statut") StatutDocumentClient statut,
+            @Param("search") String search,
+            Pageable pageable
+    );
+
     @Query("""
             select count(d) > 0 from DocumentClient d
             where d.agence.id = :agenceId and d.id = :documentId

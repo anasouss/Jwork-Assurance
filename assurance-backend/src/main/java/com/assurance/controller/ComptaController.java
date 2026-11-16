@@ -359,6 +359,23 @@ public class ComptaController {
         return ResponseEntity.ok(ApiResponse.success(facturationConventionService.conventions(TenantContext.getCurrentAgence(), annee)));
     }
 
+    @GetMapping("/facturation-conventions/factures")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:view')")
+    public ResponseEntity<ApiResponse<DocumentClientPageResponse>> conventionInvoices(
+            @RequestParam(required = false) Long conventionId,
+            @RequestParam(required = false) Long compagnieId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodeDu,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodeAu,
+            @RequestParam(required = false) StatutDocumentClient statut,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(documentClientService.searchConventionInvoices(
+                TenantContext.getCurrentAgence(), conventionId, compagnieId,
+                periodeDu, periodeAu, statut, search, page, size)));
+    }
+
     @GetMapping("/facturation-conventions/preparation")
     @PreAuthorize("hasAuthority('PERM_facture-convention:view')")
     public ResponseEntity<ApiResponse<com.assurance.dto.response.PreparationFactureConventionResponse>> prepareConventionInvoice(

@@ -644,6 +644,24 @@ public class DocumentClientService {
     }
 
     @Transactional(readOnly = true)
+    public DocumentClientPageResponse searchConventionInvoices(
+            Long agenceId, Long conventionId, Long compagnieId,
+            LocalDate periodeDu, LocalDate periodeAu, StatutDocumentClient statut,
+            String search, int page, int size
+    ) {
+        validatePeriod(periodeDu, periodeAu);
+        Page<DocumentClient> result = documentClientRepository.searchConventionInvoices(
+                agenceId, conventionId, compagnieId, periodeDu, periodeAu, statut, normalizeSearch(search),
+                PageRequest.of(normalizePage(page), normalizeSize(size),
+                        Sort.by(Sort.Direction.DESC, "dateEmission", "id")));
+        return DocumentClientPageResponse.builder()
+                .summary(DocumentClientPageResponse.Summary.builder().total(result.getTotalElements()).build())
+                .page(documentPageInfo(result))
+                .rows(result.getContent().stream().map(document -> toResponse(document, false)).toList())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public DocumentClientResponse detail(Long agenceId, Long documentId) {
         DocumentClient document = findDocument(agenceId, documentId);
         requireDocumentPermission(document, "view");

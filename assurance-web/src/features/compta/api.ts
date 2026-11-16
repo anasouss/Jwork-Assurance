@@ -439,6 +439,16 @@ export const comptaApi = {
     );
   },
 
+  async conventionInvoices(params: {
+    conventionId?: string; compagnieId?: string; periodeDu?: string; periodeAu?: string;
+    statut?: ClientDocumentStatus; search?: string; page: number; size: number;
+  }) {
+    const result = unwrap(await apiFetch<ApiResponse<ClientDocumentPage>>(
+      `/api/v1/compta/facturation-conventions/factures${buildQueryString(params)}`
+    ));
+    return { ...result, rows: result.rows.map(normalizeClientDocument) };
+  },
+
   async searchClientDocuments(params: {
     payeurType?: "CLIENT" | "GROUPE";
     payeurId?: string;

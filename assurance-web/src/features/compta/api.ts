@@ -440,7 +440,7 @@ export const comptaApi = {
   },
 
   async reviseConventionInvoice(id: string, request: {
-    echeanceIds: string[]; montantAttendu: number; motif: string; notes?: string; dateEcheance?: string;
+    echeanceIds: string[]; montantAttendu: number; motif: string; dateEcheance?: string;
   }) {
     return normalizeClientDocument(unwrap(await apiFetch<ApiResponse<ClientDocument>>(
       `/api/v1/compta/facturation-conventions/factures/${id}/revision`,

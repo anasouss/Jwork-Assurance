@@ -36,7 +36,6 @@ function RevisionForm({ document, onClose, onRevised, onPendingChange }: {
 }) {
   const client = useQueryClient();
   const [selected, setSelected] = useState(() => new Set(document.lignes.flatMap(line => line.echeanceFacturationConventionId ? [line.echeanceFacturationConventionId] : [])));
-  const [notes, setNotes] = useState(document.notes ?? "");
   const [reason, setReason] = useState("");
   const selectedIds = [...selected].sort();
   const sources = useQuery({
@@ -58,7 +57,7 @@ function RevisionForm({ document, onClose, onRevised, onPendingChange }: {
     mutationFn: () => {
       if (!preview.data || preview.isFetching || preview.isError) throw new Error("Actualisez l’aperçu avant de valider.");
       return comptaApi.reviseConventionInvoice(document.id, {
-      echeanceIds: selectedIds, montantAttendu: preview.data.total, motif: reason.trim(), notes: notes.trim() || undefined,
+      echeanceIds: selectedIds, montantAttendu: preview.data.total, motif: reason.trim(),
       dateEcheance: document.dateEcheance ? dueDate : undefined,
     }); },
     onSuccess: async replacement => {
@@ -110,7 +109,6 @@ function RevisionForm({ document, onClose, onRevised, onPendingChange }: {
       {document.dateEcheance && <div className="grid content-start gap-1.5"><Label>Date limite de paiement</Label>
         <DatePicker date={dueDate} minDate={today} maxDate={maximum} disabled={mutation.isPending} onSelect={value => setDueDate(toDateOnly(value) ?? "")} />
       </div>}
-      <div className={`grid gap-1.5 ${document.dateEcheance ? "" : "sm:col-span-2"}`}><Label htmlFor="revision-notes">Notes</Label><Textarea id="revision-notes" maxLength={1000} value={notes} disabled={mutation.isPending} onChange={event => setNotes(event.target.value)} /></div>
       <div className="col-span-full grid gap-1.5"><Label htmlFor="revision-reason">Motif de rectification <span className="text-destructive">*</span></Label>
         <Textarea id="revision-reason" required maxLength={500} value={reason} disabled={mutation.isPending} onChange={event => setReason(event.target.value)} />
       </div>

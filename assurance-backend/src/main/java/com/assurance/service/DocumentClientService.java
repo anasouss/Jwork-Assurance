@@ -1028,7 +1028,7 @@ public class DocumentClientService {
                     .conventionPayeur(original.getConventionPayeur()).payeurNom(original.getPayeurNom())
                     .payeurIdentifiant(original.getPayeurIdentifiant()).payeurIce(original.getPayeurIce()).payeurAdresse(original.getPayeurAdresse())
                     .conventionFacturee(original.getConventionFacturee()).conventionAdresse(original.getConventionAdresse())
-                    .conventionVille(original.getConventionVille()).notes(request.getNotes())
+                    .conventionVille(original.getConventionVille()).notes(original.getNotes())
                     .versionDocument((original.getVersionDocument() == null ? 1 : original.getVersionDocument()) + 1)
                     .documentOrigine(original).build();
             for (LigneDocumentClient line : lines) {

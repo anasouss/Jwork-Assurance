@@ -23,8 +23,5 @@ public class RectifierFactureConventionRequest {
     @Size(max = 500)
     private String motif;
 
-    @Size(max = 1000)
-    private String notes;
-
     private LocalDate dateEcheance;
 }

@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { FileText } from 'lucide-react-native';
+import { ArrowLeft, FileText } from 'lucide-react-native';
 import { useSession } from '../auth/session';
 import { usePages } from '../api/queries';
 import { document } from '../api/schemas';
-import { Button, Collection, Notice, Row } from '../components/ui';
+import { Button, Collection, Notice, Row, Screen } from '../components/ui';
+import { RecordHeading } from '../components/headers';
 import { businessDate } from '../lib/domain';
 
 const formats: Record<string, string> = {
@@ -25,7 +26,7 @@ export function DocumentPrivacy() {
   return null;
 }
 
-export function DocumentList({ contractId, claimId }: { contractId?: string; claimId?: string }) {
+export function DocumentList({ contractId, claimId, back }: { contractId?: string; claimId?: string; back?: () => void }) {
   const { binary, session } = useSession();
   const result = usePages('/client-portal/documents', document, { contratId: contractId, sinistreId: claimId }, session?.space === 'client');
   const [opening, setOpening] = useState<string | null>(null);
@@ -60,17 +61,20 @@ export function DocumentList({ contractId, claimId }: { contractId?: string; cla
       if (alive.current) setOpening(null);
     }
   }
-  if (session?.space !== 'client') return <Notice error message="Documents réservés à l’espace client." />;
+  if (session?.space !== 'client') return <Screen><Notice error message="Documents réservés à l’espace client." /></Screen>;
   return <Collection items={result.items} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}
     empty="Aucun document n’a été publié par votre agence."
-    header={error ? <Notice message={error} error /> : undefined}
-    render={(item) => <>
-      <Row title={item.titre} icon={FileText} meta={`Publié le ${businessDate(item.publishedAt)}`} />
-      <Button title="Ouvrir / partager" secondary busy={opening === item.id} disabled={opening !== null && opening !== item.id}
+    header={back || error ? <>
+      {back && <><Button title={claimId ? 'Revenir au sinistre' : 'Revenir au contrat'} icon={ArrowLeft} secondary onPress={back} />
+        <RecordHeading title="Documents" category={claimId ? 'Sinistre' : 'Contrat'} icon={FileText} /></>}
+      {error ? <Notice message={error} error /> : null}
+    </> : undefined}
+    render={(item) => <Row title={item.titre} icon={FileText} subtitle="Document de l’agence" meta={`Publié le ${businessDate(item.publishedAt)}`}
+      busy={opening === item.id} disabled={opening !== null && opening !== item.id}
         onPress={() => Alert.alert(item.titre, 'Le document sera ouvert dans une application de votre appareil.', [
           { text: 'Annuler', style: 'cancel' }, { text: 'Continuer', onPress: () => void open(item.id) },
         ])} />
-    </>} />;
+    } />;
 }

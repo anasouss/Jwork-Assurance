@@ -57,7 +57,7 @@ export default function ConventionProductionPage() {
 
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <ConventionWorkspaceHeader title="Consultation et édition des états de production" />
+    <ConventionWorkspaceHeader title="Consultation" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 xl:grid-cols-4">
       <div className="grid gap-1.5"><Label>Convention</Label><Select value={filters.conventionId ?? "ALL"}
         disabled={options.isPending || options.isError}

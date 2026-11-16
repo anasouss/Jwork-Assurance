@@ -18,7 +18,7 @@ export function businessDate(value?: string | null): string {
 
 export function money(value?: number | null): string {
   if (value == null) return '-';
-  return new Intl.NumberFormat('fr-MA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     .format(value).replace(/[\u00a0\u202f]/g, ' ');
 }
 
@@ -30,6 +30,9 @@ export function dateRange(period: 'month' | 'year', now = new Date()) {
 }
 
 const labels: Record<string, string> = {
+  DRAFT: 'Brouillon', CANCELLED: 'Annulé', EXPIRED: 'Expiré', RENEWED: 'Renouvelé',
+  DECLARE: 'Déclaré', DOSSIER_INCOMPLET: 'Dossier incomplet', TRANSMIS_COMPAGNIE: 'Transmis à la compagnie',
+  EN_ATTENTE_REGLEMENT: 'En attente de règlement', PARTIELLEMENT_REGLE: 'Partiellement réglé', REJETE: 'Rejeté', ROUVERT: 'Rouvert',
   ACTIVE: 'Actif', SUSPENDED: 'Suspendue', ARCHIVED: 'Archivée', EXPIRE: 'Expiré',
   RESILIE: 'Résilié', ANNULE: 'Annulé', CLOTURE: 'Clôturé', REFUSE: 'Refusé',
   EN_COURS: 'En cours', EN_ATTENTE: 'En attente', DOCUMENTS_EN_ATTENTE: 'Documents attendus',

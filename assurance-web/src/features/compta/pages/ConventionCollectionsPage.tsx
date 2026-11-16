@@ -138,7 +138,7 @@ export default function ConventionCollectionsPage() {
 
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <ConventionWorkspaceHeader title="Encaissement des factures" />
+    <ConventionWorkspaceHeader title="Encaissement et règlement" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
       {canView && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
         <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",

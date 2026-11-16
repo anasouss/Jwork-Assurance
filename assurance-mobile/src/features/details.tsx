@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { z } from 'zod';
+import { ArrowLeft, CarFront, FileText, ShieldCheck, UserRound, Wrench } from 'lucide-react-native';
 import { useSession } from '../auth/session';
 import { useData, usePages } from '../api/queries';
 import * as s from '../api/schemas';
 import { Button, Choices, Collection, Detail, Notice, Row, Screen, Section, State, Status, Txt } from '../components/ui';
 import { businessDate, canRead, label, money } from '../lib/domain';
 import { DocumentList } from './documents';
+import { RecordHeading } from '../components/headers';
 
 const paramsSchema = z.object({ resource: z.enum(['contracts', 'claims', 'clients']), id: s.id });
 export function DetailScreen() {
@@ -20,17 +22,19 @@ export function DetailScreen() {
 }
 function ContractHeading({ item }: { item: s.Contract }) {
   return <>
-    <Txt title>{`Police ${item.numeroPolice ?? '-'}`}</Txt><Status value={item.statut} />
+    <RecordHeading title={`Police ${item.numeroPolice ?? '-'}`} category="Contrat" icon={ShieldCheck} status={item.statut} />
+    <Section title="Couverture">
     <Detail label="Dossier" value={item.numeroDossier} /><Detail label="Compagnie" value={item.compagnie} />
     <Detail label="Type" value={label(item.type)} /><Detail label="Date d’effet" value={businessDate(item.dateEffet)} />
     <Detail label="Date d’expiration" value={businessDate(item.dateExpiration)} />
+    </Section>
   </>;
 }
 function ClientContract({ id }: { id: string }) {
   const [tab, setTab] = useState<'summary' | 'coverages' | 'assistances' | 'documents'>('summary');
   if (tab === 'coverages') return <ClientCoverages id={id} back={() => setTab('summary')} />;
   if (tab === 'assistances') return <ClientAssistances id={id} back={() => setTab('summary')} />;
-  if (tab === 'documents') return <><Button title="Revenir au contrat" secondary onPress={() => setTab('summary')} /><DocumentList contractId={id} /></>;
+  if (tab === 'documents') return <DocumentList contractId={id} back={() => setTab('summary')} />;
   return <ClientContractSummary id={id} select={setTab} />;
 }
 function ClientContractSummary({ id, select }: { id: string; select: (tab: 'coverages' | 'assistances' | 'documents') => void }) {
@@ -40,13 +44,15 @@ function ClientContractSummary({ id, select }: { id: string; select: (tab: 'cove
   if (!data) return <Screen><State loading={vehiclePage.isPending} error={vehiclePage.error} retry={() => void vehiclePage.refetch()} /></Screen>;
   return <Screen refresh={() => void vehiclePage.refetch()} refreshing={vehiclePage.isRefetching}>
     <ContractHeading item={data.contrat} />
-    <Button title="Garanties" secondary onPress={() => select('coverages')} />
-    <Button title="Assistance" secondary onPress={() => select('assistances')} />
-    <Button title="Documents" secondary onPress={() => select('documents')} />
+    <Section title="Consulter">
+      <Row title="Garanties" icon={ShieldCheck} onPress={() => select('coverages')} />
+      <Row title="Assistance" icon={Wrench} onPress={() => select('assistances')} />
+      <Row title="Documents" icon={FileText} onPress={() => select('documents')} />
+    </Section>
     <Section title="Véhicules">
       {vehiclePage.isPending ? <State loading /> : vehiclePage.error ? <State error={vehiclePage.error} retry={() => void vehiclePage.refetch()} />
         : !vehiclePage.data?.vehicules.items.length ? <Txt muted>Aucun véhicule actif.</Txt>
-          : vehiclePage.data.vehicules.items.map((item) => <Row key={item.id} title={item.immatriculation ?? '-'} subtitle={item.marque ?? '-'}
+          : vehiclePage.data.vehicules.items.map((item) => <Row key={item.id} icon={CarFront} title={item.immatriculation ?? '-'} subtitle={item.marque ?? '-'}
             meta={`Du ${businessDate(item.dateEffet)} au ${businessDate(item.dateExpiration)}`} />)}
       {page > 0 && <Button title="Véhicules précédents" secondary onPress={() => setPage(page - 1)} />}
       {vehiclePage.data && !vehiclePage.data.vehicules.page.last && <Button title="Véhicules suivants" secondary onPress={() => setPage(page + 1)} />}
@@ -58,7 +64,7 @@ function ClientCoverages({ id, back }: { id: string; back: () => void }) {
   return <Collection items={result.items} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}
-    header={<Button title="Revenir au contrat" secondary onPress={back} />}
+    header={<><Button title="Revenir au contrat" icon={ArrowLeft} secondary onPress={back} /><RecordHeading title="Garanties" category="Contrat" icon={ShieldCheck} /></>}
     render={(item) => <Section title={`${item.code} · ${item.libelle}`}>
       {(item.vehiculeId || item.remorqueId) && <Detail label={item.remorqueId ? 'Remorque' : 'Véhicule'} value={item.immatriculation} />}
       <Detail label="Capital (MAD)" value={money(item.capital)} />
@@ -71,7 +77,7 @@ function ClientAssistances({ id, back }: { id: string; back: () => void }) {
   return <Collection items={result.items} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}
-    header={<Button title="Revenir au contrat" secondary onPress={back} />}
+    header={<><Button title="Revenir au contrat" icon={ArrowLeft} secondary onPress={back} /><RecordHeading title="Assistance" category="Contrat" icon={Wrench} /></>}
     render={(item) => <Section title={item.produit ?? 'Assistance'}>
       <Detail label="Référence" value={item.numero} /><Detail label="Compagnie" value={item.compagnie} />
       <Detail label="Date d’effet" value={businessDate(item.dateEffet)} /><Detail label="Expiration" value={businessDate(item.dateExpiration)} />
@@ -80,7 +86,7 @@ function ClientAssistances({ id, back }: { id: string; back: () => void }) {
 function ClientClaim({ id }: { id: string }) {
   const [tab, setTab] = useState<'summary' | 'updates' | 'documents'>('summary');
   if (tab === 'updates') return <ClaimUpdates id={id} back={() => setTab('summary')} />;
-  if (tab === 'documents') return <><Button title="Revenir au sinistre" secondary onPress={() => setTab('summary')} /><DocumentList claimId={id} /></>;
+  if (tab === 'documents') return <DocumentList claimId={id} back={() => setTab('summary')} />;
   return <ClientClaimSummary id={id} select={setTab} />;
 }
 function ClientClaimSummary({ id, select }: { id: string; select: (tab: 'updates' | 'documents') => void }) {
@@ -88,11 +94,15 @@ function ClientClaimSummary({ id, select }: { id: string; select: (tab: 'updates
   const item = result.data;
   return <Screen refresh={() => void result.refetch()} refreshing={result.isRefetching}>
     {!item ? <State loading={result.isPending} error={result.error} retry={() => void result.refetch()} /> : <>
-      <Txt title>{item.numero}</Txt><Status value={item.statut} />
+      <RecordHeading title={item.numero} category="Sinistre" icon={Wrench} status={item.statut} />
+      <Section title="Déclaration">
       <Detail label="N° de police" value={item.numeroPolice} /><Detail label="Date du sinistre" value={businessDate(item.dateSinistre)} />
       <Detail label="Date de déclaration" value={businessDate(item.dateDeclaration)} /><Detail label="Date de clôture" value={businessDate(item.dateCloture)} />
-      <Button title="Suivi de l’agence" secondary onPress={() => select('updates')} />
-      <Button title="Documents" secondary onPress={() => select('documents')} />
+      </Section>
+      <Section title="Consulter">
+        <Row title="Suivi de l’agence" icon={Wrench} onPress={() => select('updates')} />
+        <Row title="Documents" icon={FileText} onPress={() => select('documents')} />
+      </Section>
     </>}
   </Screen>;
 }
@@ -101,7 +111,7 @@ function ClaimUpdates({ id, back }: { id: string; back: () => void }) {
   return <Collection items={result.items} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}
-    header={<Button title="Revenir au sinistre" secondary onPress={back} />}
+    header={<><Button title="Revenir au sinistre" icon={ArrowLeft} secondary onPress={back} /><RecordHeading title="Suivi de l’agence" category="Sinistre" icon={Wrench} /></>}
     empty="Votre agence n’a pas encore publié de message."
     render={(item) => <Section title={item.titre}><Txt muted>{businessDate(item.publishedAt)}</Txt><Txt>{item.message}</Txt></Section>} />;
 }
@@ -111,19 +121,21 @@ function StaffContract({ id }: { id: string }) {
   const item = result.data;
   return <Screen refresh={() => void result.refetch()} refreshing={result.isRefetching}>
     {!item ? <State loading={result.isPending} error={result.error} retry={() => void result.refetch()} /> : <>
-      <Txt title>{item.numeroDossier ?? 'Contrat'}</Txt><Status value={item.statut} />
+      <RecordHeading title={item.numeroDossier ?? 'Contrat'} category="Dossier de production" icon={ShieldCheck} status={item.statut} />
       <Choices value={tab} onChange={setTab} options={[{ value: 'summary', label: 'Contrat' }, { value: 'vehicles', label: 'Véhicules' },
         { value: 'coverages', label: 'Garanties' }, { value: 'movements', label: 'Mouvements' }]} />
       {tab === 'summary' && <>
+        <Section title="Couverture">
         <Detail label="Police" value={item.numeroPolice} /><Detail label="Compagnie" value={item.compagnieAssuranceNom} />
         <Detail label="Branche" value={item.brancheAssuranceLibelle} /><Detail label="Type" value={label(item.typeContrat)} />
         <Detail label="Date d’effet" value={businessDate(item.dateEffet)} /><Detail label="Expiration" value={businessDate(item.dateEcheance)} />
-        <Section title="Clients">{item.clients?.map((entry, index) => <Row key={`${entry.clientId}-${index}`} title={entry.nomAffichage ?? '-'} subtitle={label(entry.role)} />)}</Section>
+        </Section>
+        <Section title="Clients">{item.clients?.map((entry, index) => <Row key={`${entry.clientId}-${index}`} icon={UserRound} title={entry.nomAffichage ?? '-'} subtitle={label(entry.role)} />)}</Section>
         <Section title="Assistance">{item.assistances?.length ? item.assistances.map((entry) => <Row key={entry.id}
-          title={entry.produit ?? 'Assistance'} subtitle={entry.compagnieAssistanceLibelle ?? '-'} meta={`Référence : ${entry.numeroContratOuQuittance ?? '-'}`} />) : <Txt muted>Aucune assistance.</Txt>}</Section>
+          icon={Wrench} title={entry.produit ?? 'Assistance'} subtitle={entry.compagnieAssistanceLibelle ?? '-'} meta={`Référence : ${entry.numeroContratOuQuittance ?? '-'}`} />) : <Txt muted>Aucune assistance.</Txt>}</Section>
       </>}
       {tab === 'vehicles' && (item.vehicules?.length ? item.vehicules.map((entry) => <Row key={entry.vehiculeId}
-        title={entry.immatriculation ?? '-'} subtitle={[entry.marque, entry.usageLibelle].filter(Boolean).join(' · ')}
+        icon={CarFront} title={entry.immatriculation ?? '-'} subtitle={[entry.marque, entry.usageLibelle].filter(Boolean).join(' · ')}
         meta={`Du ${businessDate(entry.dateEffet)} au ${businessDate(entry.dateEcheance)}`} />) : <State empty="Aucun véhicule." />)}
       {tab === 'movements' && (item.mouvements?.length ? item.mouvements.map((entry) => <Section key={entry.id} title={`${entry.numeroMouvement ?? '-'} · ${entry.libelle ?? '-'}`}>
         <Status value={entry.statut} /><Detail label="Date d’effet" value={businessDate(entry.dateEffet)} />
@@ -140,14 +152,19 @@ function StaffClaim({ id }: { id: string }) {
   const item = result.data;
   return <Screen refresh={() => void result.refetch()} refreshing={result.isRefetching}>
     {!item ? <State loading={result.isPending} error={result.error} retry={() => void result.refetch()} /> : <>
-      <Txt title>{item.numeroSinistre}</Txt><Status value={item.statut} />
-      <Detail label="Étape de suivi" value={label(item.etapeSuivi)} /><Detail label="Police" value={item.couverture?.numeroPolice} />
+      <RecordHeading title={item.numeroSinistre} category="Sinistre" icon={Wrench} status={item.statut} />
+      <Section title="Couverture">
+      <Detail label="Police" value={item.couverture?.numeroPolice} />
       <Detail label="Assuré" value={item.couverture?.assure} /><Detail label="Compagnie" value={item.couverture?.compagnie} />
-      <Detail label="Véhicule" value={item.couverture?.immatriculation} /><Detail label="Date du sinistre" value={businessDate(item.dateSinistre)} />
+      <Detail label="Véhicule" value={item.couverture?.immatriculation} />
+      </Section>
+      <Section title="Déclaration et intervenants">
+      <Detail label="Date du sinistre" value={businessDate(item.dateSinistre)} />
       <Detail label="Déclaration" value={businessDate(item.dateDeclaration)} /><Detail label="Gestionnaire" value={item.gestionnaire} />
       <Detail label="Garage" value={item.garage} /><Detail label="Expert" value={item.premierExpert} />
-      <Section title="Prochaine action"><Txt>{item.prochaineAction ?? '-'}</Txt><Detail label="Échéance" value={businessDate(item.dateEcheanceAction)} /></Section>
-      <Section title="Garanties impliquées">{item.garanties?.filter((entry) => entry.impliquee).map((entry) => <Row key={entry.id} title={entry.libelle ?? entry.code ?? '-'} />)}</Section>
+      </Section>
+      <Section title="Suivi"><Detail label="Étape" value={label(item.etapeSuivi)} /><Detail label="Prochaine action" value={item.prochaineAction} /><Detail label="Échéance" value={businessDate(item.dateEcheanceAction)} /></Section>
+      <Section title="Garanties impliquées">{item.garanties?.filter((entry) => entry.impliquee).map((entry) => <Row key={entry.id} icon={ShieldCheck} title={entry.libelle ?? entry.code ?? '-'} />)}</Section>
     </>}
   </Screen>;
 }
@@ -157,11 +174,13 @@ function StaffClient({ id }: { id: string }) {
   const data = result.data;
   return <Screen refresh={() => void result.refetch()} refreshing={result.isRefetching}>
     {!data ? <State loading={result.isPending} error={result.error} retry={() => void result.refetch()} /> : <>
-      <Txt title>{data.client.nomAffichage ?? data.client.raisonSociale ?? '-'}</Txt>
+      <RecordHeading title={data.client.nomAffichage ?? data.client.raisonSociale ?? '-'} category="Client" icon={UserRound} subtitle={data.client.codeClient} />
+      <Section title="Coordonnées">
       <Detail label="Code client" value={data.client.codeClient} /><Detail label="Téléphone" value={data.client.telephone} />
       <Detail label="E-mail" value={data.client.email} /><Detail label="Adresse" value={data.client.adresse} /><Detail label="Ville" value={data.client.ville} />
+      </Section>
       {canRead(session?.space ?? '', session?.user?.permissions ?? [], 'contracts') && <Section title="Contrats">
-        {data.contrats?.length ? data.contrats.map((entry) => <Row key={entry.id} title={entry.numeroDossier ?? '-'} subtitle={`Police ${entry.numeroPolice ?? '-'}`} status={entry.statut}
+        {data.contrats?.length ? data.contrats.map((entry) => <Row key={entry.id} icon={ShieldCheck} title={entry.numeroDossier ?? '-'} subtitle={`Police ${entry.numeroPolice ?? '-'}`} status={entry.statut}
           onPress={() => router.push({ pathname: '/detail/[resource]/[id]', params: { resource: 'contracts', id: entry.id } })} />) : <Txt muted>Aucun contrat.</Txt>}
       </Section>}
     </>}

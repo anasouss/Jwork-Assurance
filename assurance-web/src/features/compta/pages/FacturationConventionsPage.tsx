@@ -157,7 +157,7 @@ export default function FacturationConventionsPage() {
 
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <ConventionWorkspaceHeader title="Établissement des factures" />
+    <ConventionWorkspaceHeader title="Facturation" />
 
     <section className="border-y bg-card p-4">
       <div className="flex flex-wrap items-end gap-3">

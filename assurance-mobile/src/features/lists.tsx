@@ -6,7 +6,7 @@ import { useSession } from '../auth/session';
 import * as s from '../api/schemas';
 import { usePages } from '../api/queries';
 import { ApiError, queryString } from '../api/transport';
-import { Collection, Notice, Row, SearchBar } from '../components/ui';
+import { Collection, Notice, Row, Screen, SearchBar } from '../components/ui';
 import { businessDate, canRead, label } from '../lib/domain';
 import { DocumentList } from './documents';
 
@@ -38,7 +38,7 @@ function StaffContracts() {
   const denied = result.error instanceof ApiError && [401, 403, 404].includes(result.error.status);
   const contracts = denied ? [] : result.data?.pages.flatMap((page) => page.items.flatMap((group) => group.contrats)) ?? [];
   const unique = [...new Map(contracts.map((item) => [item.id, item])).values()];
-  if (!allowed) return <Notice error message="Vous n’avez pas accès aux contrats." />;
+  if (!allowed) return <Screen><Notice error message="Vous n’avez pas accès aux contrats." /></Screen>;
   return <Collection items={unique} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}
@@ -66,7 +66,7 @@ function StaffClaims() {
   const [search, setSearch] = useState('');
   const allowed = canRead(session?.space ?? '', session?.user?.permissions ?? [], 'claims');
   const result = usePages('/sinistres', s.staffClaim, { query: search }, allowed);
-  if (!allowed) return <Notice error message="Vous n’avez pas accès aux sinistres." />;
+  if (!allowed) return <Screen><Notice error message="Vous n’avez pas accès aux sinistres." /></Screen>;
   return <Collection items={result.items} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}
@@ -80,7 +80,7 @@ export function ClientsScreen() {
   const [search, setSearch] = useState('');
   const allowed = canRead(session?.space ?? '', session?.user?.permissions ?? [], 'clients');
   const result = usePages('/clients', s.client, { query: search }, allowed);
-  if (!allowed) return <Notice error message="Vous n’avez pas accès aux clients." />;
+  if (!allowed) return <Screen><Notice error message="Vous n’avez pas accès aux clients." /></Screen>;
   return <Collection items={result.items} loading={result.isPending} error={result.error}
     refresh={() => void result.refetch()} refreshing={result.isRefetching && !result.isFetchingNextPage}
     next={() => void result.fetchNextPage()} more={result.hasNextPage} fetchingMore={result.isFetchingNextPage}

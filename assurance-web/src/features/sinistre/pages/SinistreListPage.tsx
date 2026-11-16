@@ -6,6 +6,7 @@ import {
   Download,
   Eye,
   FilePlus2,
+  LoaderCircle,
   MoreHorizontal,
   Pencil,
   Search,
@@ -188,7 +189,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline"><Link to="/app/sinistre">Module sinistres</Link></Button>
-          <Button variant="outline" disabled={exportRegister.isPending || list.isPending || list.isError} onClick={() => exportRegister.mutate()}><Download className="size-4" />{exportRegister.isPending ? "Export en cours…" : "Registre Excel"}</Button>
         {canCreate && !isRegister ? (
           <Button onClick={() => setDeclarationOpen(true)}>
             <FilePlus2 className="size-4" />
@@ -287,7 +287,19 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
           </div>
       </section>
       {list.isError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 text-sm text-destructive"><span>{list.error instanceof Error ? list.error.message : "Chargement des dossiers impossible."}</span><Button variant="outline" onClick={() => list.refetch()}>Réessayer</Button></div> : null}
-      <section aria-label="Résultats des sinistres" className="min-w-0 border">
+      <section aria-label="Résultats des sinistres" className="min-w-0 space-y-2">
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+            disabled={exportRegister.isPending || list.isFetching || list.isError || !list.data?.page.totalElements}
+            onClick={() => exportRegister.mutate()}
+          >
+            {exportRegister.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
+            Exporter Excel
+          </Button>
+        </div>
+        <div className="min-w-0 overflow-hidden rounded-md border bg-card">
           <div className="overflow-x-auto">
             <Table className={isRegister ? "min-w-[1600px]" : "min-w-[1100px]"}>
               <TableHeader className="bg-sky-700 text-white [&_th]:text-white">
@@ -431,6 +443,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
             loading={list.isFetching}
             onPageChange={changePage}
           />
+        </div>
       </section>
       <SinistreDeclarationContextDialog
         open={declarationOpen}

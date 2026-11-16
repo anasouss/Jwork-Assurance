@@ -145,15 +145,18 @@ export default function SinistrePrestatairesPage() {
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeInactive} onCheckedChange={checked => setFilters(f => ({ ...f, includeInactive: checked === true }))} />Inclure les inactifs</label>
         <div className="flex gap-2"><Button size="icon" title="Rechercher" aria-label="Rechercher" disabled={domains.isPending || domains.isError || specialties.isPending || specialties.isError} onClick={apply}><Search className="size-4" /></Button>
           <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => { setFilters(initialFilters); setApplied(initialFilters); setPage(0); setParams({ type: "ALL" }, { replace: true }); }}><RotateCcw className="size-4" /></Button>
-          {canExport && <Button variant="outline" disabled={exportFile.isPending || directory.isFetching || directory.isError || !directory.data?.page.totalElements}
-            onClick={() => exportFile.mutate({ params: directoryParams(applied), filename: `prestataires-${automobile ? "automobile" : doctor ? "medecins" : "annuaire"}.xlsx` })}>
-            {exportFile.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}Exporter Excel
-          </Button>}
         </div>
       </div>
       {(options.isError || specialties.isError || cities.isError || domains.isError) && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-5">Impossible de charger les filtres.</p>}
     </section>
-    <section className="min-w-0 overflow-hidden rounded-md border bg-card">
+    <section className="min-w-0 space-y-2">
+      {canExport && <div className="flex justify-end">
+        <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" disabled={exportFile.isPending || directory.isFetching || directory.isError || !directory.data?.page.totalElements}
+          onClick={() => exportFile.mutate({ params: directoryParams(applied), filename: `prestataires-${automobile ? "automobile" : doctor ? "medecins" : "annuaire"}.xlsx` })}>
+          {exportFile.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}Exporter Excel
+        </Button>
+      </div>}
+      <div className="overflow-hidden rounded-md border bg-card">
       <div className="overflow-x-auto"><table className={`w-full text-sm ${doctor ? "min-w-[850px]" : "min-w-[1100px]"}`}>
         <thead className="bg-sky-700 text-left text-xs uppercase text-white"><tr>{headers.map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
         <tbody className="divide-y">{directory.isPending ? <TableRowsSkeleton colSpan={columns} rows={6} />
@@ -176,6 +179,7 @@ export default function SinistrePrestatairesPage() {
       </table></div>
       <ServerPagination className="border-t px-4 py-3" page={directory.data?.page.number ?? page} totalPages={directory.data?.page.totalPages ?? 0}
         totalElements={directory.data?.page.totalElements ?? 0} loading={directory.isFetching} onPageChange={setPage} />
+      </div>
     </section>
     <SinistreIntervenantDialog open={open} kind={dialogKind} intervenant={editing} cities={cities.data ?? []} saving={save.isPending}
       initialDomaineId={!editing && filters.domaineId !== "ALL" ? filters.domaineId : undefined}

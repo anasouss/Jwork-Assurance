@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,12 +14,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
 import { sinistreApi, sinistreKeys } from "../api";
 import type { Intervenant, ProviderAgreement, ProviderKind } from "../types";
 import { providerTypes } from "../provider-types";
+import { ProviderAgreementUsageSelect } from "./ProviderAgreementUsageSelect";
 import {
   SinistreVilleSelect,
   type CityOption,
@@ -106,15 +108,16 @@ export function SinistreIntervenantDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-4xl" showCloseButton={!saving}>
-        <DialogHeader>
+      <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl" showCloseButton={!saving}>
+        <DialogHeader className="shrink-0 border-b px-5 py-4 pr-12">
           <DialogTitle>
             {intervenant ? "Modifier" : "Ajouter"}{" "}
             {providerTypes.find(type => type.value === kind)?.singular ?? "un prestataire"}
           </DialogTitle>
           <DialogDescription className="sr-only">Coordonnées de l’intervenant</DialogDescription>
         </DialogHeader>
-        <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Code" required>
             <Input
               value={form.code}
@@ -162,7 +165,7 @@ export function SinistreIntervenantDialog({
               />
             </label>
           </div>
-          <div className="sm:col-span-2">
+          <div className="sm:col-span-2 lg:col-span-3">
             <Field label="Adresse">
               <Input
                 value={form.adresse}
@@ -193,34 +196,45 @@ export function SinistreIntervenantDialog({
         <fieldset disabled={saving} className="grid gap-3 border-t pt-4">
           <legend className="text-sm font-semibold">Compagnies et accords</legend>
           <label className="flex items-center gap-2 text-sm"><Checkbox checked={form.toutesCompagnies} onCheckedChange={checked => update("toutesCompagnies", checked === true)} />Intervient pour toutes les compagnies, même sans accord</label>
-          {form.accords.map((agreement, index) => {
+          {form.accords.length > 0 && <div className="min-w-0 overflow-x-auto"><table className="w-full min-w-[600px] table-fixed text-sm">
+            <caption className="sr-only">Accords avec les compagnies</caption>
+            <colgroup><col /><col className="w-14" /><col className="w-28" />{kind === "GARAGE" && <col className="w-48" />}<col className="w-20" /></colgroup>
+            <thead className="border-b text-left text-xs text-muted-foreground"><tr>
+              <th className="px-2 py-2 font-medium">Compagnie <span className="text-destructive">*</span></th><th className="px-2 py-2 text-center font-medium">Actif</th>
+              <th className="px-2 py-2 text-center font-medium">Conventionné</th>{kind === "GARAGE" && <th className="px-2 py-2 font-medium">Usages autorisés</th>}
+              <th className="px-2 py-2"><span className="sr-only">Actions</span></th>
+            </tr></thead>
+            <tbody className="divide-y">{form.accords.map((agreement, index) => {
             const change = (patch: Partial<ProviderAgreement>) => update("accords", form.accords.map((a, i) => i === index ? { ...a, ...patch } : a));
-            return <div key={index} className="grid items-end gap-3 border-b pb-3 sm:grid-cols-2 lg:grid-cols-[minmax(160px,1fr)_auto_auto_140px_140px_auto]">
-              <Field label="Compagnie" required><Select value={agreement.compagnieId} onValueChange={value => change({ compagnieId: value })}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{(options.data?.compagnies ?? []).filter(c => c.id === agreement.compagnieId || !form.accords.some(a => a.compagnieId === c.id)).map(c => <SelectItem key={c.id} value={c.id}>{c.libelle}</SelectItem>)}</SelectContent>
-              </Select></Field>
-              <label className="flex h-10 items-center gap-2 text-sm"><Checkbox checked={agreement.actif} onCheckedChange={value => change({ actif: value === true })} />Actif</label>
-              <label className="flex h-10 items-center gap-2 text-sm"><Checkbox checked={agreement.conventionne} onCheckedChange={value => change({ conventionne: value === true })} />Conventionné</label>
-              <Field label="Du"><DatePicker date={agreement.dateDebut ?? ""} onSelect={date => change({ dateDebut: toDateOnly(date) ?? null })} /></Field>
-              <Field label="Au"><DatePicker date={agreement.dateFin ?? ""} onSelect={date => change({ dateFin: toDateOnly(date) ?? null })} /></Field>
-              <Button type="button" variant="ghost" size="icon" title="Retirer l'accord" aria-label="Retirer l'accord" onClick={() => update("accords", form.accords.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
-              {kind === "GARAGE" && <fieldset className="grid gap-3 sm:col-span-2 lg:col-span-6">
-                <legend className="mb-2 text-sm font-medium">Usages autorisés</legend>
-                <label className="flex items-center gap-2 text-sm"><Checkbox checked={agreement.tousUsages} onCheckedChange={value => change({ tousUsages: value === true, usages: value === true ? [] : agreement.usages })} />Tous les usages</label>
-                {!agreement.tousUsages && <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
-                  {[...(options.data?.usages ?? []), ...agreement.usages.filter(u => !options.data?.usages.some(option => option.id === u.id))].map(usage => <label key={usage.id} className="flex items-start gap-2 text-sm">
-                    <Checkbox checked={agreement.usages.some(u => u.id === usage.id)} onCheckedChange={value => change({ usages: value === true ? [...agreement.usages, usage] : agreement.usages.filter(u => u.id !== usage.id) })} />
-                    <span>{usage.libelle}</span>
-                  </label>)}
-                </div>}
-                {!agreement.tousUsages && !agreement.usages.length && <p className="text-sm text-destructive">Sélectionnez au moins un usage.</p>}
-              </fieldset>}
-            </div>;
-          })}
+            const invalidPeriod = Boolean(agreement.dateDebut && agreement.dateFin && agreement.dateDebut > agreement.dateFin);
+            return <tr key={index}>
+              <td className="px-2 py-2"><Select value={agreement.compagnieId} disabled={saving} onValueChange={value => change({ compagnieId: value })}>
+                <SelectTrigger aria-label={`Compagnie de l'accord ${index + 1}`}><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{(options.data?.compagnies ?? []).filter(c => c.id === agreement.compagnieId || !form.accords.some(a => a.compagnieId === c.id)).map(c => <SelectItem key={c.id} value={c.id}>{c.libelle}</SelectItem>)}</SelectContent>
+              </Select></td>
+              <td className="px-2 py-2 text-center"><Checkbox aria-label={`Accord ${index + 1} actif`} checked={agreement.actif} onCheckedChange={value => change({ actif: value === true })} /></td>
+              <td className="px-2 py-2 text-center"><Checkbox aria-label={`Accord ${index + 1} conventionné`} checked={agreement.conventionne} onCheckedChange={value => change({ conventionne: value === true })} /></td>
+              {kind === "GARAGE" && <td className="px-2 py-2"><ProviderAgreementUsageSelect agreement={agreement} options={options.data?.usages ?? []} disabled={saving || options.isPending || options.isError} onChange={change} /></td>}
+              <td className="px-1 py-2"><div className="flex items-center justify-end">
+                <Popover><PopoverTrigger asChild><Button type="button" variant="ghost" size="icon" disabled={saving}
+                  className={invalidPeriod ? "text-destructive" : agreement.dateDebut || agreement.dateFin ? "text-primary" : "text-muted-foreground"}
+                  title={invalidPeriod ? "Période de validité invalide" : "Période de validité"} aria-label={`Période de validité de l'accord ${index + 1}`}>
+                  <CalendarDays className="size-4" />
+                </Button></PopoverTrigger><PopoverContent align="end" className="grid w-[min(22rem,calc(100vw-2rem))] gap-3">
+                  <p className="text-sm font-semibold">Période de validité</p>
+                  <Field label="Du"><DatePicker disabled={saving} date={agreement.dateDebut ?? ""} onSelect={date => change({ dateDebut: toDateOnly(date) ?? null })} /></Field>
+                  <Field label="Au"><DatePicker disabled={saving} date={agreement.dateFin ?? ""} onSelect={date => change({ dateFin: toDateOnly(date) ?? null })} /></Field>
+                  {invalidPeriod && <p role="alert" className="text-sm text-destructive">La fin ne peut pas précéder le début.</p>}
+                </PopoverContent></Popover>
+                <Button type="button" variant="ghost" size="icon" title="Retirer l'accord" aria-label={`Retirer l'accord ${index + 1}`} onClick={() => update("accords", form.accords.filter((_, i) => i !== index))}><Trash2 className="size-4" /></Button>
+              </div></td>
+            </tr>;
+          })}</tbody></table></div>}
+          {form.accords.some(a => a.dateDebut && a.dateFin && a.dateDebut > a.dateFin) && <p role="alert" className="text-sm text-destructive">Un accord contient une période de validité invalide.</p>}
           <Button type="button" variant="outline" className="justify-self-start" disabled={options.isPending || options.isError || form.accords.some(a => !a.compagnieId)} onClick={() => update("accords", [...form.accords, { compagnieId: "", actif: true, conventionne: false, tousUsages: true, usages: [], conventionneActuellement: false }])}><Plus className="size-4" />Ajouter une compagnie</Button>
         </fieldset>
         {(options.isError || specialties.isError) && <p role="alert" className="text-sm text-destructive">{options.error?.message || specialties.error?.message}</p>}
-        <DialogFooter>
+        </div>
+        <DialogFooter className="shrink-0 border-t px-5 py-3">
           <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
             Annuler
           </Button>

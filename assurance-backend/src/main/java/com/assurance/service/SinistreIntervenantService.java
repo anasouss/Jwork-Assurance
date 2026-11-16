@@ -33,6 +33,8 @@ public class SinistreIntervenantService {
     private final GarageSinistreRepository garageRepository;
     private final BusinessActivityRecorder activityRecorder;
     private final PrestataireSinistreService prestataireService;
+    private final com.assurance.repository.PrestataireMedicalSinistreRepository medicalRepository;
+    private final DomaineInterventionSinistreService domaines;
 
     @Transactional(readOnly = true)
     public List<SinistreIntervenantResponse> listExperts(Long agenceId, boolean includeInactive) {
@@ -152,6 +154,7 @@ public class SinistreIntervenantService {
                 .typePrestataire(com.assurance.enums.TypePrestataireSinistre.EXPERT)
                 .toutesCompagnies(expert.isToutesCompagnies())
                 .specialites(expert.getSpecialites().stream().map(prestataireService::specialiteResponse).toList())
+                .domaines(domainResponses(expert.getDomaines()))
                 .accords(accordResponses(expert.getAccords()))
                 .build();
     }
@@ -170,6 +173,7 @@ public class SinistreIntervenantService {
                 .typePrestataire(com.assurance.enums.TypePrestataireSinistre.GARAGE)
                 .toutesCompagnies(garage.isToutesCompagnies())
                 .specialites(garage.getSpecialites().stream().map(prestataireService::specialiteResponse).toList())
+                .domaines(domainResponses(garage.getDomaines()))
                 .accords(accordResponses(garage.getAccords()))
                 .build();
     }
@@ -178,6 +182,54 @@ public class SinistreIntervenantService {
         return agreements.stream().sorted(java.util.Comparator.comparing(a -> a.getCompagnie().getNom()))
                 .map(a -> new SinistreIntervenantResponse.Accord(a.getCompagnie().getId(), a.getCompagnie().getNom(),
                         a.isActif(), a.isConventionne(), a.getDateDebut(), a.getDateFin())).toList();
+    }
+
+    private List<com.assurance.dto.response.SpecialitePrestataireResponse.Reference> domainResponses(java.util.Set<com.assurance.entity.DomaineInterventionSinistre> items) {
+        return items.stream().sorted(java.util.Comparator.comparing(com.assurance.entity.DomaineInterventionSinistre::getLibelle))
+                .map(d -> new com.assurance.dto.response.SpecialitePrestataireResponse.Reference(d.getId(), d.getLibelle())).toList();
+    }
+
+    private SinistreIntervenantResponse toResponse(com.assurance.entity.PrestataireMedicalSinistre provider) {
+        return SinistreIntervenantResponse.builder().id(provider.getId()).code(provider.getCode()).nom(provider.getNom())
+                .telephone(provider.getTelephone()).email(provider.getEmail()).adresse(provider.getAdresse())
+                .villeId(provider.getVille() == null ? null : provider.getVille().getId())
+                .ville(provider.getVille() == null ? null : provider.getVille().getNom()).actif(provider.isActif())
+                .typePrestataire(provider.getTypePrestataire()).toutesCompagnies(provider.isToutesCompagnies())
+                .domaines(domainResponses(provider.getDomaines()))
+                .specialites(provider.getSpecialites().stream().map(prestataireService::specialiteResponse).toList())
+                .accords(accordResponses(provider.getAccords())).build();
+    }
+
+    @Transactional
+    public SinistreIntervenantResponse saveMedical(Long agenceId, Long id, com.assurance.dto.request.UpsertPrestataireMedicalRequest request) {
+        var type = request.getTypePrestataire();
+        if (type == null || type == com.assurance.enums.TypePrestataireSinistre.GARAGE || type == com.assurance.enums.TypePrestataireSinistre.EXPERT) {
+            throw new BadRequestException("Utilisez la fiche garage ou expert pour cet opérateur");
+        }
+        String code = normalizeCode(request.getCode());
+        if (medicalRepository.existsByAgenceIdAndCodeIgnoreCaseAndIdNot(agenceId, code, id == null ? 0L : id)) {
+            throw new BadRequestException("Ce code prestataire existe déjà dans l'agence");
+        }
+        var provider = id == null ? com.assurance.entity.PrestataireMedicalSinistre.builder().agence(resolveAgency(agenceId)).typePrestataire(type).build()
+                : medicalRepository.findByIdAndAgenceId(id, agenceId).orElseThrow(() -> new ResourceNotFoundException("Prestataire", id));
+        if (provider.getTypePrestataire() != type) throw new BadRequestException("Le type d'un prestataire existant ne peut pas changer");
+        var before = id == null ? java.util.Map.<String, String>of() : ClaimActivity.intervenantSnapshot(toResponse(provider));
+        provider.setCode(code);
+        provider.setNom(request.getNom().trim());
+        provider.setTelephone(trimToNull(request.getTelephone()));
+        provider.setEmail(trimToNull(request.getEmail()));
+        provider.setAdresse(trimToNull(request.getAdresse()));
+        provider.setVille(resolveVille(request.getVilleId()));
+        provider.setActif(request.getActif() == null || request.getActif());
+        prestataireService.configure(provider, request);
+        provider = medicalRepository.save(provider);
+        var response = toResponse(provider);
+        activityRecorder.record(new com.assurance.activity.ActivityCommand(agenceId, com.assurance.activity.ActivityModule.SINISTRES,
+                id == null ? com.assurance.activity.ActivityAction.CREATED : com.assurance.activity.ActivityAction.UPDATED,
+                "Prestataire médical enregistré", "CLAIM_MEDICAL_PROVIDER",
+                new com.assurance.activity.ActivityReference(ActivityRecordType.REFERENTIEL, "PRESTATAIRE_MEDICAL:" + provider.getId(), provider.getNom()),
+                List.of(), com.assurance.activity.ActivityValues.changes(before, ClaimActivity.intervenantSnapshot(response))));
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -195,6 +247,9 @@ public class SinistreIntervenantService {
         if (type == com.assurance.enums.TypePrestataireSinistre.EXPERT) {
             return prestataireService.eligibleExperts(context).stream().map(this::toResponse).toList();
         }
+        if (type != com.assurance.enums.TypePrestataireSinistre.GARAGE) {
+            throw new BadRequestException("La désignation médicale dans un dossier nécessite un parcours dédié ; cet opérateur est géré dans l'annuaire");
+        }
         return prestataireService.eligibleGarages(context).stream().map(garage -> {
             var response = toResponse(garage);
             response.setConventionne(prestataireService.approved(garage.getAccords(), context));
@@ -205,28 +260,66 @@ public class SinistreIntervenantService {
     @Transactional(readOnly = true)
     public com.assurance.dto.response.PagedResponse<SinistreIntervenantResponse> directory(Long agenceId,
             com.assurance.enums.TypePrestataireSinistre type, boolean includeInactive, String query,
-            Long villeId, Long compagnieId, Long specialiteId, int page, int size) {
+            Long villeId, Long compagnieId, Long specialiteId, Long brancheId, Long domaineId, int page, int size) {
+        prestataireService.validateDirectorySpecialty(agenceId, type, specialiteId, brancheId);
+        if (domaineId != null) {
+            var domain = domaines.require(agenceId, domaineId);
+            if (!domain.getOperateurs().contains(type)) throw new BadRequestException("Opérateur incompatible avec le domaine sélectionné");
+            if (specialiteId != null && prestataireService.specialites(agenceId).stream().noneMatch(s -> s.id().equals(specialiteId)
+                    && s.domaines().stream().anyMatch(d -> d.id().equals(domaineId)))) {
+                throw new BadRequestException("La spécialité ne couvre pas le domaine sélectionné");
+            }
+        }
         var pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
-                org.springframework.data.domain.Sort.by(type == com.assurance.enums.TypePrestataireSinistre.EXPERT ? "nom" : "raisonSociale").and(org.springframework.data.domain.Sort.by("id")));
+                org.springframework.data.domain.Sort.by(type == com.assurance.enums.TypePrestataireSinistre.GARAGE ? "raisonSociale" : "nom")
+                        .and(org.springframework.data.domain.Sort.by("id")));
         org.springframework.data.domain.Page<SinistreIntervenantResponse> result;
         if (type == com.assurance.enums.TypePrestataireSinistre.EXPERT) {
-            result = expertRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, "nom"), pageable).map(this::toResponse);
+            result = expertRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, null, "nom"), pageable).map(this::toResponse);
+        } else if (type == com.assurance.enums.TypePrestataireSinistre.GARAGE) {
+            result = garageRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, null, "raisonSociale"), pageable).map(this::toResponse);
         } else {
-            result = garageRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, "raisonSociale"), pageable).map(this::toResponse);
+            result = medicalRepository.findAll(directoryFilter(agenceId, includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, type, "nom"), pageable).map(this::toResponse);
         }
         return com.assurance.dto.response.PagedResponse.<SinistreIntervenantResponse>builder()
                 .items(result.getContent()).page(com.assurance.dto.response.PageMetadata.from(result)).build();
     }
 
     private <T> org.springframework.data.jpa.domain.Specification<T> directoryFilter(Long agenceId, boolean includeInactive,
-            String query, Long villeId, Long compagnieId, Long specialiteId, String nameField) {
+            String query, Long villeId, Long compagnieId, Long specialiteId, Long brancheId, Long domaineId, com.assurance.enums.TypePrestataireSinistre medicalType, String nameField) {
         return (root, criteria, cb) -> {
             var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
             predicates.add(cb.equal(root.get("agence").get("id"), agenceId));
+            if (medicalType != null) predicates.add(cb.equal(root.get("typePrestataire"), medicalType));
             if (!includeInactive) predicates.add(cb.isTrue(root.get("actif")));
             if (villeId != null) predicates.add(cb.equal(root.get("ville").get("id"), villeId));
-            if (compagnieId != null) predicates.add(cb.equal(root.join("accords").get("compagnie").get("id"), compagnieId));
-            if (specialiteId != null) predicates.add(cb.equal(root.join("specialites").get("id"), specialiteId));
+            if (compagnieId != null) {
+                var agreement = root.join("accords", jakarta.persistence.criteria.JoinType.LEFT);
+                predicates.add(cb.or(cb.isTrue(root.get("toutesCompagnies")), cb.and(
+                        cb.equal(agreement.get("agence").get("id"), agenceId), cb.equal(agreement.get("compagnie").get("id"), compagnieId),
+                        cb.isTrue(agreement.get("actif")), cb.or(cb.isNull(agreement.get("dateDebut")), cb.lessThanOrEqualTo(agreement.get("dateDebut"), java.time.LocalDate.now())),
+                        cb.or(cb.isNull(agreement.get("dateFin")), cb.greaterThanOrEqualTo(agreement.get("dateFin"), java.time.LocalDate.now())))));
+            }
+            if (domaineId != null) {
+                var directDomain = root.join("domaines", jakarta.persistence.criteria.JoinType.LEFT);
+                var specialty = root.join("specialites", jakarta.persistence.criteria.JoinType.LEFT);
+                var specialtyDomain = specialty.join("domaines", jakarta.persistence.criteria.JoinType.LEFT);
+                var directMatches = cb.and(cb.equal(directDomain.get("id"), domaineId), cb.equal(directDomain.get("agence").get("id"), agenceId));
+                var specialtyMatches = cb.and(cb.equal(specialtyDomain.get("id"), domaineId), cb.equal(specialty.get("agence").get("id"), agenceId), cb.isTrue(specialty.get("actif")));
+                if (specialiteId == null) predicates.add(cb.or(directMatches, specialtyMatches));
+                else predicates.add(cb.and(specialtyMatches, cb.equal(specialty.get("id"), specialiteId)));
+            }
+            if (specialiteId != null || brancheId != null) {
+                var specialty = root.join("specialites");
+                predicates.add(cb.equal(specialty.get("agence").get("id"), agenceId));
+                predicates.add(cb.isTrue(specialty.get("actif")));
+                if (specialiteId != null) predicates.add(cb.equal(specialty.get("id"), specialiteId));
+                if (brancheId != null) {
+                    var guarantee = specialty.join("garanties");
+                    predicates.add(cb.equal(guarantee.get("brancheAssurance").get("id"), brancheId));
+                    predicates.add(cb.isTrue(guarantee.get("actif")));
+                }
+            }
             if (query != null && !query.isBlank()) {
                 String pattern = "%" + query.trim().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
                 predicates.add(cb.or(cb.like(cb.lower(root.get("code")), pattern, '!'), cb.like(cb.lower(root.get(nameField)), pattern, '!'),

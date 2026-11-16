@@ -18,13 +18,14 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toDateOnly } from "@/features/production/date";
 import { sinistreApi, sinistreKeys } from "../api";
-import type { Intervenant, ProviderAgreement } from "../types";
+import type { Intervenant, ProviderAgreement, ProviderKind } from "../types";
+import { providerTypes } from "../provider-types";
 import {
   SinistreVilleSelect,
   type CityOption,
 } from "./SinistreVilleSelect";
 
-export type IntervenantKind = "EXPERT" | "GARAGE";
+export type IntervenantKind = ProviderKind;
 
 export function SinistreIntervenantDialog({
   open,
@@ -34,6 +35,8 @@ export function SinistreIntervenantDialog({
   saving,
   onOpenChange,
   onSubmit,
+  initialDomaineId,
+  initialSpecialiteId,
 }: {
   open: boolean;
   kind: IntervenantKind;
@@ -42,6 +45,8 @@ export function SinistreIntervenantDialog({
   saving: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (request: object) => void;
+  initialDomaineId?: string;
+  initialSpecialiteId?: string;
 }) {
   const [form, setForm] = useState({
     code: "",
@@ -53,10 +58,12 @@ export function SinistreIntervenantDialog({
     actif: true,
     toutesCompagnies: true,
     specialiteIds: [] as string[],
+    domaineIds: [] as string[],
     accords: [] as ProviderAgreement[],
   });
   const options = useQuery({ queryKey: sinistreKeys.providerOptions(), queryFn: sinistreApi.providerOptions, enabled: open });
   const specialties = useQuery({ queryKey: sinistreKeys.specialties(), queryFn: sinistreApi.specialties, enabled: open });
+  const domains = useQuery({ queryKey: sinistreKeys.providerDomains(), queryFn: sinistreApi.providerDomains, enabled: open });
 
   useEffect(() => {
     if (!open) return;
@@ -69,10 +76,11 @@ export function SinistreIntervenantDialog({
       villeId: intervenant?.villeId ?? "",
       actif: intervenant?.actif ?? true,
       toutesCompagnies: intervenant?.toutesCompagnies ?? true,
-      specialiteIds: intervenant?.specialites?.map(s => s.id) ?? [],
+      specialiteIds: intervenant?.specialites?.map(s => s.id) ?? (initialSpecialiteId ? [initialSpecialiteId] : []),
+      domaineIds: intervenant?.domaines?.map(d => d.id) ?? (initialDomaineId ? [initialDomaineId] : []),
       accords: intervenant?.accords?.map(a => ({ ...a })) ?? [],
     });
-  }, [intervenant, open]);
+  }, [intervenant, open, initialDomaineId, initialSpecialiteId]);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -89,6 +97,7 @@ export function SinistreIntervenantDialog({
       actif: form.actif,
       toutesCompagnies: form.toutesCompagnies,
       specialiteIds: form.specialiteIds,
+      domaineIds: form.domaineIds,
       accords: form.accords,
     });
   }
@@ -99,7 +108,7 @@ export function SinistreIntervenantDialog({
         <DialogHeader>
           <DialogTitle>
             {intervenant ? "Modifier" : "Ajouter"}{" "}
-            {kind === "EXPERT" ? "un expert" : "un garage"}
+            {providerTypes.find(type => type.value === kind)?.singular ?? "un prestataire"}
           </DialogTitle>
           <DialogDescription className="sr-only">Coordonnées de l’intervenant</DialogDescription>
         </DialogHeader>
@@ -113,7 +122,7 @@ export function SinistreIntervenantDialog({
               }
             />
           </Field>
-          <Field label={kind === "EXPERT" ? "Nom" : "Raison sociale"} required>
+          <Field label={kind === "GARAGE" ? "Raison sociale" : "Nom"} required>
             <Input
               value={form.nom}
               maxLength={180}
@@ -162,6 +171,14 @@ export function SinistreIntervenantDialog({
           </div>
         </fieldset>
         <fieldset disabled={saving} className="grid gap-3 border-t pt-4">
+          <legend className="text-sm font-semibold">Domaines d’intervention</legend>
+          <div className="grid gap-2 sm:grid-cols-2">{domains.data?.filter(d => d.operateurs.includes(kind) && (d.actif || form.domaineIds.includes(d.id))).map(domain => <label key={domain.id} className="flex items-start gap-2 text-sm">
+            <Checkbox checked={form.domaineIds.includes(domain.id)} disabled={!domain.actif && !form.domaineIds.includes(domain.id)} onCheckedChange={checked => update("domaineIds", checked ? [...form.domaineIds, domain.id] : form.domaineIds.filter(id => id !== domain.id))} />
+            <span>{domain.libelle}{!domain.actif ? " (inactif)" : ""}</span>
+          </label>)}</div>
+          {domains.isError && <p role="alert" className="text-sm text-destructive">{domains.error.message}</p>}
+        </fieldset>
+        <fieldset disabled={saving} className="grid gap-3 border-t pt-4">
           <legend className="text-sm font-semibold">Spécialités</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {(specialties.data ?? []).filter(s => s.typePrestataire === kind).map(s => <label key={s.id} className="flex items-start gap-2 text-sm">
@@ -195,7 +212,7 @@ export function SinistreIntervenantDialog({
             Annuler
           </Button>
           <Button
-            disabled={!form.code.trim() || !form.nom.trim() || saving || options.isPending || specialties.isPending || options.isError || specialties.isError
+            disabled={!form.code.trim() || !form.nom.trim() || saving || options.isPending || specialties.isPending || options.isError || specialties.isError || domains.isPending || domains.isError
               || (!form.toutesCompagnies && !form.accords.length) || form.accords.some(a => !a.compagnieId || (a.dateDebut && a.dateFin && a.dateDebut > a.dateFin))}
             onClick={submit}
           >

@@ -33,6 +33,11 @@ import lombok.Setter;
 public class ExpertSinistre extends BaseEntity {
 
     @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "experts_sinistre_domaines", joinColumns = @JoinColumn(name = "expert_id"), inverseJoinColumns = @JoinColumn(name = "domaine_id"))
+    private java.util.Set<DomaineInterventionSinistre> domaines = new java.util.LinkedHashSet<>();
+
+    @Builder.Default
     @Column(name = "toutes_compagnies", nullable = false)
     private boolean toutesCompagnies = true;
 

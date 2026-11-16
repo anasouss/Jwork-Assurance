@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface GarageSinistreRepository extends JpaRepository<GarageSinistre, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<GarageSinistre> {
 
     boolean existsBySpecialitesId(Long specialiteId);
+    boolean existsByDomainesId(Long domaineId);
 
     @EntityGraph(attributePaths = "ville")
     List<GarageSinistre> findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(Long agenceId);

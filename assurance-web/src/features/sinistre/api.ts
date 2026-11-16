@@ -27,6 +27,7 @@ import type {
   TypeDocument,
   ProviderEligibilityContext,
   ProviderKind,
+  ProviderDomain,
   ProviderReference,
   ProviderSpecialty,
 } from "./types";
@@ -56,6 +57,7 @@ export const sinistreKeys = {
   providers: () => [...sinistreKeys.all, "prestataires"] as const,
   specialties: () => [...sinistreKeys.providers(), "specialites"] as const,
   providerOptions: () => [...sinistreKeys.providers(), "options"] as const,
+  providerDomains: () => [...sinistreKeys.providers(), "domaines"] as const,
   eligible: (type: ProviderKind, context: ProviderEligibilityContext) => [...sinistreKeys.all, "eligible-prestataires", type, context] as const,
   treasuryAccounts: () => [...sinistreKeys.all, "treasury-accounts"] as const,
 };
@@ -64,16 +66,27 @@ export const sinistreApi = {
   async assistances(contratId: string, vehiculeId: string | undefined, dateSinistre: string) {
     return unwrap(await apiFetch<ApiResponse<ClaimAssistance[]>>(`/api/v1/sinistres/assistances${buildQueryString({ contratId, vehiculeId, dateSinistre })}`));
   },
-  async providers(params: { typePrestataire: ProviderKind; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; page: number; size: number }) {
+  async providers(params: { typePrestataire: ProviderKind; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; brancheId?: string; domaineId?: string; page: number; size: number }) {
     return unwrap(await apiFetch<ApiResponse<PagedResponse<Intervenant>>>(`/api/v1/sinistres/prestataires${buildQueryString(params)}`));
   },
   async providerOptions() {
-    return unwrap(await apiFetch<ApiResponse<{ compagnies: ProviderReference[]; garanties: ProviderReference[] }>>("/api/v1/sinistres/prestataires/options"));
+    return unwrap(await apiFetch<ApiResponse<{ compagnies: ProviderReference[]; garanties: ProviderReference[]; branches: ProviderReference[] }>>("/api/v1/sinistres/prestataires/options"));
   },
   async specialties() {
     return unwrap(await apiFetch<ApiResponse<ProviderSpecialty[]>>("/api/v1/sinistres/prestataires/specialites"));
   },
-  async saveSpecialty(id: string | null, request: { code: string; libelle: string; typePrestataire: ProviderKind; actif: boolean; garantieIds: string[] }) {
+  async providerDomains() {
+    return unwrap(await apiFetch<ApiResponse<ProviderDomain[]>>("/api/v1/sinistres/prestataires/domaines"));
+  },
+  async saveProviderDomain(id: string | null, request: Omit<ProviderDomain, "id" | "branche">) {
+    return unwrap(await apiFetch<ApiResponse<ProviderDomain>>(`/api/v1/sinistres/prestataires/domaines${id ? `/${id}` : ""}`,
+      { method: id ? "PUT" : "POST", body: JSON.stringify(request) }));
+  },
+  async saveMedicalProvider(id: string | null, request: object) {
+    return unwrap(await apiFetch<ApiResponse<Intervenant>>(`/api/v1/sinistres/prestataires/medicaux${id ? `/${id}` : ""}`,
+      { method: id ? "PUT" : "POST", body: JSON.stringify(request) }));
+  },
+  async saveSpecialty(id: string | null, request: { code: string; libelle: string; typePrestataire: ProviderKind; actif: boolean; garantieIds: string[]; domaineIds?: string[] }) {
     return unwrap(await apiFetch<ApiResponse<ProviderSpecialty>>(`/api/v1/sinistres/prestataires/specialites${id ? `/${id}` : ""}`,
       { method: id ? "PUT" : "POST", body: JSON.stringify(request) }));
   },

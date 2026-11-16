@@ -33,6 +33,11 @@ import lombok.Setter;
 public class GarageSinistre extends BaseEntity {
 
     @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "garages_sinistre_domaines", joinColumns = @JoinColumn(name = "garage_id"), inverseJoinColumns = @JoinColumn(name = "domaine_id"))
+    private java.util.Set<DomaineInterventionSinistre> domaines = new java.util.LinkedHashSet<>();
+
+    @Builder.Default
     @Column(name = "toutes_compagnies", nullable = false)
     private boolean toutesCompagnies = true;
 

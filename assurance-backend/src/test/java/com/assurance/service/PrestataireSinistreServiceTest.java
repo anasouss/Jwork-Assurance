@@ -23,8 +23,9 @@ class PrestataireSinistreServiceTest {
     private final ExpertSinistreRepository experts = mock(ExpertSinistreRepository.class);
     private final SinistreGarantieRepository guarantees = mock(SinistreGarantieRepository.class);
     private final PrestataireSinistreService service = new PrestataireSinistreService(specialties,
-            mock(GarantieRepository.class), mock(CompagnieAssuranceRepository.class), mock(AgenceRepository.class),
-            experts, garages, mock(SinistreRepository.class), guarantees,
+            mock(GarantieRepository.class), mock(BrancheAssuranceRepository.class), mock(CompagnieAssuranceRepository.class), mock(AgenceRepository.class),
+            experts, garages, mock(PrestataireMedicalSinistreRepository.class), mock(DomaineInterventionSinistreService.class),
+            mock(SinistreRepository.class), guarantees,
             mock(SinistreCouvertureService.class), mock(BusinessActivityRecorder.class));
     private final LocalDate date = LocalDate.of(2026, 11, 13);
 

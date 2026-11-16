@@ -16,6 +16,11 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SpecialitePrestataireSinistre extends BaseEntity {
+    @Builder.Default
+    @ManyToMany
+    @JoinTable(name = "specialites_prestataires_domaines", joinColumns = @JoinColumn(name = "specialite_id"), inverseJoinColumns = @JoinColumn(name = "domaine_id"))
+    private Set<DomaineInterventionSinistre> domaines = new LinkedHashSet<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agence_id", nullable = false)
     private Agence agence;
@@ -27,7 +32,7 @@ public class SpecialitePrestataireSinistre extends BaseEntity {
     private String libelle;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type_prestataire", nullable = false, length = 20)
+    @Column(name = "type_prestataire", nullable = false, length = 30)
     private TypePrestataireSinistre typePrestataire;
 
     @Builder.Default

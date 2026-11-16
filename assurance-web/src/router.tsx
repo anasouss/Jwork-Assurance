@@ -65,6 +65,7 @@ export const router = createBrowserRouter([
       },
       { path: "sinistre/prestataires", lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistrePrestatairesPage")) },
       { path: "sinistre/prestataires/specialites", lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreSpecialitesPage")) },
+      { path: "sinistre/prestataires/domaines", lazy: lazyRoute(() => import("@/features/sinistre/pages/SinistreDomainesPage")) },
       {
         path: "production/ajouter-dossier",
         lazy: lazyRoute(() => import("@/features/production/pages/ContratCreationPage")),

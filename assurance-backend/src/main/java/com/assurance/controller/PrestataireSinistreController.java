@@ -23,6 +23,7 @@ import java.util.Set;
 public class PrestataireSinistreController {
     private final PrestataireSinistreService service;
     private final SinistreIntervenantService intervenants;
+    private final com.assurance.service.DomaineInterventionSinistreService domaines;
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:view')")
@@ -33,9 +34,41 @@ public class PrestataireSinistreController {
             @RequestParam(required = false) Long villeId,
             @RequestParam(required = false) Long compagnieId,
             @RequestParam(required = false) Long specialiteId,
+            @RequestParam(required = false) Long brancheId,
+            @RequestParam(required = false) Long domaineId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
         return ApiResponse.success(intervenants.directory(TenantContext.getCurrentAgence(), typePrestataire,
-                includeInactive, query, villeId, compagnieId, specialiteId, page, size));
+                includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, page, size));
+    }
+
+    @GetMapping("/domaines")
+    @PreAuthorize("hasAnyAuthority('PERM_domaine-prestataire:view', 'PERM_prestataire-sinistre:view', 'PERM_prestataire-sinistre:create', 'PERM_prestataire-sinistre:update', 'PERM_specialite-prestataire:view', 'PERM_specialite-prestataire:create', 'PERM_specialite-prestataire:update')")
+    public ApiResponse<List<DomaineInterventionResponse>> domains() {
+        return ApiResponse.success(domaines.list(TenantContext.getCurrentAgence()));
+    }
+
+    @PostMapping("/domaines")
+    @PreAuthorize("hasAuthority('PERM_domaine-prestataire:create')")
+    public ApiResponse<DomaineInterventionResponse> createDomain(@Valid @RequestBody com.assurance.dto.request.UpsertDomaineInterventionRequest request) {
+        return ApiResponse.success(domaines.save(TenantContext.getCurrentAgence(), null, request));
+    }
+
+    @PutMapping("/domaines/{id}")
+    @PreAuthorize("hasAuthority('PERM_domaine-prestataire:update')")
+    public ApiResponse<DomaineInterventionResponse> updateDomain(@PathVariable Long id, @Valid @RequestBody com.assurance.dto.request.UpsertDomaineInterventionRequest request) {
+        return ApiResponse.success(domaines.save(TenantContext.getCurrentAgence(), id, request));
+    }
+
+    @PostMapping("/medicaux")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:create')")
+    public ApiResponse<SinistreIntervenantResponse> createMedical(@Valid @RequestBody com.assurance.dto.request.UpsertPrestataireMedicalRequest request) {
+        return ApiResponse.success(intervenants.saveMedical(TenantContext.getCurrentAgence(), null, request));
+    }
+
+    @PutMapping("/medicaux/{id}")
+    @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:update')")
+    public ApiResponse<SinistreIntervenantResponse> updateMedical(@PathVariable Long id, @Valid @RequestBody com.assurance.dto.request.UpsertPrestataireMedicalRequest request) {
+        return ApiResponse.success(intervenants.saveMedical(TenantContext.getCurrentAgence(), id, request));
     }
 
     @GetMapping("/eligibles")
@@ -54,13 +87,13 @@ public class PrestataireSinistreController {
     }
 
     @GetMapping("/options")
-    @PreAuthorize("hasAnyAuthority('PERM_prestataire-sinistre:view', 'PERM_specialite-prestataire:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_prestataire-sinistre:view', 'PERM_prestataire-sinistre:create', 'PERM_prestataire-sinistre:update', 'PERM_specialite-prestataire:view', 'PERM_specialite-prestataire:create', 'PERM_specialite-prestataire:update', 'PERM_domaine-prestataire:view', 'PERM_domaine-prestataire:create', 'PERM_domaine-prestataire:update')")
     public ApiResponse<Map<String, List<SpecialitePrestataireResponse.Reference>>> options() {
         return ApiResponse.success(service.options());
     }
 
     @GetMapping("/specialites")
-    @PreAuthorize("hasAnyAuthority('PERM_specialite-prestataire:view', 'PERM_prestataire-sinistre:view')")
+    @PreAuthorize("hasAnyAuthority('PERM_specialite-prestataire:view', 'PERM_specialite-prestataire:create', 'PERM_specialite-prestataire:update', 'PERM_prestataire-sinistre:view', 'PERM_prestataire-sinistre:create', 'PERM_prestataire-sinistre:update')")
     public ApiResponse<List<SpecialitePrestataireResponse>> specialties() {
         return ApiResponse.success(service.specialites(TenantContext.getCurrentAgence()));
     }

@@ -13,6 +13,9 @@ public class ConfigurationPrestataireRequest {
     private Boolean toutesCompagnies;
 
     @Size(max = 100)
+    private List<@NotNull Long> domaineIds;
+
+    @Size(max = 100)
     private List<@NotNull Long> specialiteIds;
 
     @Valid

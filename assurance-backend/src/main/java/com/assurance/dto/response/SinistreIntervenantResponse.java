@@ -19,6 +19,7 @@ public class SinistreIntervenantResponse {
     private com.assurance.enums.TypePrestataireSinistre typePrestataire;
     private boolean toutesCompagnies;
     private java.util.List<SpecialitePrestataireResponse> specialites;
+    private java.util.List<SpecialitePrestataireResponse.Reference> domaines;
     private java.util.List<Accord> accords;
 
     public record Accord(Long compagnieId, String compagnie, boolean actif, boolean conventionne,

@@ -23,10 +23,13 @@ import java.util.stream.Collectors;
 public class PrestataireSinistreService {
     private final SpecialitePrestataireSinistreRepository specialiteRepository;
     private final GarantieRepository garantieRepository;
+    private final BrancheAssuranceRepository brancheRepository;
     private final CompagnieAssuranceRepository compagnieRepository;
     private final AgenceRepository agenceRepository;
     private final ExpertSinistreRepository expertRepository;
     private final GarageSinistreRepository garageRepository;
+    private final PrestataireMedicalSinistreRepository medicalRepository;
+    private final DomaineInterventionSinistreService domaines;
     private final SinistreRepository sinistreRepository;
     private final SinistreGarantieRepository sinistreGarantieRepository;
     private final SinistreCouvertureService couvertureService;
@@ -36,6 +39,9 @@ public class PrestataireSinistreService {
     public Map<String, List<SpecialitePrestataireResponse.Reference>> options() {
         return Map.of("compagnies", compagnieRepository.findAll(org.springframework.data.domain.Sort.by("nom")).stream()
                         .map(c -> new SpecialitePrestataireResponse.Reference(c.getId(), c.getNom())).toList(),
+                "branches", brancheRepository.findAll(org.springframework.data.domain.Sort.by("libelle")).stream()
+                        .filter(b -> Boolean.TRUE.equals(b.getActif()))
+                        .map(b -> new SpecialitePrestataireResponse.Reference(b.getId(), b.getLibelle())).toList(),
                 "garanties", garantieRepository.findAll(org.springframework.data.domain.Sort.by("code")).stream()
                         .map(g -> new SpecialitePrestataireResponse.Reference(g.getId(), g.getCode() + " · " + g.getLibelle())).toList());
     }
@@ -56,7 +62,7 @@ public class PrestataireSinistreService {
                 : specialiteRepository.findByIdAndAgenceId(id, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Spécialité", id));
         if (id != null && item.getTypePrestataire() != request.getTypePrestataire()
-                && (expertRepository.existsBySpecialitesId(id) || garageRepository.existsBySpecialitesId(id))) {
+                && (expertRepository.existsBySpecialitesId(id) || garageRepository.existsBySpecialitesId(id) || medicalRepository.existsBySpecialitesId(id))) {
             throw new BadRequestException("Le type d'une spécialité déjà attribuée ne peut pas être modifié");
         }
         Set<Long> ids = new LinkedHashSet<>(request.getGarantieIds());
@@ -69,6 +75,13 @@ public class PrestataireSinistreService {
         item.setActif(request.isActif());
         item.getGaranties().clear();
         item.getGaranties().addAll(guarantees);
+        domaines.configure(agenceId, request.getTypePrestataire(), item.getDomaines(), request.getDomaineIds());
+        for (var domain : item.getDomaines()) {
+            if (!domain.getOperateurs().contains(item.getTypePrestataire()) || guarantees.stream().noneMatch(g -> g.getBrancheAssurance() != null
+                    && domain.getBrancheAssurance().getId().equals(g.getBrancheAssurance().getId()))) {
+                throw new BadRequestException("Les garanties de la spécialité doivent couvrir la branche de chaque domaine sélectionné");
+            }
+        }
         item = specialiteRepository.save(item);
         activityRecorder.record(new ActivityCommand(agenceId, ActivityModule.SINISTRES,
                 id == null ? ActivityAction.CREATED : ActivityAction.UPDATED,
@@ -81,25 +94,55 @@ public class PrestataireSinistreService {
     private Map<String, String> specialtySnapshot(SpecialitePrestataireSinistre item) {
         return new ActivityValues().put("Code", item.getCode()).put("Libellé", item.getLibelle())
                 .put("Type", item.getTypePrestataire()).put("Actif", item.isActif())
-                .put("Garanties", item.getGaranties().stream().map(Garantie::getCode).sorted().collect(Collectors.joining(", "))).snapshot();
+                .put("Garanties", item.getGaranties().stream().map(Garantie::getCode).sorted().collect(Collectors.joining(", ")))
+                .put("Domaines", item.getDomaines().stream().map(DomaineInterventionSinistre::getLibelle).sorted().collect(Collectors.joining(", "))).snapshot();
     }
 
     public SpecialitePrestataireResponse specialiteResponse(SpecialitePrestataireSinistre item) {
         return new SpecialitePrestataireResponse(item.getId(), item.getCode(), item.getLibelle(), item.getTypePrestataire(), item.isActif(),
                 item.getGaranties().stream().sorted(Comparator.comparing(Garantie::getCode))
-                        .map(g -> new SpecialitePrestataireResponse.Reference(g.getId(), g.getCode() + " · " + g.getLibelle())).toList());
+                        .map(g -> new SpecialitePrestataireResponse.Reference(g.getId(), g.getCode() + " · " + g.getLibelle())).toList(),
+                item.getGaranties().stream().map(Garantie::getBrancheAssurance).filter(Objects::nonNull)
+                        .collect(Collectors.toMap(BaseEntity::getId, java.util.function.Function.identity(), (a, b) -> a))
+                        .values().stream().sorted(Comparator.comparing(BrancheAssurance::getLibelle))
+                        .map(b -> new SpecialitePrestataireResponse.Reference(b.getId(), b.getLibelle())).toList(),
+                item.getDomaines().stream().sorted(Comparator.comparing(DomaineInterventionSinistre::getLibelle))
+                        .map(d -> new SpecialitePrestataireResponse.Reference(d.getId(), d.getLibelle())).toList());
+    }
+
+    public void validateDirectorySpecialty(Long agenceId, TypePrestataireSinistre type, Long specialiteId, Long brancheId) {
+        if (specialiteId == null) return;
+        var specialty = specialiteRepository.findByIdAndAgenceId(specialiteId, agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Spécialité", specialiteId));
+        if (specialty.getTypePrestataire() != type) throw new BadRequestException("Spécialité incompatible avec cet opérateur");
+        if (brancheId != null && specialty.getGaranties().stream().noneMatch(g -> g.getBrancheAssurance() != null
+                && brancheId.equals(g.getBrancheAssurance().getId()))) {
+            throw new BadRequestException("La spécialité ne couvre pas la branche sélectionnée");
+        }
     }
 
     public void configure(ExpertSinistre expert, ConfigurationPrestataireRequest request) {
-        configure(expert.getAgence(), TypePrestataireSinistre.EXPERT, expert.getSpecialites(), expert.getAccords(), request, expert, null);
+        domaines.configure(expert.getAgence().getId(), TypePrestataireSinistre.EXPERT, expert.getDomaines(), request.getDomaineIds());
+        configure(expert.getAgence(), TypePrestataireSinistre.EXPERT, expert.getSpecialites(), expert.getAccords(), request, expert, null, null);
         if (request.getToutesCompagnies() != null) expert.setToutesCompagnies(request.getToutesCompagnies());
         validateScope(expert.isToutesCompagnies(), expert.getAccords());
     }
 
     public void configure(GarageSinistre garage, ConfigurationPrestataireRequest request) {
-        configure(garage.getAgence(), TypePrestataireSinistre.GARAGE, garage.getSpecialites(), garage.getAccords(), request, null, garage);
+        domaines.configure(garage.getAgence().getId(), TypePrestataireSinistre.GARAGE, garage.getDomaines(), request.getDomaineIds());
+        configure(garage.getAgence(), TypePrestataireSinistre.GARAGE, garage.getSpecialites(), garage.getAccords(), request, null, garage, null);
         if (request.getToutesCompagnies() != null) garage.setToutesCompagnies(request.getToutesCompagnies());
         validateScope(garage.isToutesCompagnies(), garage.getAccords());
+    }
+
+    public void configure(PrestataireMedicalSinistre provider, ConfigurationPrestataireRequest request) {
+        domaines.configure(provider.getAgence().getId(), provider.getTypePrestataire(), provider.getDomaines(), request.getDomaineIds());
+        configure(provider.getAgence(), provider.getTypePrestataire(), provider.getSpecialites(), provider.getAccords(), request, null, null, provider);
+        if (request.getToutesCompagnies() != null) provider.setToutesCompagnies(request.getToutesCompagnies());
+        validateScope(provider.isToutesCompagnies(), provider.getAccords());
+        if (provider.getDomaines().isEmpty() && provider.getSpecialites().stream().allMatch(s -> s.getDomaines().isEmpty())) {
+            throw new BadRequestException("Sélectionnez au moins un domaine d'intervention");
+        }
     }
 
     private void validateScope(boolean allCompanies, Set<AccordPrestataireSinistre> agreements) {
@@ -108,7 +151,7 @@ public class PrestataireSinistreService {
 
     private void configure(Agence agency, TypePrestataireSinistre type, Set<SpecialitePrestataireSinistre> specialties,
             Set<AccordPrestataireSinistre> agreements, ConfigurationPrestataireRequest request,
-            ExpertSinistre expert, GarageSinistre garage) {
+            ExpertSinistre expert, GarageSinistre garage, PrestataireMedicalSinistre medical) {
         if (request.getSpecialiteIds() != null) {
             Set<Long> ids = new HashSet<>(request.getSpecialiteIds());
             List<SpecialitePrestataireSinistre> resolved = specialiteRepository.findByAgenceIdOrderByLibelleAsc(agency.getId()).stream()
@@ -132,7 +175,7 @@ public class PrestataireSinistreService {
                     .orElseThrow(() -> new ResourceNotFoundException("Compagnie", row.getCompagnieId()));
             AccordPrestataireSinistre agreement = agreements.stream().filter(a -> a.getCompagnie().getId().equals(company.getId()))
                     .findFirst().orElseGet(() -> {
-                        var created = AccordPrestataireSinistre.builder().agence(agency).expert(expert).garage(garage).compagnie(company).build();
+                        var created = AccordPrestataireSinistre.builder().agence(agency).expert(expert).garage(garage).prestataireMedical(medical).compagnie(company).build();
                         agreements.add(created);
                         return created;
                     });

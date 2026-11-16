@@ -448,17 +448,23 @@ export type Intervenant = {
   ville?: string | null;
   actif: boolean;
   conventionne?: boolean;
-  typePrestataire?: "EXPERT" | "GARAGE";
+  typePrestataire?: ProviderKind;
+  domaines?: ProviderReference[];
   toutesCompagnies?: boolean;
   specialites?: ProviderSpecialty[];
   accords?: ProviderAgreement[];
 };
 
-export type ProviderKind = "EXPERT" | "GARAGE";
+export type ProviderKind = "EXPERT" | "GARAGE" | "MEDECIN" | "CLINIQUE" | "PHARMACIE" | "RADIOLOGIE" | "KINESITHERAPIE";
+export type ProviderDomain = {
+  id: string; code: string; libelle: string; actif: boolean; brancheId: string; branche: string; operateurs: ProviderKind[];
+};
 export type ProviderReference = { id: string; libelle: string };
 export type ProviderSpecialty = {
   id: string; code: string; libelle: string; typePrestataire: ProviderKind; actif: boolean;
   garanties: ProviderReference[];
+  branches: ProviderReference[];
+  domaines: ProviderReference[];
 };
 export type ProviderAgreement = {
   compagnieId: string; compagnie?: string; actif: boolean; conventionne: boolean;

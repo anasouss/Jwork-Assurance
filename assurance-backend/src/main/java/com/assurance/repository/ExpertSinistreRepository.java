@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface ExpertSinistreRepository extends JpaRepository<ExpertSinistre, Long>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<ExpertSinistre> {
 
     boolean existsBySpecialitesId(Long specialiteId);
+    boolean existsByDomainesId(Long domaineId);
 
     @EntityGraph(attributePaths = "ville")
     List<ExpertSinistre> findByAgenceIdAndActifTrueOrderByNomAsc(Long agenceId);

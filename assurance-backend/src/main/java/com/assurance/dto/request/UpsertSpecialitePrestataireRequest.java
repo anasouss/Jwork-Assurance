@@ -21,6 +21,9 @@ public class UpsertSpecialitePrestataireRequest {
 
     private boolean actif = true;
 
+    @Size(max = 100)
+    private List<@NotNull Long> domaineIds;
+
     @NotNull
     @Size(min = 1, max = 200)
     private List<@NotNull Long> garantieIds;

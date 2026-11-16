@@ -60,6 +60,7 @@ public class AdminService {
     private final AgencyLogoStorageService agencyLogoStorageService;
     private final AgencySignatureStorageService agencySignatureStorageService;
     private final AcquisitionClientService acquisitionClientService;
+    private final DomaineInterventionSinistreService providerDomains;
     private final TresorerieService tresorerieService;
     private final BusinessActivityRecorder activityRecorder;
 
@@ -501,6 +502,7 @@ public class AdminService {
         Agence saved = activityRecorder.perform(() -> {
             Agence created = agenceRepository.save(agence);
             acquisitionClientService.provisionDefaultOrigins(created.getId());
+            providerDomains.seedDefaults(created);
             return created;
         }, created -> {
             ActivityCommand command = AdministrationActivity.agency(created, null, ActivityAction.CREATED, "Agence créée", "AGENCY_CREATE");

@@ -8,7 +8,8 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "accords_prestataires_sinistre", uniqueConstraints = {
         @UniqueConstraint(name = "uk_accord_expert_compagnie", columnNames = {"expert_id", "compagnie_id"}),
-        @UniqueConstraint(name = "uk_accord_garage_compagnie", columnNames = {"garage_id", "compagnie_id"})
+        @UniqueConstraint(name = "uk_accord_garage_compagnie", columnNames = {"garage_id", "compagnie_id"}),
+        @UniqueConstraint(name = "uk_accord_medical_compagnie", columnNames = {"prestataire_medical_id", "compagnie_id"})
 }, indexes = @Index(name = "idx_accord_prestataire_agence", columnList = "agence_id,compagnie_id,actif"))
 @Getter
 @Setter
@@ -27,6 +28,10 @@ public class AccordPrestataireSinistre extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "garage_id")
     private GarageSinistre garage;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "prestataire_medical_id")
+    private PrestataireMedicalSinistre prestataireMedical;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "compagnie_id", nullable = false)

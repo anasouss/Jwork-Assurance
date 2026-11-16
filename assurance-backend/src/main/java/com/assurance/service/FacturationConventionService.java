@@ -166,6 +166,97 @@ public class FacturationConventionService {
         return new PreparationFactureConventionResponse(convention.getIntitule(), periods.get(0).start(), periods.get(periods.size() - 1).end(), rows);
     }
 
+    @Transactional
+    public PreparationFactureConventionResponse revisionCandidates(Long agenceId, Long documentId) {
+        DocumentClient original = documentClientService.requireConventionRevision(agenceId, documentId);
+        var reference = original.getLignes().get(0).getEcheanceFacturationConvention();
+        Long conventionId = reference.getContrat().getConvention().getId();
+        synchronizeSchedules(agenceId, conventionId);
+        List<PreparationFactureConventionResponse.Ligne> candidates = new ArrayList<>();
+        for (var schedule : echeanceRepository.findPendingPeriod(agenceId, conventionId,
+                original.getPeriodeDebut(), original.getPeriodeFin())) {
+            if (schedule.getContrat().getCompagnieAssurance() == null || !Objects.equals(reference.getContrat().getCompagnieAssurance().getId(),
+                    schedule.getContrat().getCompagnieAssurance().getId())) continue;
+            try {
+                var candidate = preview(agenceId, List.of(schedule.getId()));
+                if (candidate.total().signum() != original.getTotalDocument().signum()) continue;
+                var payer = conventionPayer(schedule.getContrat().getConvention());
+                candidates.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(), payer.id(), payer.type(),
+                        payer.name(), null, candidate.lignes(), schedule.getPeriodeDebut(), schedule.getPeriodeFin(), false));
+            } catch (BadRequestException exception) {
+                candidates.add(new PreparationFactureConventionResponse.Ligne(schedule.getId(), null, null, null,
+                        exception.getMessage(), List.of(), schedule.getPeriodeDebut(), schedule.getPeriodeFin(), false));
+            }
+        }
+        return new PreparationFactureConventionResponse(original.getConventionFacturee(),
+                original.getPeriodeDebut(), original.getPeriodeFin(), candidates);
+    }
+
+    @Transactional(readOnly = true)
+    public ConventionInvoicePreviewResponse previewRevision(Long agenceId, Long documentId, List<Long> ids) {
+        DocumentClient original = documentClientService.requireConventionRevision(agenceId, documentId);
+        List<LigneDocumentClient> additions = revisionAdditionalLines(agenceId, original, ids, false);
+        Set<Long> selected = new java.util.HashSet<>(ids);
+        List<LigneDocumentClient> combined = new ArrayList<>(original.getLignes().stream()
+                .filter(line -> selected.contains(line.getEcheanceFacturationConvention().getId())).toList());
+        combined.addAll(additions);
+        int direction = ConventionDocumentPolarity.direction(combined.stream().map(LigneDocumentClient::getMontantTtc).toList());
+        if (direction != original.getTotalDocument().signum()) throw new BadRequestException("Les primes et les ristournes doivent rester séparées");
+        return new ConventionInvoicePreviewResponse(original.getConventionFacturee(), original.getPayeurNom(),
+                original.getPeriodeDebut(), original.getPeriodeFin(),
+                combined.stream().map(LigneDocumentClient::getMontantTtc).reduce(ZERO, BigDecimal::add),
+                combined.stream().map(line -> new ConventionInvoicePreviewResponse.Line(line.getNumeroQuittance(), line.getNumeroPolice(),
+                        line.getCompagnie(), line.getMouvement(), line.getAssureConvention(), line.getVehiculeConvention(),
+                        line.getDateOperation(), line.getDateEcheance(), line.getMontantBulletinConvention(), line.getMontantTtc())).toList());
+    }
+
+    @Transactional
+    public DocumentClientResponse reviseInvoice(Long agenceId, Long documentId,
+            com.assurance.dto.request.RectifierFactureConventionRequest request) {
+        agenceRepository.findByIdForUpdate(agenceId).orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        documentRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Facture", documentId));
+        DocumentClient original = documentClientService.requireConventionRevision(agenceId, documentId);
+        var additions = revisionAdditionalLines(agenceId, original, request.getEcheanceIds(), true);
+        return documentClientService.reviseConvention(agenceId, documentId, request, additions);
+    }
+
+    private List<LigneDocumentClient> revisionAdditionalLines(Long agenceId, DocumentClient original, List<Long> ids, boolean lock) {
+        Set<Long> existing = original.getLignes().stream().map(line -> line.getEcheanceFacturationConvention().getId()).collect(Collectors.toSet());
+        List<Long> addedIds = ids.stream().filter(id -> !existing.contains(id)).distinct().toList();
+        if (addedIds.isEmpty()) return List.of();
+        var selected = lock ? echeanceRepository.findForUpdate(agenceId, addedIds) : echeanceRepository.findSelected(agenceId, addedIds);
+        if (selected.size() != addedIds.size()) throw new BadRequestException("Échéances introuvables");
+        validateSelection(selected);
+        var reference = original.getLignes().get(0).getEcheanceFacturationConvention();
+        if (!Boolean.TRUE.equals(reference.getContrat().getConvention().getActif())) {
+            throw new BadRequestException("Cette convention est inactive : aucun ajout n'est autorisé");
+        }
+        if (selected.stream().anyMatch(schedule -> !Objects.equals(schedule.getContrat().getConvention().getId(), reference.getContrat().getConvention().getId())
+                || !Objects.equals(schedule.getContrat().getCompagnieAssurance().getId(), reference.getContrat().getCompagnieAssurance().getId())
+                || !Objects.equals(schedule.getPeriodeDebut(), original.getPeriodeDebut())
+                || !Objects.equals(schedule.getPeriodeFin(), original.getPeriodeFin()))) {
+            throw new BadRequestException("Les ajouts doivent appartenir à la même convention, compagnie et période facturée");
+        }
+        var preview = preview(agenceId, addedIds);
+        if (preview.total().signum() != original.getTotalDocument().signum()) throw new BadRequestException("Les primes et les ristournes doivent rester séparées");
+        Map<Long, List<EcheanceFacturationConvention>> allSchedules = selected.stream().map(item -> item.getContrat().getId()).distinct()
+                .collect(Collectors.toMap(Function.identity(), echeanceRepository::findByContratIdAndActifTrueOrderByNumeroPeriodeAsc));
+        validateIssuedBulletins(selected, allSchedules);
+        Map<Long, List<ElementFacturable>> elements = loadElements(allSchedules.keySet());
+        List<LigneDocumentClient> lines = new ArrayList<>();
+        for (var schedule : selected) {
+            for (var element : elements.getOrDefault(schedule.getContrat().getId(), List.of())) {
+                if (!isBillable(element) || !ConventionPaymentPolicy.isInvoice(element) || !matchesSource(element, schedule)) continue;
+                Amount amount = allocate(element, schedule, allSchedules.get(schedule.getContrat().getId()));
+                if (amount.ttc().signum() != 0) lines.add(invoiceSnapshot(new InvoiceLineData(schedule, element, amount), lines.size() + 1, null));
+            }
+        }
+        Set<Long> represented = lines.stream().map(line -> line.getEcheanceFacturationConvention().getId()).collect(Collectors.toSet());
+        if (!represented.containsAll(addedIds)) throw new BadRequestException("Une échéance ajoutée ne contient aucune ligne facturable");
+        return lines;
+    }
+
     private boolean matchesProductionFilter(ElementFacturable element,
             com.assurance.enums.CategorieMouvementContrat category, com.assurance.enums.SensPrimeConvention direction) {
         var movement = element.getMouvementContrat();
@@ -418,6 +509,37 @@ public class FacturationConventionService {
                                 ? "Facture de ristourne émise" : "Facture de convention émise", "CONVENTION_INVOICE_ISSUANCE", List.of()));
     }
 
+    private LigneDocumentClient invoiceSnapshot(InvoiceLineData data, int order, DocumentClient document) {
+        BigDecimal lineDebit = data.amount().ttc().signum() > 0 ? data.amount().ttc() : ZERO;
+        BigDecimal lineCredit = data.amount().ttc().signum() < 0 ? data.amount().ttc().abs() : ZERO;
+        Contrat contract = data.schedule().getContrat();
+        var details = details(data.element());
+        return LigneDocumentClient.builder()
+                .document(document)
+                .elementFacturable(data.element())
+                .echeanceFacturationConvention(data.schedule())
+                .ordre(order)
+                .dateOperation(data.element().getDateDebut() == null ? contract.getDateEffet() : data.element().getDateDebut())
+                .dateEcheance(data.element().getDateFin() == null ? contract.getDateEcheance() : data.element().getDateFin())
+                .numeroDossier(contract.getNumeroDossier())
+                .numeroPolice(contract.getNumeroPolice())
+                .numeroQuittance(details.numeroQuittance())
+                .assureConvention(details.assure())
+                .vehiculeConvention(details.vehicule())
+                .montantBulletinConvention(elementBulletin(data.element()))
+                .libelleDocument(conventionProductionLabel(contract, data.schedule().getPeriodeDebut()))
+                .mouvement(data.element().getMouvementContrat() == null ? data.element().getLibelle()
+                        : billingDetails.movementLabel(data.element().getMouvementContrat()))
+                .compagnie(companyName(data.element()))
+                .debit(lineDebit)
+                .credit(lineCredit)
+                .primeNette(data.amount().net())
+                .taxes(data.amount().taxes())
+                .accessoires(data.amount().accessories())
+                .montantTtc(data.amount().ttc())
+                .build();
+    }
+
     private DocumentClientResponse createInvoiceRecord(Long agenceId, CreerFactureConventionRequest request) {
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
@@ -523,32 +645,7 @@ public class FacturationConventionService {
                 .toList()) {
             BigDecimal lineDebit = data.amount().ttc().signum() > 0 ? data.amount().ttc() : ZERO;
             BigDecimal lineCredit = data.amount().ttc().signum() < 0 ? data.amount().ttc().abs() : ZERO;
-            Contrat contract = data.schedule().getContrat();
-            var details = details(data.element());
-            LigneDocumentClient line = LigneDocumentClient.builder()
-                    .document(document)
-                    .elementFacturable(data.element())
-                    .echeanceFacturationConvention(data.schedule())
-                    .ordre(order++)
-                    .dateOperation(data.element().getDateDebut() == null ? contract.getDateEffet() : data.element().getDateDebut())
-                    .dateEcheance(data.element().getDateFin() == null ? contract.getDateEcheance() : data.element().getDateFin())
-                    .numeroDossier(contract.getNumeroDossier())
-                    .numeroPolice(contract.getNumeroPolice())
-                    .numeroQuittance(details.numeroQuittance())
-                    .assureConvention(details.assure())
-                    .vehiculeConvention(details.vehicule())
-                    .montantBulletinConvention(elementBulletin(data.element()))
-                    .libelleDocument(conventionProductionLabel(contract, data.schedule().getPeriodeDebut()))
-                    .mouvement(data.element().getMouvementContrat() == null ? data.element().getLibelle()
-                            : billingDetails.movementLabel(data.element().getMouvementContrat()))
-                    .compagnie(companyName(data.element()))
-                    .debit(lineDebit)
-                    .credit(lineCredit)
-                    .primeNette(data.amount().net())
-                    .taxes(data.amount().taxes())
-                    .accessoires(data.amount().accessories())
-                    .montantTtc(data.amount().ttc())
-                    .build();
+            LigneDocumentClient line = invoiceSnapshot(data, order++, document);
             document.getLignes().add(line);
             debit = debit.add(lineDebit);
             credit = credit.add(lineCredit);

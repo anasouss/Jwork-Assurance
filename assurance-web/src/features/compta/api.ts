@@ -440,12 +440,26 @@ export const comptaApi = {
   },
 
   async reviseConventionInvoice(id: string, request: {
-    echeanceIds: string[]; motif: string; notes?: string; dateEcheance?: string;
+    echeanceIds: string[]; montantAttendu: number; motif: string; notes?: string; dateEcheance?: string;
   }) {
     return normalizeClientDocument(unwrap(await apiFetch<ApiResponse<ClientDocument>>(
       `/api/v1/compta/facturation-conventions/factures/${id}/revision`,
       { method: "POST", body: JSON.stringify(request) }
     )));
+  },
+
+  async conventionRevisionSources(id: string) {
+    const result = unwrap(await apiFetch<ApiResponse<ConventionInvoicePreparation>>(
+      `/api/v1/compta/facturation-conventions/factures/${id}/revision/sources`
+    ));
+    return { ...result, lignes: result.lignes.map(row => ({ ...row, echeanceId: String(row.echeanceId), payeurId: row.payeurId == null ? "" : String(row.payeurId) })) };
+  },
+
+  async previewConventionRevision(id: string, echeanceIds: string[]) {
+    return unwrap(await apiFetch<ApiResponse<ConventionInvoicePreview>>(
+      `/api/v1/compta/facturation-conventions/factures/${id}/revision/apercu`,
+      { method: "POST", body: JSON.stringify({ echeanceIds }) }
+    ));
   },
 
   async conventionInvoices(params: {

@@ -949,6 +949,15 @@ public class DocumentClientService {
             Long agenceId, Long documentId,
             com.assurance.dto.request.RectifierFactureConventionRequest request
     ) {
+        return reviseConvention(agenceId, documentId, request, List.of());
+    }
+
+    @Transactional
+    public DocumentClientResponse reviseConvention(
+            Long agenceId, Long documentId,
+            com.assurance.dto.request.RectifierFactureConventionRequest request,
+            List<LigneDocumentClient> additionalLines
+    ) {
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
         DocumentClient original = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
@@ -959,19 +968,40 @@ public class DocumentClientService {
             throw new BadRequestException(block);
         }
         Set<Long> retained = new HashSet<>(request.getEcheanceIds());
-        List<LigneDocumentClient> lines = original.getLignes().stream()
+        List<LigneDocumentClient> lines = new ArrayList<>(original.getLignes().stream()
                 .filter(line -> retained.contains(line.getEcheanceFacturationConvention().getId()))
-                .sorted(Comparator.comparing(LigneDocumentClient::getOrdre)).toList();
+                .sorted(Comparator.comparing(LigneDocumentClient::getOrdre)).toList());
         Set<Long> available = original.getLignes().stream()
                 .map(line -> line.getEcheanceFacturationConvention().getId()).collect(Collectors.toSet());
-        if (retained.isEmpty() || !available.containsAll(retained)) {
-            throw new BadRequestException("Conservez au moins une échéance de la facture d'origine");
+        Set<Long> additions = additionalLines.stream().map(line -> line.getEcheanceFacturationConvention().getId()).collect(Collectors.toSet());
+        Set<Long> allIds = new HashSet<>(available);
+        allIds.addAll(additions);
+        if (retained.isEmpty() || !allIds.containsAll(retained) || !retained.containsAll(additions)) {
+            throw new BadRequestException("Sélectionnez des échéances éligibles de la facture d'origine ou de la même période");
         }
-        ConventionDocumentPolarity.direction(lines.stream().map(LigneDocumentClient::getMontantTtc).toList());
-        var schedules = echeanceFacturationConventionRepository.findForUpdate(agenceId, new ArrayList<>(available));
-        if (schedules.size() != available.size() || schedules.stream().anyMatch(schedule ->
-                schedule.getDocumentClient() == null || !documentId.equals(schedule.getDocumentClient().getId()))) {
+        lines.addAll(additionalLines);
+        int direction = ConventionDocumentPolarity.direction(lines.stream().map(LigneDocumentClient::getMontantTtc).toList());
+        if (direction != original.getTotalDocument().signum()) {
+            throw new BadRequestException("Les primes et les ristournes doivent rester séparées");
+        }
+        BigDecimal total = money(lines.stream().map(LigneDocumentClient::getMontantTtc).reduce(BigDecimal.ZERO, BigDecimal::add));
+        if (request.getMontantAttendu() == null || total.compareTo(request.getMontantAttendu()) != 0) {
+            throw new BadRequestException("Les montants ont changé. Actualisez l'aperçu avant de valider.");
+        }
+        var schedules = echeanceFacturationConventionRepository.findForUpdate(agenceId, new ArrayList<>(allIds));
+        if (schedules.size() != allIds.size() || schedules.stream().anyMatch(schedule -> available.contains(schedule.getId())
+                ? schedule.getDocumentClient() == null || !documentId.equals(schedule.getDocumentClient().getId())
+                : !Boolean.TRUE.equals(schedule.getActif()) || schedule.getDocumentClient() != null
+                  || schedule.getStatut() != StatutEcheanceFacturationConvention.A_FACTURER)) {
             throw new BadRequestException("Les périodes ne sont plus rattachées à cette facture. Actualisez la page.");
+        }
+        var reference = original.getLignes().get(0).getEcheanceFacturationConvention().getContrat();
+        if (schedules.stream().filter(schedule -> additions.contains(schedule.getId())).anyMatch(schedule ->
+                !Objects.equals(schedule.getContrat().getConvention().getId(), reference.getConvention().getId())
+                || !Objects.equals(schedule.getContrat().getCompagnieAssurance().getId(), reference.getCompagnieAssurance().getId())
+                || !Objects.equals(schedule.getPeriodeDebut(), original.getPeriodeDebut())
+                || !Objects.equals(schedule.getPeriodeFin(), original.getPeriodeFin()))) {
+            throw new BadRequestException("Les ajouts doivent appartenir à la même convention, compagnie et période facturée");
         }
         LocalDate emission = LocalDate.now();
         if (original.getTotalDocument().signum() > 0 && original.getDateEcheance() != null) {
@@ -1038,6 +1068,14 @@ public class DocumentClientService {
             return new ActivityCommand(command.agenceId(), command.module(), command.action(), command.title(),
                     command.origin(), command.subject(), command.references(), changes);
         });
+    }
+
+    public DocumentClient requireConventionRevision(Long agenceId, Long documentId) {
+        com.assurance.security.BusinessPermission.require("facture-convention:revise");
+        DocumentClient original = findDocument(agenceId, documentId);
+        String block = conventionRevisionBlockingReason(original);
+        if (block != null) throw new BadRequestException(block);
+        return original;
     }
 
     private String conventionRevisionBlockingReason(DocumentClient document) {

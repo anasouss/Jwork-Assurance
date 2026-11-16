@@ -152,7 +152,7 @@ public final class PermissionExplanation {
             case "reglement-client:refund" -> "Régler au bénéficiaire une sélection de ristournes dont le total est négatif.";
             case "reglement-client:adjust" -> "Accorder un écart motivé sur une créance, dans la limite configurée pour l'agence.";
             case "facture-convention:issue" -> "Sélectionner les échéances éligibles d'une convention et établir la facture de la période.";
-            case "facture-convention:revise" -> "Remplacer une facture de convention sans historique de règlement, conserver ou retirer ses échéances et rectifier ses notes ou sa date limite autorisée. L'original reste consultable.";
+            case "facture-convention:revise" -> "Remplacer une facture de convention sans historique de règlement, ajouter des échéances éligibles de même convention, compagnie, période et sens, conserver ou retirer ses échéances et rectifier ses notes ou sa date limite autorisée. L'original reste consultable.";
             case "sinistre-provision:create" -> "Enregistrer une estimation du coût d'un sinistre ; aucun paiement n'est créé par cette provision.";
             case "user:assign-role" -> "Attribuer le rôle Consultation à un collaborateur sans modifier son nom ou son adresse e-mail.";
             default -> "Action « " + permission.actionLabel() + " » appliquée à " + area.example() + ", dans la rubrique « " + permission.resourceLabel() + " ».";

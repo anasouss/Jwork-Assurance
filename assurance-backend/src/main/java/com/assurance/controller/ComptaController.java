@@ -382,8 +382,25 @@ public class ComptaController {
             @PathVariable Long documentId,
             @Valid @RequestBody com.assurance.dto.request.RectifierFactureConventionRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success(documentClientService.reviseConvention(
+        return ResponseEntity.ok(ApiResponse.success(facturationConventionService.reviseInvoice(
                 TenantContext.getCurrentAgence(), documentId, request), "Facture de convention rectifiée"));
+    }
+
+    @GetMapping("/facturation-conventions/factures/{documentId}/revision/sources")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:revise')")
+    public ResponseEntity<ApiResponse<com.assurance.dto.response.PreparationFactureConventionResponse>> conventionRevisionSources(
+            @PathVariable Long documentId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(facturationConventionService.revisionCandidates(TenantContext.getCurrentAgence(), documentId)));
+    }
+
+    @PostMapping("/facturation-conventions/factures/{documentId}/revision/apercu")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:revise')")
+    public ResponseEntity<ApiResponse<com.assurance.dto.response.ConventionInvoicePreviewResponse>> conventionRevisionPreview(
+            @PathVariable Long documentId, @Valid @RequestBody PropositionEcheanceFactureConventionRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(facturationConventionService.previewRevision(
+                TenantContext.getCurrentAgence(), documentId, request.getEcheanceIds())));
     }
 
     @GetMapping("/facturation-conventions/preparation")

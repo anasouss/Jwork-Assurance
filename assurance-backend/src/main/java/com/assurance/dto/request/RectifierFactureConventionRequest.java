@@ -16,6 +16,9 @@ public class RectifierFactureConventionRequest {
     @NotEmpty
     private List<@NotNull Long> echeanceIds;
 
+    @NotNull
+    private java.math.BigDecimal montantAttendu;
+
     @NotBlank
     @Size(max = 500)
     private String motif;

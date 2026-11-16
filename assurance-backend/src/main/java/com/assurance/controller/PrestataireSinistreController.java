@@ -29,6 +29,7 @@ public class PrestataireSinistreController {
     @PreAuthorize("hasAuthority('PERM_prestataire-sinistre:view')")
     public ApiResponse<PagedResponse<SinistreIntervenantResponse>> directory(
             @RequestParam(defaultValue = "GARAGE") TypePrestataireSinistre typePrestataire,
+            @RequestParam(defaultValue = "false") boolean tousOperateurs,
             @RequestParam(defaultValue = "false") boolean includeInactive,
             @RequestParam(required = false) String query,
             @RequestParam(required = false) Long villeId,
@@ -37,6 +38,10 @@ public class PrestataireSinistreController {
             @RequestParam(required = false) Long brancheId,
             @RequestParam(required = false) Long domaineId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        if (tousOperateurs) {
+            return ApiResponse.success(intervenants.directoryAll(TenantContext.getCurrentAgence(),
+                    includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, page, size));
+        }
         return ApiResponse.success(intervenants.directory(TenantContext.getCurrentAgence(), typePrestataire,
                 includeInactive, query, villeId, compagnieId, specialiteId, brancheId, domaineId, page, size));
     }

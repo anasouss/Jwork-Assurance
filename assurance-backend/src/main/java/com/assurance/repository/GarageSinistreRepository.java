@@ -20,6 +20,9 @@ public interface GarageSinistreRepository extends JpaRepository<GarageSinistre, 
 
     Optional<GarageSinistre> findByIdAndAgenceId(Long id, Long agenceId);
 
+    @EntityGraph(attributePaths = {"ville", "domaines", "specialites", "accords", "accords.compagnie"})
+    List<GarageSinistre> findByAgenceIdAndIdIn(Long agenceId, List<Long> ids);
+
     boolean existsByAgenceIdAndCodeIgnoreCase(Long agenceId, String code);
 
     boolean existsByAgenceIdAndCodeIgnoreCaseAndIdNot(Long agenceId, String code, Long id);

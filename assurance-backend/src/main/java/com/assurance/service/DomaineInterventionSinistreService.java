@@ -123,7 +123,7 @@ public class DomaineInterventionSinistreService {
             guarantees.findByCode("BG").filter(g -> g.getBrancheAssurance() != null
                     && g.getBrancheAssurance().getId().equals(domain.getBrancheAssurance().getId())).ifPresent(glass -> {
                 // Activate after assigning qualified garages; do not change existing claim eligibility at startup.
-                specialties.save(SpecialitePrestataireSinistre.builder().agence(agency).code("BGS").libelle("Bris de glace")
+                specialties.save(SpecialitePrestataireSinistre.builder().agence(agency).code("BGS").libelle("Réparation glace")
                         .typePrestataire(TypePrestataireSinistre.GARAGE).actif(false)
                         .garanties(new LinkedHashSet<>(Set.of(glass))).domaines(new LinkedHashSet<>(Set.of(domain))).build());
             });

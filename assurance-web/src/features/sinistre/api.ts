@@ -66,7 +66,7 @@ export const sinistreApi = {
   async assistances(contratId: string, vehiculeId: string | undefined, dateSinistre: string) {
     return unwrap(await apiFetch<ApiResponse<ClaimAssistance[]>>(`/api/v1/sinistres/assistances${buildQueryString({ contratId, vehiculeId, dateSinistre })}`));
   },
-  async providers(params: { typePrestataire: ProviderKind; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; brancheId?: string; domaineId?: string; page: number; size: number }) {
+  async providers(params: { typePrestataire?: ProviderKind; tousOperateurs?: boolean; includeInactive: boolean; query?: string; villeId?: string; compagnieId?: string; specialiteId?: string; brancheId?: string; domaineId?: string; page: number; size: number }) {
     return unwrap(await apiFetch<ApiResponse<PagedResponse<Intervenant>>>(`/api/v1/sinistres/prestataires${buildQueryString(params)}`));
   },
   async providerOptions() {

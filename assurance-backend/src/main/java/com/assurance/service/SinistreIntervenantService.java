@@ -35,6 +35,7 @@ public class SinistreIntervenantService {
     private final PrestataireSinistreService prestataireService;
     private final com.assurance.repository.PrestataireMedicalSinistreRepository medicalRepository;
     private final DomaineInterventionSinistreService domaines;
+    private final com.assurance.repository.PrestataireDirectoryRepository directoryRepository;
 
     @Transactional(readOnly = true)
     public List<SinistreIntervenantResponse> listExperts(Long agenceId, boolean includeInactive) {
@@ -283,6 +284,35 @@ public class SinistreIntervenantService {
         }
         return com.assurance.dto.response.PagedResponse.<SinistreIntervenantResponse>builder()
                 .items(result.getContent()).page(com.assurance.dto.response.PageMetadata.from(result)).build();
+    }
+
+    @Transactional(readOnly = true)
+    public com.assurance.dto.response.PagedResponse<SinistreIntervenantResponse> directoryAll(Long agenceId,
+            boolean includeInactive, String query, Long villeId, Long compagnieId, Long specialiteId,
+            Long brancheId, Long domaineId, int page, int size) {
+        if (specialiteId != null) throw new BadRequestException("Sélectionnez l'opérateur de la spécialité");
+        if (domaineId != null) domaines.require(agenceId, domaineId);
+        var pageable = org.springframework.data.domain.PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)));
+        var result = directoryRepository.search(new com.assurance.repository.PrestataireDirectoryRepository.Filter(
+                agenceId, includeInactive, query, villeId, compagnieId, brancheId, domaineId), pageable);
+        var responses = new java.util.HashMap<com.assurance.repository.PrestataireDirectoryRepository.ProviderKey, SinistreIntervenantResponse>();
+        var expertIds = result.stream().filter(key -> key.type() == com.assurance.enums.TypePrestataireSinistre.EXPERT)
+                .map(com.assurance.repository.PrestataireDirectoryRepository.ProviderKey::id).toList();
+        var garageIds = result.stream().filter(key -> key.type() == com.assurance.enums.TypePrestataireSinistre.GARAGE)
+                .map(com.assurance.repository.PrestataireDirectoryRepository.ProviderKey::id).toList();
+        var medicalIds = result.stream().filter(key -> key.type() != com.assurance.enums.TypePrestataireSinistre.GARAGE
+                        && key.type() != com.assurance.enums.TypePrestataireSinistre.EXPERT)
+                .map(com.assurance.repository.PrestataireDirectoryRepository.ProviderKey::id).toList();
+        var loaded = new java.util.ArrayList<SinistreIntervenantResponse>();
+        if (!expertIds.isEmpty()) expertRepository.findByAgenceIdAndIdIn(agenceId, expertIds).stream().map(this::toResponse).forEach(loaded::add);
+        if (!garageIds.isEmpty()) garageRepository.findByAgenceIdAndIdIn(agenceId, garageIds).stream().map(this::toResponse).forEach(loaded::add);
+        if (!medicalIds.isEmpty()) medicalRepository.findByAgenceIdAndIdIn(agenceId, medicalIds).stream().map(this::toResponse).forEach(loaded::add);
+        loaded.forEach(response -> responses.put(new com.assurance.repository.PrestataireDirectoryRepository.ProviderKey(
+                response.getTypePrestataire(), response.getId()), response));
+        var content = result.getContent().stream().map(key -> java.util.Objects.requireNonNull(responses.get(key),
+                "Prestataire introuvable dans le périmètre de l'agence")).toList();
+        return com.assurance.dto.response.PagedResponse.<SinistreIntervenantResponse>builder().items(content)
+                .page(com.assurance.dto.response.PageMetadata.from(result)).build();
     }
 
     private <T> org.springframework.data.jpa.domain.Specification<T> directoryFilter(Long agenceId, boolean includeInactive,

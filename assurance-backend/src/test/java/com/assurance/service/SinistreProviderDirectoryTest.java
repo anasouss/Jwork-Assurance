@@ -1,12 +1,15 @@
 package com.assurance.service;
 
 import com.assurance.activity.BusinessActivityRecorder;
+import com.assurance.entity.ExpertSinistre;
+import com.assurance.entity.GarageSinistre;
 import com.assurance.entity.PrestataireMedicalSinistre;
 import com.assurance.enums.TypePrestataireSinistre;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
@@ -19,9 +22,42 @@ import static org.mockito.Mockito.*;
 class SinistreProviderDirectoryTest {
     private final PrestataireMedicalSinistreRepository medical = mock(PrestataireMedicalSinistreRepository.class);
     private final PrestataireSinistreService providers = mock(PrestataireSinistreService.class);
+    private final ExpertSinistreRepository experts = mock(ExpertSinistreRepository.class);
+    private final GarageSinistreRepository garages = mock(GarageSinistreRepository.class);
+    private final DomaineInterventionSinistreService domains = mock(DomaineInterventionSinistreService.class);
+    private final PrestataireDirectoryRepository directory = mock(PrestataireDirectoryRepository.class);
     private final SinistreIntervenantService service = new SinistreIntervenantService(mock(AgenceRepository.class),
-            mock(VilleRepository.class), mock(ExpertSinistreRepository.class), mock(GarageSinistreRepository.class),
-            mock(BusinessActivityRecorder.class), providers, medical, mock(DomaineInterventionSinistreService.class));
+            mock(VilleRepository.class), experts, garages,
+            mock(BusinessActivityRecorder.class), providers, medical, domains, directory);
+
+    @Test
+    void allOperatorsPreserveGlobalPaginationAndSeparateOverlappingProviderIds() {
+        var keys = List.of(new PrestataireDirectoryRepository.ProviderKey(TypePrestataireSinistre.EXPERT, 1L),
+                new PrestataireDirectoryRepository.ProviderKey(TypePrestataireSinistre.GARAGE, 1L));
+        var filter = new PrestataireDirectoryRepository.Filter(7L, false, "test", 8L, 9L, null, 10L);
+        var pageable = PageRequest.of(1, 2);
+        when(directory.search(filter, pageable)).thenReturn(new PageImpl<>(keys, pageable, 8));
+        var expert = ExpertSinistre.builder().nom("Expert").build();
+        expert.setId(1L);
+        var garage = GarageSinistre.builder().raisonSociale("Garage").build();
+        garage.setId(1L);
+        when(experts.findByAgenceIdAndIdIn(7L, List.of(1L))).thenReturn(List.of(expert));
+        when(garages.findByAgenceIdAndIdIn(7L, List.of(1L))).thenReturn(List.of(garage));
+        var result = service.directoryAll(7L, false, "test", 8L, 9L, null, null, 10L, 1, 2);
+        assertThat(result.getItems()).extracting(item -> item.getTypePrestataire())
+                .containsExactly(TypePrestataireSinistre.EXPERT, TypePrestataireSinistre.GARAGE);
+        assertThat(result.getPage().getTotalElements()).isEqualTo(8);
+        assertThat(result.getPage().getNumber()).isEqualTo(1);
+        verify(domains).require(7L, 10L);
+        verifyNoInteractions(medical);
+    }
+
+    @Test
+    void allOperatorsRejectsASpecialtyWithoutItsOperatorType() {
+        assertThatThrownBy(() -> service.directoryAll(1L, false, null, null, null, 3L, null, null, 0, 25))
+                .isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(directory);
+    }
 
     @Test
     @SuppressWarnings("unchecked")

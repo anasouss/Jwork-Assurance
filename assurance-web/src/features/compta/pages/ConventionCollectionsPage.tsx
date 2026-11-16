@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Ban, Banknote, Eye, MoreHorizontal, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
+import { Ban, Banknote, Eye, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { comptaApi } from "../api";
 import { ClientPaymentDetailsDialog } from "../components/ClientPaymentDetailsDialog";
 import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHeader";
 import { InvoiceActionDialog, InvoiceDialog } from "../components/ConventionInvoiceDialogs";
+import { ConventionInvoiceRevisionDialog } from "../components/ConventionInvoiceRevisionDialog";
 import { formatAccountingAmount } from "../format";
 import type { ClientReceivable, ConventionProductionFilters } from "../types";
 
@@ -40,6 +41,7 @@ export default function ConventionCollectionsPage() {
   const canDelete = canViewDocuments && permissions.includes("facture-convention:delete");
   const canCancel = canViewDocuments && permissions.includes("facture-convention:cancel");
   const [documentAction, setDocumentAction] = useState<{ id: string; action: "delete" | "cancel" }>();
+  const [revisionId, setRevisionId] = useState<string>();
   const [openingPdf, setOpeningPdf] = useState(false);
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -241,6 +243,7 @@ export default function ConventionCollectionsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-56">
                           {canViewDocuments && <DropdownMenuItem disabled={openingPdf} onSelect={() => void showDocument(id)}><Eye className="size-4" />Voir la facture PDF</DropdownMenuItem>}
+                          {canViewDocuments && permissions.includes("facture-convention:revise") && <DropdownMenuItem onSelect={() => setRevisionId(id)}><Pencil className="size-4" />Rectifier la facture</DropdownMenuItem>}
                           {canCreate && <DropdownMenuItem disabled={row.soldeOuvert === 0 || invoices.isFetching || selectedRows.length > 0 || (row.source.montantTtc < 0 ? !canPayRefund : !canCollect)} onSelect={() => collect([row])}><Banknote className="size-4" />{row.source.montantTtc < 0 ? "Régler la ristourne" : "Encaisser la facture"}</DropdownMenuItem>}
                           {(canCancel || canDelete) && <DropdownMenuSeparator />}
                           {canCancel && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "cancel" })}><Ban className="size-4" />Annuler la facture</DropdownMenuItem>}
@@ -258,6 +261,7 @@ export default function ConventionCollectionsPage() {
     {canViewDocuments && params.get("documentId") && <InvoiceDialog id={params.get("documentId")!} onClose={closeDetail} />}
     {params.get("reglementId") && <ClientPaymentDetailsDialog paymentId={params.get("reglementId")!} onClose={closeDetail} />}
     {documentAction && <InvoiceActionDialog key={`${documentAction.id}:${documentAction.action}`} {...documentAction} onClose={() => setDocumentAction(undefined)} />}
+    {revisionId && <ConventionInvoiceRevisionDialog key={revisionId} id={revisionId} onClose={() => setRevisionId(undefined)} onRevised={() => { setRevisionId(undefined); setSelected({}); }} />}
   </div>;
 }
 

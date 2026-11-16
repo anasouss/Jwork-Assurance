@@ -945,6 +945,114 @@ public class DocumentClientService {
     }
 
     @Transactional
+    public DocumentClientResponse reviseConvention(
+            Long agenceId, Long documentId,
+            com.assurance.dto.request.RectifierFactureConventionRequest request
+    ) {
+        Agence agence = agenceRepository.findByIdForUpdate(agenceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        DocumentClient original = documentClientRepository.findByAgenceIdAndIdForUpdate(agenceId, documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Facture", documentId));
+        com.assurance.security.BusinessPermission.require("facture-convention:revise");
+        String block = conventionRevisionBlockingReason(original);
+        if (block != null) {
+            throw new BadRequestException(block);
+        }
+        Set<Long> retained = new HashSet<>(request.getEcheanceIds());
+        List<LigneDocumentClient> lines = original.getLignes().stream()
+                .filter(line -> retained.contains(line.getEcheanceFacturationConvention().getId()))
+                .sorted(Comparator.comparing(LigneDocumentClient::getOrdre)).toList();
+        Set<Long> available = original.getLignes().stream()
+                .map(line -> line.getEcheanceFacturationConvention().getId()).collect(Collectors.toSet());
+        if (retained.isEmpty() || !available.containsAll(retained)) {
+            throw new BadRequestException("Conservez au moins une échéance de la facture d'origine");
+        }
+        ConventionDocumentPolarity.direction(lines.stream().map(LigneDocumentClient::getMontantTtc).toList());
+        var schedules = echeanceFacturationConventionRepository.findForUpdate(agenceId, new ArrayList<>(available));
+        if (schedules.size() != available.size() || schedules.stream().anyMatch(schedule ->
+                schedule.getDocumentClient() == null || !documentId.equals(schedule.getDocumentClient().getId()))) {
+            throw new BadRequestException("Les périodes ne sont plus rattachées à cette facture. Actualisez la page.");
+        }
+        LocalDate emission = LocalDate.now();
+        if (original.getTotalDocument().signum() > 0 && original.getDateEcheance() != null) {
+            if (original.getDelaiPaiementJours() != null) {
+                validateInvoiceDueDate(request.getDateEcheance(), emission, original.getDelaiPaiementJours());
+            } else {
+                validateOptionalInvoiceDueDate(request.getDateEcheance(), emission);
+            }
+        } else if (request.getDateEcheance() != null) {
+            throw new BadRequestException("Cette facture ne permet pas de date limite de paiement");
+        }
+        Map<String, String> before = InvoiceActivity.snapshot(original);
+        return businessActivityRecorder.perform(() -> {
+            DocumentClient replacement = DocumentClient.builder()
+                    .agence(agence).typeDocument(TypeDocumentClient.FACTURE).statut(StatutDocumentClient.EMIS)
+                    .numero(nextNumber(agence, TypeDocumentClient.FACTURE, emission.getYear())).dateEmission(emission)
+                    .periodeDebut(schedules.stream().filter(s -> retained.contains(s.getId()))
+                            .map(com.assurance.entity.EcheanceFacturationConvention::getPeriodeDebut).min(LocalDate::compareTo).orElseThrow())
+                    .periodeFin(schedules.stream().filter(s -> retained.contains(s.getId()))
+                            .map(com.assurance.entity.EcheanceFacturationConvention::getPeriodeFin).max(LocalDate::compareTo).orElseThrow())
+                    .dateEcheance(request.getDateEcheance()).delaiPaiementJours(original.getDelaiPaiementJours())
+                    .origineDelaiPaiement(original.getOrigineDelaiPaiement()).conditionPaiementClient(original.getConditionPaiementClient())
+                    .clientPayeur(original.getClientPayeur()).groupePayeur(original.getGroupePayeur())
+                    .conventionPayeur(original.getConventionPayeur()).payeurNom(original.getPayeurNom())
+                    .payeurIdentifiant(original.getPayeurIdentifiant()).payeurIce(original.getPayeurIce()).payeurAdresse(original.getPayeurAdresse())
+                    .conventionFacturee(original.getConventionFacturee()).conventionAdresse(original.getConventionAdresse())
+                    .conventionVille(original.getConventionVille()).notes(request.getNotes())
+                    .versionDocument((original.getVersionDocument() == null ? 1 : original.getVersionDocument()) + 1)
+                    .documentOrigine(original).build();
+            for (LigneDocumentClient line : lines) {
+                replacement.getLignes().add(LigneDocumentClient.builder().document(replacement)
+                        .elementFacturable(line.getElementFacturable()).quittance(line.getQuittance())
+                        .echeanceFacturationConvention(line.getEcheanceFacturationConvention()).ordre(replacement.getLignes().size() + 1)
+                        .dateOperation(line.getDateOperation()).dateEcheance(line.getDateEcheance())
+                        .numeroDossier(line.getNumeroDossier()).numeroPolice(line.getNumeroPolice()).numeroQuittance(line.getNumeroQuittance())
+                        .mouvement(line.getMouvement()).libelleDocument(line.getLibelleDocument()).compagnie(line.getCompagnie())
+                        .assureConvention(line.getAssureConvention()).vehiculeConvention(line.getVehiculeConvention())
+                        .montantBulletinConvention(line.getMontantBulletinConvention()).debit(line.getDebit()).credit(line.getCredit())
+                        .ecartReglement(line.getEcartReglement()).primeNette(line.getPrimeNette()).taxes(line.getTaxes())
+                        .accessoires(line.getAccessoires()).montantTtc(line.getMontantTtc()).build());
+            }
+            replacement.setTotalDebit(money(lines.stream().map(LigneDocumentClient::getDebit).reduce(BigDecimal.ZERO, BigDecimal::add)));
+            replacement.setTotalCredit(money(lines.stream().map(LigneDocumentClient::getCredit).reduce(BigDecimal.ZERO, BigDecimal::add)));
+            replacement.setTotalDocument(money(replacement.getTotalDebit().subtract(replacement.getTotalCredit())));
+            original.setStatut(StatutDocumentClient.REMPLACE);
+            original.setDateRemplacement(LocalDateTime.now());
+            original.setMotifRemplacement(request.getMotif().trim());
+            documentClientRepository.save(original);
+            DocumentClient saved = documentClientRepository.saveAndFlush(replacement);
+            original.setDocumentRemplacement(saved);
+            schedules.forEach(schedule -> {
+                boolean keep = retained.contains(schedule.getId());
+                schedule.setDocumentClient(keep ? saved : null);
+                schedule.setStatut(keep ? StatutEcheanceFacturationConvention.FACTUREE : StatutEcheanceFacturationConvention.A_FACTURER);
+            });
+            echeanceFacturationConventionRepository.saveAll(schedules);
+            return toResponse(saved, true);
+        }, result -> {
+            ActivityCommand command = InvoiceActivity.command(findDocument(agenceId, result.getId()), before,
+                    ActivityAction.REPLACED, "Facture de convention rectifiée", "CONVENTION_INVOICE_REVISION",
+                    List.of(InvoiceActivity.reference(original)));
+            var changes = new ArrayList<>(command.changes());
+            changes.add(new ActivityChange("Motif de rectification", null, request.getMotif().trim()));
+            return new ActivityCommand(command.agenceId(), command.module(), command.action(), command.title(),
+                    command.origin(), command.subject(), command.references(), changes);
+        });
+    }
+
+    private String conventionRevisionBlockingReason(DocumentClient document) {
+        if (document.getTypeDocument() != TypeDocumentClient.FACTURE || document.getStatut() != StatutDocumentClient.EMIS
+                || document.getDocumentRemplacement() != null || document.getLignes().isEmpty()
+                || document.getLignes().stream().anyMatch(line -> line.getEcheanceFacturationConvention() == null)) {
+            return "Seule la dernière version établie d'une facture de convention peut être rectifiée";
+        }
+        if (documentClientRepository.hasPaymentHistory(document.getAgence().getId(), document.getId())) {
+            return "Cette facture possède un historique de règlement ou d'affectation et ne peut pas être rectifiée";
+        }
+        return null;
+    }
+
+    @Transactional
     public DocumentClientResponse cancel(
             Long agenceId,
             Long documentId,
@@ -1381,6 +1489,10 @@ public class DocumentClientService {
                                 ? line.getElementFacturable().getMouvementContrat().getId()
                                 : null)
                         .ordre(line.getOrdre())
+                        .periodeFactureeDebut(line.getEcheanceFacturationConvention() == null ? null
+                                : line.getEcheanceFacturationConvention().getPeriodeDebut())
+                        .periodeFactureeFin(line.getEcheanceFacturationConvention() == null ? null
+                                : line.getEcheanceFacturationConvention().getPeriodeFin())
                         .dateOperation(line.getDateOperation())
                         .dateEcheance(line.getDateEcheance())
                         .numeroDossier(line.getNumeroDossier())
@@ -1408,6 +1520,7 @@ public class DocumentClientService {
                         .build())
                 .toList();
         String deletionBlock = deletionBlockingReason(document);
+        String revisionBlock = includeLines ? conventionRevisionBlockingReason(document) : null;
         return DocumentClientResponse.builder()
                 .id(document.getId())
                 .typeDocument(document.getTypeDocument())
@@ -1452,6 +1565,8 @@ public class DocumentClientService {
                         && !document.getAgence().getSignatureCheminStockage().isBlank())
                 .suppressionAutorisee(deletionBlock == null)
                 .motifBlocageSuppression(deletionBlock)
+                .rectificationAutorisee(includeLines && revisionBlock == null)
+                .motifBlocageRectification(revisionBlock)
                 .lignes(lines)
                 .build();
     }

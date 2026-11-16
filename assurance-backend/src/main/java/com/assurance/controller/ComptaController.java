@@ -376,6 +376,16 @@ public class ComptaController {
                 periodeDu, periodeAu, statut, search, page, size)));
     }
 
+    @PostMapping("/facturation-conventions/factures/{documentId}/revision")
+    @PreAuthorize("hasAuthority('PERM_facture-convention:revise')")
+    public ResponseEntity<ApiResponse<DocumentClientResponse>> reviseConventionInvoice(
+            @PathVariable Long documentId,
+            @Valid @RequestBody com.assurance.dto.request.RectifierFactureConventionRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(documentClientService.reviseConvention(
+                TenantContext.getCurrentAgence(), documentId, request), "Facture de convention rectifiée"));
+    }
+
     @GetMapping("/facturation-conventions/preparation")
     @PreAuthorize("hasAuthority('PERM_facture-convention:view')")
     public ResponseEntity<ApiResponse<com.assurance.dto.response.PreparationFactureConventionResponse>> prepareConventionInvoice(

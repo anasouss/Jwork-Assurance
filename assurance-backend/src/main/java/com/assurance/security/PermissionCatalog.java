@@ -74,7 +74,7 @@ public final class PermissionCatalog {
         resource(result, "compta", "regle-quittance", "Règles d’affectation des quittances", "view,create,update,delete");
         resource(result, "compta", "document-client", "Relevés et factures clients", "view,issue,revise,cancel,delete");
         resource(result, "compta", "production-convention", "États de production des conventions", "view,export");
-        resource(result, "compta", "facture-convention", "Factures des conventions", "view,issue,cancel,delete");
+        resource(result, "compta", "facture-convention", "Factures des conventions", "view,issue,revise,cancel,delete");
         resource(result, "compta", "reglement-client", "Règlements clients et conventions", "view,create,refund,cancel,adjust,configure");
         resource(result, "compta", "instrument-reglement", "Moyens de règlement et rejets", "view,confirm,reject,replace,represent,followup");
         resource(result, "compta", "quittance-prime", "Quittances de prime", "view,issue,delete");

@@ -443,6 +443,8 @@ export type ClientDocumentLine = {
   elementFacturableId?: string | null;
   nature?: BillableElementNature | null;
   echeanceFacturationConventionId?: string | null;
+  periodeFactureeDebut?: string | null;
+  periodeFactureeFin?: string | null;
   contratId: string;
   mouvementId?: string | null;
   ordre: number;
@@ -505,6 +507,8 @@ export type ClientDocument = {
   lignes: ClientDocumentLine[];
   suppressionAutorisee?: boolean;
   motifBlocageSuppression?: string | null;
+  rectificationAutorisee?: boolean;
+  motifBlocageRectification?: string | null;
 };
 
 export type ClientDocumentPage = {

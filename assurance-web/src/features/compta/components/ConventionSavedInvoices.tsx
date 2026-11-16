@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Ban, Eye, MoreHorizontal, RefreshCw, RotateCcw, Search, Trash2, WalletCards } from "lucide-react";
+import { Ban, Eye, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Search, Trash2, WalletCards } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { comptaApi } from "../api";
 import { formatAccountingAmount } from "../format";
 import type { ClientDocumentStatus } from "../types";
 import { InvoiceActionDialog } from "./ConventionInvoiceDialogs";
+import { ConventionInvoiceRevisionDialog } from "./ConventionInvoiceRevisionDialog";
 
 export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, periodeAu, highlightId }: {
   conventionId?: string; compagnieId?: string; periodeDu?: string; periodeAu?: string; highlightId?: string;
@@ -26,6 +27,8 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
   const [status, setStatus] = useState<ClientDocumentStatus>();
   const [page, setPage] = useState(0);
   const [action, setAction] = useState<{ id: string; action: "cancel" | "delete" }>();
+  const [revisionId, setRevisionId] = useState<string>();
+  const [replacementHighlight, setReplacementHighlight] = useState<string>();
   const invoices = useQuery({
     queryKey: ["compta", "convention-invoices", conventionId, compagnieId, periodeDu, periodeAu, status, appliedSearch, page],
     queryFn: () => comptaApi.conventionInvoices({ conventionId, compagnieId, periodeDu, periodeAu,
@@ -71,7 +74,7 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
         <tbody className="divide-y">
           {invoices.isPending ? <TableRowsSkeleton colSpan={8} rows={5} /> : invoices.isError ? <tr><td colSpan={8} className="p-8 text-center"><p role="alert" className="text-destructive">{invoices.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void invoices.refetch()}>Réessayer</Button></td></tr>
             : !invoices.data?.rows.length ? <tr><td colSpan={8} className="p-10 text-center text-muted-foreground">Aucune facture pour ces critères.</td></tr>
-              : invoices.data.rows.map(invoice => <tr key={invoice.id} className={invoice.id === highlightId ? "bg-amber-50 dark:bg-amber-950/30" : "hover:bg-muted/30"}>
+              : invoices.data.rows.map(invoice => <tr key={invoice.id} className={invoice.id === (replacementHighlight ?? highlightId) ? "bg-amber-50 dark:bg-amber-950/30" : "hover:bg-muted/30"}>
                 <td className="px-3 py-3"><button type="button" disabled={pdf.isPending} className="font-medium text-sky-700 hover:underline dark:text-sky-300" onClick={() => pdf.mutate(invoice.id)}>{invoice.numero}</button>
                   {invoice.totalDocument < 0 && <div className="mt-1 text-xs text-muted-foreground">Facture de ristourne</div>}</td>
                 <td className="px-3 py-3">{invoice.conventionFacturee || invoice.payeurNom || "-"}</td>
@@ -82,6 +85,9 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
                 <td className="px-3 py-3 text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Actions pour ${invoice.numero}`}><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem disabled={pdf.isPending} onSelect={() => pdf.mutate(invoice.id)}><Eye className="size-4" />Voir la facture PDF</DropdownMenuItem>
+                    {invoice.documentOrigineId && <DropdownMenuItem disabled={pdf.isPending} onSelect={() => pdf.mutate(invoice.documentOrigineId!)}><Eye className="size-4" />Version précédente · {invoice.numeroDocumentOrigine}</DropdownMenuItem>}
+                    {invoice.documentRemplacementId && <DropdownMenuItem disabled={pdf.isPending} onSelect={() => pdf.mutate(invoice.documentRemplacementId!)}><Eye className="size-4" />Version suivante · {invoice.numeroDocumentRemplacement}</DropdownMenuItem>}
+                    {invoice.statut === "EMIS" && permissions.includes("facture-convention:revise") && <DropdownMenuItem onSelect={() => setRevisionId(invoice.id)}><Pencil className="size-4" />Rectifier la facture</DropdownMenuItem>}
                     {invoice.statut === "EMIS" && permissions.includes("reglement-client:view") && <DropdownMenuItem onSelect={() => navigate(`/app/compta/conventions/encaissements?documentId=${invoice.id}`)}><WalletCards className="size-4" />Encaissement et règlement</DropdownMenuItem>}
                     {invoice.statut === "EMIS" && (permissions.includes("facture-convention:cancel") || permissions.includes("facture-convention:delete")) && <DropdownMenuSeparator />}
                     {invoice.statut === "EMIS" && permissions.includes("facture-convention:cancel") && <DropdownMenuItem variant="destructive" onSelect={() => setAction({ id: invoice.id, action: "cancel" })}><Ban className="size-4" />Annuler la facture</DropdownMenuItem>}
@@ -94,6 +100,9 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
       <ServerPagination className="border-t px-4 py-3" page={invoices.data?.page.number ?? page} totalPages={invoices.data?.page.totalPages ?? 0} totalElements={invoices.data?.page.totalElements ?? 0} loading={invoices.isFetching} onPageChange={setPage} />
     </div>
     {action && <InvoiceActionDialog key={`${action.id}:${action.action}`} {...action} onClose={() => setAction(undefined)} />}
+    {revisionId && <ConventionInvoiceRevisionDialog key={revisionId} id={revisionId} onClose={() => setRevisionId(undefined)} onRevised={replacement => {
+      setRevisionId(undefined); setReplacementHighlight(replacement.id); setStatus(undefined); setSearch(""); setAppliedSearch(""); setPage(0);
+    }} />}
   </section>;
 }
 

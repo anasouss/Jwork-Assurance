@@ -51,6 +51,8 @@ public class DocumentClientResponse {
     private boolean signatureDisponible;
     private boolean suppressionAutorisee;
     private String motifBlocageSuppression;
+    private boolean rectificationAutorisee;
+    private String motifBlocageRectification;
     private List<Ligne> lignes;
 
     @Getter
@@ -61,6 +63,8 @@ public class DocumentClientResponse {
         private Long elementFacturableId;
         private NatureElementFacturable nature;
         private Long echeanceFacturationConventionId;
+        private LocalDate periodeFactureeDebut;
+        private LocalDate periodeFactureeFin;
         private Long contratId;
         private Long mouvementId;
         private Integer ordre;

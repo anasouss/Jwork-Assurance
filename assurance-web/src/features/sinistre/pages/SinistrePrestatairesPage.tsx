@@ -58,11 +58,10 @@ export default function SinistrePrestatairesPage() {
   // Older API responses identify the seeded Automobile domain by code only.
   const automobile = (appliedDomain?.brancheCode ?? appliedDomain?.code) === "AUTOMOBILE";
   const doctor = !automobile && applied.typePrestataire === "MEDECIN";
-  const compact = automobile || doctor;
-  const columns = doctor ? 5 + Number(canUpdate) : automobile ? 8 + Number(canUpdate) : 9;
+  const columns = (doctor ? 5 : 8) + Number(canUpdate);
   const headers = doctor ? ["Médecin", "Ville", "Adresse", "Contact", "Spécialité", ...(canUpdate ? ["Action"] : [])]
     : automobile ? ["Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", "Statut", ...(canUpdate ? ["Action"] : [])]
-    : ["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut", "Action"];
+    : ["Opérateur", "Branche", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", "Statut", ...(canUpdate ? ["Action"] : [])];
   const operatorTypes = providerTypes.filter(type => !domain || domain.operateurs.includes(type.value));
   const operatorSpecialties = specialties.data?.filter(s => s.actif && (!domain || (domain.operateurs.includes(s.typePrestataire) && s.domaines.some(d => d.id === domain.id)))) ?? [];
   const dialogKind = editing?.typePrestataire ?? creationKind;
@@ -163,21 +162,16 @@ export default function SinistrePrestatairesPage() {
               : directory.data.items.map(item => <tr key={`${item.typePrestataire}:${item.id}`} className="align-top hover:bg-muted/30">
                 {doctor ? <DoctorProviderCells item={item} specialiteId={applied.specialiteId} />
                   : automobile ? <AutomobileProviderCells item={item} compagnieId={applied.compagnieId} specialiteId={applied.specialiteId} /> : <>
-                <td className="px-3 py-3 font-medium">{item.code}</td><td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}<p className="mt-1 text-xs font-normal text-muted-foreground">{item.typePrestataire ? providerTypeLabel(item.typePrestataire) : ""} · {item.domaines?.map(d => d.libelle).join(", ") || "-"}</p><p className="mt-1 text-xs font-normal text-muted-foreground">{item.adresse}</p></td>
-                <td className="px-3 py-3">{item.telephone || "-"}<p className="text-xs text-muted-foreground">{item.email}</p></td><td className="px-3 py-3">{item.ville || "-"}</td>
-                <td className="max-w-64 px-3 py-3"><div className="flex flex-wrap gap-1">{item.specialites?.map(s => <Badge key={s.id} variant={s.actif ? "info" : "gray"}>{s.libelle}</Badge>)}{!item.specialites?.length && "-"}</div></td>
-                <td className="max-w-72 px-3 py-3">{item.typePrestataire !== "GARAGE" ? "-" : <ul className="space-y-2">
-                  {item.accords?.filter(a => applied.compagnieId === "ALL" || a.compagnieId === applied.compagnieId).map(a => <li key={a.compagnieId}>
-                    <span className="block text-xs text-muted-foreground">{a.compagnie}</span>
-                    {a.tousUsages ? "Tous les usages" : a.usages?.map(u => u.libelle).join(", ") || "-"}
-                  </li>)}
-                  {!item.accords?.some(a => applied.compagnieId === "ALL" || a.compagnieId === applied.compagnieId) && <li>-</li>}
-                </ul>}</td>
-                <td className="max-w-72 px-3 py-3"><p className="mb-1 text-xs text-muted-foreground">{item.toutesCompagnies ? "Toutes compagnies" : "Compagnies liées uniquement"}</p>
-                  <ul className="space-y-1">{item.accords?.map(a => <li key={a.compagnieId}>{a.compagnie} <span className="text-xs text-muted-foreground">· {a.actif ? (a.conventionne ? "Conventionné" : "Non conventionné") : "Inactif"}{a.dateFin ? ` · au ${a.dateFin.split("-").reverse().join("/")}` : ""}</span></li>)}</ul></td>
+                <td className="max-w-48 break-words px-3 py-3">{item.typePrestataire ? providerTypeLabel(item.typePrestataire) : "-"}</td>
+                <td className="max-w-56 break-words px-3 py-3">{item.domaines?.map(d => d.libelle).join(", ") || "-"}</td>
+                <td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}</td>
+                <td className="whitespace-nowrap px-3 py-3">{item.telephone ? <a className="hover:underline" href={`tel:${item.telephone}`}>{item.telephone}</a> : "-"}</td>
+                <td className="max-w-56 break-all px-3 py-3">{item.email ? <a className="hover:underline" href={`mailto:${item.email}`}>{item.email}</a> : "-"}</td>
+                <td className="max-w-72 break-words px-3 py-3">{item.adresse || "-"}</td>
+                <td className="max-w-40 break-words px-3 py-3">{item.ville || "-"}</td>
                 <td className="px-3 py-3"><Badge variant={item.actif ? "success" : "gray"}>{item.actif ? "Actif" : "Inactif"}</Badge></td>
                 </>}
-                {(!compact || canUpdate) && <td className="px-3 py-3">{canUpdate ? <Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button> : null}</td>}
+                {canUpdate && <td className="px-3 py-3"><Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button></td>}
               </tr>)}</tbody>
       </table></div>
       <ServerPagination className="border-t px-4 py-3" page={directory.data?.page.number ?? page} totalPages={directory.data?.page.totalPages ?? 0}

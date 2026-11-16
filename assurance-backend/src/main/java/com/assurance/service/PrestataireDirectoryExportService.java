@@ -14,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,7 +37,7 @@ public class PrestataireDirectoryExportService {
         String[] headers = automobile
                 ? new String[]{"Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", "Statut"}
                 : doctor ? new String[]{"Médecin", "Ville", "Adresse", "Contact", "Spécialité"}
-                : new String[]{"Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut"};
+                : new String[]{"Opérateur", "Branche", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", "Statut"};
         try (Workbook workbook = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
             var sheet = workbook.createSheet(automobile ? "Automobile" : doctor ? "Médecins" : "Prestataires");
             var headerStyle = workbook.createCellStyle();
@@ -67,7 +66,7 @@ public class PrestataireDirectoryExportService {
                 for (var item : result.getItems()) {
                     if (index >= 1_048_576) throw new BadRequestException("Trop de résultats pour Excel. Précisez les filtres.");
                     var row = sheet.createRow(index++);
-                    var values = automobile ? automobile(item, filters) : doctor ? doctor(item, filters) : general(item, filters);
+                    var values = automobile ? automobile(item, filters) : doctor ? doctor(item, filters) : general(item);
                     int lines = 1;
                     for (int column = 0; column < values.size(); column++) {
                         String value = values.get(column);
@@ -120,18 +119,11 @@ public class PrestataireDirectoryExportService {
         return List.of(text(item.getNom()) + (item.isActif() ? "" : " (Inactif)"), text(item.getVille()), text(item.getAdresse()), text(contact), text(specialty));
     }
 
-    private List<String> general(SinistreIntervenantResponse item, Filters f) {
-        String provider = join(item.getNom(), typeLabel(item.getTypePrestataire()) + " · "
-                + text(item.getDomaines() == null ? null : item.getDomaines().stream().map(SpecialitePrestataireResponse.Reference::libelle).collect(Collectors.joining(", "))), item.getAdresse());
-        String usage = item.getTypePrestataire() != TypePrestataireSinistre.GARAGE ? "" : agreements(item).stream()
-                .filter(a -> companyMatches(a, f)).map(a -> usage(a, true)).collect(Collectors.joining("\n"));
-        String companies = (item.isToutesCompagnies() ? "Toutes compagnies" : "Compagnies liées uniquement")
-                + agreements(item).stream().map(a -> "\n" + a.compagnie() + " · "
-                + (!a.actif() ? "Inactif" : a.conventionne() ? "Conventionné" : "Non conventionné")
-                + (a.dateFin() == null ? "" : " · au " + a.dateFin().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))))
-                .collect(Collectors.joining());
-        return List.of(text(item.getCode()), text(provider), join(text(item.getTelephone()), item.getEmail()), text(item.getVille()),
-                text(specialties(item).stream().map(SpecialitePrestataireResponse::libelle).collect(Collectors.joining(", "))), text(usage), companies, status(item));
+    private List<String> general(SinistreIntervenantResponse item) {
+        String branches = item.getDomaines() == null ? "" : item.getDomaines().stream()
+                .map(SpecialitePrestataireResponse.Reference::libelle).collect(Collectors.joining(", "));
+        return List.of(typeLabel(item.getTypePrestataire()), text(branches), text(item.getNom()), text(item.getTelephone()),
+                text(item.getEmail()), text(item.getAdresse()), text(item.getVille()), status(item));
     }
 
     private String usage(SinistreIntervenantResponse.Accord agreement, boolean includeCompany) {

@@ -71,14 +71,24 @@ class PrestataireDirectoryExportServiceTest {
 
     @Test
     void generalExportKeepsTheGeneralTableLayout() throws Exception {
+        var expert = item(TypePrestataireSinistre.EXPERT, "Expert");
+        expert.setDomaines(List.of(new SpecialitePrestataireResponse.Reference(10L, "Automobile")));
         when(directory.directory(7L, TypePrestataireSinistre.EXPERT, false, null, null, null, null, null, null, 0, 100))
-                .thenReturn(page(List.of(item(TypePrestataireSinistre.EXPERT, "Expert")), 1, 1));
+                .thenReturn(page(List.of(expert), 1, 1));
         var filters = new PrestataireDirectoryExportService.Filters(TypePrestataireSinistre.EXPERT, false, false, null, null, null, null, null, null);
         try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(service.export(7L, filters)))) {
             var sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Code");
-            assertThat(sheet.getRow(0).getCell(6).getStringCellValue()).isEqualTo("Compagnies et accords");
+            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Opérateur");
+            assertThat(sheet.getRow(0).getCell(1).getStringCellValue()).isEqualTo("Branche");
+            assertThat(sheet.getRow(0).getCell(6).getStringCellValue()).isEqualTo("Ville");
             assertThat(sheet.getRow(0).getLastCellNum()).isEqualTo((short) 8);
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("Expert");
+            assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("Automobile");
+            assertThat(sheet.getRow(1).getCell(2).getStringCellValue()).isEqualTo("Expert");
+            assertThat(sheet.getRow(1).getCell(3).getStringCellValue()).isEqualTo("0528000000");
+            assertThat(sheet.getRow(1).getCell(4).getStringCellValue()).isEqualTo("contact@example.test");
+            assertThat(sheet.getRow(1).getCell(5).getStringCellValue()).isEqualTo("Adresse");
+            assertThat(sheet.getRow(1).getCell(7).getStringCellValue()).isEqualTo("Actif");
         }
     }
 

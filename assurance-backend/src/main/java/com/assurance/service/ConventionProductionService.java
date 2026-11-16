@@ -137,6 +137,17 @@ public class ConventionProductionService {
                     case RISTOURNE -> cb.lessThan(total, BigDecimal.ZERO);
                 });
             }
+            if (filter.getStatut() != null) {
+                var total = root.<BigDecimal>get("primeTotale");
+                if (filter.getStatut() == com.assurance.enums.StatutProductionConvention.RISTOURNE) {
+                    predicates.add(cb.lessThan(total, BigDecimal.ZERO));
+                } else {
+                    predicates.add(cb.greaterThan(total, BigDecimal.ZERO));
+                    Predicate collected = ConventionProductionSettlement.collected(root, query, cb, agency);
+                    predicates.add(filter.getStatut() == com.assurance.enums.StatutProductionConvention.ENCAISSEE
+                            ? collected : cb.not(collected));
+                }
+            }
             if (filter.getMode() != null) {
                 predicates.add(cb.or(cb.equal(movement.get("modeReglementConvention"), filter.getMode()),
                         cb.and(cb.isNull(movement.get("modeReglementConvention")),

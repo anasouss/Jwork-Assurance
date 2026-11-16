@@ -335,6 +335,7 @@ export type ConventionProductionFilters = {
   mode?: "BUREAU" | "FACTURE";
   categorieMouvement?: "AFFAIRE_NOUVELLE" | "RENOUVELLEMENT" | "AVENANT";
   categoriesMouvement?: ("AFFAIRE_NOUVELLE" | "RENOUVELLEMENT" | "AVENANT")[];
+  statut?: "IMPAYEE" | "ENCAISSEE" | "RISTOURNE";
   sensPrime?: "PRIME_A_PAYER" | "RISTOURNE";
   typeDate: "EFFET" | "EMISSION";
   dateDu: string;

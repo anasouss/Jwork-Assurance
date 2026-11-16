@@ -18,6 +18,7 @@ public class ConventionProductionFilter {
     private CategorieMouvementContrat categorieMouvement;
     private java.util.List<CategorieMouvementContrat> categoriesMouvement;
     private SensPrimeConvention sensPrime;
+    private com.assurance.enums.StatutProductionConvention statut;
     private String typeDate = "EFFET";
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate dateDu;

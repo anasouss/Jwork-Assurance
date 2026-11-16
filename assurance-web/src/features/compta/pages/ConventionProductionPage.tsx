@@ -85,10 +85,10 @@ export default function ConventionProductionPage() {
           options={[{ value: "AFFAIRE_NOUVELLE", label: "Affaire nouvelle" }, { value: "RENOUVELLEMENT", label: "Renouvellement / Terme" }, { value: "AVENANT", label: "Avenant" }]}
           value={filters.categoriesMouvement ?? []} onChange={value => setFilters(current => ({ ...current, categoriesMouvement: value }))} />
       </div>
-      <div className="grid gap-1.5"><Label>Statut</Label><Select value={filters.sensPrime ?? "ALL"}
-        onValueChange={value => setFilters(current => ({ ...current, sensPrime: value === "ALL" ? undefined : value as ConventionProductionFilters["sensPrime"] }))}>
+      <div className="grid gap-1.5"><Label>Statut</Label><Select value={filters.statut ?? "ALL"}
+        onValueChange={value => setFilters(current => ({ ...current, statut: value === "ALL" ? undefined : value as ConventionProductionFilters["statut"] }))}>
         <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem>
-          <SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem>
+          <SelectItem value="IMPAYEE">Impayée</SelectItem><SelectItem value="ENCAISSEE">Encaissée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem>
         </SelectContent></Select></div>
       <div className="grid gap-1.5"><Label>Critère de date</Label><Select value={filters.typeDate}
         onValueChange={value => setFilters(current => ({ ...current, typeDate: value as "EFFET" | "EMISSION" }))}>

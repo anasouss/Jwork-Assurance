@@ -92,7 +92,8 @@ public class DomaineInterventionSinistreService {
 
     public DomaineInterventionResponse response(DomaineInterventionSinistre domain) {
         return new DomaineInterventionResponse(domain.getId(), domain.getCode(), domain.getLibelle(), domain.isActif(),
-                domain.getBrancheAssurance().getId(), domain.getBrancheAssurance().getLibelle(), Set.copyOf(domain.getOperateurs()));
+                domain.getBrancheAssurance().getId(), domain.getBrancheAssurance().getLibelle(), Set.copyOf(domain.getOperateurs()),
+                domain.getBrancheAssurance().getCode());
     }
 
     private Map<String, String> snapshot(DomaineInterventionSinistre domain) {

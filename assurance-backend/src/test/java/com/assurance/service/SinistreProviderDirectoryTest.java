@@ -4,6 +4,8 @@ import com.assurance.activity.BusinessActivityRecorder;
 import com.assurance.entity.ExpertSinistre;
 import com.assurance.entity.GarageSinistre;
 import com.assurance.entity.PrestataireMedicalSinistre;
+import com.assurance.entity.AccordPrestataireSinistre;
+import com.assurance.entity.CompagnieAssurance;
 import com.assurance.enums.TypePrestataireSinistre;
 import com.assurance.exception.BadRequestException;
 import com.assurance.repository.*;
@@ -14,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -78,5 +81,33 @@ class SinistreProviderDirectoryTest {
         assertThatThrownBy(() -> service.eligible(TypePrestataireSinistre.MEDECIN, null))
                 .isInstanceOf(BadRequestException.class).hasMessageContaining("parcours dédié");
         verifyNoInteractions(providers, medical);
+    }
+
+    @Test
+    void directoryConventionStatusRejectsExpiredFutureInactiveAndEmptyRestrictedAgreements() {
+        var garage = GarageSinistre.builder().raisonSociale("Garage").build();
+        var today = LocalDate.now();
+        for (int index = 1; index <= 5; index++) {
+            var company = CompagnieAssurance.builder().nom("Compagnie " + index).build();
+            company.setId((long) index);
+            var agreement = AccordPrestataireSinistre.builder().garage(garage).compagnie(company).conventionne(true).build();
+            if (index == 1) {
+                agreement.setDateDebut(today);
+                agreement.setDateFin(today);
+            }
+            if (index == 2) agreement.setDateFin(today.minusDays(1));
+            if (index == 3) agreement.setDateDebut(today.plusDays(1));
+            if (index == 4) agreement.setActif(false);
+            if (index == 5) agreement.setTousUsages(false);
+            garage.getAccords().add(agreement);
+        }
+        when(garages.findByAgenceIdAndActifTrueOrderByRaisonSocialeAsc(1L)).thenReturn(List.of(garage));
+        var result = service.listGarages(1L, false).get(0);
+        assertThat(result.getAccords()).extracting(accord -> accord.conventionneActuellement())
+                .containsExactly(true, false, false, false, false);
+        garage.setActif(false);
+        when(garages.findByAgenceIdOrderByRaisonSocialeAsc(1L)).thenReturn(List.of(garage));
+        assertThat(service.listGarages(1L, true).get(0).getAccords())
+                .allMatch(accord -> !accord.conventionneActuellement());
     }
 }

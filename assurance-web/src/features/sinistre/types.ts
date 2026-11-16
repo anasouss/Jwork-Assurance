@@ -458,6 +458,7 @@ export type Intervenant = {
 export type ProviderKind = "EXPERT" | "GARAGE" | "MEDECIN" | "CLINIQUE" | "PHARMACIE" | "RADIOLOGIE" | "KINESITHERAPIE";
 export type ProviderDomain = {
   id: string; code: string; libelle: string; actif: boolean; brancheId: string; branche: string; operateurs: ProviderKind[];
+  brancheCode: string;
 };
 export type ProviderReference = { id: string; libelle: string };
 export type ProviderSpecialty = {
@@ -470,6 +471,7 @@ export type ProviderAgreement = {
   compagnieId: string; compagnie?: string; actif: boolean; conventionne: boolean;
   tousUsages: boolean;
   usages: ProviderReference[];
+  conventionneActuellement: boolean;
   dateDebut?: string | null; dateFin?: string | null;
 };
 export type ProviderEligibilityContext = {

@@ -217,7 +217,7 @@ export function SinistreIntervenantDialog({
               </fieldset>}
             </div>;
           })}
-          <Button type="button" variant="outline" className="justify-self-start" disabled={options.isPending || options.isError || form.accords.some(a => !a.compagnieId)} onClick={() => update("accords", [...form.accords, { compagnieId: "", actif: true, conventionne: false, tousUsages: true, usages: [] }])}><Plus className="size-4" />Ajouter une compagnie</Button>
+          <Button type="button" variant="outline" className="justify-self-start" disabled={options.isPending || options.isError || form.accords.some(a => !a.compagnieId)} onClick={() => update("accords", [...form.accords, { compagnieId: "", actif: true, conventionne: false, tousUsages: true, usages: [], conventionneActuellement: false }])}><Plus className="size-4" />Ajouter une compagnie</Button>
         </fieldset>
         {(options.isError || specialties.isError) && <p role="alert" className="text-sm text-destructive">{options.error?.message || specialties.error?.message}</p>}
         <DialogFooter>

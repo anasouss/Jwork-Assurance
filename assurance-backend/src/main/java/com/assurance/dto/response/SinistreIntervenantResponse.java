@@ -24,6 +24,6 @@ public class SinistreIntervenantResponse {
 
     public record Accord(Long compagnieId, String compagnie, boolean actif, boolean conventionne,
             java.time.LocalDate dateDebut, java.time.LocalDate dateFin, boolean tousUsages,
-            java.util.List<SpecialitePrestataireResponse.Reference> usages) {
+            java.util.List<SpecialitePrestataireResponse.Reference> usages, boolean conventionneActuellement) {
     }
 }

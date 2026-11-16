@@ -78,7 +78,7 @@ export const sinistreApi = {
   async providerDomains() {
     return unwrap(await apiFetch<ApiResponse<ProviderDomain[]>>("/api/v1/sinistres/prestataires/domaines"));
   },
-  async saveProviderDomain(id: string | null, request: Omit<ProviderDomain, "id" | "branche">) {
+  async saveProviderDomain(id: string | null, request: Omit<ProviderDomain, "id" | "branche" | "brancheCode">) {
     return unwrap(await apiFetch<ApiResponse<ProviderDomain>>(`/api/v1/sinistres/prestataires/domaines${id ? `/${id}` : ""}`,
       { method: id ? "PUT" : "POST", body: JSON.stringify(request) }));
   },

@@ -16,6 +16,7 @@ import { toast } from "@/lib/toast";
 import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
+import { AutomobileProviderCells } from "../components/AutomobileProviderCells";
 import type { Intervenant, ProviderKind } from "../types";
 import { providerTypes, providerTypeLabel } from "../provider-types";
 
@@ -41,6 +42,10 @@ export default function SinistrePrestatairesPage() {
   const specialties = useQuery({ queryKey: sinistreKeys.specialties(), queryFn: sinistreApi.specialties, enabled: canView });
   const domains = useQuery({ queryKey: sinistreKeys.providerDomains(), queryFn: sinistreApi.providerDomains, enabled: canView });
   const domain = domains.data?.find(d => d.id === filters.domaineId);
+  const automobile = domains.data?.find(d => d.id === applied.domaineId)?.brancheCode === "AUTOMOBILE";
+  const columns = automobile ? 7 + Number(canUpdate) : 9;
+  const headers = automobile ? ["Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", ...(canUpdate ? ["Action"] : [])]
+    : ["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut", "Action"];
   const operatorTypes = providerTypes.filter(type => !domain || domain.operateurs.includes(type.value));
   const operatorSpecialties = specialties.data?.filter(s => s.actif && (!domain || (domain.operateurs.includes(s.typePrestataire) && s.domaines.some(d => d.id === domain.id)))) ?? [];
   const dialogKind = editing?.typePrestataire ?? creationKind;
@@ -122,11 +127,12 @@ export default function SinistrePrestatairesPage() {
     </section>
     <section className="min-w-0 overflow-hidden rounded-md border bg-card">
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm">
-        <thead className="bg-sky-700 text-left text-xs uppercase text-white"><tr>{["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut", "Action"].map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
-        <tbody className="divide-y">{directory.isPending ? <TableRowsSkeleton colSpan={9} rows={6} />
-          : directory.isError ? <tr><td colSpan={9} className="p-8 text-center"><p role="alert" className="text-destructive">{directory.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void directory.refetch()}>Réessayer</Button></td></tr>
-            : !directory.data.items.length ? <tr><td colSpan={9} className="p-10 text-center text-muted-foreground">Aucun prestataire pour ces critères.</td></tr>
+        <thead className="bg-sky-700 text-left text-xs uppercase text-white"><tr>{headers.map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
+        <tbody className="divide-y">{directory.isPending ? <TableRowsSkeleton colSpan={columns} rows={6} />
+          : directory.isError ? <tr><td colSpan={columns} className="p-8 text-center"><p role="alert" className="text-destructive">{directory.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void directory.refetch()}>Réessayer</Button></td></tr>
+            : !directory.data.items.length ? <tr><td colSpan={columns} className="p-10 text-center text-muted-foreground">Aucun prestataire pour ces critères.</td></tr>
               : directory.data.items.map(item => <tr key={`${item.typePrestataire}:${item.id}`} className="align-top hover:bg-muted/30">
+                {automobile ? <AutomobileProviderCells item={item} compagnieId={applied.compagnieId} specialiteId={applied.specialiteId} /> : <>
                 <td className="px-3 py-3 font-medium">{item.code}</td><td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}<p className="mt-1 text-xs font-normal text-muted-foreground">{item.typePrestataire ? providerTypeLabel(item.typePrestataire) : ""} · {item.domaines?.map(d => d.libelle).join(", ") || "-"}</p><p className="mt-1 text-xs font-normal text-muted-foreground">{item.adresse}</p></td>
                 <td className="px-3 py-3">{item.telephone || "-"}<p className="text-xs text-muted-foreground">{item.email}</p></td><td className="px-3 py-3">{item.ville || "-"}</td>
                 <td className="max-w-64 px-3 py-3"><div className="flex flex-wrap gap-1">{item.specialites?.map(s => <Badge key={s.id} variant={s.actif ? "info" : "gray"}>{s.libelle}</Badge>)}{!item.specialites?.length && "-"}</div></td>
@@ -140,7 +146,8 @@ export default function SinistrePrestatairesPage() {
                 <td className="max-w-72 px-3 py-3"><p className="mb-1 text-xs text-muted-foreground">{item.toutesCompagnies ? "Toutes compagnies" : "Compagnies liées uniquement"}</p>
                   <ul className="space-y-1">{item.accords?.map(a => <li key={a.compagnieId}>{a.compagnie} <span className="text-xs text-muted-foreground">· {a.actif ? (a.conventionne ? "Conventionné" : "Non conventionné") : "Inactif"}{a.dateFin ? ` · au ${a.dateFin.split("-").reverse().join("/")}` : ""}</span></li>)}</ul></td>
                 <td className="px-3 py-3"><Badge variant={item.actif ? "success" : "gray"}>{item.actif ? "Actif" : "Inactif"}</Badge></td>
-                <td className="px-3 py-3">{canUpdate ? <Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button> : null}</td>
+                </>}
+                {(!automobile || canUpdate) && <td className="px-3 py-3">{canUpdate ? <Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button> : null}</td>}
               </tr>)}</tbody>
       </table></div>
       <ServerPagination className="border-t px-4 py-3" page={directory.data?.page.number ?? page} totalPages={directory.data?.page.totalPages ?? 0}

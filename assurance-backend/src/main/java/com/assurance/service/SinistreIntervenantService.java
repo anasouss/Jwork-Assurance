@@ -185,7 +185,17 @@ public class SinistreIntervenantService {
                         a.isActif(), a.isConventionne(), a.getDateDebut(), a.getDateFin(), a.isTousUsages(),
                         a.getUsages().stream().sorted(java.util.Comparator.comparing(com.assurance.entity.Usage::getCode))
                                 .map(u -> new com.assurance.dto.response.SpecialitePrestataireResponse.Reference(
-                                        u.getId(), u.getCode() + " · " + u.getLibelle())).toList())).toList();
+                                        u.getId(), u.getCode() + " · " + u.getLibelle())).toList(),
+                        conventionneActuellement(a))).toList();
+    }
+
+    private boolean conventionneActuellement(com.assurance.entity.AccordPrestataireSinistre agreement) {
+        var today = java.time.LocalDate.now();
+        return agreement.isActif() && agreement.isConventionne()
+                && (agreement.getDateDebut() == null || !agreement.getDateDebut().isAfter(today))
+                && (agreement.getDateFin() == null || !agreement.getDateFin().isBefore(today))
+                && (agreement.getGarage() == null || (agreement.getGarage().isActif()
+                        && (agreement.isTousUsages() || !agreement.getUsages().isEmpty())));
     }
 
     private List<com.assurance.dto.response.SpecialitePrestataireResponse.Reference> domainResponses(java.util.Set<com.assurance.entity.DomaineInterventionSinistre> items) {

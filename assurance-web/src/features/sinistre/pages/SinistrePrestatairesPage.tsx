@@ -17,6 +17,7 @@ import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
 import { SinistreVilleSelect } from "../components/SinistreVilleSelect";
 import { AutomobileProviderCells } from "../components/AutomobileProviderCells";
+import { DoctorProviderCells } from "../components/DoctorProviderCells";
 import type { Intervenant, ProviderKind } from "../types";
 import { providerTypes, providerTypeLabel } from "../provider-types";
 
@@ -42,9 +43,14 @@ export default function SinistrePrestatairesPage() {
   const specialties = useQuery({ queryKey: sinistreKeys.specialties(), queryFn: sinistreApi.specialties, enabled: canView });
   const domains = useQuery({ queryKey: sinistreKeys.providerDomains(), queryFn: sinistreApi.providerDomains, enabled: canView });
   const domain = domains.data?.find(d => d.id === filters.domaineId);
-  const automobile = domains.data?.find(d => d.id === applied.domaineId)?.brancheCode === "AUTOMOBILE";
-  const columns = automobile ? 7 + Number(canUpdate) : 9;
-  const headers = automobile ? ["Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", ...(canUpdate ? ["Action"] : [])]
+  const appliedDomain = domains.data?.find(d => d.id === applied.domaineId);
+  // Older API responses identify the seeded Automobile domain by code only.
+  const automobile = (appliedDomain?.brancheCode ?? appliedDomain?.code) === "AUTOMOBILE";
+  const doctor = !automobile && applied.typePrestataire === "MEDECIN";
+  const compact = automobile || doctor;
+  const columns = doctor ? 5 + Number(canUpdate) : automobile ? 7 + Number(canUpdate) : 9;
+  const headers = doctor ? ["Médecin", "Ville", "Adresse", "Contact", "Spécialité", ...(canUpdate ? ["Action"] : [])]
+    : automobile ? ["Opérateur", "Usage", "Prestataire", "N° tél.", "E-mail", "Adresse", "Ville", ...(canUpdate ? ["Action"] : [])]
     : ["Code", "Prestataire", "Contact", "Ville", "Spécialités", "Usages par compagnie", "Compagnies et accords", "Statut", "Action"];
   const operatorTypes = providerTypes.filter(type => !domain || domain.operateurs.includes(type.value));
   const operatorSpecialties = specialties.data?.filter(s => s.actif && (!domain || (domain.operateurs.includes(s.typePrestataire) && s.domaines.some(d => d.id === domain.id)))) ?? [];
@@ -98,13 +104,21 @@ export default function SinistrePrestatairesPage() {
       <div className="grid gap-1.5"><Label htmlFor="provider-domain">Branche</Label><Select value={filters.domaineId} disabled={domains.isPending || domains.isError} onValueChange={value => {
         const next = domains.data?.find(d => d.id === value);
         const nextKind = next && kind !== "ALL" && !next.operateurs.includes(kind) ? "ALL" : kind;
-        setFilters(f => ({ ...f, domaineId: value, specialiteId: "ALL", typePrestataire: nextKind }));
+        const updated = { ...filters, domaineId: value, specialiteId: "ALL", typePrestataire: nextKind };
+        setFilters(updated);
+        setApplied(updated);
+        setPage(0);
+        setParams({ type: nextKind }, { replace: true });
       }}><SelectTrigger id="provider-domain"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les branches</SelectItem>
         {domains.data?.filter(d => d.actif).map(d => <SelectItem key={d.id} value={d.id}>{d.libelle}</SelectItem>)}
       </SelectContent></Select></div>
       <div className="grid gap-1.5"><Label htmlFor="provider-type">Opérateur</Label><Select value={filters.specialiteId === "ALL" ? kind : `SPECIALITE:${filters.specialiteId}`} disabled={domains.isPending || domains.isError || specialties.isPending || specialties.isError} onValueChange={value => {
         const specialty = operatorSpecialties.find(s => `SPECIALITE:${s.id}` === value);
-        setFilters(current => ({ ...current, typePrestataire: specialty?.typePrestataire ?? (value as OperatorFilter), specialiteId: specialty?.id ?? "ALL" }));
+        const updated = { ...filters, typePrestataire: specialty?.typePrestataire ?? (value as OperatorFilter), specialiteId: specialty?.id ?? "ALL" };
+        setFilters(updated);
+        setApplied(updated);
+        setPage(0);
+        setParams({ type: updated.typePrestataire }, { replace: true });
         setOpen(false); setEditing(null);
       }}><SelectTrigger id="provider-type"><SelectValue /></SelectTrigger><SelectContent>
         <SelectItem value="ALL">Tous les opérateurs</SelectItem>
@@ -126,13 +140,14 @@ export default function SinistrePrestatairesPage() {
       {(options.isError || specialties.isError || cities.isError || domains.isError) && <p role="alert" className="text-sm text-destructive sm:col-span-2 xl:col-span-5">Impossible de charger les filtres.</p>}
     </section>
     <section className="min-w-0 overflow-hidden rounded-md border bg-card">
-      <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm">
+      <div className="overflow-x-auto"><table className={`w-full text-sm ${doctor ? "min-w-[850px]" : "min-w-[1100px]"}`}>
         <thead className="bg-sky-700 text-left text-xs uppercase text-white"><tr>{headers.map(label => <th key={label} className="px-3 py-3">{label}</th>)}</tr></thead>
         <tbody className="divide-y">{directory.isPending ? <TableRowsSkeleton colSpan={columns} rows={6} />
           : directory.isError ? <tr><td colSpan={columns} className="p-8 text-center"><p role="alert" className="text-destructive">{directory.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void directory.refetch()}>Réessayer</Button></td></tr>
             : !directory.data.items.length ? <tr><td colSpan={columns} className="p-10 text-center text-muted-foreground">Aucun prestataire pour ces critères.</td></tr>
               : directory.data.items.map(item => <tr key={`${item.typePrestataire}:${item.id}`} className="align-top hover:bg-muted/30">
-                {automobile ? <AutomobileProviderCells item={item} compagnieId={applied.compagnieId} specialiteId={applied.specialiteId} /> : <>
+                {doctor ? <DoctorProviderCells item={item} specialiteId={applied.specialiteId} />
+                  : automobile ? <AutomobileProviderCells item={item} compagnieId={applied.compagnieId} specialiteId={applied.specialiteId} /> : <>
                 <td className="px-3 py-3 font-medium">{item.code}</td><td className="max-w-64 break-words px-3 py-3 font-medium">{item.nom}<p className="mt-1 text-xs font-normal text-muted-foreground">{item.typePrestataire ? providerTypeLabel(item.typePrestataire) : ""} · {item.domaines?.map(d => d.libelle).join(", ") || "-"}</p><p className="mt-1 text-xs font-normal text-muted-foreground">{item.adresse}</p></td>
                 <td className="px-3 py-3">{item.telephone || "-"}<p className="text-xs text-muted-foreground">{item.email}</p></td><td className="px-3 py-3">{item.ville || "-"}</td>
                 <td className="max-w-64 px-3 py-3"><div className="flex flex-wrap gap-1">{item.specialites?.map(s => <Badge key={s.id} variant={s.actif ? "info" : "gray"}>{s.libelle}</Badge>)}{!item.specialites?.length && "-"}</div></td>
@@ -147,7 +162,7 @@ export default function SinistrePrestatairesPage() {
                   <ul className="space-y-1">{item.accords?.map(a => <li key={a.compagnieId}>{a.compagnie} <span className="text-xs text-muted-foreground">· {a.actif ? (a.conventionne ? "Conventionné" : "Non conventionné") : "Inactif"}{a.dateFin ? ` · au ${a.dateFin.split("-").reverse().join("/")}` : ""}</span></li>)}</ul></td>
                 <td className="px-3 py-3"><Badge variant={item.actif ? "success" : "gray"}>{item.actif ? "Actif" : "Inactif"}</Badge></td>
                 </>}
-                {(!automobile || canUpdate) && <td className="px-3 py-3">{canUpdate ? <Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button> : null}</td>}
+                {(!compact || canUpdate) && <td className="px-3 py-3">{canUpdate ? <Button variant="ghost" size="icon" title="Modifier le prestataire" aria-label={`Modifier ${item.nom}`} onClick={() => { setEditing(item); setOpen(true); }}><Pencil className="size-4" /></Button> : null}</td>}
               </tr>)}</tbody>
       </table></div>
       <ServerPagination className="border-t px-4 py-3" page={directory.data?.page.number ?? page} totalPages={directory.data?.page.totalPages ?? 0}

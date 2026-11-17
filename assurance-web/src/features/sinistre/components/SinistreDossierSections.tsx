@@ -67,12 +67,12 @@ export function GeneralSection({
   const garageInvalid = !!form.garageId && !historicalGarage && !garages.some(item => item.id === form.garageId);
   return (
       <section className="min-w-0 py-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="-mx-4 -mt-4 mb-4 flex flex-wrap items-center justify-between gap-2 bg-sky-700 px-4 py-3 text-white">
           <h2 className="font-semibold">Informations du sinistre</h2>
-          {editable && !editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : null}
+          {editable && !editing ? <Button size="sm" variant="outline" className="text-foreground" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : null}
           {editable && editing ? (
             <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={saving} onClick={() => { setForm(generalForm(dossier)); setEditing(false); onCancel?.(); }}>Annuler</Button>
+            <Button size="sm" variant="outline" className="text-foreground" disabled={saving} onClick={() => { setForm(generalForm(dossier)); setEditing(false); onCancel?.(); }}>Annuler</Button>
             <Button
               size="sm"
               disabled={saving || garageInvalid || (garageChanged && (garageQuery.isFetching || garageQuery.isError)) || (dossier.statut !== "BROUILLON" && !form.referenceCompagnie.trim()) || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
@@ -274,6 +274,7 @@ export function CoverageSection({
   onSave,
   editMode = false,
   onCancel,
+  headerAction,
 }: {
   dossier: SinistreDetail;
   assessmentVisible: boolean;
@@ -282,6 +283,7 @@ export function CoverageSection({
   onSave?: (guarantees: object[]) => Promise<unknown>;
   editMode?: boolean;
   onCancel?: () => void;
+  headerAction?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState(editMode && editable);
   const [drafts, setDrafts] = useState<Record<string, GuaranteeDraft>>(() =>
@@ -301,10 +303,10 @@ export function CoverageSection({
     <section className="min-w-0">
     <SectionHeader
       title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
-      action={
-        editable && !editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : editable ? (
+      action={headerAction ?? (
+        editable && !editing ? <Button size="sm" variant="outline" className="text-foreground" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : editable ? (
           <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={saving} onClick={() => {
+          <Button size="sm" variant="outline" className="text-foreground" disabled={saving} onClick={() => {
             setDrafts(Object.fromEntries(dossier.garanties.map((item) => [item.id, toGuaranteeDraft(item)])));
             setEditing(false);
             onCancel?.();
@@ -336,12 +338,12 @@ export function CoverageSection({
           </Button>
           </div>
         ) : null
-      }
+      )}
     />
       <p className="px-4 py-2 text-sm text-muted-foreground">{involvedCount} sur {dossier.garanties.length} garantie(s) impliquée(s) · Montants en MAD</p>
       {!editing || !editable ? <div className="overflow-x-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
             <TableRow>
               <TableHead>Garantie</TableHead>
               <TableHead>Impliquée</TableHead>
@@ -534,7 +536,7 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-800 bg-sky-700 px-4 py-3 text-white">
       <h2 className="font-semibold">{title}</h2>
       {action}
     </div>

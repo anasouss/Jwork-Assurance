@@ -40,38 +40,44 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
       toast.error(error instanceof Error ? error.message : "Changement d’étape impossible");
     },
   });
-  return <section aria-label="Suivi opérationnel" className="min-w-0 border-y border-sky-200 bg-card px-4 py-4 dark:border-sky-900">
-    <div className="flex flex-wrap items-center justify-between gap-2">
+  return <section aria-label="Suivi opérationnel" className="min-w-0 border-y border-sky-200 bg-card dark:border-sky-900">
+    <div className="flex flex-wrap items-center justify-between gap-2 bg-sky-700 px-4 py-3 text-white">
       <h2 className="text-sm font-semibold">Suivi opérationnel</h2>
       <div className="flex flex-wrap items-center gap-3">
-        {currentIndex >= 0 ? <p className="text-xs font-medium text-sky-700 dark:text-sky-300">Étape {currentIndex + 1}/{suiviSteps.length} · {suiviLabels[dossier.etapeSuivi]}</p> : null}
-        {canTransition && destinations.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={() => {
+        {currentIndex >= 0 ? <p className="text-xs font-medium text-sky-100">Étape {currentIndex + 1}/{suiviSteps.length} · {suiviLabels[dossier.etapeSuivi]}</p> : null}
+        {canTransition && destinations.length > 0 ? <Button type="button" size="sm" variant="outline" className="border-white/40 bg-transparent text-white hover:bg-white/15 hover:text-white dark:bg-transparent dark:hover:bg-white/15" onClick={() => {
           setSelected(null);
           setMotif("");
           setChangeOpen(true);
         }}><ArrowRightLeft className="size-4" />Changer l’étape</Button> : null}
       </div>
     </div>
-    <ol className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <ol className="flex flex-col px-5 py-6 md:grid md:grid-cols-6 md:px-4">
       {suiviSteps.map((step, index) => {
         const active = dossier.etapeSuivi === step;
         const completed = completedSteps.has(step);
-        return <li key={step} className={cn("min-w-0 border-b-2 pb-3", active ? "border-sky-600 dark:border-sky-400" : completed ? "border-emerald-600 dark:border-emerald-400" : "border-border")} aria-current={active ? "step" : undefined}
+        const nextStep = suiviSteps[index + 1];
+        const connected = completed && nextStep !== undefined && (nextStep === dossier.etapeSuivi || completedSteps.has(nextStep));
+        return <li key={step} className="relative min-w-0" aria-current={active ? "step" : undefined}
           aria-label={`${index + 1}. ${suiviLabels[step]}${active ? " · étape actuelle" : completed ? " · étape passée" : ""}`}>
+          {index < suiviSteps.length - 1 ? <span aria-hidden="true" className={cn(
+            "absolute bottom-0 left-[15px] top-8 w-0.5 md:bottom-auto md:left-1/2 md:right-[-50%] md:top-[15px] md:h-0.5 md:w-auto",
+            connected ? "bg-sky-600 dark:bg-sky-400" : "bg-border",
+          )} /> : null}
           <div className={cn(
-              "flex min-h-14 items-start gap-2 text-sm",
+              "relative flex min-h-16 items-start gap-3 pb-4 text-sm md:min-h-20 md:flex-col md:items-center md:gap-3 md:px-2 md:pb-0 md:text-center",
               active ? "text-sky-900 dark:text-sky-200" : "text-muted-foreground",
             )}>
             <span aria-hidden="true" className={cn(
-              "grid size-7 shrink-0 place-items-center rounded-full border text-xs font-semibold tabular-nums",
-              active ? "border-sky-700 bg-sky-700 text-white dark:border-sky-500 dark:bg-sky-600" : completed ? "border-emerald-600 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-200" : "border-border bg-muted/40 text-muted-foreground",
+              "relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-2 text-xs font-semibold tabular-nums ring-4 ring-card",
+              active ? "border-sky-700 bg-sky-700 text-white dark:border-sky-500 dark:bg-sky-600" : completed ? "border-sky-600 bg-sky-100 text-sky-900 dark:border-sky-500 dark:bg-sky-950 dark:text-sky-200" : "border-border bg-card text-muted-foreground",
             )}>{completed ? <Check className="size-4" /> : index + 1}</span>
-            <span className={cn("min-w-0 break-words pt-0.5", active && "font-semibold", completed && "text-emerald-800 dark:text-emerald-300")}>{suiviLabels[step]}</span>
+            <span className={cn("min-w-0 break-words pt-1 md:pt-0 md:text-xs", active && "font-semibold", completed && "text-sky-800 dark:text-sky-300")}>{suiviLabels[step]}</span>
           </div>
         </li>;
       })}
     </ol>
-    {dossier.prochaineAction ? <p className="mt-2 break-words text-sm text-muted-foreground"><span className="font-medium text-foreground">Prochaine action : </span>{dossier.prochaineAction}</p> : null}
+    {dossier.prochaineAction ? <p className="border-t bg-muted/25 px-4 py-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">Prochaine action : </span>{dossier.prochaineAction}</p> : null}
     <Dialog open={changeOpen && canTransition} onOpenChange={(open) => { if (!change.isPending) setChangeOpen(open); }}>
       <DialogContent className="sm:max-w-lg" showCloseButton={!change.isPending}>
         <DialogHeader>

@@ -328,11 +328,11 @@ export default function SinistreDetailPage() {
           />
         </section>
         <section id="garanties" className="scroll-mt-24 border-y bg-card">
-          {canUpdate && !locked ? <div className="flex justify-end px-4 pt-3"><Button asChild size="sm" variant="outline"><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier?section=garanties`}><Pencil className="size-4" />Modifier les garanties</Link></Button></div> : null}
         <CoverageSection
             key={`coverage-${dossier.id}`}
             dossier={dossier}
             assessmentVisible={coverageAssessmentVisible}
+            headerAction={canUpdate && !locked ? <Button asChild size="sm"><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier?section=garanties`}><Pencil className="size-4" />Modifier les garanties</Link></Button> : undefined}
             editable={false}
             saving={false}
         />
@@ -353,7 +353,7 @@ export default function SinistreDetailPage() {
         >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
                   <TableRow>
                     <TableHead>Type</TableHead>
                     <TableHead>Nom</TableHead>
@@ -444,7 +444,7 @@ export default function SinistreDetailPage() {
             >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
                   <TableRow>
                     <TableHead>Phase</TableHead>
                     <TableHead>Expert</TableHead>
@@ -522,7 +522,7 @@ export default function SinistreDetailPage() {
             >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Montant</TableHead>
@@ -572,7 +572,7 @@ export default function SinistreDetailPage() {
             >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
@@ -807,7 +807,7 @@ function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-800 bg-sky-700 px-4 py-3 text-white">
       <h2 className="font-semibold">{title}</h2>
       {action}
     </div>
@@ -837,20 +837,20 @@ function WorkflowPanel({
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="min-w-0 border-y [&_thead]:bg-muted/50"
+      className="min-w-0 border-y"
     >
-      <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 bg-muted/35 py-1">
+      <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 bg-sky-700 py-1 text-white">
         <CollapsibleTrigger asChild>
           <button
             type="button"
             className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 px-4 py-3 text-left"
           >
             <ChevronDown
-              className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+              className={`size-4 shrink-0 text-sky-100 transition-transform ${open ? "rotate-180" : ""}`}
             />
             <span className="font-semibold">{title}</span>
             {summary ? (
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-sky-100">
                 {summary}
               </span>
             ) : null}
@@ -897,10 +897,10 @@ function DocumentsPanel({
 
   return (
     <section className="min-w-0 border-y">
-      <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 bg-sky-50 px-4 py-3 dark:bg-sky-950/25">
+      <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 bg-sky-700 px-4 py-3 text-white">
         <div className="min-w-0">
           <h2 className="font-semibold">Pièces du dossier</h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-sky-100">
             {dossier.documents.length} document(s) déposé(s)
           </p>
         </div>

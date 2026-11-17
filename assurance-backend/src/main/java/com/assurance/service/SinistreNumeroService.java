@@ -31,9 +31,8 @@ public class SinistreNumeroService {
         sequenceRepository.save(sequence);
         return String.format(
                 Locale.ROOT,
-                "SIN/%s/%d/%05d",
-                agence.getCode(),
-                annee,
+                "SIN%02d-%05d",
+                annee % 100,
                 numero
         );
     }

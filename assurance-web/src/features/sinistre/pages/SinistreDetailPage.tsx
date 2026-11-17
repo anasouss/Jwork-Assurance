@@ -11,7 +11,6 @@ import {
   FilePlus2,
   FileX2,
   History,
-  MoreHorizontal,
   Pencil,
   Plus,
   Trash2,
@@ -35,7 +34,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -88,6 +87,7 @@ export default function SinistreDetailPage() {
   const canCreateOperation = permissions.includes("sinistre-operation:create");
   const canCancelOperation = permissions.includes("sinistre-operation:cancel");
   const [transitionOpen, setTransitionOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<SinistreDetail["parties"][number] | null>(null);
   const [financeMode, setFinanceMode] = useState<FinanceDialogMode | null>(
@@ -302,13 +302,8 @@ export default function SinistreDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canUpdate && !locked ? <Button asChild><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier`}><Pencil className="size-4" />Modifier le dossier</Link></Button> : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="outline"><MoreHorizontal className="size-4" />Actions du dossier</Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {canTransition && dossier.workflow.transitions.length > 0 ? <DropdownMenuItem onSelect={() => setTransitionOpen(true)}>Changer le statut</DropdownMenuItem> : null}
-              <DropdownMenuItem asChild><a href="#historique"><History className="size-4" />Historique</a></DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button variant="outline" onClick={() => setHistoryOpen(true)}><History className="size-4" />Historique</Button>
+          {canTransition && dossier.workflow.transitions.length > 0 ? <Button variant="outline" onClick={() => setTransitionOpen(true)}>Changer le statut</Button> : null}
         </div>
       </header>
       <SinistreTracking dossier={dossier} />
@@ -654,9 +649,15 @@ export default function SinistreDetailPage() {
           </div>
         ) : <p className="border-y py-8 text-sm text-muted-foreground">Aucune écriture financière. Les provisions et opérations seront disponibles à l’étape d’expertise.</p>}
         </section>
-        <section id="historique" className="min-w-0 scroll-mt-24 bg-card">
-          <WorkflowPanel title="Historique du dossier" summary={`${dossier.evenements.length} événement(s)`} defaultOpen><DossierHistory dossier={dossier} /></WorkflowPanel>
-        </section>
+      <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+        <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Historique du dossier</DialogTitle>
+            <DialogDescription>{dossier.numeroSinistre} · {dossier.evenements.length} événement(s)</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 overflow-y-auto"><DossierHistory dossier={dossier} /></div>
+        </DialogContent>
+      </Dialog>
       <SinistreTransitionDialog
         open={transitionOpen}
         transitions={dossier.workflow.transitions}

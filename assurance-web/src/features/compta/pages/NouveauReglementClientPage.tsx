@@ -460,12 +460,12 @@ export default function NouveauReglementClientPage() {
 
       <section className="grid overflow-hidden rounded-md border bg-card sm:grid-cols-3">
         <SummaryCell
-          label="Total des éléments"
-          value={String(rows.length)}
+          label="Montant à régler"
+          value={money(amountDue)}
           tone="quittance"
         />
         <SummaryCell
-          label="Total du règlement"
+          label={outgoing ? "Montant versé" : "Montant reçu"}
           value={money(paymentTotal)}
           tone="payment"
         />

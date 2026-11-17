@@ -1,8 +1,7 @@
-import { Fragment, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Ban,
-  ChevronDown,
   Download,
   Eye,
   FilePlus2,
@@ -28,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +57,6 @@ import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
 import { formatDate, statusLabels } from "../format";
 import { repairLabels, suiviLabels } from "../workflow";
-import { SinistreTracking } from "../components/SinistreTracking";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
 import type {
@@ -78,7 +77,7 @@ type PortfolioScope = { clientId: string; contratId: string; brancheId: string }
 
 export default function SinistreListPage({ mode = "consultation" }: { mode?: "consultation" | "registre" }) {
   const isRegister = mode === "registre";
-  const columnCount = isRegister ? 14 : 10;
+  const columnCount = isRegister ? 14 : 11;
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const [initial] = useState(() => readState(params));
@@ -100,7 +99,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
     null,
   );
   const [declarationOpen, setDeclarationOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const request = useMemo(
     () => ({
       query: applied.query.trim() || undefined,
@@ -162,7 +160,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
   });
 
   function apply(next: Filters) {
-    setExpandedId(null);
     setApplied(next);
     setPage(0);
     setParams(writeState(next, 0, scope), { replace: true });
@@ -173,7 +170,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
     apply(next);
   }
   function changePage(next: number) {
-    setExpandedId(null);
     setPage(next);
     setParams(writeState(applied, next, scope), { replace: true });
   }
@@ -212,7 +208,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
         </div>
       ) : null}
       <section aria-label="Filtres des sinistres" className="border-y bg-muted/20 p-4">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.5fr)_minmax(160px,1fr)_minmax(180px,1fr)_minmax(155px,0.8fr)_minmax(155px,0.8fr)_auto]">
             <Field label="Recherche">
               <Input
                 value={filters.query}
@@ -248,6 +244,9 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                 </SelectContent>
               </Select>
             </Field>
+            <Field label="Étape de suivi"><Select value={filters.etapeSuivi} onValueChange={(etapeSuivi) => setFilters((current) => ({ ...current, etapeSuivi }))}>
+              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les étapes</SelectItem>{Object.entries(suiviLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+            </Select></Field>
             <Field label="Du">
               <DatePicker
                 date={filters.dateDu}
@@ -256,9 +255,6 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                 }
               />
             </Field>
-            <Field label="Étape de suivi"><Select value={filters.etapeSuivi} onValueChange={(etapeSuivi) => setFilters((current) => ({ ...current, etapeSuivi }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les étapes</SelectItem>{Object.entries(suiviLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
-            </Select></Field>
             <Field label="Au">
               <DatePicker
                 date={filters.dateAu}
@@ -316,6 +312,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                   <TableHead>{isRegister ? "Réparation" : "Mode de réparation"}</TableHead>
                   <TableHead>Premier expert</TableHead>
                   {isRegister ? <><TableHead>Statut</TableHead><TableHead>Suivi</TableHead></> : null}
+                  {!isRegister ? <TableHead>Étape de suivi</TableHead> : null}
                   <TableHead className="w-20 text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -324,13 +321,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                   <TableRowsSkeleton rows={7} colSpan={columnCount} />
                 ) : null}
                 {(list.data?.items ?? []).map((item) => (
-                  <Fragment key={item.id}><TableRow
-                    className={!isRegister ? "cursor-pointer" : undefined}
-                    data-state={!isRegister && expandedId === item.id ? "selected" : undefined}
-                    onClick={!isRegister ? (event) => {
-                      if ((event.target as HTMLElement).closest("button, a")) return;
-                      setExpandedId(expandedId === item.id ? null : item.id);
-                    } : undefined}>
+                  <TableRow key={item.id}>
                     {isRegister ? <TableCell>
                       <Link
                         className="font-medium text-sky-700 hover:underline dark:text-sky-400"
@@ -339,14 +330,12 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                         {item.numeroSinistre}
                       </Link>
                     </TableCell> : null}
-                    <TableCell>{isRegister ? item.referenceCompagnie || "-" : <button
-                      type="button" aria-expanded={expandedId === item.id} aria-controls={`claim-tracking-${item.id}`}
-                      aria-label={`Suivi du sinistre ${item.referenceCompagnie || item.numeroSinistre}`}
-                      className="flex items-center gap-2 text-left font-medium text-sky-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400"
-                      onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
-                      <ChevronDown aria-hidden="true" className={`size-4 shrink-0 ${expandedId === item.id ? "rotate-180" : ""}`} />
-                      {item.referenceCompagnie || "-"}
-                    </button>}</TableCell>
+                    <TableCell>{isRegister ? item.referenceCompagnie || "-" : <Link
+                      to={`/app/sinistre/dossiers/${item.id}`}
+                      aria-label={`Consulter le sinistre ${item.referenceCompagnie || item.numeroSinistre}`}
+                      className="font-medium text-sky-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400">
+                      {item.referenceCompagnie || item.numeroSinistre}
+                    </Link>}</TableCell>
                     <TableCell className="max-w-56 whitespace-normal">{item.assure || "-"}</TableCell>
                     <TableCell>{item.numeroPolice || "-"}</TableCell>
                     <TableCell>{item.immatriculation || "-"}</TableCell>
@@ -368,6 +357,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                           .join(" · ") || "-"}
                       </div>
                     </TableCell></> : null}
+                    {!isRegister ? <TableCell><Badge variant="secondary">{suiviLabels[item.etapeSuivi] || "-"}</Badge></TableCell> : null}
                     <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -420,7 +410,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
-                  </TableRow>{!isRegister && expandedId === item.id ? <TableRow><TableCell colSpan={columnCount} className="whitespace-normal bg-muted/20 px-4 py-3"><div id={`claim-tracking-${item.id}`}><ExpandedTracking id={item.id} /></div></TableCell></TableRow> : null}</Fragment>
+                  </TableRow>
                 ))}
                 {!list.isLoading && !list.isError && (list.data?.items.length ?? 0) === 0 ? (
                   <TableRow>
@@ -523,7 +513,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid min-w-0 gap-1.5">
       <Label>{label}</Label>
       {children}
     </div>
@@ -568,11 +558,4 @@ function toIso(date?: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function ExpandedTracking({ id }: { id: string }) {
-  const detail = useQuery({ queryKey: sinistreKeys.detail(id), queryFn: () => sinistreApi.get(id) });
-  if (detail.isPending) return <p className="py-3 text-sm text-muted-foreground">Chargement du suivi…</p>;
-  if (detail.isError) return <div role="alert" className="flex items-center gap-3 text-sm text-destructive">{detail.error instanceof Error ? detail.error.message : "Suivi indisponible"}<Button variant="outline" size="sm" onClick={() => detail.refetch()}>Réessayer</Button></div>;
-  return <SinistreTracking dossier={detail.data} />;
 }

@@ -20,6 +20,8 @@ import com.assurance.dto.response.SuiviRejetBancaireResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -452,6 +454,28 @@ class ReglementClientReplacementTest {
         var cash = original.getReglement().getInstruments().get(1);
         assertThat(cash.getStatut()).isEqualTo(StatutInstrumentReglement.CONFIRME);
         verify(tresorerieService).recordInstrumentEntry(cash, account, LocalDate.now());
+        verify(tresorerieService, times(1)).recordInstrumentEntry(any(), any(), any());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ModeReglementClient.class, names = {"VIREMENT", "VERSEMENT_BANCAIRE"})
+    void confirmsBankReplacementAndPostsExactlyOneTreasuryEntry(ModeReglementClient mode) {
+        var original = original();
+        if (mode == ModeReglementClient.VIREMENT) bank();
+        save();
+        var account = CompteTresorerie.builder().agence(original.getAgence())
+                .typeCompte(TypeCompteTresorerie.BANQUE).actif(true).build();
+        account.setId(3L);
+        when(tresorerieService.findAccount(7L, 3L)).thenReturn(account);
+        var replacementRequest = row(mode, "100.00", "BANK-NEW");
+        replacementRequest.setCompteTresorerieId(3L);
+
+        service.replaceInstrument(7L, 9L, request(replacementRequest));
+
+        var replacement = original.getReglement().getInstruments().get(1);
+        assertThat(replacement.getStatut()).isEqualTo(StatutInstrumentReglement.CONFIRME);
+        assertThat(replacement.getMontant()).isEqualByComparingTo("100.00");
+        verify(tresorerieService).recordInstrumentEntry(replacement, account, LocalDate.now());
         verify(tresorerieService, times(1)).recordInstrumentEntry(any(), any(), any());
     }
 

@@ -124,10 +124,10 @@ export default function RapprochementBancairePage() {
     queryFn: () => comptaApi.bankStatementImport(importId),
     enabled: Boolean(importId),
   });
-  const pendingInstruments = useQuery({
-    queryKey: ["compta", "payment-instruments", "pending"],
-    queryFn: comptaApi.pendingPaymentInstruments,
-    enabled: Boolean(importId),
+  const reconciliationInstruments = useQuery({
+    queryKey: ["compta", "payment-instruments", "bank-reconciliation", accountId],
+    queryFn: () => comptaApi.bankReconciliationInstruments(accountId),
+    enabled: Boolean(importId && accountId),
   });
 
   useEffect(() => {
@@ -219,9 +219,9 @@ export default function RapprochementBancairePage() {
     onError: showError,
   });
 
-  const pendingForAccount = useMemo(() => (pendingInstruments.data ?? []).filter(
+  const pendingForAccount = useMemo(() => (reconciliationInstruments.data ?? []).filter(
     (instrument) => !instrument.compteTresorerieId || instrument.compteTresorerieId === accountId
-  ), [accountId, pendingInstruments.data]);
+  ), [accountId, reconciliationInstruments.data]);
 
   return (
     <div className="grid gap-5">

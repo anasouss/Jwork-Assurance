@@ -464,6 +464,15 @@ public class ReglementClientController {
         )));
     }
 
+    @GetMapping("/instruments/rapprochement")
+    @PreAuthorize("hasAuthority('PERM_rapprochement-bancaire:view')")
+    public ResponseEntity<ApiResponse<List<ReglementClientResponse.Instrument>>> reconciliationInstruments(
+            @RequestParam Long compteId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(reglementClientService.bankReconciliationInstruments(
+                TenantContext.getCurrentAgence(), compteId)));
+    }
+
     @GetMapping("/instruments/rejets-bancaires")
     @PreAuthorize("hasAuthority('PERM_instrument-reglement:view')")
     public ResponseEntity<ApiResponse<InstrumentReglementPageResponse>> bankRejections(

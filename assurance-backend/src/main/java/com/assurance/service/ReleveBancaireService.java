@@ -39,6 +39,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -248,19 +249,8 @@ public class ReleveBancaireService {
         ImportReleveBancaire imported = findImport(agenceId, importId);
         List<LigneReleveBancaire> lines = lineRepository
                 .findByImportReleveIdOrderByNumeroLigneAsc(importId);
-        List<InstrumentReglementClient> pending = instrumentRepository
-                .findByAgenceIdAndStatutInOrderByDateEcheanceAscIdAsc(
-                        agenceId,
-                        Set.of(
-                                StatutInstrumentReglement.EN_ATTENTE,
-                                StatutInstrumentReglement.REMIS_EN_BANQUE
-                        )
-                ).stream()
-                .filter(instrument -> instrument.getStatut()
-                        == StatutInstrumentReglement.REMIS_EN_BANQUE
-                        || (instrument.getMode() != ModeReglementClient.CHEQUE
-                            && instrument.getMode() != ModeReglementClient.EFFET))
-                .toList();
+        List<InstrumentReglementClient> pending = instrumentRepository.findBankReconciliationCandidates(
+                agenceId, imported.getCompteTresorerie().getId());
         return detailResponse(imported, lines, pending);
     }
 
@@ -375,7 +365,7 @@ public class ReleveBancaireService {
         return detail(agenceId, importId);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ImportReleveBancaireResponse validate(Long agenceId, Long importId) {
         ImportReleveBancaire imported = findEditableImport(agenceId, importId);
         var before = BankStatementActivity.snapshot(imported, lineRepository.findByImportReleveIdOrderByNumeroLigneAsc(importId));
@@ -419,11 +409,14 @@ public class ReleveBancaireService {
         Map<Long, List<RapprochementBancaire>> byInstrument = selected.stream()
                 .collect(Collectors.groupingBy(
                         reconciliation -> reconciliation.getInstrumentReglement().getId(),
-                        LinkedHashMap::new,
+                        java.util.TreeMap::new,
                         Collectors.toList()
                 ));
         for (List<RapprochementBancaire> group : byInstrument.values()) {
-            InstrumentReglementClient instrument = group.get(0).getInstrumentReglement();
+            InstrumentReglementClient instrument = instrumentRepository.findByIdAndAgenceIdForUpdate(
+                    group.get(0).getInstrumentReglement().getId(), agenceId)
+                    .orElseThrow(() -> new BadRequestException("Instrument de rapprochement introuvable"));
+            entityManager.refresh(instrument);
             validateInstrumentForAccount(instrument, imported.getCompteTresorerie());
             BigDecimal selectedAmount = group.stream()
                     .map(RapprochementBancaire::getMontant)
@@ -703,7 +696,14 @@ public class ReleveBancaireService {
             InstrumentReglementClient instrument,
             CompteTresorerie account
     ) {
-        if (instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
+        boolean confirmedBankPayment = instrument.getStatut() == StatutInstrumentReglement.CONFIRME
+                && isDirectBankPayment(instrument);
+        if (!instrument.getAgence().getId().equals(account.getAgence().getId())
+                || instrument.getReglement().getStatut() != com.assurance.enums.StatutReglementClient.VALIDE
+                || instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+            throw new BadRequestException("Le moyen de règlement ne correspond pas à un encaissement de cette agence");
+        }
+        if (!confirmedBankPayment && instrument.getStatut() != StatutInstrumentReglement.EN_ATTENTE
                 && instrument.getStatut() != StatutInstrumentReglement.REMIS_EN_BANQUE) {
             throw new BadRequestException("Le moyen de règlement n’est plus en attente d'encaissement");
         }
@@ -718,6 +718,11 @@ public class ReleveBancaireService {
                 && !account.getId().equals(instrument.getCompteTresorerie().getId())) {
             throw new BadRequestException("Le moyen de règlement est associé à un autre compte bancaire");
         }
+    }
+
+    private boolean isDirectBankPayment(InstrumentReglementClient instrument) {
+        return instrument.getMode() == ModeReglementClient.VIREMENT
+                || instrument.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE;
     }
 
     private LigneReleveBancaire toEntity(

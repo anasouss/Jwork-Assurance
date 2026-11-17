@@ -20,6 +20,32 @@ import jakarta.persistence.LockModeType;
 
 public interface InstrumentReglementClientRepository extends JpaRepository<InstrumentReglementClient, Long> {
 
+    @EntityGraph(attributePaths = {"reglement", "compteTresorerie"})
+    @Query("""
+            select i from InstrumentReglementClient i
+            where i.agence.id = :agenceId
+              and i.reglement.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and i.reglement.sens = com.assurance.enums.SensMouvementTresorerie.ENTREE
+              and (i.compteTresorerie.id = :accountId or
+                  (i.compteTresorerie is null and i.statut <> com.assurance.enums.StatutInstrumentReglement.CONFIRME))
+              and ((i.mode in (com.assurance.enums.ModeReglementClient.VIREMENT,
+                              com.assurance.enums.ModeReglementClient.VERSEMENT_BANCAIRE)
+                    and i.statut in (com.assurance.enums.StatutInstrumentReglement.EN_ATTENTE,
+                                     com.assurance.enums.StatutInstrumentReglement.REMIS_EN_BANQUE,
+                                     com.assurance.enums.StatutInstrumentReglement.CONFIRME))
+                or (i.mode in (com.assurance.enums.ModeReglementClient.CHEQUE,
+                               com.assurance.enums.ModeReglementClient.EFFET)
+                    and i.statut = com.assurance.enums.StatutInstrumentReglement.REMIS_EN_BANQUE))
+              and coalesce((select sum(r.montant) from RapprochementBancaire r
+                            where r.instrumentReglement = i
+                              and r.statut = com.assurance.enums.StatutRapprochementBancaire.VALIDE), 0) < i.montant
+            order by i.dateEcheance asc, i.id asc
+            """)
+    List<InstrumentReglementClient> findBankReconciliationCandidates(
+            @Param("agenceId") Long agenceId,
+            @Param("accountId") Long accountId
+    );
+
     boolean existsByAgenceIdAndCompteTresorerieIdAndStatutAndReglementStatut(
             Long agenceId,
             Long compteTresorerieId,

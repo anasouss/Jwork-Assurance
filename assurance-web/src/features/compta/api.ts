@@ -803,6 +803,12 @@ export const comptaApi = {
     )).map(normalizePaymentInstrument);
   },
 
+  async bankReconciliationInstruments(compteId: string) {
+    return unwrap(await apiFetch<ApiResponse<PaymentInstrument[]>>(
+      `/api/v1/compta/reglements-clients/instruments/rapprochement${buildQueryString({ compteId })}`
+    )).map(normalizePaymentInstrument);
+  },
+
   async paymentInstruments(params: {
     statut?: PaymentInstrument["statut"];
     statuts?: PaymentInstrument["statut"][];

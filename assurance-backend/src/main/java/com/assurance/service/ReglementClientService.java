@@ -73,6 +73,7 @@ import com.assurance.repository.ElementFacturableRepository;
 import com.assurance.repository.InstrumentReglementClientRepository;
 import com.assurance.repository.LigneDocumentClientRepository;
 import com.assurance.repository.LigneBordereauRemiseRepository;
+import com.assurance.repository.MouvementTresorerieRepository;
 import com.assurance.repository.QuittanceRepository;
 import com.assurance.repository.ReglementClientRepository;
 import com.assurance.repository.SequenceReglementClientRepository;
@@ -155,6 +156,7 @@ public class ReglementClientService {
     private final AgenceRepository agenceRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final TresorerieService tresorerieService;
+    private final MouvementTresorerieRepository mouvementTresorerieRepository;
     private final LigneBordereauRemiseRepository remittanceLineRepository;
     private final BanqueService banqueService;
     private final ParametreApplicationService parametreApplicationService;
@@ -1074,8 +1076,7 @@ public class ReglementClientService {
     private void confirmImmediateInstruments(ReglementClient payment) {
         LocalDate operationDate = LocalDate.now();
         for (InstrumentReglementClient instrument : payment.getInstruments()) {
-            if (instrument.getMode() == ModeReglementClient.ESPECES
-                    || instrument.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE) {
+            if (isImmediatePaymentMode(instrument.getMode())) {
                 instrument.setStatut(StatutInstrumentReglement.CONFIRME);
                 instrument.setDateStatut(operationDate);
                 instrument.getAffectations().forEach(allocation ->
@@ -1087,6 +1088,10 @@ public class ReglementClientService {
                 );
             }
         }
+    }
+
+    private boolean isImmediatePaymentMode(ModeReglementClient mode) {
+        return mode == ModeReglementClient.ESPECES || BANK_ACCOUNT_REQUIRED_MODES.contains(mode);
     }
 
     @Transactional
@@ -1323,9 +1328,6 @@ public class ReglementClientService {
             InstrumentReglementClient replacement = buildInstrument(replaced.getAgence(), replaced.getReglement(), entry, false);
             replacement.setInstrumentRemplace(replaced);
             replacement.setDateStatut(replacementDate);
-            if (replacement.getMode() == ModeReglementClient.VERSEMENT_BANCAIRE) {
-                replacement.setStatut(StatutInstrumentReglement.CONFIRME);
-            }
             replacements.add(replacement);
         }
         distributeReplacementAllocations(sources, replacements);
@@ -1550,6 +1552,20 @@ public class ReglementClientService {
                         remittanceLines.get(instrument.getId()), assistanceNumbers
                 ))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReglementClientResponse.Instrument> bankReconciliationInstruments(Long agenceId, Long accountId) {
+        CompteTresorerie account = tresorerieService.findAccount(agenceId, accountId);
+        if (account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
+            throw new BadRequestException("Le rapprochement nécessite un compte bancaire");
+        }
+        List<InstrumentReglementClient> instruments = instrumentRepository.findBankReconciliationCandidates(agenceId, accountId);
+        Map<Long, LigneBordereauRemise> remittanceLines = activeRemittanceLines(
+                instruments.stream().map(InstrumentReglementClient::getId).toList());
+        Map<Long, String> assistanceNumbers = assistanceNumbers(agenceId, instruments);
+        return instruments.stream().map(instrument -> toInstrumentResponse(
+                instrument, remittanceLines.get(instrument.getId()), assistanceNumbers)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -1807,7 +1823,7 @@ public class ReglementClientService {
             Agence agence,
             ReglementClient payment,
             CreerReglementClientRequest.Instrument request,
-            boolean deferCashConfirmation
+            boolean deferImmediateConfirmation
     ) {
         BigDecimal allocated = request.getAffectations().stream()
                 .map(CreerReglementClientRequest.Affectation::getMontant)
@@ -1863,7 +1879,7 @@ public class ReglementClientService {
                 .agence(agence)
                 .reglement(payment)
                 .mode(request.getMode())
-                .statut(cash && !deferCashConfirmation
+                .statut(isImmediatePaymentMode(request.getMode()) && !deferImmediateConfirmation
                         ? StatutInstrumentReglement.CONFIRME
                         : StatutInstrumentReglement.EN_ATTENTE)
                 .montant(money(request.getMontant()))
@@ -1942,9 +1958,40 @@ public class ReglementClientService {
                         "Instrument de règlement",
                         instrumentId
                 ));
+        if (instrument.getStatut() == StatutInstrumentReglement.CONFIRME
+                && BANK_ACCOUNT_REQUIRED_MODES.contains(instrument.getMode())) {
+            return existingBankCollection(agenceId, instrument, accountId);
+        }
         return instrumentActivity(instrument, ActivityAction.CONFIRMED,
                 "Moyen de paiement encaissé par rapprochement bancaire", "PAYMENT_CONFIRMATION_FROM_BANK_STATEMENT",
                 () -> confirmFromBankStatementRecord(agenceId, instrument, accountId, operationDate, bankStatementLine));
+    }
+
+    private MouvementTresorerie existingBankCollection(Long agenceId, InstrumentReglementClient instrument,
+            Long accountId) {
+        if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE
+                || instrument.getReglement().getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE) {
+            throw new BadRequestException("Seul un encaissement client valide peut être rapproché");
+        }
+        if (accountId == null || instrument.getCompteTresorerie() == null
+                || !accountId.equals(instrument.getCompteTresorerie().getId())) {
+            throw new BadRequestException("Le moyen de règlement est associé à un autre compte bancaire");
+        }
+        CompteTresorerie account = tresorerieService.findAccount(agenceId, accountId);
+        if (account.getTypeCompte() != TypeCompteTresorerie.BANQUE) {
+            throw new BadRequestException("Le rapprochement nécessite un compte bancaire");
+        }
+        MouvementTresorerie movement = mouvementTresorerieRepository
+                .findFirstByAgenceIdAndInstrumentReglementIdAndNatureOrderByIdDesc(
+                        agenceId, instrument.getId(), com.assurance.enums.NatureMouvementTresorerie.REGLEMENT_CLIENT)
+                .orElseThrow(() -> new BadRequestException("L'écriture de l'encaissement confirmé est introuvable"));
+        if (!accountId.equals(movement.getCompteTresorerie().getId())
+                || money(movement.getMontant()).compareTo(money(instrument.getMontant())) != 0
+                || movement.getSens() != com.assurance.enums.SensMouvementTresorerie.ENTREE
+                || mouvementTresorerieRepository.existsByMouvementExtourneId(movement.getId())) {
+            throw new BadRequestException("L'écriture de trésorerie ne peut pas être rapprochée à cet encaissement");
+        }
+        return movement;
     }
 
     private MouvementTresorerie confirmFromBankStatementRecord(Long agenceId, InstrumentReglementClient instrument,

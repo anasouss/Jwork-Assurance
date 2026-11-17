@@ -45,8 +45,8 @@ export function SinistreTransitionDialog({
     }
   }, [open]);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
+      <DialogContent showCloseButton={!saving}>
         <DialogHeader>
           <DialogTitle>Faire évoluer le dossier</DialogTitle>
           <DialogDescription>
@@ -58,6 +58,7 @@ export function SinistreTransitionDialog({
             <Label>Nouveau statut</Label>
             <Select
               value={statut}
+              disabled={saving}
               onValueChange={(value) => setStatut(value as StatutSinistre)}
             >
               <SelectTrigger>
@@ -68,7 +69,6 @@ export function SinistreTransitionDialog({
                   <SelectItem
                     key={item.statut}
                     value={item.statut}
-                    disabled={!item.autorisee}
                   >
                     {statusLabels[item.statut]}
                   </SelectItem>
@@ -82,12 +82,13 @@ export function SinistreTransitionDialog({
             </Label>
             <Textarea
               value={motif}
+              disabled={saving}
               maxLength={500}
               onChange={(event) => setMotif(event.target.value)}
             />
           </div>
           {selected && !selected.autorisee ? (
-            <ul className="grid gap-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <ul role="alert" className="grid gap-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
               {selected.blocages.map((blocker) => (
                 <li key={blocker}>{blocker}</li>
               ))}
@@ -95,7 +96,7 @@ export function SinistreTransitionDialog({
           ) : null}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
           <Button

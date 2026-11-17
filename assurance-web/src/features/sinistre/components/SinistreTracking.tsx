@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, Check, LoaderCircle } from "lucide-react";
+import { ArrowRightLeft, Check, ChevronDown, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
   const queryClient = useQueryClient();
   const canTransition = useAuthStore((state) => state.user?.permissions.includes("sinistre:transition") ?? false);
   const [changeOpen, setChangeOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<EtapeSuiviSinistre | null>(null);
   const [motif, setMotif] = useState("");
   const currentIndex = suiviSteps.indexOf(dossier.etapeSuivi);
@@ -41,10 +42,11 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
     },
   });
   return <section aria-label="Suivi opérationnel" className="min-w-0 border-y py-3">
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-sm font-semibold">Suivi opérationnel</h2>
       <div className="flex flex-wrap items-center gap-3">
         {currentIndex >= 0 ? <p className="text-xs font-medium text-sky-700 dark:text-sky-300">Étape {currentIndex + 1}/{suiviSteps.length} · {suiviLabels[dossier.etapeSuivi]}</p> : null}
+        <Button type="button" size="sm" variant="ghost" aria-expanded={expanded} aria-controls={`claim-steps-${dossier.id}`} onClick={() => setExpanded(!expanded)}><ChevronDown className={cn("size-4 transition-transform motion-reduce:transition-none", expanded && "rotate-180")} />Parcours</Button>
         {canTransition && destinations.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={() => {
           setSelected(null);
           setMotif("");
@@ -52,7 +54,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
         }}><ArrowRightLeft className="size-4" />Changer l’étape</Button> : null}
       </div>
     </div>
-    <ol className="flex flex-col gap-2 md:grid md:grid-cols-6 md:gap-0">
+    <ol id={`claim-steps-${dossier.id}`} hidden={!expanded} className={cn("mt-4 flex-col gap-2 md:grid-cols-6 md:gap-0", expanded ? "flex md:grid" : "hidden")}>
       {suiviSteps.map((step, index) => {
         const active = dossier.etapeSuivi === step;
         const completed = completedSteps.has(step);
@@ -77,7 +79,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
         </li>;
       })}
     </ol>
-    {dossier.etapeSuivi === "INSTANCE_CLIENT" && dossier.prochaineAction ? <p className="mt-3 border-t pt-3 text-sm text-muted-foreground">{dossier.prochaineAction}</p> : null}
+    {dossier.prochaineAction ? <p className="mt-2 break-words text-sm text-muted-foreground"><span className="font-medium text-foreground">Prochaine action : </span>{dossier.prochaineAction}</p> : null}
     <Dialog open={changeOpen && canTransition} onOpenChange={(open) => { if (!change.isPending) setChangeOpen(open); }}>
       <DialogContent className="sm:max-w-lg" showCloseButton={!change.isPending}>
         <DialogHeader>

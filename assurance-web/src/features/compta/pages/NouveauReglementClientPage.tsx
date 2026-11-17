@@ -114,6 +114,7 @@ const paymentModes: Array<{
 
 export default function NouveauReglementClientPage() {
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const canCreate = permissions.includes("reglement-client:create")
     || permissions.includes("reglement-client:refund");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -161,6 +162,9 @@ export default function NouveauReglementClientPage() {
     queryKey: ["compta", "treasury-account-options"],
     queryFn: comptaApi.treasuryAccountOptions,
   });
+  const personalCashAvailable = accounts.data?.some((account) => account.actif
+    && account.typeCompte === "CAISSE" && account.natureCaisse === "INDIVIDUELLE"
+    && account.utilisateurTitulaireId === currentUserId) ?? false;
   const banks = useQuery({
     queryKey: ["compta", "banks", "active"],
     queryFn: () => comptaApi.banks(),
@@ -320,6 +324,7 @@ export default function NouveauReglementClientPage() {
     && Boolean(dateReglement)
     && rows.length > 0
     && methods.length > 0
+    && (personalCashAvailable || methods.every((method) => method.mode !== "ESPECES"))
     && paymentTotal > 0
     && amountDue > 0
     && permissions.includes(outgoing ? "reglement-client:refund" : "reglement-client:create")
@@ -562,13 +567,14 @@ export default function NouveauReglementClientPage() {
               <div className="grid gap-2"><Label>Moyen de règlement</Label>
                 <Select value={methods[0]?.mode ?? ""} onValueChange={value => { addPaymentMethod(value as ClientPaymentMode); setActivePaymentMode(value as ClientPaymentMode); }}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner un moyen" /></SelectTrigger>
-                  <SelectContent>{paymentModes.map(mode => <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{paymentModes.map(mode => <SelectItem key={mode.value} value={mode.value} disabled={mode.value === "ESPECES" && !personalCashAvailable}>{mode.label}{mode.value === "ESPECES" && !personalCashAvailable ? " · caisse indisponible" : ""}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             ) : (
               <PaymentModesMultiSelect
                 selectedModes={selectedPaymentModes.map((option) => option.value)}
                 onToggle={togglePaymentMode}
+                cashAvailable={personalCashAvailable}
               />
             )}
             {!multiClientDeposit && !signedSettlement && <div className="grid gap-2">
@@ -579,6 +585,7 @@ export default function NouveauReglementClientPage() {
               <span className="text-xs text-muted-foreground">Plafond : {money(maximumAdjustment)} MAD</span>
             </div>}
           </div>
+          {!personalCashAvailable && methods.some((method) => method.mode === "ESPECES") ? <p role="alert" className="text-sm text-destructive">Aucune caisse individuelle active n’est disponible pour votre utilisateur. Sélectionnez un autre moyen de règlement.</p> : null}
           {adjustmentAmount > 0 && <div className="grid max-w-4xl gap-2">
             <Label htmlFor="settlement-adjustment-reason">Motif de l'écart *</Label>
             <Input id="settlement-adjustment-reason" maxLength={500} value={adjustmentReason} onChange={event => setAdjustmentReason(event.target.value)} />
@@ -1014,6 +1021,7 @@ function InvalidSelection({ message }: { message: string }) {
 function PaymentModesMultiSelect(props: {
   selectedModes: ClientPaymentMode[];
   onToggle: (mode: ClientPaymentMode) => void;
+  cashAvailable: boolean;
 }) {
   const selectedOptions = paymentModes.filter((option) =>
     props.selectedModes.includes(option.value)
@@ -1046,11 +1054,12 @@ function PaymentModesMultiSelect(props: {
                     <CommandItem
                       key={value}
                       value={optionLabel}
+                      disabled={value === "ESPECES" && !props.cashAvailable && !selected}
                       onSelect={() => props.onToggle(value)}
                     >
                       <Check className={selected ? "size-4 opacity-100" : "size-4 opacity-0"} />
                       <Icon className="size-4 text-muted-foreground" />
-                      <span>{optionLabel}</span>
+                      <span>{optionLabel}{value === "ESPECES" && !props.cashAvailable ? " · caisse indisponible" : ""}</span>
                     </CommandItem>
                   );
                 })}

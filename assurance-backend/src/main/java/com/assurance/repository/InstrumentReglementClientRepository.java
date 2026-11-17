@@ -20,6 +20,13 @@ import jakarta.persistence.LockModeType;
 
 public interface InstrumentReglementClientRepository extends JpaRepository<InstrumentReglementClient, Long> {
 
+    boolean existsByAgenceIdAndCompteTresorerieIdAndStatutAndReglementStatut(
+            Long agenceId,
+            Long compteTresorerieId,
+            StatutInstrumentReglement statut,
+            StatutReglementClient statutReglement
+    );
+
     String BANK_REJECTION_FILTERS = """
             from InstrumentReglementClient instrument
             join instrument.reglement payment

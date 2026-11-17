@@ -137,7 +137,7 @@ public class SessionCaisseService {
     }
 
     private CompteTresorerie requireCashAccount(Long agenceId, Long accountId) {
-        CompteTresorerie account = compteRepository.findByIdAndAgenceId(accountId, agenceId)
+        CompteTresorerie account = compteRepository.findByIdAndAgenceIdForUpdate(accountId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));
         if (account.getTypeCompte() != TypeCompteTresorerie.CAISSE) {
             throw new BadRequestException("Une session ne peut être ouverte que sur une caisse");

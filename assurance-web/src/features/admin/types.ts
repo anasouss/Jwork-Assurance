@@ -11,6 +11,7 @@ export type AdminUser = {
   fullName: string;
   telephone?: string | null;
   actif: boolean;
+  caisseIndividuelleActive: boolean;
   lastLogin?: string | null;
   permissions: string[];
 };
@@ -128,6 +129,7 @@ export type UpsertAdminUserRequest = {
   nom: string;
   telephone?: string;
   actif: boolean;
+  caisseIndividuelleActive?: boolean;
 };
 
 export type UpsertPlatformAdminRequest = {

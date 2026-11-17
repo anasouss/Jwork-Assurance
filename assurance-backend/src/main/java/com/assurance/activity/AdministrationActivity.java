@@ -34,6 +34,7 @@ public final class AdministrationActivity {
         return new ActivityValues().put("Prénom", user.getPrenom()).put("Nom", user.getNom())
                 .put("Adresse e-mail", user.getEmail()).put("Téléphone", user.getTelephone())
                 .put("Actif", user.getActif())
+                .put("Caisse individuelle active", user.getCaisseIndividuelleActive())
                 .put("Agence", user.getAgence() == null ? "Plateforme" : reference(user.getAgence()).label())
                 .put("Rôle", user.getRole() == null ? null : reference(user.getRole()).label()).snapshot();
     }

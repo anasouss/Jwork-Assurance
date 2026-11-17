@@ -27,6 +27,11 @@ import com.assurance.repository.AgenceRepository;
 import com.assurance.repository.CompteTresorerieRepository;
 import com.assurance.repository.MouvementTresorerieRepository;
 import com.assurance.repository.UtilisateurRepository;
+import com.assurance.repository.SessionCaisseRepository;
+import com.assurance.repository.InstrumentReglementClientRepository;
+import com.assurance.enums.StatutSessionCaisse;
+import com.assurance.enums.StatutInstrumentReglement;
+import com.assurance.enums.StatutReglementClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +55,8 @@ public class TresorerieService {
     private final TresorerieAccessService accessService;
     private final BanqueService banqueService;
     private final BusinessActivityRecorder activityRecorder;
+    private final SessionCaisseRepository sessionCaisseRepository;
+    private final InstrumentReglementClientRepository instrumentRepository;
 
     @Transactional(readOnly = true)
     public List<CompteTresorerieResponse> listAccounts(Long agenceId, boolean administration) {
@@ -90,7 +97,7 @@ public class TresorerieService {
         if (request.getTypeCompte() == TypeCompteTresorerie.CAISSE
                 && request.getNatureCaisse() != NatureCaisseTresorerie.CENTRALE) {
             throw new BadRequestException(
-                    "Les caisses individuelles sont créées automatiquement avec les utilisateurs"
+                    "Activez la caisse individuelle depuis la fiche de l'utilisateur"
             );
         }
         String code = normalizeCode(request.getCode());
@@ -166,7 +173,7 @@ public class TresorerieService {
         if (account.getTypeCompte() == TypeCompteTresorerie.CAISSE
                 && account.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE) {
             throw new BadRequestException(
-                    "Le statut d'une caisse individuelle suit celui de son utilisateur"
+                    "La caisse individuelle est activée ou désactivée depuis la fiche de son utilisateur"
             );
         }
         account.setActif(Boolean.TRUE.equals(active));
@@ -404,7 +411,7 @@ public class TresorerieService {
         return account;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public CompteTresorerie findCurrentUserCashAccount(Long agenceId) {
         Long userId = accessService.currentUserId();
         CompteTresorerie account = compteRepository
@@ -417,6 +424,10 @@ public class TresorerieService {
                 .orElseThrow(() -> new BadRequestException(
                         "Aucune caisse individuelle active n'est affectée à votre utilisateur"
                 ));
+        if (!Boolean.TRUE.equals(account.getActif())
+                || !Boolean.TRUE.equals(account.getUtilisateurTitulaire().getCaisseIndividuelleActive())) {
+            throw new BadRequestException("Votre caisse individuelle n'est pas activée");
+        }
         accessService.requireAccess(
                 agenceId,
                 account.getId(),
@@ -433,6 +444,15 @@ public class TresorerieService {
                         TypeCompteTresorerie.CAISSE,
                         NatureCaisseTresorerie.INDIVIDUELLE
                 );
+        boolean enabled = Boolean.TRUE.equals(user.getCaisseIndividuelleActive());
+        for (CompteTresorerie account : personalAccounts) {
+            boolean sameAgency = user.getAgence() != null
+                    && user.getAgence().getId().equals(account.getAgence().getId());
+            if ((!enabled && (sameAgency || Boolean.TRUE.equals(account.getActif())))
+                    || (!sameAgency && Boolean.TRUE.equals(account.getActif()))) {
+                requirePersonalCashCanBeDisabled(account);
+            }
+        }
         var beforeAccounts = new java.util.LinkedHashMap<Long, java.util.Map<String, String>>();
         personalAccounts.forEach(account -> beforeAccounts.put(account.getId(), TreasuryActivity.snapshot(account)));
         CompteTresorerie current = user.getAgence() == null
@@ -450,7 +470,7 @@ public class TresorerieService {
         personalAccounts.forEach(accessService::ensureCashOwnerAccess);
         accessService.synchronizeCentralCashAccess(user);
 
-        if (user.getAgence() == null || !Boolean.TRUE.equals(user.getActif())) {
+        if (user.getAgence() == null || !Boolean.TRUE.equals(user.getActif()) || !enabled) {
             if (current != null && Boolean.TRUE.equals(current.getActif())) {
                 current.setActif(false);
                 current = compteRepository.save(current);
@@ -484,6 +504,23 @@ public class TresorerieService {
         var affectedAccounts = new java.util.ArrayList<>(personalAccounts);
         if (!beforeAccounts.containsKey(current.getId())) affectedAccounts.add(current);
         recordPersonalCashChanges(affectedAccounts, beforeAccounts);
+    }
+
+    private void requirePersonalCashCanBeDisabled(CompteTresorerie account) {
+        Long agencyId = account.getAgence().getId();
+        if (sessionCaisseRepository.existsByAgenceIdAndCompteTresorerieIdAndStatut(
+                agencyId, account.getId(), StatutSessionCaisse.OUVERTE)) {
+            throw new BadRequestException("Clôturez la session de caisse avant de désactiver la caisse individuelle");
+        }
+        BigDecimal balance = money(account.getSoldeInitial())
+                .add(money(mouvementRepository.balanceForAccount(account.getId())));
+        if (balance.signum() != 0) {
+            throw new BadRequestException("Le solde de la caisse doit être nul avant sa désactivation");
+        }
+        if (instrumentRepository.existsByAgenceIdAndCompteTresorerieIdAndStatutAndReglementStatut(
+                agencyId, account.getId(), StatutInstrumentReglement.EN_ATTENTE, StatutReglementClient.VALIDE)) {
+            throw new BadRequestException("Traitez les règlements en attente avant de désactiver la caisse individuelle");
+        }
     }
 
     private void recordPersonalCashChanges(List<CompteTresorerie> accounts,

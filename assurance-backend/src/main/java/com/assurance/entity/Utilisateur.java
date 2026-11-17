@@ -56,6 +56,10 @@ public class Utilisateur extends BaseEntity {
     @Column(nullable = false)
     private Boolean actif = true;
 
+    @Builder.Default
+    @Column(name = "caisse_individuelle_active", nullable = false)
+    private Boolean caisseIndividuelleActive = false;
+
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 

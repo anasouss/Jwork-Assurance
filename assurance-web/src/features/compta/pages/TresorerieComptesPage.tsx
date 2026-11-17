@@ -243,7 +243,7 @@ export default function TresorerieComptesPage() {
         />
         <AccountSection
           title="Caisses individuelles"
-          description="Une caisse créée automatiquement pour chaque utilisateur actif."
+          description="Caisses activées depuis la fiche des utilisateurs."
           type="CAISSE"
           accounts={(accounts.data ?? []).filter((account) =>
             account.typeCompte === "CAISSE" && account.natureCaisse !== "CENTRALE"

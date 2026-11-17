@@ -143,6 +143,10 @@ export function UsersPanel({
       setDialogOpen(false);
       setEditing(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury-accounts"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury-account-options"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury-users"] });
+      await queryClient.invalidateQueries({ queryKey: ["compta", "treasury-account-assignments"] });
       onChanged();
       toast.success("Utilisateur enregistré");
     },
@@ -181,6 +185,7 @@ export function UsersPanel({
               <TableHead>Agence</TableHead>
               <TableHead>Rôle</TableHead>
               <TableHead>Téléphone</TableHead>
+              <TableHead>Caisse individuelle</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead>Dernière connexion</TableHead>
               <TableHead className="w-20 text-right">Actions</TableHead>
@@ -188,7 +193,7 @@ export function UsersPanel({
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRowsSkeleton rows={6} colSpan={7} />
+              <TableRowsSkeleton rows={6} colSpan={8} />
             ) : filtered.length ? filtered.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>
@@ -198,6 +203,7 @@ export function UsersPanel({
                 <TableCell>{item.agenceNom ?? "-"}</TableCell>
                 <TableCell>{item.roleNom ?? item.roleCode ?? "-"}</TableCell>
                 <TableCell>{item.telephone ?? "-"}</TableCell>
+                <TableCell>{item.caisseIndividuelleActive ? "Oui" : "Non"}</TableCell>
                 <TableCell><Badge variant={item.actif ? "default" : "outline"}>{item.actif ? "Actif" : "Inactif"}</Badge></TableCell>
                 <TableCell>{formatDateTime(item.lastLogin)}</TableCell>
                 <TableCell className="text-right">
@@ -236,7 +242,7 @@ export function UsersPanel({
               </TableRow>
             )) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-28 text-center text-muted-foreground">
                   Aucun utilisateur trouvé
                 </TableCell>
               </TableRow>
@@ -290,6 +296,10 @@ export function UsersPanel({
             <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
               <Checkbox disabled={Boolean(editing) && (!rights.update || !rights.deactivate)} checked={form.actif} onCheckedChange={(checked) => setForm({ ...form, actif: Boolean(checked) })} />
               Actif
+            </label>
+            <label className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+              <Checkbox disabled={save.isPending || Boolean(editing) && !rights.update} checked={form.caisseIndividuelleActive === true} onCheckedChange={(checked) => setForm({ ...form, caisseIndividuelleActive: checked === true })} />
+              Activer une caisse individuelle
             </label>
           </div>
           <DialogFooter>
@@ -3449,7 +3459,7 @@ function LabeledInput({
 }
 
 function emptyUser(agenceId?: string, roleId?: string): UpsertAdminUserRequest {
-  return { agenceId, roleId: roleId ?? "", email: "", password: "", prenom: "", nom: "", telephone: "", actif: true };
+  return { agenceId, roleId: roleId ?? "", email: "", password: "", prenom: "", nom: "", telephone: "", actif: true, caisseIndividuelleActive: false };
 }
 
 function userToForm(user: AdminUser): UpsertAdminUserRequest {
@@ -3461,6 +3471,7 @@ function userToForm(user: AdminUser): UpsertAdminUserRequest {
     nom: user.nom,
     telephone: user.telephone ?? "",
     actif: user.actif,
+    caisseIndividuelleActive: user.caisseIndividuelleActive,
   };
 }
 

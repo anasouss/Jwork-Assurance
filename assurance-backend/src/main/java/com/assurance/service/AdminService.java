@@ -36,6 +36,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -223,12 +224,13 @@ public class AdminService {
                 .nom(request.getNom().trim())
                 .telephone(blankToNull(request.getTelephone()))
                 .actif(request.getActif() == null || request.getActif())
+                .caisseIndividuelleActive(Boolean.TRUE.equals(request.getCaisseIndividuelleActive()))
                 .build();
         return saveAgencyUser(user, null, ActivityAction.CREATED, "Utilisateur créé", "USER_CREATE",
                 agence.getId());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public AdminUtilisateurResponse updateUser(Long id, UpsertUtilisateurRequest request) {
         Utilisateur actor = currentUser();
         requireAny(actor, "user:update", "config:manage");
@@ -259,6 +261,9 @@ public class AdminService {
         user.setNom(request.getNom().trim());
         user.setTelephone(blankToNull(request.getTelephone()));
         user.setActif(request.getActif() == null || request.getActif());
+        if (request.getCaisseIndividuelleActive() != null) {
+            user.setCaisseIndividuelleActive(request.getCaisseIndividuelleActive());
+        }
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             requireAny(actor, "user:reset-password", "config:manage");
             user.setPassword(passwordEncoder.encode(request.getPassword()));

@@ -4,6 +4,10 @@ import com.assurance.entity.CompteTresorerie;
 import com.assurance.enums.NatureCaisseTresorerie;
 import com.assurance.enums.TypeCompteTresorerie;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,12 +22,17 @@ public interface CompteTresorerieRepository extends JpaRepository<CompteTresorer
 
     Optional<CompteTresorerie> findByIdAndAgenceId(Long id, Long agenceId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from CompteTresorerie c where c.id = :id and c.agence.id = :agenceId")
+    Optional<CompteTresorerie> findByIdAndAgenceIdForUpdate(@Param("id") Long id, @Param("agenceId") Long agenceId);
+
     Optional<CompteTresorerie> findByAgenceIdAndTypeCompteAndNatureCaisse(
             Long agenceId,
             TypeCompteTresorerie typeCompte,
             NatureCaisseTresorerie natureCaisse
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<CompteTresorerie> findByAgenceIdAndUtilisateurTitulaireIdAndTypeCompteAndNatureCaisseAndActifTrue(
             Long agenceId,
             Long utilisateurId,
@@ -31,6 +40,7 @@ public interface CompteTresorerieRepository extends JpaRepository<CompteTresorer
             NatureCaisseTresorerie natureCaisse
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<CompteTresorerie> findByUtilisateurTitulaireIdAndTypeCompteAndNatureCaisse(
             Long utilisateurId,
             TypeCompteTresorerie typeCompte,

@@ -22,6 +22,7 @@ public class AdminUtilisateurResponse {
     private String fullName;
     private String telephone;
     private Boolean actif;
+    private Boolean caisseIndividuelleActive;
     private LocalDateTime lastLogin;
     private Set<String> permissions;
 
@@ -39,6 +40,7 @@ public class AdminUtilisateurResponse {
                 .fullName(user.getFullName())
                 .telephone(user.getTelephone())
                 .actif(user.getActif())
+                .caisseIndividuelleActive(Boolean.TRUE.equals(user.getCaisseIndividuelleActive()))
                 .lastLogin(user.getLastLogin())
                 .permissions(user.getPermissions())
                 .build();

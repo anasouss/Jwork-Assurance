@@ -479,7 +479,7 @@ public class OperationTresorerieService {
     }
 
     private CompteTresorerie requireActiveAccount(Long agenceId, Long accountId) {
-        CompteTresorerie account = compteRepository.findByIdAndAgenceId(accountId, agenceId)
+        CompteTresorerie account = compteRepository.findByIdAndAgenceIdForUpdate(accountId, agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Compte de trésorerie", accountId));
         if (!Boolean.TRUE.equals(account.getActif())) {
             throw new BadRequestException("Le compte " + account.getLibelle() + " est inactif");

@@ -74,6 +74,14 @@ public class TresorerieAccessService {
         if (!access.getNiveauAcces().allows(required)) {
             throw new AccessDeniedException("Niveau d'accès insuffisant sur ce compte de trésorerie");
         }
+        CompteTresorerie account = access.getCompteTresorerie();
+        if (required != NiveauAccesCompteTresorerie.CONSULTATION
+                && account.getNatureCaisse() == NatureCaisseTresorerie.INDIVIDUELLE
+                && (!Boolean.TRUE.equals(account.getActif())
+                    || account.getUtilisateurTitulaire() == null
+                    || !Boolean.TRUE.equals(account.getUtilisateurTitulaire().getCaisseIndividuelleActive()))) {
+            throw new AccessDeniedException("Cette caisse individuelle est désactivée");
+        }
         return access;
     }
 
@@ -203,7 +211,9 @@ public class TresorerieAccessService {
             assignment.setNiveauAcces(required);
         }
         assignment.setActif(Boolean.TRUE.equals(owner.getActif())
-                && Boolean.TRUE.equals(account.getActif()));
+                && Boolean.TRUE.equals(account.getActif())
+                && (account.getNatureCaisse() != NatureCaisseTresorerie.INDIVIDUELLE
+                    || Boolean.TRUE.equals(owner.getCaisseIndividuelleActive())));
         affectationRepository.save(assignment);
     }
 

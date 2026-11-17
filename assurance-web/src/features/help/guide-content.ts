@@ -1196,7 +1196,7 @@ export const guideModules: GuideModule[] = [
         steps: [
           { title: "Lire la synthèse", description: "Comparez Caisse centrale, Caisses individuelles et Comptes bancaires avec leurs soldes et statuts." },
           { title: "Ajouter un compte", description: "Cliquez sur Nouveau compte, choisissez Caisse ou Banque puis renseignez code, libellé, devise et solde initial selon les champs proposés." },
-          { title: "Configurer une caisse", description: "Définissez si elle est centrale ou individuelle et choisissez l’utilisateur responsable lorsque demandé." },
+          { title: "Configurer une caisse", description: "Créez la caisse centrale en trésorerie. Activez la caisse individuelle depuis la fiche de l’utilisateur lorsqu’elle est nécessaire." },
           { title: "Configurer une banque", description: "Sélectionnez la Banque et complétez RIB/numéro de compte et informations optionnelles proposées." },
           { title: "Affecter les utilisateurs", description: "Dans Actions, ouvrez les affectations, cochez les utilisateurs autorisés puis enregistrez." },
           { title: "Consulter le détail", description: "Ouvrez un compte pour voir Solde comptable, Type, Banque, mouvements Entrée/Sortie et informations d’affectation." },

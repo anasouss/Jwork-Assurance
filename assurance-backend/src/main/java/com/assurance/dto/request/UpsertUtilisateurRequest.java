@@ -28,4 +28,5 @@ public class UpsertUtilisateurRequest {
 
     private String telephone;
     private Boolean actif = true;
+    private Boolean caisseIndividuelleActive;
 }

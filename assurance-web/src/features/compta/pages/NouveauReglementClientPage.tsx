@@ -470,11 +470,13 @@ export default function NouveauReglementClientPage() {
           tone="payment"
         />
         <SummaryCell
-          label={unallocatedCredit > 0.001 ? "Reste à affecter" : "Reste à payer"}
-          value={unallocatedCredit > 0.001 ? `+${money(unallocatedCredit)}` : money(remainingAmount)}
+          label="Solde du règlement"
+          value={money(remainingAmount)}
           detail={unallocatedCredit > 0.001
-            ? `Maximum autorisé : ${money(maximumUnallocatedCredit)}`
-            : undefined}
+            ? outgoing
+              ? "Excédent de versement"
+              : `Trop-perçu conservé en crédit client · Plafond : ${money(maximumUnallocatedCredit)} MAD`
+            : remainingAmount > 0.001 ? "Montant restant à régler" : "Règlement soldé"}
           tone={creditExceedsMaximum ? "danger" : unallocatedCredit > 0.001 ? "credit" : "balance"}
         />
       </section>
@@ -828,15 +830,17 @@ export default function NouveauReglementClientPage() {
           : "text-sm text-muted-foreground"}
         >
           {paymentPolicy.isError
-            ? "Impossible de vérifier la limite du montant restant à affecter. Réessayez avant d’enregistrer."
+            ? "Impossible de vérifier le plafond du crédit client. Réessayez avant d’enregistrer."
             : adjustmentInvalid
             ? "Vérifiez le plafond, le motif et les créances concernées par l'écart"
             : creditExceedsMaximum
-            ? `Reste à affecter supérieur au maximum autorisé de ${money(maximumUnallocatedCredit)}`
+            ? `Montant non affecté supérieur au plafond de ${money(maximumUnallocatedCredit)} MAD`
             : remainingAmount > 0.001
             ? `Paiement partiel · reste ${money(remainingAmount)}`
             : remainingAmount < -0.001
-              ? `Reste à affecter · ${money(Math.abs(remainingAmount))}`
+              ? outgoing
+                ? `Excédent de versement · ${money(Math.abs(remainingAmount))} MAD`
+                : `Trop-perçu · ${money(Math.abs(remainingAmount))} MAD en crédit client`
               : "Le règlement couvre la sélection"}
         </div>
         <div className="flex gap-2">
@@ -862,10 +866,10 @@ export default function NouveauReglementClientPage() {
       <AlertDialog open={creditConfirmationOpen} onOpenChange={setCreditConfirmationOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmer le reste à affecter</AlertDialogTitle>
+            <AlertDialogTitle>Confirmer le crédit client</AlertDialogTitle>
             <AlertDialogDescription>
-              Vous encaissez {money(paymentTotal)} MAD, dont {money(unallocatedCredit)} MAD restera
-              à affecter au compte du client.
+              Vous encaissez {money(paymentTotal)} MAD, dont {money(unallocatedCredit)} MAD de trop-perçu.
+              Ce montant sera conservé en crédit sur le compte du client, sans restitution.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

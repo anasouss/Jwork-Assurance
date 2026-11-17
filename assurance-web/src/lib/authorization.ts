@@ -22,6 +22,7 @@ const pagePermissionRules: readonly PagePermissionRule[] = [
   { paths: ["/app/sinistre"], requirement: { anyPrefix: MODULE_PERMISSION_PREFIXES.sinistre } },
   { paths: ["/app/sinistre/dossiers", "/app/sinistre/registre", "/app/sinistre/statistiques", "/app/sinistre/dossiers/:sinistreId"], requirement: { anyOf: ["sinistre:view"] } },
   { paths: ["/app/sinistre/declarer"], requirement: { anyOf: ["sinistre:create"] } },
+  { paths: ["/app/sinistre/dossiers/:sinistreId/modifier"], requirement: { anyOf: ["sinistre:update"] } },
   { paths: ["/app/sinistre/referentiels", "/app/sinistre/experts", "/app/sinistre/garages", "/app/sinistre/prestataires"], requirement: { anyOf: ["prestataire-sinistre:view"] } },
   { paths: ["/app/sinistre/prestataires/specialites"], requirement: { anyOf: ["specialite-prestataire:view"] } },
   { paths: ["/app/sinistre/prestataires/domaines"], requirement: { anyOf: ["domaine-prestataire:view"] } },

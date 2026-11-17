@@ -62,6 +62,15 @@ describe("route authorization", () => {
     expect(canAccessPath([], path)).toBe(false);
   });
 
+  it("requires update permission for the claim edit page", () => {
+    const path = "/app/sinistre/dossiers/53/modifier";
+    expect(permissionRequirementForPath(path)).toEqual({ anyOf: ["sinistre:update"] });
+    expect(canAccessPath(["sinistre:view"], path)).toBe(false);
+    expect(canAccessPath(["sinistre:update"], path)).toBe(true);
+    expect(canAccessPath([], path)).toBe(false);
+    expect(canAccessPath(["sinistre:view"], "/app/sinistre/dossiers/53")).toBe(true);
+  });
+
   it("denies unregistered operational routes and retired capabilities", () => {
     expect(canAccessPath(["contrat:view"], "/app/production/unknown")).toBe(false);
     expect(canAccessPath(["tresorerie:manage"], "/app/compta/tresorerie/comptes")).toBe(false);

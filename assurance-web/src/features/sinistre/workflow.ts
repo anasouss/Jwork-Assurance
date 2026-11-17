@@ -1,4 +1,4 @@
-import type { EtapeSuiviSinistre, ModeReparationSinistre, TypeDommageSinistre } from "./types";
+import type { EtapeSuiviSinistre, ModeReparationSinistre, StatutSinistre, TypeDommageSinistre } from "./types";
 
 export const suiviSteps: EtapeSuiviSinistre[] = ["OUVERTURE", "EXPERTISE_AVANT", "INSTANCE_CLIENT", "EXPERTISE_APRES", "COMPAGNIE", "CLOTURE"];
 export const suiviLabels: Record<EtapeSuiviSinistre, string> = {
@@ -11,3 +11,7 @@ export const suiviLabels: Record<EtapeSuiviSinistre, string> = {
 };
 export const repairLabels: Record<ModeReparationSinistre, string> = { NORMAL: "Normal", PEC: "Prise en charge", RAPIDE: "Rapide" };
 export const damageLabels: Record<TypeDommageSinistre, string> = { MATERIEL: "Matériel", CORPOREL: "Corporel", MIXTE: "Matériel et corporel" };
+
+export function isAtLeastTransmitted(statut: StatutSinistre) {
+  return ["TRANSMIS_COMPAGNIE", "EXPERTISE", "EN_ATTENTE_REGLEMENT", "PARTIELLEMENT_REGLE", "REGLE", "CLOTURE", "ROUVERT"].includes(statut);
+}

@@ -378,7 +378,7 @@ export default function SinistreListPage({ mode = "consultation" }: { mode?: "co
                           </DropdownMenuItem>
                           {canUpdate && !isRegister && item.editable ? (
                             <DropdownMenuItem asChild>
-                              <Link to={`/app/sinistre/dossiers/${item.id}#modifier`}>
+                              <Link to={`/app/sinistre/dossiers/${item.id}/modifier`}>
                                 <Pencil className="size-4" />
                                 Modifier le dossier
                               </Link>

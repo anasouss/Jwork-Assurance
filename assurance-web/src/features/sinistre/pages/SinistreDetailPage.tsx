@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Banknote,
   ChevronDown,
   CircleAlert,
-  CircleCheck,
   Download,
   FileCheck2,
   FileText,
@@ -15,14 +14,12 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
-  Save,
   Trash2,
   UserRoundSearch,
 } from "lucide-react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,23 +30,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -59,7 +45,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { downloadBlob } from "@/lib/download";
 import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
@@ -78,25 +63,18 @@ import {
   documentTypeLabels,
 } from "../components/SinistreDocumentDialog";
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
-import { SinistreAssistanceTable } from "../components/SinistreAssistanceTable";
+import { CoverageSection, GeneralSection } from "../components/SinistreDossierSections";
 import { SinistreTracking } from "../components/SinistreTracking";
-import { damageLabels, repairLabels, suiviLabels } from "../workflow";
+import { isAtLeastTransmitted, suiviLabels } from "../workflow";
 import type {
-  DecisionCouverture,
   SinistreDetail,
   StatutSinistre,
   TypeDocument,
-  ModeReparationSinistre,
 } from "../types";
 
 export default function SinistreDetailPage() {
   const { sinistreId = "" } = useParams();
   const location = useLocation();
-  const [activeSection, setActiveSection] = useState("synthese");
-  useEffect(() => { setActiveSection("synthese"); }, [sinistreId]);
-  useEffect(() => {
-    if (location.hash === "#modifier") setActiveSection("synthese");
-  }, [location.hash, location.key]);
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canUpdate = permissions.includes("sinistre:update");
@@ -131,11 +109,11 @@ export default function SinistreDetailPage() {
     queryFn: () => sinistreApi.get(sinistreId),
     enabled: Boolean(sinistreId),
   });
-  const managers = useQuery({
-    queryKey: sinistreKeys.managers(),
-    queryFn: sinistreApi.managers,
-    enabled: canUpdate,
-  });
+  useEffect(() => {
+    if (detail.data && location.hash && location.hash !== "#modifier") {
+      window.document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: "start" });
+    }
+  }, [detail.data?.id, location.hash]);
   const treasuryAccounts = useQuery({
     queryKey: sinistreKeys.treasuryAccounts(),
     queryFn: sinistreApi.treasuryAccounts,
@@ -171,17 +149,6 @@ export default function SinistreDetailPage() {
       setTransitionOpen(false);
       accept(result, "Statut mis à jour");
     },
-    onError: fail,
-  });
-  const update = useMutation({
-    mutationFn: (request: object) => sinistreApi.update(sinistreId, request),
-    onSuccess: (result) => accept(result, "Dossier mis à jour"),
-    onError: fail,
-  });
-  const guarantee = useMutation({
-    mutationFn: (guarantees: object[]) =>
-      sinistreApi.updateGuarantees(sinistreId, guarantees),
-    onSuccess: (result) => accept(result, "Garanties mises à jour"),
     onError: fail,
   });
   const party = useMutation({
@@ -309,9 +276,13 @@ export default function SinistreDetailPage() {
     isAtLeastExpertise(dossier.statut);
   const coverageAssessmentVisible = isAtLeastTransmitted(dossier.statut);
 
+  if (location.hash === "#modifier" && canUpdate && !locked) {
+    return <Navigate to={`/app/sinistre/dossiers/${dossier.id}/modifier`} replace />;
+  }
+
   return (
-    <div className="mx-auto grid w-full max-w-[1600px] gap-3">
-      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto grid w-full min-w-0 max-w-[1600px] gap-6 bg-muted/25 p-3 sm:p-5">
+      <header className="flex min-w-0 flex-col gap-3 border-b border-sky-200 bg-sky-50 px-4 pb-5 pt-2 dark:border-sky-900 dark:bg-sky-950/25 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 break-words">
           <Button asChild variant="ghost" className="mb-2 -ml-3">
             <Link to="/app/sinistre/dossiers">
@@ -324,53 +295,49 @@ export default function SinistreDetailPage() {
             <SinistreStatusBadge statut={dossier.statut} />
             {locked ? <span className="text-xs text-muted-foreground">Lecture seule</span> : null}
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-sky-950/75 dark:text-sky-200/80">
             Sinistre du {formatDate(dossier.dateSinistre)}{" "}
             · {dossier.couverture.assure} · {dossier.couverture.compagnie}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canUpdate && !locked ? <Button asChild><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier`}><Pencil className="size-4" />Modifier le dossier</Link></Button> : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button variant="outline"><MoreHorizontal className="size-4" />Actions du dossier</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {canTransition && dossier.workflow.transitions.length > 0 ? <DropdownMenuItem onSelect={() => setTransitionOpen(true)}>Changer le statut</DropdownMenuItem> : null}
-              <DropdownMenuItem onSelect={() => setActiveSection("historique")}><History className="size-4" />Historique</DropdownMenuItem>
+              <DropdownMenuItem asChild><a href="#historique"><History className="size-4" />Historique</a></DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
+      </header>
       <SinistreTracking dossier={dossier} />
-      <Tabs value={activeSection} onValueChange={setActiveSection} className="min-w-0 gap-4">
-        <div className="overflow-x-auto border-b pb-2">
-          <TabsList variant="line" aria-label="Rubriques du dossier">
-            <TabsTrigger value="synthese">Synthèse</TabsTrigger>
-            <TabsTrigger value="documents">Documents ({dossier.documents.length})</TabsTrigger>
-            <TabsTrigger value="expertises">Expertises ({dossier.missionsExpertise.length})</TabsTrigger>
-            <TabsTrigger value="finances">Finances</TabsTrigger>
-            <TabsTrigger value="historique">Historique</TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="synthese" forceMount className="grid min-w-0 gap-5 data-[state=inactive]:hidden">
-          <DocumentAttention dossier={dossier} onOpen={() => setActiveSection("documents")} />
+      <DocumentAttention dossier={dossier} />
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 space-y-6">
+        <section id="informations" className="scroll-mt-24 border-y bg-card px-4">
           <GeneralSection
             key={dossier.id}
             dossier={dossier}
-            managers={managers.data ?? []}
+            managers={[]}
             responsibilityVisible={
               dossier.garanties.some((item) => item.impliquee && item.responsabiliteCivile)
             }
-            editable={canUpdate && !locked}
-            saving={update.isPending}
-            onSave={(request) => update.mutateAsync(request)}
+            editable={false}
+            saving={false}
           />
+        </section>
+        <section id="garanties" className="scroll-mt-24 border-y bg-card">
+          {canUpdate && !locked ? <div className="flex justify-end px-4 pt-3"><Button asChild size="sm" variant="outline"><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier?section=garanties`}><Pencil className="size-4" />Modifier les garanties</Link></Button></div> : null}
         <CoverageSection
             key={`coverage-${dossier.id}`}
             dossier={dossier}
             assessmentVisible={coverageAssessmentVisible}
-            editable={canUpdate && !locked}
-            saving={guarantee.isPending}
-            onSave={(guarantees) => guarantee.mutateAsync(guarantees)}
+            editable={false}
+            saving={false}
         />
+        </section>
+        <section id="parties" className="scroll-mt-24 bg-card">
         <WorkflowPanel
           title="Parties impliquées"
           summary={`${dossier.parties.length} partie(s)`}
@@ -438,8 +405,9 @@ export default function SinistreDetailPage() {
               </Table>
             </div>
         </WorkflowPanel>
-        </TabsContent>
-        <TabsContent value="documents" forceMount className="min-w-0 space-y-4 data-[state=inactive]:hidden">
+        </section>
+        </div>
+        <aside id="documents" aria-label="Documents du dossier" className="min-w-0 scroll-mt-24 bg-card">
           <DocumentsPanel
             dossier={dossier}
             editable={canUploadDocument && !locked}
@@ -452,8 +420,9 @@ export default function SinistreDetailPage() {
             onReview={(id, statut) => reviewDocument.mutate({ id, statut })}
             onDelete={(id, name) => setDocumentToDelete({ id, name })}
           />
-        </TabsContent>
-        <TabsContent value="expertises" forceMount className="min-w-0 data-[state=inactive]:hidden">
+        </aside>
+      </div>
+        <section id="expertises" className="min-w-0 scroll-mt-24 bg-card">
             <WorkflowPanel
               title="Missions d’expertise"
               summary={`${dossier.missionsExpertise.length} mission(s)`}
@@ -533,8 +502,8 @@ export default function SinistreDetailPage() {
               </Table>
             </div>
             </WorkflowPanel>
-        </TabsContent>
-        <TabsContent value="finances" forceMount className="min-w-0 data-[state=inactive]:hidden">
+        </section>
+        <section id="finances" className="min-w-0 scroll-mt-24 bg-card">
         {financeVisible ? (
           <div className="grid gap-4">
             <FinancialSummary dossier={dossier} />
@@ -684,9 +653,10 @@ export default function SinistreDetailPage() {
             </WorkflowPanel>
           </div>
         ) : <p className="border-y py-8 text-sm text-muted-foreground">Aucune écriture financière. Les provisions et opérations seront disponibles à l’étape d’expertise.</p>}
-        </TabsContent>
-        <TabsContent value="historique" className="min-w-0"><DossierHistory dossier={dossier} /></TabsContent>
-      </Tabs>
+        </section>
+        <section id="historique" className="min-w-0 scroll-mt-24 bg-card">
+          <WorkflowPanel title="Historique du dossier" summary={`${dossier.evenements.length} événement(s)`} defaultOpen><DossierHistory dossier={dossier} /></WorkflowPanel>
+        </section>
       <SinistreTransitionDialog
         open={transitionOpen}
         transitions={dossier.workflow.transitions}
@@ -782,7 +752,7 @@ function FinancialSummary({ dossier }: { dossier: SinistreDetail }) {
     ["Reste à régler", dossier.totaux.resteARegler],
   ] as const;
   return (
-    <section className="min-w-0 border-y">
+    <section className="min-w-0 border-y border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/15">
       <SectionHeader title="Situation financière · MAD" />
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {metrics.map(([label, value]) => (
@@ -867,9 +837,9 @@ function WorkflowPanel({
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="min-w-0 border-y"
+      className="min-w-0 border-y [&_thead]:bg-muted/50"
     >
-      <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 py-1">
+      <div className="flex min-h-12 flex-wrap items-center justify-between gap-2 bg-muted/35 py-1">
         <CollapsibleTrigger asChild>
           <button
             type="button"
@@ -924,18 +894,10 @@ function DocumentsPanel({
   const openingPending = requiredDocuments.some(
     (item) => item.recu && !item.valide,
   );
-  const expertiseDocuments = dossier.documents.filter((item) =>
-    ["DEVIS", "RAPPORT_EXPERT", "ACCORD"].includes(item.type),
-  ).length;
-  const settlementDocuments = dossier.documents.filter((item) =>
-    ["FACTURE", "REGLEMENT", "RECOURS"].includes(item.type),
-  ).length;
-  const expertiseAvailable = isAtLeastTransmitted(dossier.statut);
-  const settlementAvailable = isAtLeastExpertise(dossier.statut);
 
   return (
     <section className="min-w-0 border-y">
-      <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 bg-sky-50 px-4 py-3 dark:bg-sky-950/25">
         <div className="min-w-0">
           <h2 className="font-semibold">Pièces du dossier</h2>
           <p className="text-xs text-muted-foreground">
@@ -950,29 +912,14 @@ function DocumentsPanel({
         ) : null}
       </div>
 
-      <div className="grid min-w-0 items-start lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
-      <div className="min-w-0 border-t lg:border-r">
-        <div className="px-3 py-2">
-          <p className="text-xs font-semibold uppercase text-muted-foreground">
-            Parcours documentaire
-          </p>
+      <div className="min-w-0">
+      <div className="min-w-0 border-t">
+        <div className="flex flex-wrap justify-between gap-2 px-3 py-3 text-xs">
+          <h3 className="font-semibold text-muted-foreground">Pièces requises</h3>
+          <span className={openingComplete ? "text-emerald-700 dark:text-emerald-300" : "text-amber-800 dark:text-amber-300"}>{openingComplete ? "Complet" : openingPending ? "À contrôler" : "À compléter"}</span>
         </div>
-        <DocumentStage
-          number={1}
-          title="Ouverture du dossier"
-          description="Déclaration, constat et pièces d’identité"
-          status={
-            openingComplete
-              ? "Complet"
-              : openingPending
-                ? "À contrôler"
-                : "À compléter"
-          }
-          tone={openingComplete ? "success" : "warning"}
-          active={!openingComplete}
-        >
           {requiredDocuments.length > 0 ? (
-            <div className="mt-2 grid gap-1.5">
+            <div className="grid gap-1.5 px-3 pb-3">
               {requiredDocuments.map((item) => {
                 const status = item.valide
                   ? "Validé"
@@ -1004,35 +951,6 @@ function DocumentsPanel({
               })}
             </div>
           ) : null}
-        </DocumentStage>
-        <DocumentStage
-          number={2}
-          title="Expertise"
-          description="Devis, rapport d’expert et accord compagnie"
-          status={
-            expertiseAvailable
-              ? expertiseDocuments > 0
-                ? `${expertiseDocuments} déposé(s)`
-                : "À venir"
-              : "Après transmission"
-          }
-          tone={expertiseDocuments > 0 ? "success" : "neutral"}
-          active={expertiseAvailable && expertiseDocuments === 0}
-        />
-        <DocumentStage
-          number={3}
-          title="Règlement et recours"
-          description="Factures, justificatifs et recours"
-          status={
-            settlementAvailable
-              ? settlementDocuments > 0
-                ? `${settlementDocuments} déposé(s)`
-                : "À venir"
-              : "Étape ultérieure"
-          }
-          tone={settlementDocuments > 0 ? "success" : "neutral"}
-          active={settlementAvailable && settlementDocuments === 0}
-        />
       </div>
 
       <div className="min-w-0 border-t">
@@ -1127,581 +1045,7 @@ function DocumentsPanel({
   );
 }
 
-function DocumentStage({
-  number,
-  title,
-  description,
-  status,
-  tone,
-  active = false,
-  children,
-}: {
-  number: number;
-  title: string;
-  description: string;
-  status: string;
-  tone: "success" | "warning" | "neutral";
-  active?: boolean;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className={`border-t px-3 py-3 ${active ? "bg-sky-50/50 dark:bg-sky-950/30" : ""}`}>
-      <div className="flex items-start gap-2.5">
-        <span
-          className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ${
-            tone === "success"
-              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-              : active
-                ? "bg-sky-600 text-white"
-                : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"
-          }`}
-        >
-          {tone === "success" ? <CircleCheck className="size-3.5" /> : number}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <p className="text-sm font-medium">{title}</p>
-            <span
-              className={`shrink-0 text-xs font-medium ${
-                tone === "success"
-                  ? "text-emerald-700 dark:text-emerald-300"
-                  : tone === "warning"
-                    ? "text-amber-700 dark:text-amber-300"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {status}
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function generalForm(dossier: SinistreDetail) {
-  return {
-    referenceCompagnie: dossier.referenceCompagnie || "",
-    responsabilite: dossier.tauxResponsabilite == null ? "NON_DETERMINEE" : String(dossier.tauxResponsabilite),
-    notes: dossier.notes || "",
-    gestionnaireId: dossier.gestionnaireId || "",
-    prochaineAction: dossier.prochaineAction || "",
-    dateEcheanceAction: dossier.dateEcheanceAction || "",
-    typeDommage: dossier.typeDommage || "",
-    modeReparation: dossier.modeReparation || "",
-    garageId: dossier.garageId || "",
-  };
-}
-
-function GeneralSection({
-  dossier,
-  managers,
-  responsibilityVisible,
-  editable,
-  saving,
-  onSave,
-}: {
-  dossier: SinistreDetail;
-  managers: Array<{ id: string; nom: string }>;
-  responsibilityVisible: boolean;
-  editable: boolean;
-  saving: boolean;
-  onSave: (request: object) => Promise<unknown>;
-}) {
-  const location = useLocation();
-  const sectionRef = useRef<HTMLElement>(null);
-  const [editing, setEditing] = useState(location.hash === "#modifier" && editable);
-  useEffect(() => {
-    if (location.hash !== "#modifier" || !editable) return;
-    setEditing(true);
-    sectionRef.current?.scrollIntoView({ block: "start" });
-  }, [location.hash, location.key, editable, dossier.id]);
-  useEffect(() => {
-    if (editing) sectionRef.current?.querySelector<HTMLInputElement>("input:not(:disabled)")?.focus({ preventScroll: true });
-  }, [editing]);
-  const [form, setForm] = useState(() => generalForm(dossier));
-  const [trackingOpen, setTrackingOpen] = useState(
-    Boolean(
-      dossier.prochaineAction || dossier.dateEcheanceAction || dossier.notes,
-    ),
-  );
-  useEffect(
-    () => setForm(generalForm(dossier)),
-    [dossier],
-  );
-  const update = (key: keyof typeof form, value: string) =>
-    setForm((current) => ({ ...current, [key]: value }));
-  const garageContext = { sinistreId: dossier.id, modeReparation: (form.modeReparation || undefined) as ModeReparationSinistre | undefined,
-    garantieIds: dossier.garanties.filter(g => g.impliquee).map(g => g.garantieId) };
-  const garageQuery = useQuery({ queryKey: sinistreKeys.eligible("GARAGE", garageContext), queryFn: () => sinistreApi.eligibleProviders("GARAGE", garageContext), enabled: editing && editable && dossier.couverture.brancheCode === "AUTOMOBILE" });
-  const garages = garageQuery.data ?? [];
-  const historicalGarage = form.garageId === dossier.garageId && form.modeReparation === dossier.modeReparation;
-  const garageChanged = form.garageId !== (dossier.garageId || "") || form.modeReparation !== (dossier.modeReparation || "");
-  const garageInvalid = !!form.garageId && !historicalGarage && !garages.some(item => item.id === form.garageId);
-  return (
-      <section id="modifier" ref={sectionRef} className="min-w-0 scroll-mt-24 border-y py-4">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold">Informations du sinistre</h2>
-          {editable && !editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : null}
-          {editable && editing ? (
-            <div className="flex gap-2">
-            <Button size="sm" variant="outline" disabled={saving} onClick={() => { setForm(generalForm(dossier)); setEditing(false); }}>Annuler</Button>
-            <Button
-              size="sm"
-              disabled={saving || garageInvalid || (garageChanged && (garageQuery.isFetching || garageQuery.isError)) || (dossier.statut !== "BROUILLON" && !form.referenceCompagnie.trim()) || (responsibilityVisible && form.responsabilite === "NON_DETERMINEE") || (form.modeReparation === "PEC" && !form.garageId)}
-              onClick={() =>
-                void onSave({
-                  referenceCompagnie:
-                    form.referenceCompagnie.trim() || undefined,
-                  ...(responsibilityVisible
-                    ? {
-                        tauxResponsabilite:
-                          form.responsabilite === "NON_DETERMINEE"
-                            ? null
-                            : Number(form.responsabilite),
-                      }
-                    : {}),
-                  notes: form.notes.trim() || undefined,
-                  gestionnaireId: form.gestionnaireId || dossier.gestionnaireId,
-                  prochaineAction: form.prochaineAction.trim() || undefined,
-                  dateEcheanceAction: form.dateEcheanceAction || undefined,
-                  ...(dossier.couverture.brancheCode === "AUTOMOBILE" ? {
-                    typeDommage: form.typeDommage || undefined,
-                    modeReparation: form.modeReparation || undefined,
-                    garageId: form.garageId || null,
-                  } : {}),
-                }).then(() => setEditing(false)).catch(() => undefined)
-              }
-            >
-              <Save className="size-4" />
-              Enregistrer
-            </Button>
-            </div>
-          ) : null}
-        </div>
-        <dl className="grid gap-x-5 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Info label="Police" value={dossier.couverture.numeroPolice} />
-          <Info label="Dossier" value={dossier.couverture.numeroDossier} />
-          <Info label="Compagnie" value={dossier.couverture.compagnie} />
-          <Info label="Assuré" value={dossier.couverture.assure} />
-          <Info label="Date de déclaration" value={formatDate(dossier.dateDeclaration)} />
-          <Info label="Référence compagnie" value={dossier.referenceCompagnie} />
-          <Info label="Dommages" value={dossier.typeDommage ? damageLabels[dossier.typeDommage] : undefined} />
-          <Info label="Réparation" value={dossier.modeReparation ? repairLabels[dossier.modeReparation] : undefined} />
-          <Info label="Garage" value={dossier.garage} />
-          <Info
-            label="Mouvement"
-            value={`${dossier.couverture.numeroMouvement} · ${formatDate(dossier.couverture.dateEffet)}`}
-          />
-          <Info
-            label="Véhicule"
-            value={[
-              dossier.couverture.immatriculation,
-              dossier.couverture.marque,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          />
-          <Info
-            label="Attestation"
-            value={dossier.couverture.numeroAttestation}
-          />
-          {responsibilityVisible ? <Info label="Responsabilité RC" value={dossier.tauxResponsabilite == null ? undefined : `${dossier.tauxResponsabilite} %`} /> : null}
-          <Info label="Gestionnaire" value={dossier.gestionnaire} />
-          <Info label="Prochaine action" value={dossier.prochaineAction} />
-          <Info label="Échéance de l’action" value={formatDate(dossier.dateEcheanceAction)} />
-          {dossier.notes ? <div className="sm:col-span-2 lg:col-span-4"><dt className="text-xs text-muted-foreground">Notes internes</dt><dd className="mt-1 whitespace-pre-wrap break-words">{dossier.notes}</dd></div> : null}
-        </dl>
-        {editing && editable ? <fieldset disabled={saving} className="mt-5 min-w-0 border-t pt-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {dossier.couverture.brancheCode === "AUTOMOBILE" ? <>
-            <Field label="Dommages"><Select disabled={!editable || saving} value={form.typeDommage} onValueChange={(value) => update("typeDommage", value)}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{Object.entries(damageLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
-            </Select></Field>
-            <Field label="Mode de réparation"><Select disabled={!editable || saving} value={form.modeReparation} onValueChange={(value) => setForm((current) => ({ ...current, modeReparation: value, garageId: "" }))}>
-              <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger><SelectContent>{Object.entries(repairLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
-            </Select></Field>
-            <Field label={form.modeReparation === "PEC" ? "Garage conventionné" : "Garage"} required={form.modeReparation === "PEC"}><Select disabled={!editable || saving || garageQuery.isFetching || garageQuery.isError} value={form.garageId || "NONE"} onValueChange={(value) => update("garageId", value === "NONE" ? "" : value)}>
-              <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="NONE">Non désigné</SelectItem>{historicalGarage && dossier.garageId && !garages.some((item) => item.id === dossier.garageId) ? <SelectItem value={dossier.garageId}>{dossier.garage || "Garage actuel"}</SelectItem> : null}{garages.map((item) => <SelectItem key={item.id} value={item.id}>{item.nom}</SelectItem>)}</SelectContent>
-            </Select></Field>
-            {garageQuery.isError ? <p role="alert" className="text-sm text-destructive">{garageQuery.error.message}</p> : null}
-          </> : null}
-          <Field label="Référence compagnie" required={dossier.statut !== "BROUILLON"}>
-            <Input
-              disabled={!editable}
-              maxLength={100}
-              value={form.referenceCompagnie}
-              onChange={(event) =>
-                update("referenceCompagnie", event.target.value)
-              }
-            />
-          </Field>
-          {responsibilityVisible ? (
-            <div className="sm:col-span-2">
-              <Field label="Responsabilité RC" required>
-                <Select
-                  disabled={!editable}
-                  value={form.responsabilite === "NON_DETERMINEE" ? "" : form.responsabilite}
-                  onValueChange={(value) => update("responsabilite", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0 %</SelectItem>
-                    <SelectItem value="50">50 %</SelectItem>
-                    <SelectItem value="100">100 %</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-          ) : null}
-        </div>
-        <Collapsible
-          open={trackingOpen}
-          onOpenChange={setTrackingOpen}
-          className="mt-4 border-t pt-3"
-        >
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full cursor-pointer items-center justify-between py-1 text-left"
-            >
-              <span>
-                <span className="text-sm font-semibold">Suivi interne</span>
-                {!trackingOpen && form.prochaineAction ? (
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {form.prochaineAction}
-                  </span>
-                ) : null}
-              </span>
-              <ChevronDown
-                className={`size-4 text-muted-foreground transition-transform ${trackingOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <Field label="Gestionnaire">
-                <Select
-                  disabled={!editable}
-                  value={form.gestionnaireId}
-                  onValueChange={(value) => update("gestionnaireId", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {managers.map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        {manager.nom}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Échéance de l’action">
-                <DatePicker
-                  disabled={!editable}
-                  date={form.dateEcheanceAction}
-                  onSelect={(date) =>
-                    update("dateEcheanceAction", toIsoDate(date))
-                  }
-                />
-              </Field>
-              <div className="sm:col-span-2">
-                <Field label="Prochaine action">
-                  <Input
-                    disabled={!editable}
-                    maxLength={500}
-                    value={form.prochaineAction}
-                    onChange={(event) =>
-                      update("prochaineAction", event.target.value)
-                    }
-                  />
-                </Field>
-              </div>
-              <div className="sm:col-span-2">
-                <Field label="Notes internes">
-                  <Textarea
-                    disabled={!editable}
-                    rows={2}
-                    value={form.notes}
-                    onChange={(event) => update("notes", event.target.value)}
-                  />
-                </Field>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-        </fieldset> : null}
-      </section>
-  );
-}
-
-function CoverageSection({
-  dossier,
-  assessmentVisible,
-  editable,
-  saving,
-  onSave,
-}: {
-  dossier: SinistreDetail;
-  assessmentVisible: boolean;
-  editable: boolean;
-  saving: boolean;
-  onSave: (guarantees: object[]) => Promise<unknown>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, GuaranteeDraft>>(() =>
-    Object.fromEntries(
-      dossier.garanties.map((item) => [item.id, toGuaranteeDraft(item)]),
-    ),
-  );
-  useEffect(() => {
-    setDrafts(
-      Object.fromEntries(
-        dossier.garanties.map((item) => [item.id, toGuaranteeDraft(item)]),
-      ),
-    );
-  }, [dossier.garanties]);
-
-  const changed = dossier.garanties.filter((item) =>
-    guaranteeDraftChanged(item, drafts[item.id]),
-  );
-  const involvedCount = dossier.garanties.filter(
-    (item) => drafts[item.id]?.involved ?? item.impliquee,
-  ).length;
-
-  return (
-    <section className="min-w-0 border-y">
-    <SectionHeader
-      title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
-      action={
-        editable && !editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : editable ? (
-          <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={saving} onClick={() => {
-            setDrafts(Object.fromEntries(dossier.garanties.map((item) => [item.id, toGuaranteeDraft(item)])));
-            setEditing(false);
-          }}>Annuler</Button>
-          <Button
-            size="sm"
-            disabled={saving || changed.length === 0}
-            onClick={() =>
-              void onSave(
-                changed.map((item) => {
-                  const draft = drafts[item.id];
-                  return {
-                    id: item.id,
-                    decisionCouverture: draft.decision,
-                    impliquee: draft.involved,
-                    franchiseAppliquee: draft.franchise
-                      ? Number(draft.franchise)
-                      : undefined,
-                    montantIndemnisable: draft.indemnisable
-                      ? Number(draft.indemnisable)
-                      : undefined,
-                  };
-                }),
-              ).then(() => setEditing(false)).catch(() => undefined)
-            }
-          >
-            <Save className="size-4" />
-            Enregistrer
-          </Button>
-          </div>
-        ) : null
-      }
-    />
-      <p className="px-4 py-2 text-sm text-muted-foreground">{involvedCount} sur {dossier.garanties.length} garantie(s) impliquée(s) · Montants en MAD</p>
-      {!editing || !editable ? <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Garantie</TableHead>
-              <TableHead>Impliquée</TableHead>
-              <TableHead className="text-right">Capital</TableHead>
-              {assessmentVisible ? <>
-                <TableHead>Décision</TableHead>
-                <TableHead className="text-right">Franchise appliquée</TableHead>
-                <TableHead className="text-right">Indemnisable</TableHead>
-              </> : null}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {dossier.garanties.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="whitespace-normal">
-                  <span className="font-medium">{item.code} · {item.libelle}</span>
-                  <p className="text-xs text-muted-foreground">Franchise contractuelle {item.tauxFranchise ?? 0} % / {formatMoney(item.franchiseMinimale)}</p>
-                </TableCell>
-                <TableCell>{item.impliquee ? "Oui" : "Non"}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatMoney(item.capital)}</TableCell>
-                {assessmentVisible ? <>
-                  <TableCell>{coverageDecisionLabels[item.decisionCouverture]}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoney(item.franchiseAppliquee)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoney(item.montantIndemnisable)}</TableCell>
-                </> : null}
-              </TableRow>
-            ))}
-            {dossier.garanties.length === 0 ? <TableRow><TableCell colSpan={assessmentVisible ? 6 : 3} className="py-6 text-center text-muted-foreground">Aucune garantie.</TableCell></TableRow> : null}
-          </TableBody>
-        </Table>
-      </div> : <div className={assessmentVisible ? "grid gap-3 py-4" : "divide-y"}>
-        {dossier.garanties.map((item) => {
-          const draft = drafts[item.id] ?? toGuaranteeDraft(item);
-          return (
-            <GuaranteeRow
-              key={item.id}
-              item={item}
-              draft={draft}
-              assessmentVisible={assessmentVisible}
-              editable={editable && !saving}
-              onChange={(next) =>
-                setDrafts((current) => ({ ...current, [item.id]: next }))
-              }
-            />
-          );
-        })}
-      </div>}
-      {dossier.assistances?.length ? <div className="px-4 pb-4"><SinistreAssistanceTable items={dossier.assistances} /></div> : null}
-    </section>
-  );
-}
-
-type GuaranteeDraft = {
-  decision: DecisionCouverture;
-  involved: boolean;
-  franchise: string;
-  indemnisable: string;
-};
-
-const coverageDecisionLabels: Record<DecisionCouverture, string> = {
-  A_ETUDIER: "À étudier",
-  ACCEPTEE: "Acceptée",
-  PARTIELLE: "Partiellement acceptée",
-  REFUSEE: "Refusée",
-};
-
-function GuaranteeRow({
-  item,
-  draft,
-  assessmentVisible,
-  editable,
-  onChange,
-}: {
-  item: SinistreDetail["garanties"][number];
-  draft: GuaranteeDraft;
-  assessmentVisible: boolean;
-  editable: boolean;
-  onChange: (draft: GuaranteeDraft) => void;
-}) {
-  return (
-    <div
-      className={
-        assessmentVisible
-          ? "grid items-end gap-3 border-b py-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_190px_150px_170px]"
-          : "grid items-center gap-3 px-4 py-3"
-      }
-    >
-      <div>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            checked={draft.involved}
-            disabled={!editable}
-            onCheckedChange={(checked) =>
-              onChange({ ...draft, involved: checked === true })
-            }
-            aria-label={`Garantie impliquée ${item.libelle}`}
-          />
-          <p className="font-medium">
-            {item.code} · {item.libelle}
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Capital {formatMoney(item.capital)} · franchise contractuelle{" "}
-          {item.tauxFranchise ?? 0}% / {formatMoney(item.franchiseMinimale)}
-        </p>
-      </div>
-      {assessmentVisible ? (
-      <>
-      <Field label="Décision">
-        <Select
-          disabled={!editable}
-          value={draft.decision}
-          onValueChange={(value) =>
-            onChange({ ...draft, decision: value as DecisionCouverture })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="A_ETUDIER">À étudier</SelectItem>
-            <SelectItem value="ACCEPTEE">Acceptée</SelectItem>
-            <SelectItem value="PARTIELLE">Partiellement acceptée</SelectItem>
-            <SelectItem value="REFUSEE">Refusée</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field label="Franchise appliquée">
-        <Input
-          disabled={!editable}
-          type="number"
-          min="0"
-          value={draft.franchise}
-          onChange={(event) =>
-            onChange({ ...draft, franchise: event.target.value })
-          }
-        />
-      </Field>
-      <Field label="Montant indemnisable">
-        <Input
-          disabled={!editable}
-          type="number"
-          min="0"
-          value={draft.indemnisable}
-          onChange={(event) =>
-            onChange({ ...draft, indemnisable: event.target.value })
-          }
-        />
-      </Field>
-      </>
-      ) : null}
-    </div>
-  );
-}
-
-function toGuaranteeDraft(
-  item: SinistreDetail["garanties"][number],
-): GuaranteeDraft {
-  return {
-    decision: item.decisionCouverture,
-    involved: item.impliquee,
-    franchise:
-      item.franchiseAppliquee == null ? "" : String(item.franchiseAppliquee),
-    indemnisable:
-      item.montantIndemnisable == null
-        ? ""
-        : String(item.montantIndemnisable),
-  };
-}
-
-function guaranteeDraftChanged(
-  item: SinistreDetail["garanties"][number],
-  draft?: GuaranteeDraft,
-) {
-  if (!draft) return false;
-  const initial = toGuaranteeDraft(item);
-  return (
-    draft.decision !== initial.decision ||
-    draft.involved !== initial.involved ||
-    draft.franchise !== initial.franchise ||
-    draft.indemnisable !== initial.indemnisable
-  );
-}
 
 function operationFlow(
   operation: SinistreDetail["operations"][number],
@@ -1730,22 +1074,6 @@ function paymentModeLabel(
   }[mode];
 }
 
-function toIsoDate(date?: Date) {
-  if (!date) return "";
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function isAtLeastTransmitted(statut: StatutSinistre) {
-  return [
-    "TRANSMIS_COMPAGNIE",
-    "EXPERTISE",
-    "EN_ATTENTE_REGLEMENT",
-    "PARTIELLEMENT_REGLE",
-    "REGLE",
-    "CLOTURE",
-    "ROUVERT",
-  ].includes(statut);
-}
 
 function isAtLeastExpertise(statut: StatutSinistre) {
   return [
@@ -1763,7 +1091,7 @@ function isSettlementStage(statut: StatutSinistre) {
   );
 }
 
-function DocumentAttention({ dossier, onOpen }: { dossier: SinistreDetail; onOpen: () => void }) {
+function DocumentAttention({ dossier }: { dossier: SinistreDetail }) {
   const missing = dossier.workflow.documentsRequis.filter((item) => item.obligatoire && !item.recu && !item.valide).length;
   const messages = [
     missing > 0 ? `${missing} document(s) obligatoire(s) manquant(s)` : null,
@@ -1773,30 +1101,6 @@ function DocumentAttention({ dossier, onOpen }: { dossier: SinistreDetail; onOpe
   if (messages.length === 0) return null;
   return <div className="flex flex-wrap items-center justify-between gap-2 border-y border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
     <p className="flex min-w-0 items-center gap-2"><CircleAlert className="size-4 shrink-0" /><span>{messages.join(" · ")}</span></p>
-    <Button size="sm" variant="ghost" onClick={onOpen}><FileText className="size-4" />Voir les documents</Button>
+    <Button asChild size="sm" variant="ghost"><a href="#documents"><FileText className="size-4" />Voir les documents</a></Button>
   </div>;
-}
-function Field({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid min-w-0 gap-1.5">
-      <Label>{label}{required ? <span className="text-red-500">*</span> : null}</Label>
-      {children}
-    </div>
-  );
-}
-function Info({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="break-words font-medium">{value || "-"}</dd>
-    </div>
-  );
 }

@@ -205,16 +205,26 @@ public class QuittancePrimePdfService {
                         .setBorder(new SolidBorder(BORDER, 0.5f)));
                 add(detail, amount(premiumTotal), bold, true);
                 copy.add(detail);
-                copy.add(new Paragraph("Mode de règlement")
-                        .setFont(bold).setFontColor(HEADER).setMarginTop(8).setMarginBottom(4));
+                Table paymentAndSignature = new Table(new float[]{1.4f, 1}).useAllAvailableWidth()
+                        .setMarginTop(8).setMarginBottom(6).setKeepTogether(true);
+                Cell paymentDetails = new Cell().setBorder(Border.NO_BORDER).setPadding(0).setPaddingRight(12)
+                        .setVerticalAlignment(VerticalAlignment.TOP);
+                paymentDetails.add(new Paragraph("Mode de règlement")
+                        .setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginTop(0).setMarginBottom(4));
                 for (InstrumentReglementClient i : instruments) {
                     BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
                     if (instrumentAmount.signum() == 0) continue;
-                    copy.add(new Paragraph(join(mode(i), label("N°", i.getReferenceInstrument()),
+                    paymentDetails.add(new Paragraph(join(mode(i), label("N°", i.getReferenceInstrument()),
                             i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle()))
                             .setFontSize(8).setMarginTop(0).setMarginBottom(4));
                 }
-                copy.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(12).setMarginBottom(25));
+                paymentAndSignature.addCell(paymentDetails);
+                // Reserve approximately 25 mm beneath the heading for a physical stamp/signature.
+                paymentAndSignature.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0).setPaddingBottom(72)
+                        .setVerticalAlignment(VerticalAlignment.TOP)
+                        .add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setFontSize(8)
+                                .setTextAlignment(TextAlignment.RIGHT).setMargin(0)));
+                copy.add(paymentAndSignature);
                 Agence agency = payment.getAgence();
                 copy.add(new Paragraph(join(agency.getNom(), agency.getAdresse(), agency.getVille(), agency.getTelephone(), agency.getEmail())
                         + "\n" + join(label("ICE", agency.getIce()), label("IF", agency.getIdentifiantFiscal()), label("Agrément", agency.getNumeroAgrement())))
@@ -451,8 +461,12 @@ public class QuittancePrimePdfService {
         addField(parties, "Nom", payment.getPayeurNom(), normal, bold);
         Client payer = payment.getClientPayeur();
         if (payer != null) {
-            addField(parties, "Adresse", payer.getAdresse(), normal, bold);
-            addField(parties, "Ville", payer.getVille() == null ? null : payer.getVille().getNom(), normal, bold);
+            String address = java.util.stream.Stream.of(payer.getAdresse(),
+                            payer.getVille() == null ? null : payer.getVille().getNom())
+                    .filter(part -> part != null && !part.isBlank())
+                    .map(String::trim)
+                    .collect(java.util.stream.Collectors.joining(", "));
+            addField(parties, "Adresse", address, normal, bold);
         }
         identity.addCell(parties);
         document.add(identity);

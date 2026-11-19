@@ -118,7 +118,7 @@ public class QuittancePrimePdfService {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfDocument pdf = new PdfDocument(new PdfWriter(out));
             Document document = new Document(pdf, PageSize.A4);
-            document.setMargins(24, 24, 62, 24);
+            document.setMargins(24, 24, 24, 24);
             PdfFont normal = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             document.setFont(normal).setFontSize(8).setFontColor(INK);
@@ -149,15 +149,26 @@ public class QuittancePrimePdfService {
                 float tableWidth = PageSize.A4.getWidth() - document.getLeftMargin() - document.getRightMargin();
                 float textWidth = tableWidth;
                 for (float amountWidth : amountWidths) textWidth -= amountWidth;
-                int flexibleColumns = sharedPolicyAndPeriod ? widths.size() : widths.size() - 2;
+                int flexibleColumns = sharedPolicyAndPeriod ? widths.size() : widths.size() - 3;
                 float dateWidth = normal.getWidth("00/00/0000", 7) + 12;
-                if (!sharedPolicyAndPeriod) textWidth -= 2 * dateWidth;
+                float policyWidth = bold.getWidth("CONTRAT", 6) + 12;
+                if (!sharedPolicyAndPeriod) {
+                    for (PrimeRow row : detailRows) {
+                        for (String policy : row.policyNumbers(assistance).split("\\R")) {
+                            policyWidth = Math.max(policyWidth, normal.getWidth(policy, 7) + 12);
+                        }
+                    }
+                    // Exceptionally long references may wrap without squeezing other columns.
+                    policyWidth = Math.min(policyWidth, tableWidth / 4);
+                    textWidth -= policyWidth + 2 * dateWidth;
+                }
                 float textWeight = 0;
                 for (int index = 0; index < flexibleColumns; index++) textWeight += widths.get(index);
                 float[] columnWidths = new float[widths.size() + amountWidths.length];
                 for (int index = 0; index < widths.size(); index++) {
                     columnWidths[index] = index < flexibleColumns
-                            ? textWidth * widths.get(index) / textWeight : dateWidth;
+                            ? textWidth * widths.get(index) / textWeight
+                            : index == flexibleColumns ? policyWidth : dateWidth;
                 }
                 System.arraycopy(amountWidths, 0, columnWidths, widths.size(), amountWidths.length);
                 Table detail = new Table(columnWidths).setWidth(tableWidth).setFixedLayout();
@@ -195,7 +206,7 @@ public class QuittancePrimePdfService {
                 add(detail, amount(premiumTotal), bold, true);
                 copy.add(detail);
                 copy.add(new Paragraph("Mode de règlement")
-                        .setFont(bold).setFontColor(HEADER).setMarginTop(12).setMarginBottom(4));
+                        .setFont(bold).setFontColor(HEADER).setMarginTop(8).setMarginBottom(4));
                 for (InstrumentReglementClient i : instruments) {
                     BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
                     if (instrumentAmount.signum() == 0) continue;
@@ -203,7 +214,7 @@ public class QuittancePrimePdfService {
                             i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle()))
                             .setFontSize(8).setMarginTop(0).setMarginBottom(4));
                 }
-                copy.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(20).setMarginBottom(25));
+                copy.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(12).setMarginBottom(25));
                 Agence agency = payment.getAgence();
                 copy.add(new Paragraph(join(agency.getNom(), agency.getAdresse(), agency.getVille(), agency.getTelephone(), agency.getEmail())
                         + "\n" + join(label("ICE", agency.getIce()), label("IF", agency.getIdentifiantFiscal()), label("Agrément", agency.getNumeroAgrement())))
@@ -400,7 +411,7 @@ public class QuittancePrimePdfService {
     private void writeHeader(Div document, ReglementClient payment, String reference,
                              List<PrimeRow> rows, Map<Long, AssistanceContrat> assistance,
                              boolean sharedPolicyAndPeriod, boolean showCompany, PdfFont normal, PdfFont bold) {
-        Table header = new Table(new float[]{1, 3, 1}).useAllAvailableWidth().setKeepTogether(true).setMarginBottom(14);
+        Table header = new Table(new float[]{1, 3, 1}).useAllAvailableWidth().setKeepTogether(true).setMarginBottom(8);
         Cell brand = new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE);
         byte[] logo = logoStorage.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
         if (logo != null && logo.length > 0) brand.add(new Image(ImageDataFactory.create(logo)).scaleToFit(85, 42));
@@ -413,8 +424,8 @@ public class QuittancePrimePdfService {
                         .setTextAlignment(TextAlignment.CENTER).setMargin(0)));
         header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0));
         document.add(header);
-        Table identity = new Table(new float[]{1, 1}).useAllAvailableWidth().setMarginBottom(12).setKeepTogether(true);
-        Cell details = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
+        Table identity = new Table(new float[]{1, 1}).useAllAvailableWidth().setMarginBottom(8).setKeepTogether(true);
+        Cell details = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(6);
         addField(details, "N° quittance", reference, normal, bold);
         addField(details, "Intermédiaire", agency.getNom(), normal, bold);
         if (!showCompany) {
@@ -427,16 +438,16 @@ public class QuittancePrimePdfService {
             addField(details, policyLabel(rows), row.policyNumbers(assistance), normal, bold);
         }
         identity.addCell(details);
-        Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(8);
+        Cell parties = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(6);
         if (Boolean.TRUE.equals(payment.getMultiPayeur())) {
-            parties.add(new Paragraph("REPRÉSENTANT").setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginBottom(6));
+            parties.add(new Paragraph("REPRÉSENTANT").setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginTop(0).setMarginBottom(4));
             addField(parties, "Nom", payment.getDeposantNom(), normal, bold);
             identity.addCell(parties);
             document.add(identity);
             return;
         }
         parties.add(new Paragraph("SOUSCRIPTEUR")
-                .setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginBottom(6));
+                .setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginTop(0).setMarginBottom(4));
         addField(parties, "Nom", payment.getPayeurNom(), normal, bold);
         Client payer = payment.getClientPayeur();
         if (payer != null) {
@@ -449,7 +460,7 @@ public class QuittancePrimePdfService {
 
     private static void addField(Cell cell, String label, String text, PdfFont normal, PdfFont bold) {
         cell.add(new Paragraph().add(new Text(label + " : ").setFont(bold))
-                .add(new Text(value(text)).setFont(normal)).setFontSize(8).setMarginTop(0).setMarginBottom(4));
+                .add(new Text(value(text)).setFont(normal)).setFontSize(8).setMarginTop(0).setMarginBottom(2));
     }
 
     private static Client party(Contrat contract, RoleClientContrat role) {

@@ -18,7 +18,6 @@ import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
-import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
@@ -123,16 +122,6 @@ public class QuittancePrimePdfService {
             PdfFont normal = PdfFontFactory.createFont(StandardFonts.HELVETICA);
             PdfFont bold = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
             document.setFont(normal).setFontSize(8).setFontColor(INK);
-            pdf.addEventHandler(com.itextpdf.kernel.events.PdfDocumentEvent.END_PAGE, event -> {
-                var pageEvent = (com.itextpdf.kernel.events.PdfDocumentEvent) event;
-                var page = pageEvent.getPage();
-                PdfCanvas canvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
-                canvas.setStrokeColor(HEADER).setLineWidth(0.5f).moveTo(24, 48).lineTo(571, 48).stroke();
-                Canvas footer = new Canvas(canvas, pdf, new Rectangle(24, 9, 547, 35));
-                footer.add(new Paragraph(reference + " · Page " + pdf.getPageNumber(page))
-                        .setFont(normal).setFontSize(6).setTextAlignment(TextAlignment.CENTER).setMargin(0));
-                footer.close();
-            });
             List<PrimeRow> detailRows = detailRows(rows);
             PrimeRow firstRow = detailRows.get(0);
             boolean multiPayer = Boolean.TRUE.equals(payment.getMultiPayeur());
@@ -144,10 +133,8 @@ public class QuittancePrimePdfService {
                     .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().count() > 1;
             Set<String> selectedKeys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
             List<Div> copies = new ArrayList<>();
-            for (String copyLabel : List.of("Exemplaire client", "Exemplaire agence")) {
+            for (int copyIndex = 0; copyIndex < 2; copyIndex++) {
                 Div copy = new Div();
-                copy.add(new Paragraph(copyLabel).setFont(bold).setFontSize(7).setFontColor(HEADER)
-                        .setTextAlignment(TextAlignment.RIGHT).setMarginTop(0).setMarginBottom(4).setKeepWithNext(true));
                 writeHeader(copy, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, showCompany, normal, bold);
                 if (sharedPolicyAndPeriod) {
                     copy.add(new Paragraph().add(new Text("Période de garantie : ").setFont(bold))

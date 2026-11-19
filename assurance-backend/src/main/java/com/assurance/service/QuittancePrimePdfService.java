@@ -22,11 +22,17 @@ import com.itextpdf.layout.Canvas;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
+import com.itextpdf.layout.element.AreaBreak;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Div;
 import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
+import com.itextpdf.layout.layout.LayoutArea;
+import com.itextpdf.layout.layout.LayoutContext;
+import com.itextpdf.layout.layout.LayoutResult;
+import com.itextpdf.layout.property.AreaBreakType;
 import com.itextpdf.layout.property.TextAlignment;
 import com.itextpdf.layout.property.VerticalAlignment;
 import lombok.RequiredArgsConstructor;
@@ -123,10 +129,7 @@ public class QuittancePrimePdfService {
                 PdfCanvas canvas = new PdfCanvas(page.newContentStreamAfter(), page.getResources(), pdf);
                 canvas.setStrokeColor(HEADER).setLineWidth(0.5f).moveTo(24, 48).lineTo(571, 48).stroke();
                 Canvas footer = new Canvas(canvas, pdf, new Rectangle(24, 9, 547, 35));
-                Agence agency = payment.getAgence();
-                footer.add(new Paragraph(join(agency.getNom(), agency.getAdresse(), agency.getVille(), agency.getTelephone(), agency.getEmail())
-                        + "\n" + join(label("ICE", agency.getIce()), label("IF", agency.getIdentifiantFiscal()), label("Agrément", agency.getNumeroAgrement()))
-                        + "\n" + reference + " · Page " + pdf.getPageNumber(page))
+                footer.add(new Paragraph(reference + " · Page " + pdf.getPageNumber(page))
                         .setFont(normal).setFontSize(6).setTextAlignment(TextAlignment.CENTER).setMargin(0));
                 footer.close();
             });
@@ -139,64 +142,109 @@ public class QuittancePrimePdfService {
                             && Objects.equals(row.element.getDateFin(), firstRow.element.getDateFin()));
             boolean showCompany = detailRows.stream()
                     .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().count() > 1;
-            writeHeader(document, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, showCompany, normal, bold);
-            if (sharedPolicyAndPeriod) {
-                document.add(new Paragraph().add(new Text("Période de garantie : ").setFont(bold))
-                        .add("du " + date(firstRow.element.getDateDebut()) + " au " + date(firstRow.element.getDateFin()))
-                        .setFontSize(8).setMarginTop(0).setMarginBottom(6).setKeepWithNext(true));
-            }
-            BigDecimal premiumTotal = detailRows.stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add);
-            List<Float> widths = new ArrayList<>(List.of(1.1f, 1.8f));
-            if (showCompany) widths.add(1.6f);
-            if (!sharedPolicyAndPeriod) widths.addAll(List.of(1.35f, 0.9f, 0.9f));
-            widths.addAll(List.of(1f, 0.85f, 0.75f, 1f));
-            float[] columnWidths = new float[widths.size()];
-            for (int index = 0; index < widths.size(); index++) columnWidths[index] = widths.get(index);
-            Table detail = new Table(columnWidths).useAllAvailableWidth();
-            List<String> columns = new ArrayList<>(List.of("CATÉGORIE", "MOUVEMENT"));
-            if (showCompany) columns.add("COMPAGNIE");
-            if (!sharedPolicyAndPeriod) columns.addAll(List.of(policyLabel(detailRows).toUpperCase(java.util.Locale.ROOT), "DU", "AU"));
-            columns.addAll(List.of("PRIME NETTE", "TAXES", "ACC.", "TTC"));
-            for (int index = 0; index < columns.size(); index++) {
-                String column = columns.get(index);
-                TextAlignment alignment = index >= columns.size() - 4 ? TextAlignment.RIGHT
-                        : index < 2 || (showCompany && index == 2) ? TextAlignment.LEFT : TextAlignment.CENTER;
-                detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
-                        .setTextAlignment(alignment)
-                        .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5)
-                        .setBorder(new SolidBorder(BORDER, 0.5f)));
-            }
-            for (PrimeRow row : detailRows) {
-                add(detail, row.branchNames(assistance), normal, false);
-                add(detail, movementLabel(row, assistance), normal, false);
-                if (showCompany) add(detail, row.company(row.element, assistance.get(row.element.getId())), normal, false);
-                if (!sharedPolicyAndPeriod) {
-                    String policyIdentity = row.policyNumbers(assistance);
-                    add(detail, policyIdentity, normal, TextAlignment.CENTER);
-                    add(detail, date(row.element.getDateDebut()), normal, TextAlignment.CENTER);
-                    add(detail, date(row.element.getDateFin()), normal, TextAlignment.CENTER);
-                }
-                add(detail, amount(row.net()), normal, true);
-                add(detail, amount(row.taxes()), normal, true);
-                add(detail, amount(row.fees()), normal, true);
-                add(detail, amount(row.total()), bold, true);
-            }
-            detail.addCell(new Cell(1, columns.size() - 1).add(new Paragraph("TOTAL").setFont(bold).setMargin(0))
-                    .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5)
-                    .setBorder(new SolidBorder(BORDER, 0.5f)));
-            add(detail, amount(premiumTotal), bold, true);
-            document.add(detail);
-            document.add(new Paragraph("Mode de règlement")
-                    .setFont(bold).setFontColor(HEADER).setMarginTop(12).setMarginBottom(4));
             Set<String> selectedKeys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
-            for (InstrumentReglementClient i : instruments) {
-                BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
-                if (instrumentAmount.signum() == 0) continue;
-                document.add(new Paragraph(join(mode(i), label("N°", i.getReferenceInstrument()),
-                        i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle()))
-                        .setFontSize(8).setMarginTop(0).setMarginBottom(4));
+            List<Div> copies = new ArrayList<>();
+            for (String copyLabel : List.of("Exemplaire client", "Exemplaire agence")) {
+                Div copy = new Div();
+                copy.add(new Paragraph(copyLabel).setFont(bold).setFontSize(7).setFontColor(HEADER)
+                        .setTextAlignment(TextAlignment.RIGHT).setMarginTop(0).setMarginBottom(4).setKeepWithNext(true));
+                writeHeader(copy, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, showCompany, normal, bold);
+                if (sharedPolicyAndPeriod) {
+                    copy.add(new Paragraph().add(new Text("Période de garantie : ").setFont(bold))
+                            .add("du " + date(firstRow.element.getDateDebut()) + " au " + date(firstRow.element.getDateFin()))
+                            .setFontSize(8).setMarginTop(0).setMarginBottom(6).setKeepWithNext(true));
+                }
+                BigDecimal premiumTotal = detailRows.stream().map(PrimeRow::total).reduce(BigDecimal.ZERO, BigDecimal::add);
+                List<Float> widths = new ArrayList<>(List.of(1.1f, 1.8f));
+                if (showCompany) widths.add(1.6f);
+                if (!sharedPolicyAndPeriod) widths.addAll(List.of(1.35f, 0.9f, 0.9f));
+                float[] amountWidths = amountColumnWidths(detailRows, premiumTotal, normal, bold);
+                float tableWidth = PageSize.A4.getWidth() - document.getLeftMargin() - document.getRightMargin();
+                float textWidth = tableWidth;
+                for (float amountWidth : amountWidths) textWidth -= amountWidth;
+                int flexibleColumns = sharedPolicyAndPeriod ? widths.size() : widths.size() - 2;
+                float dateWidth = normal.getWidth("00/00/0000", 7) + 12;
+                if (!sharedPolicyAndPeriod) textWidth -= 2 * dateWidth;
+                float textWeight = 0;
+                for (int index = 0; index < flexibleColumns; index++) textWeight += widths.get(index);
+                float[] columnWidths = new float[widths.size() + amountWidths.length];
+                for (int index = 0; index < widths.size(); index++) {
+                    columnWidths[index] = index < flexibleColumns
+                            ? textWidth * widths.get(index) / textWeight : dateWidth;
+                }
+                System.arraycopy(amountWidths, 0, columnWidths, widths.size(), amountWidths.length);
+                Table detail = new Table(columnWidths).setWidth(tableWidth).setFixedLayout();
+                List<String> columns = new ArrayList<>(List.of("CATÉGORIE", "MOUVEMENT"));
+                if (showCompany) columns.add("COMPAGNIE");
+                if (!sharedPolicyAndPeriod) columns.addAll(List.of(policyLabel(detailRows).toUpperCase(java.util.Locale.ROOT), "DU", "AU"));
+                columns.addAll(List.of("PRIME NETTE", "TAXES", "ACC.", "TTC"));
+                for (int index = 0; index < columns.size(); index++) {
+                    String column = columns.get(index);
+                    TextAlignment alignment = index >= columns.size() - 4 ? TextAlignment.RIGHT
+                            : index < 2 || (showCompany && index == 2) ? TextAlignment.LEFT : TextAlignment.CENTER;
+                    detail.addHeaderCell(new Cell().add(new Paragraph(column).setFont(bold).setFontSize(6).setMargin(0))
+                            .setTextAlignment(alignment)
+                            .setBackgroundColor(HEADER).setFontColor(ColorConstants.WHITE).setPadding(5)
+                            .setBorder(new SolidBorder(BORDER, 0.5f)));
+                }
+                for (PrimeRow row : detailRows) {
+                    add(detail, row.branchNames(assistance), normal, false);
+                    add(detail, movementLabel(row, assistance), normal, false);
+                    if (showCompany) add(detail, row.company(row.element, assistance.get(row.element.getId())), normal, false);
+                    if (!sharedPolicyAndPeriod) {
+                        String policyIdentity = row.policyNumbers(assistance);
+                        add(detail, policyIdentity, normal, TextAlignment.CENTER);
+                        add(detail, date(row.element.getDateDebut()), normal, TextAlignment.CENTER);
+                        add(detail, date(row.element.getDateFin()), normal, TextAlignment.CENTER);
+                    }
+                    add(detail, amount(row.net()), normal, true);
+                    add(detail, amount(row.taxes()), normal, true);
+                    add(detail, amount(row.fees()), normal, true);
+                    add(detail, amount(row.total()), bold, true);
+                }
+                detail.addCell(new Cell(1, columns.size() - 1).add(new Paragraph("TOTAL").setFont(bold).setMargin(0))
+                        .setTextAlignment(TextAlignment.RIGHT).setBackgroundColor(PALE).setPadding(5)
+                        .setBorder(new SolidBorder(BORDER, 0.5f)));
+                add(detail, amount(premiumTotal), bold, true);
+                copy.add(detail);
+                copy.add(new Paragraph("Mode de règlement")
+                        .setFont(bold).setFontColor(HEADER).setMarginTop(12).setMarginBottom(4));
+                for (InstrumentReglementClient i : instruments) {
+                    BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
+                    if (instrumentAmount.signum() == 0) continue;
+                    copy.add(new Paragraph(join(mode(i), label("N°", i.getReferenceInstrument()),
+                            i.getBanqueEmettriceReference() == null ? null : i.getBanqueEmettriceReference().getLibelle()))
+                            .setFontSize(8).setMarginTop(0).setMarginBottom(4));
+                }
+                copy.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(20).setMarginBottom(25));
+                Agence agency = payment.getAgence();
+                copy.add(new Paragraph(join(agency.getNom(), agency.getAdresse(), agency.getVille(), agency.getTelephone(), agency.getEmail())
+                        + "\n" + join(label("ICE", agency.getIce()), label("IF", agency.getIdentifiantFiscal()), label("Agrément", agency.getNumeroAgrement())))
+                        .setFont(normal).setFontSize(6).setTextAlignment(TextAlignment.CENTER)
+                        .setBorderTop(new SolidBorder(BORDER, 0.5f)).setPaddingTop(4)
+                        .setMargin(0).setKeepTogether(true));
+                copies.add(copy);
             }
-            document.add(new Paragraph("Cachet et signature du cabinet").setFont(bold).setTextAlignment(TextAlignment.RIGHT).setMarginTop(20).setMarginBottom(25));
+
+            float pageMiddle = PageSize.A4.getHeight() / 2;
+            float copyWidth = PageSize.A4.getWidth() - document.getLeftMargin() - document.getRightMargin();
+            float halfHeight = Math.min(pageMiddle - document.getTopMargin(),
+                    pageMiddle - document.getBottomMargin()) - 12;
+            boolean sharedSheet = copies.stream().allMatch(copy -> fitsCopy(copy, document, copyWidth, halfHeight));
+            if (sharedSheet) {
+                // Each cut half retains its own branding, signature and agency details.
+                document.add(copies.get(0).setHeight(halfHeight)
+                        .setFixedPosition(1, document.getLeftMargin(), pageMiddle + 12, copyWidth));
+                document.add(copies.get(1).setHeight(halfHeight)
+                        .setFixedPosition(1, document.getLeftMargin(), document.getBottomMargin(), copyWidth));
+                new PdfCanvas(pdf.getPage(1)).setStrokeColor(BORDER).setLineWidth(0.5f)
+                        .setLineDash(3, 3).moveTo(document.getLeftMargin(), pageMiddle)
+                        .lineTo(PageSize.A4.getWidth() - document.getRightMargin(), pageMiddle).stroke();
+            } else {
+                document.add(copies.get(0));
+                document.add(new AreaBreak(AreaBreakType.NEXT_PAGE));
+                document.add(copies.get(1));
+            }
             document.close();
             return out.toByteArray();
         } catch (java.io.IOException error) {
@@ -356,7 +404,13 @@ public class QuittancePrimePdfService {
         return hasAssistance ? hasInsurance ? "N° police / contrat" : "N° contrat" : "N° police";
     }
 
-    private void writeHeader(Document document, ReglementClient payment, String reference,
+    private static boolean fitsCopy(Div copy, Document document, float width, float height) {
+        return copy.createRendererSubTree().setParent(document.getRenderer())
+                .layout(new LayoutContext(new LayoutArea(1, new Rectangle(width, height))))
+                .getStatus() == LayoutResult.FULL;
+    }
+
+    private void writeHeader(Div document, ReglementClient payment, String reference,
                              List<PrimeRow> rows, Map<Long, AssistanceContrat> assistance,
                              boolean sharedPolicyAndPeriod, boolean showCompany, PdfFont normal, PdfFont bold) {
         Table header = new Table(new float[]{1, 3, 1}).useAllAvailableWidth().setKeepTogether(true).setMarginBottom(14);
@@ -528,6 +582,24 @@ public class QuittancePrimePdfService {
         private BigDecimal total() {
             return document == null ? element.getPrimeTotale() : sum(lines().stream().map(LigneDocumentClient::getMontantTtc).toList());
         }
+    }
+
+    private static float[] amountColumnWidths(List<PrimeRow> rows, BigDecimal total, PdfFont normal, PdfFont bold) {
+        String[] headers = {"PRIME NETTE", "TAXES", "ACC.", "TTC"};
+        float[] widths = new float[headers.length];
+        // Include both cell paddings and a small allowance for borders/rounding.
+        for (int index = 0; index < headers.length; index++) {
+            widths[index] = bold.getWidth(headers[index], 6) + 12;
+        }
+        for (PrimeRow row : rows) {
+            BigDecimal[] amounts = {row.net(), row.taxes(), row.fees(), row.total()};
+            for (int index = 0; index < amounts.length; index++) {
+                PdfFont font = index == amounts.length - 1 ? bold : normal;
+                widths[index] = Math.max(widths[index], font.getWidth(amount(amounts[index]), 7) + 12);
+            }
+        }
+        widths[3] = Math.max(widths[3], bold.getWidth(amount(total), 7) + 12);
+        return widths;
     }
 
     private static void add(Table table, String text, PdfFont font, boolean right) {

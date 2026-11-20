@@ -1533,6 +1533,7 @@ function normalizeClientPayment(payment: ClientPayment): ClientPayment {
     clientPayeurId: payment.clientPayeurId == null ? null : String(payment.clientPayeurId),
     groupePayeurId: payment.groupePayeurId == null ? null : String(payment.groupePayeurId),
     conventionPayeurId: payment.conventionPayeurId == null ? null : String(payment.conventionPayeurId),
+    compagnieDirecteId: payment.compagnieDirecteId == null ? null : String(payment.compagnieDirecteId),
     instruments: payment.instruments.map(normalizePaymentInstrument),
     detail: payment.detail ? {
       ...payment.detail,

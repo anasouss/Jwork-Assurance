@@ -782,7 +782,7 @@ function PaymentActionsMenu({
           <Printer className="size-4" />
           {pdfLoading ? "Ouverture..." : "Fiche de règlement PDF"}
         </DropdownMenuItem>
-        {canViewPremiumReceipt && payment.statut === "VALIDE" && payment.sens !== "SORTIE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
+        {canViewPremiumReceipt && payment.circuit !== "DIRECT_COMPAGNIE" && payment.statut === "VALIDE" && payment.sens !== "SORTIE" && <DropdownMenuItem disabled={pdfLoading} onSelect={onPremiumReceipt}>
           <FileText className="size-4" /> Quittance de prime PDF
         </DropdownMenuItem>}
         {canCreateInvoice && (

@@ -27,7 +27,8 @@ const INSTRUMENT_VARIANTS = {
 
 export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
   const canViewTreasury = useAuthStore((state) => state.user?.permissions.includes("bordereau-remise:view") ?? false);
-  const canManageTreasury = useAuthStore((state) => state.user?.permissions.some(code => code === "instrument-reglement:confirm" || code === "instrument-reglement:reject") ?? false);
+  const treasuryPermissions = useAuthStore((state) => state.user?.permissions.some(code => code === "instrument-reglement:confirm" || code === "instrument-reglement:reject") ?? false);
+  const canManageTreasury = payment.circuit !== "DIRECT_COMPAGNIE" && treasuryPermissions;
   const outgoing = payment.sens === "SORTIE";
   const client = useQueryClient();
   const [operation, setOperation] = useState<{ id: string; statut: "CONFIRME" | "REJETE" }>();
@@ -59,6 +60,7 @@ export function ClientPaymentDetails({ payment }: { payment: ClientPayment }) {
   return <div className="min-w-0 space-y-5">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
       <dl className="min-w-0 space-y-2 text-sm">
+        <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">Circuit :</dt><dd>{payment.circuit === "DIRECT_COMPAGNIE" ? `Direct compagnie · ${payment.compagnieDirecte || "-"}` : "Via l'agence"}</dd></div>
         <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">{outgoing ? "Bénéficiaire :" : "Payeur :"}</dt><dd className="break-words font-semibold">{payment.payeurNom}</dd></div>
         {payment.multiPayeur && <div className="flex min-w-0 gap-2"><dt className="shrink-0 text-muted-foreground">Déposant :</dt><dd className="break-words">{payment.deposantNom || "-"}</dd></div>}
       </dl>

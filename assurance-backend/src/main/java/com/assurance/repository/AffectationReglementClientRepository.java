@@ -14,6 +14,19 @@ import java.util.List;
 import java.util.Set;
 
 public interface AffectationReglementClientRepository extends JpaRepository<AffectationReglementClient, Long> {
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("""
+            select a from AffectationReglementClient a
+            where a.instrument.reglement.agence.id = :agenceId
+              and a.instrument.reglement.circuit = com.assurance.enums.CircuitReglementClient.DIRECT_COMPAGNIE
+              and a.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
+              and a.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
+              and (a.elementFacturable.id in :elementIds or exists (
+                  select l.id from LigneDocumentClient l
+                  where l.document = a.documentClient and l.elementFacturable.id in :elementIds))
+            """)
+    List<AffectationReglementClient> lockCompanyDirectByElementIds(@Param("agenceId") Long agenceId,
+            @Param("elementIds") Collection<Long> elementIds);
 
     @Query("""
             select distinct allocation.elementFacturable.contrat.id

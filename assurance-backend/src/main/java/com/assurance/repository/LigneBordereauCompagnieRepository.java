@@ -9,6 +9,15 @@ import java.util.Collection;
 import java.util.List;
 
 public interface LigneBordereauCompagnieRepository extends JpaRepository<LigneBordereauCompagnie, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+    @Query("""
+            select l from LigneBordereauCompagnie l
+            where l.bordereau.agence.id = :agenceId
+              and l.affectationReservee.quittance.elementFacturable.id in :elementIds
+            """)
+    List<LigneBordereauCompagnie> lockReservedByElementIds(@Param("agenceId") Long agenceId,
+            @Param("elementIds") Collection<Long> elementIds);
+
     boolean existsByAffectationReserveeId(Long affectationId);
     boolean existsByAffectationReserveeIdIn(Collection<Long> affectationIds);
 

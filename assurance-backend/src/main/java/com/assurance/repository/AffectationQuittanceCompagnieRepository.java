@@ -73,6 +73,17 @@ public interface AffectationQuittanceCompagnieRepository extends JpaRepository<A
               and (:dateDu is null or a.dateEffet >= :dateDu)
               and (:dateAu is null or a.dateEffet <= :dateAu)
               and not exists (
+                    select paymentAllocation.id from AffectationReglementClient paymentAllocation
+                    where paymentAllocation.instrument.reglement.agence = a.agence
+                      and paymentAllocation.instrument.reglement.circuit = com.assurance.enums.CircuitReglementClient.DIRECT_COMPAGNIE
+                      and paymentAllocation.instrument.reglement.statut <> com.assurance.enums.StatutReglementClient.ANNULE
+                      and paymentAllocation.statut <> com.assurance.enums.StatutAffectationReglement.ANNULEE
+                      and (paymentAllocation.elementFacturable = a.quittance.elementFacturable or exists (
+                          select dl.id from LigneDocumentClient dl
+                          where dl.document = paymentAllocation.documentClient
+                            and dl.elementFacturable = a.quittance.elementFacturable))
+              )
+              and not exists (
                     select l.id
                     from LigneBordereauCompagnie l
                     where l.affectationReservee = a

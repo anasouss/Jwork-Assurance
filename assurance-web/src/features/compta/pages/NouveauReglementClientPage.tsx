@@ -121,6 +121,8 @@ export default function NouveauReglementClientPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const conventionCollection = location.pathname.startsWith("/app/compta/conventions/encaissements/");
+  const [circuit, setCircuit] = useState<"AGENCE" | "DIRECT_COMPAGNIE">("AGENCE");
+  const [companyConfirmed, setCompanyConfirmed] = useState(false);
   const queryClient = useQueryClient();
   const requestedMultiClientDeposit = searchParams.get("multi") === "1";
   const multiClientDeposit = requestedMultiClientDeposit;
@@ -178,10 +180,12 @@ export default function NouveauReglementClientPage() {
   const selectedTotal = rows.reduce((sum, row) => sum + row.soldeOuvert, 0);
   const signedSettlement = rows.some(row => row.soldeOuvert < 0);
   const outgoing = selectedTotal < -0.005;
+  const companyDirect = conventionCollection && !outgoing && circuit === "DIRECT_COMPAGNIE";
   const amountDue = Math.abs(round(selectedTotal));
   const paymentTotal = methods.reduce((sum, method) => sum + numeric(method.montant), 0);
   const allocatedAmounts = allocationByReceivable(rows, paymentTotal);
-  const adjustmentAmount = settlementAdjustment ?? 0;
+  const conventionPayment = conventionCollection || rows.some(row => row.source.payeurType === "CONVENTION");
+  const adjustmentAmount = conventionPayment ? 0 : settlementAdjustment ?? 0;
   const adjustmentPlan = distributeSettlementAdjustment(rows.map(row => ({
     elementFacturableId: row.source.elementFacturableId, documentClientId: row.source.documentClientId,
     soldeOuvert: row.soldeOuvert, montantRegle: allocatedAmounts.get(receivableTargetKey(row)) ?? 0,
@@ -189,7 +193,7 @@ export default function NouveauReglementClientPage() {
   const remainingAmount = round(amountDue - paymentTotal - adjustmentPlan.total);
   const unallocatedCredit = Math.max(0, round(paymentTotal - amountDue));
   const maximumAdjustment = paymentPolicy.data?.ecartReglementMaximum ?? 0;
-  const canGrantAdjustment = permissions.includes("reglement-client:adjust") && !multiClientDeposit && !signedSettlement;
+  const canGrantAdjustment = permissions.includes("reglement-client:adjust") && !conventionPayment && !multiClientDeposit && !signedSettlement;
   const adjustmentInvalid = !Number.isFinite(adjustmentAmount) || adjustmentAmount < 0
     || adjustmentAmount > maximumAdjustment || adjustmentPlan.unassigned > 0
     || (adjustmentAmount > 0 && (!canGrantAdjustment || !adjustmentReason.trim()));
@@ -234,7 +238,7 @@ export default function NouveauReglementClientPage() {
   }, [methods.length, requestedMultiClientDeposit]);
 
   useEffect(() => {
-    if (!soleActiveBankAccountId) return;
+    if (!soleActiveBankAccountId || companyDirect) return;
     setMethods((current) => {
       let changed = false;
       const next = current.map((method) => {
@@ -246,7 +250,7 @@ export default function NouveauReglementClientPage() {
       });
       return changed ? next : current;
     });
-  }, [methods, soleActiveBankAccountId, outgoing]);
+  }, [methods, soleActiveBankAccountId, outgoing, companyDirect]);
 
   useEffect(() => {
     if (!signedSettlement) return;
@@ -291,6 +295,8 @@ export default function NouveauReglementClientPage() {
         depositorName
       );
       request.ecarts = adjustmentPlan.ecarts;
+      request.circuit = companyDirect ? "DIRECT_COMPAGNIE" : "AGENCE";
+      request.confirmationCompagnie = companyDirect && companyConfirmed;
       if (multiClientDeposit && receipt) {
         return comptaApi.createMultiClientBankDeposit(request, receipt);
       }
@@ -324,7 +330,8 @@ export default function NouveauReglementClientPage() {
     && Boolean(dateReglement)
     && rows.length > 0
     && methods.length > 0
-    && (personalCashAvailable || methods.every((method) => method.mode !== "ESPECES"))
+    && (companyDirect || personalCashAvailable || methods.every((method) => method.mode !== "ESPECES"))
+    && (!companyDirect || (companyConfirmed && dateReglement <= today && Math.abs(remainingAmount) < 0.005))
     && paymentTotal > 0
     && amountDue > 0
     && permissions.includes(outgoing ? "reglement-client:refund" : "reglement-client:create")
@@ -339,7 +346,7 @@ export default function NouveauReglementClientPage() {
       && methods.length === 1
       && methods[0]?.mode === "VERSEMENT_BANCAIRE"
     ))
-    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing));
+    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing, companyDirect));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
     setMethods((current) => current.map((method) => method.key === key
@@ -349,7 +356,7 @@ export default function NouveauReglementClientPage() {
 
   function addPaymentMethod(mode: ClientPaymentMode) {
     const method = newPaymentMethod(mode);
-    if (signedSettlement) {
+    if (signedSettlement || companyDirect) {
       method.montant = money(amountDue);
       setMethods([method]);
       setEditingMethodKey(method.key);
@@ -565,11 +572,11 @@ export default function NouveauReglementClientPage() {
                   <Landmark className="size-4 text-orange-700" /> Versement bancaire
                 </div>
               </div>
-            ) : signedSettlement ? (
+            ) : signedSettlement || companyDirect ? (
               <div className="grid gap-2"><Label>Moyen de règlement</Label>
                 <Select value={methods[0]?.mode ?? ""} onValueChange={value => { addPaymentMethod(value as ClientPaymentMode); setActivePaymentMode(value as ClientPaymentMode); }}>
                   <SelectTrigger><SelectValue placeholder="Sélectionner un moyen" /></SelectTrigger>
-                  <SelectContent>{paymentModes.map(mode => <SelectItem key={mode.value} value={mode.value} disabled={mode.value === "ESPECES" && !personalCashAvailable}>{mode.label}{mode.value === "ESPECES" && !personalCashAvailable ? " · caisse indisponible" : ""}</SelectItem>)}</SelectContent>
+                  <SelectContent>{paymentModes.filter(mode => !companyDirect || ["ESPECES", "VIREMENT", "VERSEMENT_BANCAIRE"].includes(mode.value)).map(mode => <SelectItem key={mode.value} value={mode.value} disabled={!companyDirect && mode.value === "ESPECES" && !personalCashAvailable}>{mode.label}{!companyDirect && mode.value === "ESPECES" && !personalCashAvailable ? " · caisse indisponible" : ""}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             ) : (
@@ -579,7 +586,17 @@ export default function NouveauReglementClientPage() {
                 cashAvailable={personalCashAvailable}
               />
             )}
-            {!multiClientDeposit && !signedSettlement && <div className="grid gap-2">
+            {conventionCollection && !outgoing && <div className="grid gap-2">
+              <Label htmlFor="payment-circuit">Bénéficiaire</Label>
+              <Select value={circuit} onValueChange={value => {
+                setCircuit(value as "AGENCE" | "DIRECT_COMPAGNIE");
+                setCompanyConfirmed(false); setMethods([]); setActivePaymentMode(null); setEditingMethodKey(undefined);
+              }}>
+                <SelectTrigger id="payment-circuit"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="AGENCE">Cabinet</SelectItem><SelectItem value="DIRECT_COMPAGNIE">Compagnie</SelectItem></SelectContent>
+              </Select>
+            </div>}
+            {!conventionPayment && !multiClientDeposit && !signedSettlement && <div className="grid gap-2">
               <Label htmlFor="settlement-adjustment">Écart de règlement (MAD)</Label>
               <MoneyInput id="settlement-adjustment" value={settlementAdjustment} onValueChange={setSettlementAdjustment}
                 disabled={!canGrantAdjustment || !paymentPolicy.isSuccess || maximumAdjustment === 0}
@@ -587,7 +604,8 @@ export default function NouveauReglementClientPage() {
               <span className="text-xs text-muted-foreground">Plafond : {money(maximumAdjustment)} MAD</span>
             </div>}
           </div>
-          {!personalCashAvailable && methods.some((method) => method.mode === "ESPECES") ? <p role="alert" className="text-sm text-destructive">Aucune caisse individuelle active n’est disponible pour votre utilisateur. Sélectionnez un autre moyen de règlement.</p> : null}
+          {companyDirect && <label className="flex items-center gap-3 text-sm"><Switch checked={companyConfirmed} onCheckedChange={setCompanyConfirmed} />Paiement confirmé par la compagnie</label>}
+          {!companyDirect && !personalCashAvailable && methods.some((method) => method.mode === "ESPECES") ? <p role="alert" className="text-sm text-destructive">Aucune caisse individuelle active n’est disponible pour votre utilisateur. Sélectionnez un autre moyen de règlement.</p> : null}
           {adjustmentAmount > 0 && <div className="grid max-w-4xl gap-2">
             <Label htmlFor="settlement-adjustment-reason">Motif de l'écart *</Label>
             <Input id="settlement-adjustment-reason" maxLength={500} value={adjustmentReason} onChange={event => setAdjustmentReason(event.target.value)} />
@@ -643,7 +661,7 @@ export default function NouveauReglementClientPage() {
                       key={method.key}
                       method={method}
                       number={methodNumber}
-                      complete={methodValid(method, accounts.data ?? [], outgoing)}
+                      complete={methodValid(method, accounts.data ?? [], outgoing, companyDirect)}
                       bankLabel={(banks.data ?? []).find((bank) => bank.id === method.banqueEmettriceId)?.libelle}
                       accountLabel={(accounts.data ?? []).find((account) => account.id === method.compteTresorerieId)?.libelle}
                       onEdit={() => setEditingMethodKey(method.key)}
@@ -665,7 +683,7 @@ export default function NouveauReglementClientPage() {
                       </span>
                     </div>
 
-                  {requiresPaymentReference(method.mode) ? (
+                  {companyDirect || requiresPaymentReference(method.mode) ? (
                     <div className="grid gap-1.5">
                       <Label>{method.mode === "VERSEMENT_BANCAIRE" ? "N° bordereau banque" : "Référence"}</Label>
                       <Input
@@ -721,7 +739,7 @@ export default function NouveauReglementClientPage() {
                   ) : null}
                   {method.mode !== "ESPECES" ? (
                     <>
-                      {!requiresPaymentReference(method.mode) ? (
+                      {!companyDirect && !requiresPaymentReference(method.mode) ? (
                         <div className="grid gap-1.5">
                           <Label>Référence</Label>
                           <Input
@@ -733,7 +751,7 @@ export default function NouveauReglementClientPage() {
                           />
                         </div>
                       ) : null}
-                      {requiresBankAccountAtEntry(method.mode) || outgoing ? (
+                      {!companyDirect && (requiresBankAccountAtEntry(method.mode) || outgoing) ? (
                         <AccountSelect
                           accounts={accounts.data ?? []}
                           type="BANQUE"
@@ -763,7 +781,7 @@ export default function NouveauReglementClientPage() {
                   ) : null}
 
                     <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
-                      {!multiClientDeposit && !signedSettlement ? (
+                      {!companyDirect && !multiClientDeposit && !signedSettlement ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -789,7 +807,7 @@ export default function NouveauReglementClientPage() {
                     </div>
                   </div>
 
-                  {!signedSettlement && (method.mode === "CHEQUE" || method.mode === "EFFET") && (
+                  {!companyDirect && !signedSettlement && (method.mode === "CHEQUE" || method.mode === "EFFET") && (
                     <div className="flex items-center gap-3 rounded-md border px-3 py-2">
                       <Switch
                         id={`office-payment-${method.key}`}
@@ -800,7 +818,7 @@ export default function NouveauReglementClientPage() {
                     </div>
                   )}
 
-                  {requiresBankAccountAtEntry(method.mode)
+                  {!companyDirect && requiresBankAccountAtEntry(method.mode)
                     && !accounts.isLoading
                     && activeBankAccounts.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
@@ -1337,8 +1355,11 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
   };
 }
 
-function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false) {
+function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false, companyDirect = false) {
   if (numeric(method.montant) <= 0) return false;
+  if (companyDirect) return ["ESPECES", "VIREMENT", "VERSEMENT_BANCAIRE"].includes(method.mode)
+    && Boolean(method.referenceInstrument.trim()) && !method.compteTresorerieId && !method.reglementBureau
+    && (!showsOriginatingBank(method.mode) || Boolean(method.banqueEmettriceId));
   if (method.mode === "ESPECES") {
     return true;
   }

@@ -72,6 +72,9 @@ public class QuittancePrimePdfService {
     }
 
     public byte[] render(ReglementClient payment, String reference, LocalDate issuedOn, Set<String> policyKeys) {
+        if (payment.isDirectCompagnie()) {
+            throw new BadRequestException("La quittance d'un paiement direct doit être délivrée par la compagnie");
+        }
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement annulé ne peut pas donner lieu à une quittance de prime");
         }

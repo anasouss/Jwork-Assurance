@@ -53,6 +53,9 @@ public class QuittancePrimeClientService {
     }
 
     private void requireValid(ReglementClient payment) {
+        if (payment.isDirectCompagnie()) {
+            throw new BadRequestException("La quittance d'un paiement direct doit être délivrée par la compagnie");
+        }
         if (payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE) {
             throw new BadRequestException("Un décaissement ne donne pas lieu à une quittance de prime encaissée");
         }

@@ -162,6 +162,7 @@ public class ReglementClientService {
     private final ParametreApplicationService parametreApplicationService;
     private final StorageLayoutService storageLayoutService;
     private final EcartReglementClientRepository ecartRepository;
+    private final com.assurance.repository.LigneBordereauCompagnieRepository companyBordereauLines;
     private final BusinessActivityRecorder businessActivityRecorder;
 
     @Transactional(readOnly = true)
@@ -786,6 +787,7 @@ public class ReglementClientService {
             CreerReglementClientRequest request,
             MultipartFile receipt
     ) {
+        boolean companyDirect = request.getCircuit() == com.assurance.enums.CircuitReglementClient.DIRECT_COMPAGNIE;
         List<CreerReglementClientRequest.Instrument> requestedInstruments = request.getInstruments();
         List<Long> elementIds = requestedInstruments.stream()
                 .flatMap(instrument -> instrument.getAffectations().stream())
@@ -918,6 +920,9 @@ public class ReglementClientService {
 
         Agence agence = agenceRepository.findByIdForUpdate(agenceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Agence", agenceId));
+        com.assurance.entity.CompagnieAssurance directCompany = companyDirect
+                ? validateCompanyDirectPayment(agenceId, request, documents, directElementIds, existingDocumentAmounts)
+                : null;
         Utilisateur user = utilisateurRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Utilisateur", userId));
         BigDecimal totalPayment = sumInstruments(requestedInstruments);
@@ -955,6 +960,9 @@ public class ReglementClientService {
             );
         }
         BigDecimal unallocatedCredit = money(totalPayment.subtract(totalAllocated.abs()));
+        if (companyDirect && unallocatedCredit.signum() != 0) {
+            throw new BadRequestException("Un paiement direct compagnie doit être entièrement affecté, sans crédit agence");
+        }
         BigDecimal maximumUnallocatedCredit = maxUnallocatedCredit(agenceId);
         if (unallocatedCredit.compareTo(maximumUnallocatedCredit) > 0) {
             throw new BadRequestException(
@@ -970,6 +978,8 @@ public class ReglementClientService {
                 .creePar(user)
                 .build();
         payment.setDateReglement(request.getDateReglement());
+        payment.setCircuit(request.getCircuit());
+        payment.setCompagnieDirecte(directCompany);
         payment.setClientPayeur(payer.client());
         payment.setGroupePayeur(payer.group());
         payment.setConventionPayeur(payer.convention());
@@ -1030,11 +1040,66 @@ public class ReglementClientService {
         return toResponse(payment);
     }
 
+    private com.assurance.entity.CompagnieAssurance validateCompanyDirectPayment(Long agenceId,
+            CreerReglementClientRequest request, List<DocumentClient> documents, List<Long> directElementIds,
+            Map<Long, AllocationAmounts> currentAmounts) {
+        if (documents.stream().anyMatch(document -> document.getTotalDocument().signum() < 0)) {
+            throw new BadRequestException("Les règlements de ristourne sont exclusivement pris en charge par l'agence");
+        }
+        if (!Boolean.TRUE.equals(request.getConfirmationCompagnie()) || Boolean.TRUE.equals(request.getMultiPayeur())
+                || documents.isEmpty() || !directElementIds.isEmpty()
+                || documents.stream().anyMatch(document -> document.getConventionFacturee() == null)
+                || (request.getEcarts() != null && !request.getEcarts().isEmpty())) {
+            throw new BadRequestException("Le circuit direct compagnie exige des factures conventions et une confirmation compagnie, sans écart");
+        }
+        if (request.getDateReglement().isAfter(LocalDate.now())) {
+            throw new BadRequestException("La date du paiement confirmé par la compagnie ne peut pas être future");
+        }
+        for (CreerReglementClientRequest.Instrument instrument : request.getInstruments()) {
+            if (!isImmediatePaymentMode(instrument.getMode())
+                    || instrument.getReferenceInstrument() == null || instrument.getReferenceInstrument().isBlank()) {
+                throw new BadRequestException("Déclarez un paiement compagnie encaissé en espèces, par virement ou versement, avec sa référence");
+            }
+        }
+        for (DocumentClient document : documents) {
+            AllocationAmounts current = currentAmounts.getOrDefault(document.getId(), AllocationAmounts.empty());
+            BigDecimal requested = request.getInstruments().stream().flatMap(instrument -> instrument.getAffectations().stream())
+                    .filter(allocation -> document.getId().equals(allocation.getDocumentClientId()))
+                    .map(CreerReglementClientRequest.Affectation::getMontant).reduce(ZERO, BigDecimal::add);
+            if (current.confirmed().signum() != 0 || current.pending().signum() != 0 || current.adjustment().signum() != 0
+                    || money(requested).compareTo(money(document.getTotalDocument())) != 0) {
+                throw new BadRequestException("Réglez chaque facture intégralement par un seul circuit, sans paiement agence existant");
+            }
+        }
+        List<Long> ids = documents.stream().flatMap(document -> document.getLignes().stream())
+                .map(line -> line.getElementFacturable().getId()).distinct().sorted().toList();
+        List<ElementFacturable> sources = elementRepository.findClientDocumentSourcesForUpdate(agenceId, ids);
+        if (sources.size() != ids.size() || !companyBordereauLines.lockReservedByElementIds(agenceId, ids).isEmpty()) {
+            throw new BadRequestException("Une source est indisponible ou déjà réservée dans un bordereau compagnie");
+        }
+        com.assurance.entity.CompagnieAssurance company = null;
+        for (ElementFacturable element : sources) {
+            var candidate = element.getCompagnieAssurance() == null
+                    ? element.getContrat().getCompagnieAssurance() : element.getCompagnieAssurance();
+            if (element.getNature() == com.assurance.enums.NatureElementFacturable.ASSISTANCE || candidate == null
+                    || (company != null && !company.getId().equals(candidate.getId()))) {
+                throw new BadRequestException("Un paiement direct doit concerner une seule compagnie d'assurance");
+            }
+            company = candidate;
+        }
+        if (company == null) throw new BadRequestException("Compagnie de la facture introuvable");
+        return company;
+    }
+
     private void validateSettlementAdjustments(Long agenceId, CreerReglementClientRequest request,
             Map<Long, ElementFacturable> elements, Map<Long, DocumentClient> documents,
             Map<Long, AllocationAmounts> existing, Map<Long, Map<Long, AllocationAmounts>> invoiceAmounts,
             Map<Long, BigDecimal> requestedAmounts, Map<Long, Long> invoiceByElement) {
         if (request.getEcarts() == null || request.getEcarts().isEmpty()) return;
+        if (request.getConventionPayeurId() != null || documents.values().stream().anyMatch(document ->
+                document.getConventionFacturee() != null || document.getConventionPayeur() != null)) {
+            throw new BadRequestException("Les écarts de règlement ne sont pas autorisés pour les conventions");
+        }
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getAuthorities().stream()
                 .noneMatch(authority -> "PERM_reglement-client:adjust".equals(authority.getAuthority()))) {
@@ -1076,12 +1141,12 @@ public class ReglementClientService {
     private void confirmImmediateInstruments(ReglementClient payment) {
         LocalDate operationDate = LocalDate.now();
         for (InstrumentReglementClient instrument : payment.getInstruments()) {
-            if (isImmediatePaymentMode(instrument.getMode())) {
+            if (payment.isDirectCompagnie() || isImmediatePaymentMode(instrument.getMode())) {
                 instrument.setStatut(StatutInstrumentReglement.CONFIRME);
-                instrument.setDateStatut(operationDate);
+                instrument.setDateStatut(payment.isDirectCompagnie() ? payment.getDateReglement() : operationDate);
                 instrument.getAffectations().forEach(allocation ->
                         allocation.setStatut(StatutAffectationReglement.CONFIRMEE));
-                tresorerieService.recordInstrumentEntry(
+                if (!payment.isDirectCompagnie()) tresorerieService.recordInstrumentEntry(
                         instrument,
                         instrument.getCompteTresorerie(),
                         payment.getDateReglement()
@@ -1114,6 +1179,9 @@ public class ReglementClientService {
 
     private ReglementClientResponse changeInstrumentStatusRecord(Long agenceId, InstrumentReglementClient instrument,
             ChangerStatutInstrumentReglementRequest request) {
+        if (instrument.getReglement().isDirectCompagnie()) {
+            throw new BadRequestException("Un paiement direct compagnie ne se traite pas dans la trésorerie agence");
+        }
         if (instrument.getReglement().getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement doit être enregistré avant de traiter son moyen de paiement");
         }
@@ -1180,6 +1248,15 @@ public class ReglementClientService {
 
     private ReglementClientResponse cancelPaymentRecord(Long agenceId, ReglementClient payment,
             AnnulerReglementClientRequest request) {
+        if (payment.isDirectCompagnie()) {
+            List<Long> sourceIds = payment.getInstruments().stream().flatMap(instrument -> instrument.getAffectations().stream())
+                    .flatMap(allocation -> allocation.getDocumentClient().getLignes().stream())
+                    .map(line -> line.getElementFacturable().getId()).distinct().sorted().toList();
+            elementRepository.findClientDocumentSourcesForUpdate(agenceId, sourceIds);
+            var quittances = quittanceRepository.findGlobalForPaymentHistory(agenceId, sourceIds);
+            quittances.forEach(quittance -> quittance.setPayee(false));
+            quittanceRepository.saveAll(quittances);
+        }
         if (payment.getInstruments().stream().anyMatch(instrument ->
                 instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE)) {
             throw new BadRequestException(
@@ -1203,7 +1280,7 @@ public class ReglementClientService {
                     .filter(Objects::nonNull)
                     .map(DocumentClient::getId)
                     .toList());
-            if (instrument.getStatut() == StatutInstrumentReglement.CONFIRME) {
+            if (instrument.getStatut() == StatutInstrumentReglement.CONFIRME && !payment.isDirectCompagnie()) {
                 tresorerieService.reverseInstrumentEntry(instrument, request.getMotif(), operationDate);
             }
             instrument.setStatut(StatutInstrumentReglement.REJETE);
@@ -1740,6 +1817,7 @@ public class ReglementClientService {
                 && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
                 && (remittanceLine == null || remittanceLine.getStatut() == StatutLigneBordereauRemise.REJETEE);
         return ReglementClientResponse.Instrument.builder()
+                .circuit(instrument.getReglement().getCircuit())
                 .sens(instrument.getReglement().getSens())
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())
@@ -1833,6 +1911,19 @@ public class ReglementClientService {
             throw new BadRequestException("Une ventilation dépasse le montant de son moyen de règlement");
         }
         boolean cash = request.getMode() == ModeReglementClient.ESPECES;
+        if (payment.isDirectCompagnie()) {
+            if (request.getCompteTresorerieId() != null || Boolean.TRUE.equals(request.getReglementBureau())
+                    || request.getDateEcheance() != null) {
+                throw new BadRequestException("Un paiement direct compagnie ne doit pas utiliser un compte ou une remise agence");
+            }
+            validateInstrumentReference(request);
+            return InstrumentReglementClient.builder().agence(agence).reglement(payment)
+                    .mode(request.getMode()).statut(StatutInstrumentReglement.EN_ATTENTE)
+                    .montant(money(request.getMontant())).dateInstrument(payment.getDateReglement())
+                    .referenceInstrument(trimToNull(request.getReferenceInstrument()))
+                    .banqueEmettriceReference(resolveOriginatingBank(agence.getId(), request))
+                    .reglementBureau(false).dateStatut(payment.getDateReglement()).build();
+        }
         boolean outgoing = payment.getSens() == com.assurance.enums.SensMouvementTresorerie.SORTIE;
         if (outgoing && Boolean.TRUE.equals(request.getReglementBureau())) {
             throw new BadRequestException("Le règlement au bureau ne concerne pas les paiements émis par l'agence");
@@ -3208,6 +3299,9 @@ public class ReglementClientService {
     ) {
         Map<Long, String> assistanceNumbers = assistanceNumbers(payment.getAgence().getId(), payment.getInstruments());
         return ReglementClientResponse.builder()
+                .circuit(payment.getCircuit())
+                .compagnieDirecteId(payment.getCompagnieDirecte() == null ? null : payment.getCompagnieDirecte().getId())
+                .compagnieDirecte(payment.getCompagnieDirecte() == null ? null : payment.getCompagnieDirecte().getNom())
                 .sens(payment.getSens())
                 .id(payment.getId())
                 .numero(payment.getNumero())
@@ -3248,6 +3342,7 @@ public class ReglementClientService {
             Map<Long, String> assistanceNumbers
     ) {
         return ReglementClientResponse.Instrument.builder()
+                .circuit(instrument.getReglement().getCircuit())
                 .sens(instrument.getReglement().getSens())
                 .id(instrument.getId())
                 .reglementId(instrument.getReglement().getId())

@@ -57,6 +57,19 @@ public class ReglementClient extends AuditedEntity {
     @Column(name = "date_reglement", nullable = false)
     private LocalDate dateReglement;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "circuit", nullable = false, length = 24)
+    @Builder.Default
+    private com.assurance.enums.CircuitReglementClient circuit = com.assurance.enums.CircuitReglementClient.AGENCE;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "compagnie_directe_id")
+    private CompagnieAssurance compagnieDirecte;
+
+    public boolean isDirectCompagnie() {
+        return circuit == com.assurance.enums.CircuitReglementClient.DIRECT_COMPAGNIE;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_payeur_id")
     private Client clientPayeur;

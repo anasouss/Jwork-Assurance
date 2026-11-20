@@ -35,6 +35,8 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
       statut: status, search: appliedSearch || undefined, page, size: 25 }),
     staleTime: 0,
   });
+  const periodHeading = invoices.data?.rows.some(invoice => !quarterLabel(invoice.periodeDebut, invoice.periodeFin))
+    ? "Période facturée" : "Trimestre";
   const pdf = useMutation({
     mutationFn: async (id: string) => {
       const tab = window.open("about:blank", "_blank");
@@ -69,7 +71,7 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
     <div className="overflow-hidden rounded-md border">
       <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-sm">
         <thead className="bg-orange-600 text-left text-xs uppercase text-white"><tr>
-          {["Facture", "Convention", "Période facturée", "Date d’émission", "Échéance", "Montant", "État", "Actions"].map(title => <th key={title} className={`px-3 py-3 ${["Montant", "Actions"].includes(title) ? "text-right" : ""}`}>{title}</th>)}
+          {["Facture", "Convention", periodHeading, "Date d’émission", "Échéance", "Montant", "État", "Actions"].map(title => <th key={title} className={`px-3 py-3 ${["Montant", "Actions"].includes(title) ? "text-right" : ""}`}>{title}</th>)}
         </tr></thead>
         <tbody className="divide-y">
           {invoices.isPending ? <TableRowsSkeleton colSpan={8} rows={5} /> : invoices.isError ? <tr><td colSpan={8} className="p-8 text-center"><p role="alert" className="text-destructive">{invoices.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void invoices.refetch()}>Réessayer</Button></td></tr>
@@ -78,7 +80,9 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
                 <td className="px-3 py-3"><button type="button" disabled={pdf.isPending} className="font-medium text-sky-700 hover:underline dark:text-sky-300" onClick={() => pdf.mutate(invoice.id)}>{invoice.numero}</button>
                   {invoice.totalDocument < 0 && <div className="mt-1 text-xs text-muted-foreground">Facture de ristourne</div>}</td>
                 <td className="px-3 py-3">{invoice.conventionFacturee || invoice.payeurNom || "-"}</td>
-                <td className="px-3 py-3">{date(invoice.periodeDebut)} au {date(invoice.periodeFin)}</td>
+                <td className="whitespace-nowrap px-3 py-3" title={`${date(invoice.periodeDebut)} au ${date(invoice.periodeFin)}`}>
+                  {quarterLabel(invoice.periodeDebut, invoice.periodeFin) ?? `${date(invoice.periodeDebut)} au ${date(invoice.periodeFin)}`}
+                </td>
                 <td className="px-3 py-3">{date(invoice.dateEmission)}</td><td className="px-3 py-3">{date(invoice.dateEcheance)}</td>
                 <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(invoice.totalDocument)}</td>
                 <td className="px-3 py-3"><Badge variant={invoice.statut === "EMIS" ? "success" : "secondary"}>{({ EMIS: "Établie", ANNULE: "Annulée", REMPLACE: "Remplacée" } as const)[invoice.statut]}</Badge></td>
@@ -104,6 +108,17 @@ export function ConventionSavedInvoices({ conventionId, compagnieId, periodeDu, 
       setRevisionId(undefined); setReplacementHighlight(replacement.id); setStatus(undefined); setSearch(""); setAppliedSearch(""); setPage(0);
     }} />}
   </section>;
+}
+
+function quarterLabel(start?: string | null, end?: string | null) {
+  if (!start || !end || !/^\d{4}-\d{2}-01$/.test(start)) return undefined;
+  const [year, month] = start.split("-").map(Number);
+  if (![1, 4, 7, 10].includes(month)) return undefined;
+  const lastDay = new Date(Date.UTC(year, month + 2, 0)).getUTCDate();
+  const expectedEnd = `${year}-${String(month + 2).padStart(2, "0")}-${lastDay}`;
+  if (end !== expectedEnd) return undefined;
+  const quarter = (month + 2) / 3;
+  return `${quarter === 1 ? "1er" : `${quarter}e`} trimestre ${year}`;
 }
 
 function date(value?: string | null) {

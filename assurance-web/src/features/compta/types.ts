@@ -822,6 +822,9 @@ export type PremiumReceiptOptions = {
 };
 
 export type ClientPayment = {
+  circuit?: "AGENCE" | "DIRECT_COMPAGNIE";
+  compagnieDirecteId?: string | null;
+  compagnieDirecte?: string | null;
   sens?: "ENTREE" | "SORTIE";
   id: string;
   numero: string;
@@ -885,6 +888,8 @@ export type ClientPaymentPage = {
 };
 
 export type CreateClientPaymentRequest = {
+  circuit?: "AGENCE" | "DIRECT_COMPAGNIE";
+  confirmationCompagnie?: boolean;
   ecarts?: { elementFacturableId: string; documentClientId?: string; montant: number; motif: string }[];
   dateReglement: string;
   clientPayeurId?: string;

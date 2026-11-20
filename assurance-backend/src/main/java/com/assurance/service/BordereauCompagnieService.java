@@ -67,6 +67,8 @@ public class BordereauCompagnieService {
     private final BordereauCompagnieRepository bordereauRepository;
     private final LigneBordereauCompagnieRepository ligneRepository;
     private final AffectationQuittanceCompagnieRepository sourceRepository;
+    private final com.assurance.repository.AffectationReglementClientRepository clientAllocations;
+    private final com.assurance.repository.ElementFacturableRepository billableElements;
     private final AffectationReglementCompagnieRepository allocationRepository;
     private final SequenceBordereauCompagnieRepository sequenceRepository;
     private final AgenceRepository agenceRepository;
@@ -426,6 +428,13 @@ public class BordereauCompagnieService {
             BordereauCompagnie bordereau,
             AffectationQuittanceCompagnie source
     ) {
+        if (source.getQuittance().getElementFacturable() != null) {
+            List<Long> ids = List.of(source.getQuittance().getElementFacturable().getId());
+            billableElements.findClientDocumentSourcesForUpdate(bordereau.getAgence().getId(), ids);
+            if (!clientAllocations.lockCompanyDirectByElementIds(bordereau.getAgence().getId(), ids).isEmpty()) {
+                throw new BadRequestException("Cette quittance a déjà été réglée directement avec la compagnie");
+            }
+        }
         if (!source.getTiersCompagnie().getId().equals(bordereau.getTiersCompagnie().getId())) {
             throw new BadRequestException("Toutes les lignes doivent appartenir à la même compagnie");
         }

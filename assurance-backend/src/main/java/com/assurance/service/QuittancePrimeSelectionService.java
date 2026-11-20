@@ -277,6 +277,9 @@ public class QuittancePrimeSelectionService {
         ReglementClient payment = (lock ? payments.findByIdAndAgenceIdForUpdate(paymentId, agencyId)
                 : payments.findByIdAndAgenceId(paymentId, agencyId))
                 .orElseThrow(() -> new ResourceNotFoundException("Règlement client", paymentId));
+        if (payment.isDirectCompagnie()) {
+            throw new BadRequestException("La quittance d'un paiement direct doit être délivrée par la compagnie");
+        }
         if (payment.getStatut() != StatutReglementClient.VALIDE) {
             throw new BadRequestException("Le règlement est annulé : sa quittance ne peut pas être délivrée");
         }

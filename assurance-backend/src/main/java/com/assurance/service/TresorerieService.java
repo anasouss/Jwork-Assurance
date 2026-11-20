@@ -253,6 +253,9 @@ public class TresorerieService {
             LocalDate operationDate,
             LigneReleveBancaire bankStatementLine
     ) {
+        if (instrument.getReglement().isDirectCompagnie()) {
+            throw new BadRequestException("Un paiement direct compagnie ne génère pas d'écriture de trésorerie agence");
+        }
         if (!instrument.getAgence().getId().equals(account.getAgence().getId())) {
             throw new BadRequestException("Le compte de trésorerie appartient à une autre agence");
         }
@@ -290,6 +293,9 @@ public class TresorerieService {
             String reason,
             LocalDate operationDate
     ) {
+        if (instrument.getReglement().isDirectCompagnie()) {
+            throw new BadRequestException("Un paiement direct compagnie n'a pas d'écriture agence à extourner");
+        }
         MouvementTresorerie original = mouvementRepository
                 .findFirstByAgenceIdAndInstrumentReglementIdAndNatureOrderByIdDesc(
                         instrument.getAgence().getId(),

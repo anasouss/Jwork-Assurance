@@ -20,6 +20,9 @@ public class ReglementClientResponse {
     private Long id;
     private String numero;
     private LocalDate dateReglement;
+    private com.assurance.enums.CircuitReglementClient circuit;
+    private Long compagnieDirecteId;
+    private String compagnieDirecte;
     private Long clientPayeurId;
     private Long groupePayeurId;
     private Long conventionPayeurId;
@@ -79,6 +82,7 @@ public class ReglementClientResponse {
     @Getter
     @Builder
     public static class Instrument {
+        private com.assurance.enums.CircuitReglementClient circuit;
         private com.assurance.enums.SensMouvementTresorerie sens;
         private Long id;
         private Long reglementId;

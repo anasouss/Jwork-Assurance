@@ -20,6 +20,11 @@ public class CreerReglementClientRequest {
     @NotNull
     private LocalDate dateReglement;
 
+    @NotNull
+    private com.assurance.enums.CircuitReglementClient circuit = com.assurance.enums.CircuitReglementClient.AGENCE;
+
+    private Boolean confirmationCompagnie = false;
+
     private Long clientPayeurId;
     private Long groupePayeurId;
     private Long conventionPayeurId;

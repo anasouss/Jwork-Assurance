@@ -120,7 +120,9 @@ export default function NouveauReglementClientPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const conventionCollection = location.pathname.startsWith("/app/compta/conventions/encaissements/");
+  const conventionSettlement = location.pathname.startsWith("/app/compta/conventions/reglements/");
+  const conventionCollection = conventionSettlement || location.pathname.startsWith("/app/compta/conventions/encaissements/");
+  const conventionReturnPath = conventionSettlement ? "/app/compta/conventions/reglements" : "/app/compta/conventions/encaissements";
   const [circuit, setCircuit] = useState<"AGENCE" | "DIRECT_COMPAGNIE">("AGENCE");
   const [companyConfirmed, setCompanyConfirmed] = useState(false);
   const queryClient = useQueryClient();
@@ -129,7 +131,7 @@ export default function NouveauReglementClientPage() {
   const selection = selectionFromParams(searchParams);
   const returnPath = multiClientDeposit
     ? multiClientSelectionPath(selection)
-    : conventionCollection ? "/app/compta/conventions/encaissements" : "/app/compta/reglements";
+    : conventionCollection ? conventionReturnPath : "/app/compta/reglements";
   const hasSelection = selection.elementFacturableIds.length > 0
     || selection.documentClientIds.length > 0;
   const [dateReglement, setDateReglement] = useState(today);
@@ -316,7 +318,7 @@ export default function NouveauReglementClientPage() {
         queryClient.invalidateQueries({ queryKey: ["compta", "treasury"] }),
       ]);
       navigate(conventionCollection
-        ? `/app/compta/conventions/encaissements?reglementId=${payment.id}`
+        ? `${conventionReturnPath}?reglementId=${payment.id}`
         : `/app/compta/reglements/historique?search=${encodeURIComponent(payment.numero)}`, {
         replace: true,
       });
@@ -445,6 +447,12 @@ export default function NouveauReglementClientPage() {
       ? receivables.error.message
       : "La sélection ne peut pas être chargée."} returnPath={returnPath} conventionCollection={conventionCollection} />;
   }
+  if (conventionCollection && rows.length > 0 && outgoing !== conventionSettlement) {
+    return <InvalidSelection message={conventionSettlement
+      ? "Sélectionnez uniquement des factures à régler."
+      : "Les factures à régler doivent être traitées dans la rubrique Règlements."}
+      returnPath={returnPath} conventionCollection />;
+  }
 
   return (
     <div className="mx-auto grid w-full max-w-[1440px] gap-5">
@@ -467,7 +475,7 @@ export default function NouveauReglementClientPage() {
         <Button asChild variant="outline">
           <Link to={returnPath}>
             <ArrowLeft className="size-4" />
-            {conventionCollection ? "Retour aux factures conventions" : "Retour aux primes à encaisser"}
+            {conventionSettlement ? "Retour aux règlements" : conventionCollection ? "Retour aux factures conventions" : "Retour aux primes à encaisser"}
           </Link>
         </Button>
       </header>
@@ -1035,7 +1043,7 @@ function InvalidSelection({ message, returnPath, conventionCollection }: {
           <p className="mt-1 text-sm text-muted-foreground">{message}</p>
         </div>
         <Button asChild>
-          <Link to={returnPath}>{conventionCollection ? "Retour aux factures conventions" : "Retour aux primes à encaisser"}</Link>
+          <Link to={returnPath}>{returnPath === "/app/compta/conventions/reglements" ? "Retour aux règlements" : conventionCollection ? "Retour aux factures conventions" : "Retour aux primes à encaisser"}</Link>
         </Button>
       </div>
     </div>

@@ -673,6 +673,20 @@ export const comptaApi = {
     ));
   },
 
+  async conventionPayments(params: {
+    sens: "ENTREE" | "SORTIE";
+    conventionId?: string;
+    search?: string;
+    statut?: ClientPayment["statut"];
+    mode?: PaymentInstrument["mode"];
+    page: number;
+    size: number;
+  }) {
+    return normalizeClientPaymentPage(unwrap(await apiFetch<ApiResponse<ClientPaymentPage>>(
+      `/api/v1/compta/reglements-clients/conventions${buildQueryString(params)}`
+    )));
+  },
+
   async clientPayments(params: {
     dateDu?: string;
     dateAu?: string;

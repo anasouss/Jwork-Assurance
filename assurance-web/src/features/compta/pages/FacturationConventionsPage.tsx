@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toDateOnly } from "@/features/production/date";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
+import { conventionPeriodLabel as periodLabel } from "../convention-period";
 import { ConventionInvoiceLines } from "../components/ConventionInvoiceLines";
 import { ConventionSavedInvoices } from "../components/ConventionSavedInvoices";
 import { AccessDenied } from "@/components/shared";
@@ -196,11 +197,11 @@ export default function FacturationConventionsPage() {
             onChange={event => { setYear(Number(event.target.value)); setPeriodNumber("ALL"); }} />
         </div>
         <div className="grid w-full min-w-0 gap-1.5 sm:max-w-[440px] sm:flex-[1.5_1_320px]">
-          <Label htmlFor="billing-period">{savedView ? "Période facturée" : "Période à facturer"}</Label>
+          <Label htmlFor="billing-period">{convention?.fractionnement === "TRIMESTRIEL" ? "Trimestre" : savedView ? "Période facturée" : "Période à facturer"}</Label>
           <Select value={periodNumber} disabled={issue.isPending || !convention?.periodes.length} onValueChange={setPeriodNumber}>
             <SelectTrigger id="billing-period"><SelectValue placeholder="Sélectionner une période" /></SelectTrigger>
-            <SelectContent><SelectItem value="ALL">Toutes les périodes</SelectItem>{convention?.periodes.map(item => <SelectItem key={item.numero} value={String(item.numero)}>
-              {periodLabel(convention.fractionnement, item.numero)} · {shortDate(item.debut)} au {shortDate(item.fin)}
+            <SelectContent><SelectItem value="ALL">{convention?.fractionnement === "TRIMESTRIEL" ? "Tous les trimestres" : "Toutes les périodes"}</SelectItem>{convention?.periodes.map(item => <SelectItem key={item.numero} value={String(item.numero)} title={`${shortDate(item.debut)} au ${shortDate(item.fin)}`}>
+              {periodLabel(convention.fractionnement, item.numero)}
             </SelectItem>)}</SelectContent>
           </Select>
         </div>
@@ -294,11 +295,6 @@ export default function FacturationConventionsPage() {
       </DialogContent>
     </Dialog>
   </div>;
-}
-
-function periodLabel(frequency: string | null, number: number) {
-  const label = frequency === "TRIMESTRIEL" ? "Trimestre" : frequency === "SEMESTRIEL" ? "Semestre" : frequency === "MENSUEL" ? "Mois" : "Année";
-  return `${label} ${number}`;
 }
 
 function shortDate(value: string) {

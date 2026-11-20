@@ -470,6 +470,19 @@ public class ReglementClientService {
                                     default -> "dateReglement";
                                 }).and(Sort.by(Sort.Direction.DESC, "id")))
         );
+        return paymentPage(result);
+    }
+
+    @Transactional(readOnly = true)
+    public ReglementClientPageResponse searchConventionPayments(Long agenceId,
+            com.assurance.enums.SensMouvementTresorerie sens, Long conventionId, StatutReglementClient statut,
+            ModeReglementClient mode, String search, int page, int size) {
+        return paymentPage(reglementRepository.searchConventionPayments(agenceId, sens, conventionId, statut, mode,
+                normalizeSearch(search), PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
+                        Sort.by(Sort.Direction.DESC, "dateReglement").and(Sort.by(Sort.Direction.DESC, "id")))));
+    }
+
+    private ReglementClientPageResponse paymentPage(Page<ReglementClient> result) {
         Map<Long, LigneBordereauRemise> remittanceLines = remittanceLinesWithHistory(
                 result.getContent().stream()
                         .flatMap(payment -> payment.getInstruments().stream())

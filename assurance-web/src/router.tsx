@@ -239,6 +239,22 @@ export const router = createBrowserRouter([
         lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementClientPage")),
       },
       {
+        path: "compta/conventions/encaissements/historique",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionPaymentHistoryPage")),
+      },
+      {
+        path: "compta/conventions/reglements",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionPaymentHistoryPage")),
+      },
+      {
+        path: "compta/conventions/reglements/nouveau",
+        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionCollectionsPage")),
+      },
+      {
+        path: "compta/conventions/reglements/enregistrer",
+        lazy: lazyRoute(() => import("@/features/compta/pages/NouveauReglementClientPage")),
+      },
+      {
         path: "compta/conventions/production",
         lazy: lazyRoute(() => import("@/features/compta/pages/ConventionProductionPage")),
       },

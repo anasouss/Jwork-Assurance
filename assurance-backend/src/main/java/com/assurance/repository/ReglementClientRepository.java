@@ -14,6 +14,28 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 public interface ReglementClientRepository extends JpaRepository<ReglementClient, Long> {
+    @EntityGraph(attributePaths = {"clientPayeur", "groupePayeur", "conventionPayeur", "creePar", "validePar", "compagnieDirecte"})
+    @Query("""
+            select r from ReglementClient r
+            where r.agence.id = :agenceId and r.sens = :sens
+              and (r.conventionPayeur is not null or exists (
+                  select a.id from AffectationReglementClient a
+                  where a.instrument.reglement = r and a.documentClient.conventionFacturee is not null))
+              and (:conventionId is null or r.conventionPayeur.id = :conventionId)
+              and (:statut is null or r.statut = :statut)
+              and (:mode is null or exists (
+                  select i.id from InstrumentReglementClient i where i.reglement = r and i.mode = :mode))
+              and (:search is null or lower(r.numero) like concat('%', :search, '%')
+                  or lower(r.payeurNom) like concat('%', :search, '%')
+                  or exists (select i.id from InstrumentReglementClient i where i.reglement = r
+                      and lower(coalesce(i.referenceInstrument, '')) like concat('%', :search, '%')))
+            """)
+    Page<ReglementClient> searchConventionPayments(@Param("agenceId") Long agenceId,
+            @Param("sens") com.assurance.enums.SensMouvementTresorerie sens,
+            @Param("conventionId") Long conventionId,
+            @Param("statut") com.assurance.enums.StatutReglementClient statut,
+            @Param("mode") com.assurance.enums.ModeReglementClient mode,
+            @Param("search") String search, Pageable pageable);
 
     @EntityGraph(attributePaths = {
             "clientPayeur", "groupePayeur", "creePar", "validePar", "instruments",

@@ -1,10 +1,11 @@
-import { ArrowLeft, FilePlus2, ListChecks, WalletCards } from "lucide-react";
+import { ArrowLeft, Banknote, FilePlus2, ListChecks, WalletCards } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export const conventionActions = [
   { title: "Consultation", href: "/app/compta/conventions/production", icon: ListChecks, permission: "production-convention:view" },
   { title: "Facturation", href: "/app/compta/conventions/factures", icon: FilePlus2, permission: "facture-convention:view" },
-  { title: "Encaissement et règlement", href: "/app/compta/conventions/encaissements", icon: WalletCards, permission: "reglement-client:view" },
+  { title: "Encaissements", href: "/app/compta/conventions/encaissements", icon: WalletCards, permission: "reglement-client:view" },
+  { title: "Règlements", href: "/app/compta/conventions/reglements", icon: Banknote, permission: "reglement-client:view" },
 ];
 
 export function ConventionWorkspaceHeader({ title }: { title: string }) {

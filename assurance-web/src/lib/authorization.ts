@@ -48,6 +48,8 @@ const pagePermissionRules: readonly PagePermissionRule[] = [
   { paths: ["/app/compta/conventions"], requirement: { anyOf: ["production-convention:view","facture-convention:view","reglement-client:view"] } },
   { paths: ["/app/compta/conventions/encaissements", "/app/compta/reglements", "/app/compta/reglements/versement-multi-clients", "/app/compta/reglements/historique", "/app/compta/reglements/validation", "/app/compta/reglements/etat-encaissements", "/app/compta/reglements/:reglementId"], requirement: { anyOf: ["reglement-client:view"] } },
   { paths: ["/app/compta/conventions/encaissements/nouveau", "/app/compta/reglements/nouveau"], requirement: { anyOf: ["reglement-client:create","reglement-client:refund"] } },
+  { paths: ["/app/compta/conventions/reglements", "/app/compta/conventions/encaissements/historique"], requirement: { anyOf: ["reglement-client:view"] } },
+  { paths: ["/app/compta/conventions/reglements/nouveau", "/app/compta/conventions/reglements/enregistrer"], requirement: { anyOf: ["reglement-client:refund"] } },
   { paths: ["/app/compta/conventions/production"], requirement: { anyOf: ["production-convention:view"] } },
   { paths: ["/app/compta/bordereaux-compagnies", "/app/compta/bordereaux-compagnies/:bordereauId"], requirement: { anyOf: ["bordereau-compagnie:view"] } },
   { paths: ["/app/compta/bordereaux-compagnies/nouveau"], requirement: { anyOf: ["bordereau-compagnie:create"] } },

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Ban, Banknote, Eye, MoreHorizontal, Pencil, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { ConventionWorkspaceHeader } from "../components/ConventionWorkspaceHead
 import { InvoiceActionDialog, InvoiceDialog } from "../components/ConventionInvoiceDialogs";
 import { ConventionInvoiceRevisionDialog } from "../components/ConventionInvoiceRevisionDialog";
 import { formatAccountingAmount } from "../format";
+import { conventionPeriodLabel } from "../convention-period";
 import type { ClientReceivable, ConventionProductionFilters } from "../types";
 
 const labels = {
@@ -29,9 +30,10 @@ const labels = {
 const variants = { IMPAYEE: "warning", PARTIELLEMENT_REGLEE: "accent", COUVERTE_EN_ATTENTE: "info", PAYEE: "success" } as const;
 const emptyFilters = { conventionId: "ALL", companyId: "ALL", search: "", dateDu: "", dateAu: "", includeSettled: true,
   year: String(new Date().getFullYear()), period: "ALL", periodeDu: "", periodeAu: "",
-  movement: "ALL", operation: "ENCAISSEMENT" };
+  movement: "ALL" };
 
 export default function ConventionCollectionsPage() {
+  const settlementPage = useLocation().pathname.startsWith("/app/compta/conventions/reglements/");
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canView = permissions.includes("reglement-client:view");
   const canViewDocuments = permissions.includes("facture-convention:view");
@@ -49,6 +51,7 @@ export default function ConventionCollectionsPage() {
   const [applied, setApplied] = useState(emptyFilters);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Record<string, ClientReceivable>>({});
+  useEffect(() => { setPage(0); setSelected({}); }, [settlementPage]);
   const year = Number(filters.year);
   const validYear = Number.isInteger(year) && year >= 1900 && year <= 2200;
   const options = useQuery({
@@ -59,17 +62,18 @@ export default function ConventionCollectionsPage() {
   const convention = options.data?.find(option => option.id === filters.conventionId);
   const effectiveCompany = convention?.compagnieId ?? filters.companyId;
   const invoices = useQuery({
-    queryKey: ["compta", "convention-invoice-receivables", applied, page],
+    queryKey: ["compta", "convention-invoice-receivables", settlementPage, applied, page],
     queryFn: () => comptaApi.clientInvoiceReceivables({
       conventionsOnly: true,
       conventionId: applied.conventionId === "ALL" ? undefined : applied.conventionId,
       compagnieId: applied.companyId === "ALL" ? undefined : applied.companyId,
-      categorieMouvement: applied.movement === "ALL" ? undefined : applied.movement as ConventionProductionFilters["categorieMouvement"],
-      sensPrime: applied.operation === "REGLEMENT" ? "RISTOURNE" : "PRIME_A_PAYER",
+      categorieMouvement: settlementPage || applied.movement === "ALL" ? undefined : applied.movement as ConventionProductionFilters["categorieMouvement"],
+      sensPrime: settlementPage ? "RISTOURNE" : "PRIME_A_PAYER",
       periodeDu: applied.periodeDu || undefined, periodeAu: applied.periodeAu || undefined,
       includeSettled: applied.includeSettled,
       search: applied.search.trim() || undefined,
-      dateDu: applied.dateDu || undefined, dateAu: applied.dateAu || undefined,
+      dateDu: settlementPage ? undefined : applied.dateDu || undefined,
+      dateAu: settlementPage ? undefined : applied.dateAu || undefined,
       sortBy: "DATE", sortDirection: "DESC", page, size: 25,
     }),
     enabled: canView, refetchOnMount: "always",
@@ -77,7 +81,7 @@ export default function ConventionCollectionsPage() {
   const rows = invoices.data?.rows ?? [];
   const selectedRows = rows.filter(row => row.source.documentClientId
     && selected[row.source.documentClientId] && row.soldeOuvert !== 0);
-  const settlement = applied.operation === "REGLEMENT";
+  const settlement = settlementPage;
   const firstPayer = selectedRows[0] ? payerKey(selectedRows[0]) : undefined;
   const eligible = rows.filter(row => row.source.documentClientId && row.soldeOuvert !== 0
     && (row.source.montantTtc < 0 ? canPayRefund : canCollect)
@@ -86,7 +90,7 @@ export default function ConventionCollectionsPage() {
 
   function apply() {
     if (!validYear) { toast.error("Sélectionnez une année entre 1900 et 2200."); return; }
-    if (filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu) {
+    if (!settlementPage && filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu) {
       toast.error("La date de début doit précéder la date de fin.");
       return;
     }
@@ -105,7 +109,7 @@ export default function ConventionCollectionsPage() {
     if (items[0].source.montantTtc < 0 ? !canPayRefund : !canCollect) return;
     const query = new URLSearchParams();
     items.forEach(row => query.append("document", row.source.documentClientId!));
-    navigate(`/app/compta/conventions/encaissements/nouveau?${query}`);
+    navigate(`${settlementPage ? "/app/compta/conventions/reglements/enregistrer" : "/app/compta/conventions/encaissements/nouveau"}?${query}`);
   }
   function closeDetail() {
     const next = new URLSearchParams(params); next.delete("documentId"); next.delete("reglementId");
@@ -138,18 +142,12 @@ export default function ConventionCollectionsPage() {
 
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <ConventionWorkspaceHeader title="Encaissement et règlement" />
+    <ConventionWorkspaceHeader title={settlementPage ? "Nouveau règlement" : "Encaissements"} />
+    <div className="flex justify-end"><Button variant="outline" asChild><Link to={settlementPage
+      ? "/app/compta/conventions/reglements" : "/app/compta/conventions/encaissements/historique"}>
+      {settlementPage ? "Règlements enregistrés" : "Encaissements enregistrés"}
+    </Link></Button></div>
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
-      <div className="grid gap-1.5"><Label htmlFor="collection-operation">Opération</Label>
-        <Select value={filters.operation} onValueChange={operation => {
-          setFilters(current => ({ ...current, operation }));
-          setApplied(current => ({ ...current, operation }));
-          setPage(0); setSelected({});
-        }}>
-          <SelectTrigger id="collection-operation"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="ENCAISSEMENT">Encaissement</SelectItem><SelectItem value="REGLEMENT">Règlement</SelectItem></SelectContent>
-        </Select>
-      </div>
       {canView && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
         <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",
           companyId: value === "ALL" ? current.companyId : options.data?.find(option => option.id === value)?.compagnieId ?? "ALL" }))}>
@@ -171,23 +169,27 @@ export default function ConventionCollectionsPage() {
       {canView && <>
         <div className="grid gap-1.5"><Label htmlFor="collection-year">Année du cycle</Label><Input id="collection-year" type="number" min={1900} max={2200} value={filters.year}
           onChange={event => setFilters(current => ({ ...current, year: event.target.value, period: "ALL" }))} /></div>
-        <div className="grid gap-1.5"><Label htmlFor="collection-period">Période facturée</Label>
+        <div className="grid gap-1.5"><Label htmlFor="collection-period">{convention?.fractionnement === "TRIMESTRIEL" ? "Trimestre" : "Période facturée"}</Label>
           <Select value={filters.period} disabled={!convention || options.isFetching} onValueChange={value => setFilters(current => ({ ...current, period: value }))}>
-            <SelectTrigger id="collection-period"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Toutes les périodes</SelectItem>
-              {convention?.periodes.map(period => <SelectItem key={period.numero} value={String(period.numero)}>{date(period.debut)} au {date(period.fin)}</SelectItem>)}
+            <SelectTrigger id="collection-period"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">{convention?.fractionnement === "TRIMESTRIEL" ? "Tous les trimestres" : "Toutes les périodes"}</SelectItem>
+              {convention?.periodes.map(period => <SelectItem key={period.numero} value={String(period.numero)} title={`${date(period.debut)} au ${date(period.fin)}`}>
+                {conventionPeriodLabel(convention.fractionnement, period.numero)}
+              </SelectItem>)}
             </SelectContent>
           </Select></div>
       </>}
-      <div className="grid gap-1.5"><Label htmlFor="collection-movement">Mouvement</Label>
+      {!settlementPage && <div className="grid gap-1.5"><Label htmlFor="collection-movement">Mouvement</Label>
         <Select value={filters.movement} onValueChange={value => setFilters(current => ({ ...current, movement: value }))}>
           <SelectTrigger id="collection-movement"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
-        </Select></div>
+        </Select></div>}
       <div className="grid gap-1.5"><Label htmlFor="collection-search">N° facture / payeur</Label>
         <Input id="collection-search" value={filters.search} onChange={event => setFilters(current => ({ ...current, search: event.target.value }))}
           onKeyDown={event => { if (event.key === "Enter") apply(); }} />
       </div>
-      <div className="grid gap-1.5"><Label>Émise du</Label><DatePicker date={filters.dateDu} onSelect={date => setFilters(current => ({ ...current, dateDu: toDateOnly(date) ?? "" }))} /></div>
-      <div className="grid gap-1.5"><Label>Au</Label><DatePicker date={filters.dateAu} onSelect={date => setFilters(current => ({ ...current, dateAu: toDateOnly(date) ?? "" }))} /></div>
+      {!settlementPage && <>
+        <div className="grid gap-1.5"><Label>Émise du</Label><DatePicker date={filters.dateDu} onSelect={date => setFilters(current => ({ ...current, dateDu: toDateOnly(date) ?? "" }))} /></div>
+        <div className="grid gap-1.5"><Label>Au</Label><DatePicker date={filters.dateAu} onSelect={date => setFilters(current => ({ ...current, dateAu: toDateOnly(date) ?? "" }))} /></div>
+      </>}
       <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
         <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeSettled} onCheckedChange={checked => setFilters(current => ({ ...current, includeSettled: checked === true }))} />Inclure les factures soldées</label>
         <div className="flex gap-2">

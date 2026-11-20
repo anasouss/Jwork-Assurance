@@ -29,7 +29,7 @@ const labels = {
 const variants = { IMPAYEE: "warning", PARTIELLEMENT_REGLEE: "accent", COUVERTE_EN_ATTENTE: "info", PAYEE: "success" } as const;
 const emptyFilters = { conventionId: "ALL", companyId: "ALL", search: "", dateDu: "", dateAu: "", includeSettled: true,
   year: String(new Date().getFullYear()), period: "ALL", periodeDu: "", periodeAu: "",
-  movement: "ALL", premiumDirection: "ALL" };
+  movement: "ALL", operation: "ENCAISSEMENT" };
 
 export default function ConventionCollectionsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
@@ -65,7 +65,7 @@ export default function ConventionCollectionsPage() {
       conventionId: applied.conventionId === "ALL" ? undefined : applied.conventionId,
       compagnieId: applied.companyId === "ALL" ? undefined : applied.companyId,
       categorieMouvement: applied.movement === "ALL" ? undefined : applied.movement as ConventionProductionFilters["categorieMouvement"],
-      sensPrime: applied.premiumDirection === "ALL" ? undefined : applied.premiumDirection as ConventionProductionFilters["sensPrime"],
+      sensPrime: applied.operation === "REGLEMENT" ? "RISTOURNE" : "PRIME_A_PAYER",
       periodeDu: applied.periodeDu || undefined, periodeAu: applied.periodeAu || undefined,
       includeSettled: applied.includeSettled,
       search: applied.search.trim() || undefined,
@@ -77,7 +77,7 @@ export default function ConventionCollectionsPage() {
   const rows = invoices.data?.rows ?? [];
   const selectedRows = rows.filter(row => row.source.documentClientId
     && selected[row.source.documentClientId] && row.soldeOuvert !== 0);
-  const selectedTotal = selectedRows.reduce((sum, row) => sum + row.soldeOuvert, 0);
+  const settlement = applied.operation === "REGLEMENT";
   const firstPayer = selectedRows[0] ? payerKey(selectedRows[0]) : undefined;
   const eligible = rows.filter(row => row.source.documentClientId && row.soldeOuvert !== 0
     && (row.source.montantTtc < 0 ? canPayRefund : canCollect)
@@ -140,6 +140,16 @@ export default function ConventionCollectionsPage() {
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title="Encaissement et règlement" />
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
+      <div className="grid gap-1.5"><Label htmlFor="collection-operation">Opération</Label>
+        <Select value={filters.operation} onValueChange={operation => {
+          setFilters(current => ({ ...current, operation }));
+          setApplied(current => ({ ...current, operation }));
+          setPage(0); setSelected({});
+        }}>
+          <SelectTrigger id="collection-operation"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="ENCAISSEMENT">Encaissement</SelectItem><SelectItem value="REGLEMENT">Règlement</SelectItem></SelectContent>
+        </Select>
+      </div>
       {canView && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
         <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",
           companyId: value === "ALL" ? current.companyId : options.data?.find(option => option.id === value)?.compagnieId ?? "ALL" }))}>
@@ -172,10 +182,6 @@ export default function ConventionCollectionsPage() {
         <Select value={filters.movement} onValueChange={value => setFilters(current => ({ ...current, movement: value }))}>
           <SelectTrigger id="collection-movement"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
         </Select></div>
-      <div className="grid gap-1.5"><Label htmlFor="collection-premium">Statut</Label>
-        <Select value={filters.premiumDirection} onValueChange={value => setFilters(current => ({ ...current, premiumDirection: value }))}>
-          <SelectTrigger id="collection-premium"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les statuts</SelectItem><SelectItem value="PRIME_A_PAYER">Impayée</SelectItem><SelectItem value="RISTOURNE">Ristourne</SelectItem></SelectContent>
-        </Select></div>
       <div className="grid gap-1.5"><Label htmlFor="collection-search">N° facture / payeur</Label>
         <Input id="collection-search" value={filters.search} onChange={event => setFilters(current => ({ ...current, search: event.target.value }))}
           onKeyDown={event => { if (event.key === "Enter") apply(); }} />
@@ -197,10 +203,10 @@ export default function ConventionCollectionsPage() {
     </section>
     <section className="overflow-hidden rounded-md border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
-        <h2 className="font-semibold">Factures conventions</h2>
+        <h2 className="font-semibold">{settlement ? "Factures conventions à régler" : "Factures conventions à encaisser"}</h2>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-muted-foreground">Montants en MAD</span>
-          {canCreate && <Button disabled={!selectedRows.length || invoices.isFetching || invoices.isError} onClick={() => collect(selectedRows)}><Banknote className="size-4" />{selectedTotal < 0 ? "Régler la ristourne" : "Encaisser"} ({selectedRows.length})</Button>}
+          {canCreate && <Button disabled={!selectedRows.length || invoices.isFetching || invoices.isError} onClick={() => collect(selectedRows)}><Banknote className="size-4" />{settlement ? "Régler" : "Encaisser"} ({selectedRows.length})</Button>}
         </div>
       </div>
       <div className="overflow-x-auto"><table className="w-full min-w-[1100px] text-sm">
@@ -244,7 +250,7 @@ export default function ConventionCollectionsPage() {
                         <DropdownMenuContent align="end" className="min-w-56">
                           {canViewDocuments && <DropdownMenuItem disabled={openingPdf} onSelect={() => void showDocument(id)}><Eye className="size-4" />Voir la facture PDF</DropdownMenuItem>}
                           {canViewDocuments && permissions.includes("facture-convention:revise") && <DropdownMenuItem onSelect={() => setRevisionId(id)}><Pencil className="size-4" />Rectifier la facture</DropdownMenuItem>}
-                          {canCreate && <DropdownMenuItem disabled={row.soldeOuvert === 0 || invoices.isFetching || selectedRows.length > 0 || (row.source.montantTtc < 0 ? !canPayRefund : !canCollect)} onSelect={() => collect([row])}><Banknote className="size-4" />{row.source.montantTtc < 0 ? "Régler la ristourne" : "Encaisser la facture"}</DropdownMenuItem>}
+                          {canCreate && <DropdownMenuItem disabled={row.soldeOuvert === 0 || invoices.isFetching || selectedRows.length > 0 || (row.source.montantTtc < 0 ? !canPayRefund : !canCollect)} onSelect={() => collect([row])}><Banknote className="size-4" />{row.source.montantTtc < 0 ? "Régler" : "Encaisser la facture"}</DropdownMenuItem>}
                           {(canCancel || canDelete) && <DropdownMenuSeparator />}
                           {canCancel && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "cancel" })}><Ban className="size-4" />Annuler la facture</DropdownMenuItem>}
                           {canDelete && <DropdownMenuItem variant="destructive" onSelect={() => setDocumentAction({ id, action: "delete" })}><Trash2 className="size-4" />Supprimer définitivement</DropdownMenuItem>}

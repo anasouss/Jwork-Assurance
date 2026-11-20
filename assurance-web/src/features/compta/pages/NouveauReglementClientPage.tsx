@@ -447,7 +447,7 @@ export default function NouveauReglementClientPage() {
             {conventionCollection ? "Département conventions" : "Comptabilité"}
           </div>
           <h1 className="mt-1 text-xl font-semibold">
-            {outgoing ? "Régler la ristourne" : conventionCollection ? "Encaisser les factures conventions" : "Enregistrer un règlement"}
+            {outgoing ? conventionCollection ? "Régler les factures conventions" : "Régler la ristourne" : conventionCollection ? "Encaisser les factures conventions" : "Enregistrer un règlement"}
           </h1>
           <p className="text-sm text-muted-foreground">
             {receivables.isLoading
@@ -867,7 +867,7 @@ export default function NouveauReglementClientPage() {
             }}
           >
             <Banknote className="size-4" />
-            {outgoing ? "Régler la ristourne" : multiClientDeposit ? "Enregistrer le versement" : "Enregistrer le règlement"}
+            {outgoing ? conventionCollection ? "Régler" : "Régler la ristourne" : multiClientDeposit ? "Enregistrer le versement" : "Enregistrer le règlement"}
           </Button>
         </div>
       </footer>

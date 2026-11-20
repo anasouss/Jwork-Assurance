@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { referenceApi } from "@/features/production/api/references";
 import { sinistreApi, sinistreKeys } from "../api";
 import { SinistreDeclarationContextDialog } from "../components/SinistreDeclarationContextDialog";
-import { SinistreOpeningFields, type OpeningFields } from "../components/SinistreOpeningFields";
+import { SinistreOpeningDocuments, SinistreOpeningFields, type OpeningFields } from "../components/SinistreOpeningFields";
 import { SinistreIntervenantDialog } from "../components/SinistreIntervenantDialog";
 import { SinistreAssistanceTable } from "../components/SinistreAssistanceTable";
 import { parseOpeningDamage } from "../opening-context";
@@ -215,7 +215,7 @@ export default function SinistreDeclarationPage() {
       return;
     }
     if (declarer && guaranteeIds.length === 0) {
-      toast.error("Une garantie impliquée est obligatoire pour déclarer");
+      toast.error("Une garantie sinistrée est obligatoire pour déclarer");
       return;
     }
     if (declarer && !confirmed) {
@@ -296,7 +296,11 @@ export default function SinistreDeclarationPage() {
             </div>
           ) : null}
 
-          <Section title="Garanties impliquées" icon={ShieldCheck}>
+          <Section title="Documents de base" icon={ShieldCheck}>
+            <SinistreOpeningDocuments documents={documents} onChange={setDocuments} disabled={busy} />
+          </Section>
+
+          <Section title="Garanties sinistrées" icon={ShieldCheck}>
             <GuaranteeTable guarantees={guarantees} selectedIds={guaranteeIds} onToggle={(id, checked) =>
               setGuaranteeIds((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id))} />
             {assistancePending ? <p role="status" className="mt-4 text-sm text-muted-foreground">Vérification de l’assistance liée…</p> : null}
@@ -308,7 +312,7 @@ export default function SinistreDeclarationPage() {
           <Section title="Ouverture et intervenants" icon={ShieldCheck}>
             <SinistreOpeningFields automobile={automobile} responsabiliteCivile={responsabiliteCivile} value={opening} onChange={setOpening}
               providerContext={{ contratId, vehiculeId: selectedVehicle?.id, dateSinistre, garantieIds: guaranteeIds }} onEligibilityChange={setProvidersValid}
-              documents={documents} onDocumentsChange={setDocuments} disabled={busy}
+              disabled={busy}
               onAddExpert={canCreateExpert ? () => setExpertDialogOpen(true) : undefined} />
           </Section>
 

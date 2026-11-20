@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
-import { Paperclip, Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { FileDropzone } from "@/components/ui/file-dropzone";
@@ -23,13 +23,11 @@ export type OpeningFields = {
   dateMission: string;
 };
 
-export function SinistreOpeningFields({ automobile, responsabiliteCivile, value, onChange, documents, onDocumentsChange, disabled, onAddExpert, providerContext, onEligibilityChange }: {
+export function SinistreOpeningFields({ automobile, responsabiliteCivile, value, onChange, disabled, onAddExpert, providerContext, onEligibilityChange }: {
   automobile: boolean;
   responsabiliteCivile: boolean;
   value: OpeningFields;
   onChange: (value: OpeningFields) => void;
-  documents: OpeningDocument[];
-  onDocumentsChange: (documents: OpeningDocument[]) => void;
   disabled: boolean;
   onAddExpert?: () => void;
   providerContext: ProviderEligibilityContext;
@@ -72,28 +70,42 @@ export function SinistreOpeningFields({ automobile, responsabiliteCivile, value,
     </fieldset>
     {!expertValid || !garageValid ? <p role="alert" className="text-sm text-destructive">Vérifiez les prestataires sélectionnés : compagnie, garanties et validité des accords.</p> : null}
     {experts.isError || garages.isError ? <p role="alert" className="text-sm text-destructive">{[experts.error, garages.error].filter(Boolean).map((error) => error instanceof Error ? error.message : "Référentiel indisponible").join(" · ")}</p> : null}
-    <div className="border-t pt-4">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Paperclip className="size-4" /> Pièces d’ouverture</h3>
-      <div className="grid gap-4 md:grid-cols-3">
-        {(["CONSTAT", "PV_POLICE", "DECLARATION"] as const).map((type) => <div key={type} className="grid content-start gap-2">
-          <h4 className="text-sm font-medium">{openingDocumentLabels[type]}</h4>
-          <FileDropzone multiple disabled={disabled} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-            title={`Déposer ${type === "DECLARATION" ? "une déclaration" : type === "PV_POLICE" ? "un procès-verbal" : "un constat"}`}
-            description="PDF, JPG, PNG ou Word · 30 Mo par fichier · Parcourir"
-            className="bg-background"
-            onFilesSelect={(files) => {
-              const result = appendOpeningFiles(documents, files, type);
-              onDocumentsChange(result.documents);
-              if (result.errors.length) toast.error(result.errors.join("\n"));
-            }} />
-          <span className="text-xs text-muted-foreground">{documents.filter((document) => document.type === type).length} fichier(s)</span>
-        </div>)}
-      </div>
-      {documents.length > 0 ? <ul className="mt-3 divide-y">{documents.map((document, index) => <li key={`${index}-${document.file.name}`} className="flex items-center justify-between gap-3 py-2 text-sm">
-        <span className="min-w-0 break-words">{document.file.name} <span className="text-muted-foreground">· {openingDocumentLabels[document.type]} · {(document.file.size / 1024 / 1024).toFixed(1).replace(".", ",")} Mo</span></span>
-        <Button disabled={disabled} variant="ghost" size="icon" title="Retirer la pièce" aria-label={`Retirer ${document.file.name}`} onClick={() => onDocumentsChange(documents.filter((_, position) => position !== index))}><Trash2 className="size-4" /></Button>
-      </li>)}</ul> : null}
+  </div>;
+}
+
+export function SinistreOpeningDocuments({ documents, onChange, disabled }: {
+  documents: OpeningDocument[];
+  onChange: (documents: OpeningDocument[]) => void;
+  disabled: boolean;
+}) {
+  const [selectedType, setSelectedType] = useState<OpeningDocument["type"] | "">("");
+  const document = documents[0];
+  const type = document?.type ?? selectedType;
+
+  return <div className="grid gap-4">
+    <div className="grid gap-1.5 sm:max-w-sm">
+      <Label htmlFor="opening-document-type">Type de document</Label>
+      <Select disabled={disabled} value={type} onValueChange={(next) => {
+        const nextType = next as OpeningDocument["type"];
+        setSelectedType(nextType);
+        if (document) onChange([{ ...document, type: nextType }]);
+      }}>
+        <SelectTrigger id="opening-document-type"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+        <SelectContent>{(["CONSTAT", "PV_POLICE", "DECLARATION"] as const).map((item) =>
+          <SelectItem key={item} value={item}>{openingDocumentLabels[item]}</SelectItem>)}
+        </SelectContent>
+      </Select>
     </div>
+    <FileDropzone disabled={disabled || !type} file={document?.file ?? null}
+      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" title="Déposer un document"
+      description="PDF, JPG, PNG ou Word · 30 Mo maximum · Parcourir"
+      onFileChange={(file) => {
+        if (!file) { onChange([]); return; }
+        if (!type) return;
+        const result = appendOpeningFiles([], [file], type);
+        if (result.errors.length) toast.error(result.errors.join("\n"));
+        else onChange(result.documents);
+      }} />
   </div>;
 }
 

@@ -900,7 +900,7 @@ function DocumentsPanel({
     <section className="min-w-0 border-y">
       <div className="flex min-h-12 flex-wrap items-center justify-between gap-3 bg-sky-700 px-4 py-3 text-white">
         <div className="min-w-0">
-          <h2 className="font-semibold">Pièces du dossier</h2>
+          <h2 className="font-semibold">Documents du dossier</h2>
           <p className="text-xs text-sky-100">
             {dossier.documents.length} document(s) déposé(s)
           </p>
@@ -916,7 +916,7 @@ function DocumentsPanel({
       <div className="min-w-0">
       <div className="min-w-0 border-t">
         <div className="flex flex-wrap justify-between gap-2 px-3 py-3 text-xs">
-          <h3 className="font-semibold text-muted-foreground">Pièces requises</h3>
+          <h3 className="font-semibold text-muted-foreground">Documents de base</h3>
           <span className={openingComplete ? "text-emerald-700 dark:text-emerald-300" : "text-amber-800 dark:text-amber-300"}>{openingComplete ? "Complet" : openingPending ? "À contrôler" : "À compléter"}</span>
         </div>
           {requiredDocuments.length > 0 ? (

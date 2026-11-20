@@ -298,11 +298,12 @@ export function CoverageSection({
   const involvedCount = dossier.garanties.filter(
     (item) => editing && editable ? drafts[item.id]?.involved ?? item.impliquee : item.impliquee,
   ).length;
+  const selectedGuarantees = dossier.garanties.filter((item) => item.impliquee);
 
   return (
     <section className="min-w-0">
     <SectionHeader
-      title={assessmentVisible ? "Décision de couverture" : "Garanties impliquées"}
+      title="Garanties sinistrées"
       action={headerAction ?? (
         editable && !editing ? <Button size="sm" variant="outline" className="text-foreground" onClick={() => setEditing(true)}><Pencil className="size-4" />Modifier</Button> : editable ? (
           <div className="flex gap-2">
@@ -340,13 +341,12 @@ export function CoverageSection({
         ) : null
       )}
     />
-      <p className="px-4 py-2 text-sm text-muted-foreground">{involvedCount} sur {dossier.garanties.length} garantie(s) impliquée(s) · Montants en MAD</p>
+      <p className="px-4 py-2 text-sm text-muted-foreground">{involvedCount} garantie(s) sinistrée(s) · Montants en MAD</p>
       {!editing || !editable ? <div className="overflow-x-auto">
         <Table>
           <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
             <TableRow>
               <TableHead>Garantie</TableHead>
-              <TableHead>Impliquée</TableHead>
               <TableHead className="text-right">Capital</TableHead>
               {assessmentVisible ? <>
                 <TableHead>Décision</TableHead>
@@ -356,13 +356,12 @@ export function CoverageSection({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {dossier.garanties.map((item) => (
+            {selectedGuarantees.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="whitespace-normal">
                   <span className="font-medium">{item.code} · {item.libelle}</span>
                   <p className="text-xs text-muted-foreground">Franchise contractuelle {item.tauxFranchise ?? 0} % / {formatMoney(item.franchiseMinimale)}</p>
                 </TableCell>
-                <TableCell>{item.impliquee ? "Oui" : "Non"}</TableCell>
                 <TableCell className="text-right tabular-nums">{formatMoney(item.capital)}</TableCell>
                 {assessmentVisible ? <>
                   <TableCell>{coverageDecisionLabels[item.decisionCouverture]}</TableCell>
@@ -371,7 +370,7 @@ export function CoverageSection({
                 </> : null}
               </TableRow>
             ))}
-            {dossier.garanties.length === 0 ? <TableRow><TableCell colSpan={assessmentVisible ? 6 : 3} className="py-6 text-center text-muted-foreground">Aucune garantie.</TableCell></TableRow> : null}
+            {selectedGuarantees.length === 0 ? <TableRow><TableCell colSpan={assessmentVisible ? 5 : 2} className="py-6 text-center text-muted-foreground">Aucune garantie sinistrée sélectionnée.</TableCell></TableRow> : null}
           </TableBody>
         </Table>
       </div> : <div className={assessmentVisible ? "grid gap-3 py-4" : "divide-y"}>
@@ -439,7 +438,7 @@ function GuaranteeRow({
             onCheckedChange={(checked) =>
               onChange({ ...draft, involved: checked === true })
             }
-            aria-label={`Garantie impliquée ${item.libelle}`}
+            aria-label={`Garantie sinistrée ${item.libelle}`}
           />
           <p className="font-medium">
             {item.code} · {item.libelle}

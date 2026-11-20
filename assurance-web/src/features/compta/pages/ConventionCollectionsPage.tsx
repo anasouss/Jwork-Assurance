@@ -104,7 +104,7 @@ export default function ConventionCollectionsPage() {
       || items.some(row => payerKey(row) !== payerKey(items[0]))) return;
     if (items[0].source.montantTtc < 0 ? !canPayRefund : !canCollect) return;
     const query = new URLSearchParams();
-    items.forEach(row => query.append("selectionDocument", row.source.documentClientId!));
+    items.forEach(row => query.append("document", row.source.documentClientId!));
     navigate(`/app/compta/conventions/encaissements/nouveau?${query}`);
   }
   function closeDetail() {

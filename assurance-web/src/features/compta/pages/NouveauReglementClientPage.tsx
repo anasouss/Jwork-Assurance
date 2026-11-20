@@ -429,12 +429,14 @@ export default function NouveauReglementClientPage() {
   }
 
   if (!hasSelection) {
-    return <InvalidSelection message="Aucune prime à encaisser n’a été sélectionnée." />;
+    return <InvalidSelection message={conventionCollection
+      ? "Aucune facture convention n’a été sélectionnée."
+      : "Aucune prime à encaisser n’a été sélectionnée."} returnPath={returnPath} conventionCollection={conventionCollection} />;
   }
   if (receivables.isError) {
     return <InvalidSelection message={receivables.error instanceof Error
       ? receivables.error.message
-      : "La sélection ne peut pas être chargée."} />;
+      : "La sélection ne peut pas être chargée."} returnPath={returnPath} conventionCollection={conventionCollection} />;
   }
 
   return (
@@ -1001,7 +1003,11 @@ function SortableReceivableRow(props: {
   );
 }
 
-function InvalidSelection({ message }: { message: string }) {
+function InvalidSelection({ message, returnPath, conventionCollection }: {
+  message: string;
+  returnPath: string;
+  conventionCollection: boolean;
+}) {
   return (
     <div className="grid min-h-[50vh] place-items-center">
       <div className="grid max-w-lg justify-items-center gap-4 text-center">
@@ -1011,7 +1017,7 @@ function InvalidSelection({ message }: { message: string }) {
           <p className="mt-1 text-sm text-muted-foreground">{message}</p>
         </div>
         <Button asChild>
-          <Link to="/app/compta/reglements">Retour aux primes à encaisser</Link>
+          <Link to={returnPath}>{conventionCollection ? "Retour aux factures conventions" : "Retour aux primes à encaisser"}</Link>
         </Button>
       </div>
     </div>

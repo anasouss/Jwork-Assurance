@@ -22,6 +22,9 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
                   select a.id from AffectationReglementClient a
                   where a.instrument.reglement = r and a.documentClient.conventionFacturee is not null))
               and (:conventionId is null or r.conventionPayeur.id = :conventionId)
+              and (:documentId is null or exists (
+                  select allocation.id from AffectationReglementClient allocation
+                  where allocation.instrument.reglement = r and allocation.documentClient.id = :documentId))
               and (:statut is null or r.statut = :statut)
               and (:mode is null or exists (
                   select i.id from InstrumentReglementClient i where i.reglement = r and i.mode = :mode))
@@ -33,6 +36,7 @@ public interface ReglementClientRepository extends JpaRepository<ReglementClient
     Page<ReglementClient> searchConventionPayments(@Param("agenceId") Long agenceId,
             @Param("sens") com.assurance.enums.SensMouvementTresorerie sens,
             @Param("conventionId") Long conventionId,
+            @Param("documentId") Long documentId,
             @Param("statut") com.assurance.enums.StatutReglementClient statut,
             @Param("mode") com.assurance.enums.ModeReglementClient mode,
             @Param("search") String search, Pageable pageable);

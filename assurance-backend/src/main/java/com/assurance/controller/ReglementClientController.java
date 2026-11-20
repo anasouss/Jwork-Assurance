@@ -262,6 +262,7 @@ public class ReglementClientController {
     public ResponseEntity<ApiResponse<ReglementClientPageResponse>> conventionPayments(
             @RequestParam(defaultValue = "SORTIE") com.assurance.enums.SensMouvementTresorerie sens,
             @RequestParam(required = false) Long conventionId,
+            @RequestParam(required = false) Long documentId,
             @RequestParam(required = false) StatutReglementClient statut,
             @RequestParam(required = false) ModeReglementClient mode,
             @RequestParam(required = false) String search,
@@ -269,7 +270,7 @@ public class ReglementClientController {
             @RequestParam(defaultValue = "25") int size
     ) {
         return ResponseEntity.ok(ApiResponse.success(reglementClientService.searchConventionPayments(
-                TenantContext.getCurrentAgence(), sens, conventionId, statut, mode, search, page, size)));
+                TenantContext.getCurrentAgence(), sens, conventionId, documentId, statut, mode, search, page, size)));
     }
 
     @GetMapping("/recherche-moyens")

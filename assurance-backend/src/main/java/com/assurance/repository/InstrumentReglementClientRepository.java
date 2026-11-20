@@ -59,6 +59,7 @@ public interface InstrumentReglementClientRepository extends JpaRepository<Instr
             left join instrument.banqueEmettriceReference bank
             where instrument.agence.id = :agenceId
               and payment.statut = com.assurance.enums.StatutReglementClient.VALIDE
+              and payment.circuit = com.assurance.enums.CircuitReglementClient.AGENCE
               and instrument.mode in (com.assurance.enums.ModeReglementClient.CHEQUE,
                                       com.assurance.enums.ModeReglementClient.EFFET)
               and (instrument.dateRejet is not null

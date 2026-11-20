@@ -6,12 +6,10 @@ import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DatePicker } from "@/components/ui/date-picker";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toDateOnly } from "@/features/production/date";
 import { toast } from "@/lib/toast";
 import { useAuthStore } from "@/store/auth-store";
 import { comptaApi } from "../api";
@@ -21,16 +19,15 @@ import { InvoiceActionDialog, InvoiceDialog } from "../components/ConventionInvo
 import { ConventionInvoiceRevisionDialog } from "../components/ConventionInvoiceRevisionDialog";
 import { formatAccountingAmount } from "../format";
 import { conventionPeriodLabel } from "../convention-period";
-import type { ClientReceivable, ConventionProductionFilters } from "../types";
+import type { ClientReceivable } from "../types";
 
 const labels = {
-  IMPAYEE: "À encaisser", PARTIELLEMENT_REGLEE: "Partiellement réglée",
-  COUVERTE_EN_ATTENTE: "Encaissement en cours", PAYEE: "Soldée",
+  IMPAYEE: "À encaisser", PARTIELLEMENT_REGLEE: "Partiellement encaissée",
+  COUVERTE_EN_ATTENTE: "Encaissement en cours", PAYEE: "Encaissée",
 } as const;
 const variants = { IMPAYEE: "warning", PARTIELLEMENT_REGLEE: "accent", COUVERTE_EN_ATTENTE: "info", PAYEE: "success" } as const;
-const emptyFilters = { conventionId: "ALL", companyId: "ALL", search: "", dateDu: "", dateAu: "", includeSettled: true,
-  year: String(new Date().getFullYear()), period: "ALL", periodeDu: "", periodeAu: "",
-  movement: "ALL" };
+const emptyFilters = { conventionId: "ALL", companyId: "ALL", search: "", includeSettled: true,
+  year: String(new Date().getFullYear()), period: "ALL", periodeDu: "", periodeAu: "" };
 
 export default function ConventionCollectionsPage() {
   const settlementPage = useLocation().pathname.startsWith("/app/compta/conventions/reglements/");
@@ -67,13 +64,10 @@ export default function ConventionCollectionsPage() {
       conventionsOnly: true,
       conventionId: applied.conventionId === "ALL" ? undefined : applied.conventionId,
       compagnieId: applied.companyId === "ALL" ? undefined : applied.companyId,
-      categorieMouvement: settlementPage || applied.movement === "ALL" ? undefined : applied.movement as ConventionProductionFilters["categorieMouvement"],
       sensPrime: settlementPage ? "RISTOURNE" : "PRIME_A_PAYER",
       periodeDu: applied.periodeDu || undefined, periodeAu: applied.periodeAu || undefined,
       includeSettled: applied.includeSettled,
       search: applied.search.trim() || undefined,
-      dateDu: settlementPage ? undefined : applied.dateDu || undefined,
-      dateAu: settlementPage ? undefined : applied.dateAu || undefined,
       sortBy: "DATE", sortDirection: "DESC", page, size: 25,
     }),
     enabled: canView, refetchOnMount: "always",
@@ -90,10 +84,6 @@ export default function ConventionCollectionsPage() {
 
   function apply() {
     if (!validYear) { toast.error("Sélectionnez une année entre 1900 et 2200."); return; }
-    if (!settlementPage && filters.dateDu && filters.dateAu && filters.dateDu > filters.dateAu) {
-      toast.error("La date de début doit précéder la date de fin.");
-      return;
-    }
     if (filters.conventionId !== "ALL" && (!convention || options.isFetching || options.isError
       || (filters.period !== "ALL" && !convention.periodes.some(period => String(period.numero) === filters.period)))) {
       toast.error("Sélectionnez une période valide."); return;
@@ -143,10 +133,9 @@ export default function ConventionCollectionsPage() {
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
     <ConventionWorkspaceHeader title={settlementPage ? "Nouveau règlement" : "Encaissements"} />
-    <div className="flex justify-end"><Button variant="outline" asChild><Link to={settlementPage
-      ? "/app/compta/conventions/reglements" : "/app/compta/conventions/encaissements/historique"}>
-      {settlementPage ? "Règlements enregistrés" : "Encaissements enregistrés"}
-    </Link></Button></div>
+    {settlementPage && <div className="flex justify-end"><Button variant="outline" asChild><Link to="/app/compta/conventions/reglements">
+      Règlements enregistrés
+    </Link></Button></div>}
     <section className="grid gap-3 border-y bg-card p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 [&>div]:min-w-0">
       {canView && <div className="grid gap-1.5"><Label htmlFor="collection-convention">Convention</Label>
         <Select value={filters.conventionId} disabled={options.isPending || options.isError} onValueChange={value => setFilters(current => ({ ...current, conventionId: value, period: "ALL",
@@ -178,20 +167,12 @@ export default function ConventionCollectionsPage() {
             </SelectContent>
           </Select></div>
       </>}
-      {!settlementPage && <div className="grid gap-1.5"><Label htmlFor="collection-movement">Mouvement</Label>
-        <Select value={filters.movement} onValueChange={value => setFilters(current => ({ ...current, movement: value }))}>
-          <SelectTrigger id="collection-movement"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ALL">Tous les mouvements</SelectItem><SelectItem value="AFFAIRE_NOUVELLE">Affaire nouvelle</SelectItem><SelectItem value="RENOUVELLEMENT">Renouvellement / Terme</SelectItem><SelectItem value="AVENANT">Avenant</SelectItem></SelectContent>
-        </Select></div>}
       <div className="grid gap-1.5"><Label htmlFor="collection-search">N° facture / payeur</Label>
         <Input id="collection-search" value={filters.search} onChange={event => setFilters(current => ({ ...current, search: event.target.value }))}
           onKeyDown={event => { if (event.key === "Enter") apply(); }} />
       </div>
-      {!settlementPage && <>
-        <div className="grid gap-1.5"><Label>Émise du</Label><DatePicker date={filters.dateDu} onSelect={date => setFilters(current => ({ ...current, dateDu: toDateOnly(date) ?? "" }))} /></div>
-        <div className="grid gap-1.5"><Label>Au</Label><DatePicker date={filters.dateAu} onSelect={date => setFilters(current => ({ ...current, dateAu: toDateOnly(date) ?? "" }))} /></div>
-      </>}
       <div className="col-span-full flex flex-wrap items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeSettled} onCheckedChange={checked => setFilters(current => ({ ...current, includeSettled: checked === true }))} />Inclure les factures soldées</label>
+        <label className="flex items-center gap-2 text-sm"><Checkbox checked={filters.includeSettled} onCheckedChange={checked => setFilters(current => ({ ...current, includeSettled: checked === true }))} />{settlementPage ? "Inclure les factures soldées" : "Inclure les factures encaissées"}</label>
         <div className="flex gap-2">
           <Button size="icon" title="Rechercher" aria-label="Rechercher" onClick={apply}><Search className="size-4" /></Button>
           <Button variant="outline" size="icon" title="Réinitialiser" aria-label="Réinitialiser" onClick={() => {
@@ -250,6 +231,7 @@ export default function ConventionCollectionsPage() {
                           <Button variant="ghost" size="icon" title="Actions" aria-label={`Actions pour ${row.source.reference}`}><MoreHorizontal className="size-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-56">
+                          {canViewDocuments && <DropdownMenuItem onSelect={() => { const next = new URLSearchParams(params); next.set("documentId", id); setParams(next); }}><Eye className="size-4" />{settlementPage ? "Détail et règlements" : "Détail et encaissements"}</DropdownMenuItem>}
                           {canViewDocuments && <DropdownMenuItem disabled={openingPdf} onSelect={() => void showDocument(id)}><Eye className="size-4" />Voir la facture PDF</DropdownMenuItem>}
                           {canViewDocuments && permissions.includes("facture-convention:revise") && <DropdownMenuItem onSelect={() => setRevisionId(id)}><Pencil className="size-4" />Rectifier la facture</DropdownMenuItem>}
                           {canCreate && <DropdownMenuItem disabled={row.soldeOuvert === 0 || invoices.isFetching || selectedRows.length > 0 || (row.source.montantTtc < 0 ? !canPayRefund : !canCollect)} onSelect={() => collect([row])}><Banknote className="size-4" />{row.source.montantTtc < 0 ? "Régler" : "Encaisser la facture"}</DropdownMenuItem>}

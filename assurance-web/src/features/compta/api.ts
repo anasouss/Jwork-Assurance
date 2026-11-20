@@ -676,6 +676,7 @@ export const comptaApi = {
   async conventionPayments(params: {
     sens: "ENTREE" | "SORTIE";
     conventionId?: string;
+    documentId?: string;
     search?: string;
     statut?: ClientPayment["statut"];
     mode?: PaymentInstrument["mode"];

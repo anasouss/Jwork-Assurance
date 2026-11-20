@@ -240,11 +240,11 @@ export const router = createBrowserRouter([
       },
       {
         path: "compta/conventions/encaissements/historique",
-        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionPaymentHistoryPage")),
+        element: <Navigate to="/app/compta/conventions/encaissements" replace />,
       },
       {
         path: "compta/conventions/reglements",
-        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionPaymentHistoryPage")),
+        lazy: lazyRoute(() => import("@/features/compta/pages/ConventionSettlementsPage")),
       },
       {
         path: "compta/conventions/reglements/nouveau",

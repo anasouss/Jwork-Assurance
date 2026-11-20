@@ -348,7 +348,7 @@ export default function NouveauReglementClientPage() {
       && methods.length === 1
       && methods[0]?.mode === "VERSEMENT_BANCAIRE"
     ))
-    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing, companyDirect));
+    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing, companyDirect, dateReglement));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
     setMethods((current) => current.map((method) => method.key === key
@@ -358,7 +358,7 @@ export default function NouveauReglementClientPage() {
 
   function addPaymentMethod(mode: ClientPaymentMode) {
     const method = newPaymentMethod(mode);
-    if (signedSettlement || companyDirect) {
+    if (signedSettlement) {
       method.montant = money(amountDue);
       setMethods([method]);
       setEditingMethodKey(method.key);
@@ -573,27 +573,6 @@ export default function NouveauReglementClientPage() {
               />
             </div>
 
-            {multiClientDeposit ? (
-              <div className="grid gap-2">
-                <Label>Mode de règlement</Label>
-                <div className="flex h-10 items-center gap-2 rounded-md border bg-muted/30 px-3 text-sm font-medium">
-                  <Landmark className="size-4 text-orange-700" /> Versement bancaire
-                </div>
-              </div>
-            ) : signedSettlement || companyDirect ? (
-              <div className="grid gap-2"><Label>Moyen de règlement</Label>
-                <Select value={methods[0]?.mode ?? ""} onValueChange={value => { addPaymentMethod(value as ClientPaymentMode); setActivePaymentMode(value as ClientPaymentMode); }}>
-                  <SelectTrigger><SelectValue placeholder="Sélectionner un moyen" /></SelectTrigger>
-                  <SelectContent>{paymentModes.filter(mode => !companyDirect || ["ESPECES", "VIREMENT", "VERSEMENT_BANCAIRE"].includes(mode.value)).map(mode => <SelectItem key={mode.value} value={mode.value} disabled={!companyDirect && mode.value === "ESPECES" && !personalCashAvailable}>{mode.label}{!companyDirect && mode.value === "ESPECES" && !personalCashAvailable ? " · caisse indisponible" : ""}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <PaymentModesMultiSelect
-                selectedModes={selectedPaymentModes.map((option) => option.value)}
-                onToggle={togglePaymentMode}
-                cashAvailable={personalCashAvailable}
-              />
-            )}
             {conventionCollection && !outgoing && <div className="grid gap-2">
               <Label htmlFor="payment-circuit">Bénéficiaire</Label>
               <Select value={circuit} onValueChange={value => {
@@ -604,6 +583,28 @@ export default function NouveauReglementClientPage() {
                 <SelectContent><SelectItem value="AGENCE">Cabinet</SelectItem><SelectItem value="DIRECT_COMPAGNIE">Compagnie</SelectItem></SelectContent>
               </Select>
             </div>}
+            {multiClientDeposit ? (
+              <div className="grid gap-2">
+                <Label>Mode de règlement</Label>
+                <div className="flex h-10 items-center gap-2 rounded-md border bg-muted/30 px-3 text-sm font-medium">
+                  <Landmark className="size-4 text-orange-700" /> Versement bancaire
+                </div>
+              </div>
+            ) : signedSettlement ? (
+              <div className="grid gap-2"><Label>Moyen de règlement</Label>
+                <Select value={methods[0]?.mode ?? ""} onValueChange={value => { addPaymentMethod(value as ClientPaymentMode); setActivePaymentMode(value as ClientPaymentMode); }}>
+                  <SelectTrigger><SelectValue placeholder="Sélectionner un moyen" /></SelectTrigger>
+                  <SelectContent>{paymentModes.map(mode => <SelectItem key={mode.value} value={mode.value} disabled={mode.value === "ESPECES" && !personalCashAvailable}>{mode.label}{mode.value === "ESPECES" && !personalCashAvailable ? " · caisse indisponible" : ""}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <PaymentModesMultiSelect
+                selectedModes={selectedPaymentModes.map((option) => option.value)}
+                onToggle={togglePaymentMode}
+                cashAvailable={personalCashAvailable}
+                excludeCash={companyDirect}
+              />
+            )}
             {!conventionPayment && !multiClientDeposit && !signedSettlement && <div className="grid gap-2">
               <Label htmlFor="settlement-adjustment">Écart de règlement (MAD)</Label>
               <MoneyInput id="settlement-adjustment" value={settlementAdjustment} onValueChange={setSettlementAdjustment}
@@ -669,7 +670,7 @@ export default function NouveauReglementClientPage() {
                       key={method.key}
                       method={method}
                       number={methodNumber}
-                      complete={methodValid(method, accounts.data ?? [], outgoing, companyDirect)}
+                      complete={methodValid(method, accounts.data ?? [], outgoing, companyDirect, dateReglement)}
                       bankLabel={(banks.data ?? []).find((bank) => bank.id === method.banqueEmettriceId)?.libelle}
                       accountLabel={(accounts.data ?? []).find((account) => account.id === method.compteTresorerieId)?.libelle}
                       onEdit={() => setEditingMethodKey(method.key)}
@@ -739,6 +740,7 @@ export default function NouveauReglementClientPage() {
                       <Label>{method.mode === "CHEQUE" ? "Date portée sur le chèque" : "Date d’échéance"}</Label>
                       <DatePicker
                         date={method.dateEcheance}
+                        maxDate={companyDirect && dateReglement ? new Date(`${dateReglement}T00:00:00`) : undefined}
                         onSelect={(value) => updateMethod(method.key, {
                           dateEcheance: toDateOnly(value) ?? "",
                         })}
@@ -789,13 +791,13 @@ export default function NouveauReglementClientPage() {
                   ) : null}
 
                     <div className="flex h-10 items-center justify-end gap-1 md:col-span-2 xl:col-span-1 xl:col-start-6">
-                      {!companyDirect && !multiClientDeposit && !signedSettlement ? (
+                      {!multiClientDeposit && !signedSettlement ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           className="border-orange-300 text-orange-800 hover:bg-orange-50 hover:text-orange-900 dark:border-orange-800 dark:text-orange-200 dark:hover:bg-orange-950/30"
-                          disabled={!methodValid(method, accounts.data ?? [])}
+                          disabled={!methodValid(method, accounts.data ?? [], outgoing, companyDirect, dateReglement)}
                           onClick={() => addPaymentMethod(method.mode)}
                         >
                           <Plus className="size-4" />
@@ -1054,8 +1056,10 @@ function PaymentModesMultiSelect(props: {
   selectedModes: ClientPaymentMode[];
   onToggle: (mode: ClientPaymentMode) => void;
   cashAvailable: boolean;
+  excludeCash?: boolean;
 }) {
-  const selectedOptions = paymentModes.filter((option) =>
+  const availableModes = paymentModes.filter(option => !props.excludeCash || option.value !== "ESPECES");
+  const selectedOptions = availableModes.filter((option) =>
     props.selectedModes.includes(option.value)
   );
   const label = selectedOptions.length === 0
@@ -1080,7 +1084,7 @@ function PaymentModesMultiSelect(props: {
             <CommandList>
               <CommandEmpty>Aucun mode trouvé.</CommandEmpty>
               <CommandGroup>
-                {paymentModes.map(({ value, label: optionLabel, icon: Icon }) => {
+                {availableModes.map(({ value, label: optionLabel, icon: Icon }) => {
                   const selected = props.selectedModes.includes(value);
                   return (
                     <CommandItem
@@ -1363,11 +1367,13 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
   };
 }
 
-function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false, companyDirect = false) {
+function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false, companyDirect = false, paymentDate = today) {
   if (numeric(method.montant) <= 0) return false;
-  if (companyDirect) return ["ESPECES", "VIREMENT", "VERSEMENT_BANCAIRE"].includes(method.mode)
-    && Boolean(method.referenceInstrument.trim()) && !method.compteTresorerieId && !method.reglementBureau
-    && (!showsOriginatingBank(method.mode) || Boolean(method.banqueEmettriceId));
+  if (companyDirect) return method.mode !== "ESPECES" && Boolean(method.referenceInstrument.trim())
+    && !method.compteTresorerieId && !method.reglementBureau
+    && (!showsOriginatingBank(method.mode) || Boolean(method.banqueEmettriceId))
+    && (!["CHEQUE", "EFFET"].includes(method.mode)
+      || Boolean(method.dateEcheance && method.dateEcheance <= paymentDate));
   if (method.mode === "ESPECES") {
     return true;
   }

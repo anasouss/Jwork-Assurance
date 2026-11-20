@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Eye, MoreHorizontal, Plus, Printer, RefreshCw, RotateCcw, Search, XCircle } from "lucide-react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AccessDenied, ServerPagination, TableRowsSkeleton } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,12 +23,10 @@ import type { ClientPayment, ClientPaymentMode } from "../types";
 const emptyFilters = { convention: "ALL", search: "", status: "ALL", mode: "ALL" };
 const modes: ClientPaymentMode[] = ["ESPECES", "VIREMENT", "VERSEMENT_BANCAIRE", "CHEQUE", "EFFET"];
 
-export default function ConventionPaymentHistoryPage() {
-  const incoming = useLocation().pathname.startsWith("/app/compta/conventions/encaissements");
-  const sens = incoming ? "ENTREE" : "SORTIE";
+export default function ConventionSettlementsPage() {
   const permissions = useAuthStore(state => state.user?.permissions ?? []);
   const canView = permissions.includes("reglement-client:view");
-  const canCreate = permissions.includes(incoming ? "reglement-client:create" : "reglement-client:refund");
+  const canCreate = permissions.includes("reglement-client:refund");
   const canCancel = permissions.includes("reglement-client:cancel");
   const [params, setParams] = useSearchParams();
   const [filters, setFilters] = useState(emptyFilters);
@@ -42,8 +40,8 @@ export default function ConventionPaymentHistoryPage() {
   const options = useQuery({ queryKey: ["compta", "convention-billing-options", year],
     queryFn: () => comptaApi.conventionBillingOptions(year), enabled: canView });
   const payments = useQuery({
-    queryKey: ["compta", "client-payments", "conventions", sens, applied, page],
-    queryFn: () => comptaApi.conventionPayments({ sens,
+    queryKey: ["compta", "client-payments", "conventions", "SORTIE", applied, page],
+    queryFn: () => comptaApi.conventionPayments({ sens: "SORTIE",
       conventionId: applied.convention === "ALL" ? undefined : applied.convention,
       search: applied.search.trim() || undefined,
       statut: applied.status === "ALL" ? undefined : applied.status as ClientPayment["statut"],
@@ -83,11 +81,10 @@ export default function ConventionPaymentHistoryPage() {
   }
   if (!canView) return <AccessDenied />;
   return <div className="mx-auto grid w-full max-w-[1600px] gap-4">
-    <ConventionWorkspaceHeader title={incoming ? "Encaissements enregistrés" : "Règlements"} />
+    <ConventionWorkspaceHeader title="Règlements" />
     <div className="flex justify-end gap-2">
-      {incoming && <Button variant="outline" asChild><Link to="/app/compta/conventions/encaissements">Factures à encaisser</Link></Button>}
-      {canCreate && <Button asChild><Link to={incoming ? "/app/compta/conventions/encaissements" : "/app/compta/conventions/reglements/nouveau"}>
-        <Plus className="size-4" />{incoming ? "Nouvel encaissement" : "Nouveau règlement"}
+      {canCreate && <Button asChild><Link to="/app/compta/conventions/reglements/nouveau">
+        <Plus className="size-4" />Nouveau règlement
       </Link></Button>}
     </div>
     <section className="flex flex-wrap items-end gap-3 border-y bg-card p-4">
@@ -120,21 +117,19 @@ export default function ConventionPaymentHistoryPage() {
       {options.isError && <p role="alert" className="w-full text-sm text-destructive">{options.error.message}</p>}
     </section>
     <section className="overflow-hidden rounded-md border bg-card">
-      <div className="flex items-center justify-between gap-3 border-b p-4"><h2 className="font-semibold">{incoming ? "Encaissements enregistrés" : "Règlements enregistrés"}</h2><span className="text-xs text-muted-foreground">Montants en MAD</span></div>
+      <div className="flex items-center justify-between gap-3 border-b p-4"><h2 className="font-semibold">Règlements enregistrés</h2><span className="text-xs text-muted-foreground">Montants en MAD</span></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-sm">
         <thead className="bg-orange-600 text-left text-xs uppercase text-white"><tr>
-          {["N° règlement", "Date", incoming ? "Payeur" : "Bénéficiaire", "Nature", "Montant", "Mode", "État", "Actions"].map(label => <th key={label} className={`px-3 py-3 ${["Montant", "Actions"].includes(label) ? "text-right" : ""}`}>{label}</th>)}
+          {["N° règlement", "Date", "Bénéficiaire", "Nature", "Montant", "Mode", "État", "Actions"].map(label => <th key={label} className={`px-3 py-3 ${["Montant", "Actions"].includes(label) ? "text-right" : ""}`}>{label}</th>)}
         </tr></thead>
         <tbody className="divide-y">
           {payments.isPending ? <TableRowsSkeleton rows={5} colSpan={8} />
             : payments.isError ? <tr><td colSpan={8} className="p-8 text-center"><p role="alert" className="text-destructive">{payments.error.message}</p><Button variant="outline" className="mt-3" onClick={() => void payments.refetch()}>Réessayer</Button></td></tr>
-              : !payments.data?.rows.length ? <tr><td colSpan={8} className="p-10 text-center text-muted-foreground">{incoming ? "Aucun encaissement enregistré pour ces critères." : "Aucun règlement enregistré pour ces critères."}</td></tr>
+              : !payments.data?.rows.length ? <tr><td colSpan={8} className="p-10 text-center text-muted-foreground">Aucun règlement enregistré pour ces critères.</td></tr>
                 : payments.data.rows.map(payment => <tr key={payment.id} className="hover:bg-muted/30">
                   <td className="px-3 py-3"><button type="button" className="font-medium text-sky-700 hover:underline dark:text-sky-300" onClick={() => { const next = new URLSearchParams(params); next.set("reglementId", payment.id); setParams(next); }}>{payment.numero}</button></td>
                   <td className="whitespace-nowrap px-3 py-3">{formatTreasuryDate(payment.dateReglement)}</td>
-                  <td className="px-3 py-3">{payment.payeurNom}
-                    {incoming && <div className="mt-1 text-xs text-muted-foreground">{payment.circuit === "DIRECT_COMPAGNIE" ? `Compagnie · ${payment.compagnieDirecte || "-"}` : "Cabinet"}</div>}
-                  </td><td className="px-3 py-3">{incoming ? "Encaissement" : "Ristourne"}</td>
+                  <td className="px-3 py-3">{payment.payeurNom}</td><td className="px-3 py-3">Ristourne</td>
                   <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatAccountingAmount(payment.montantTotal)}</td>
                   <td className="px-3 py-3">{[...new Set(payment.instruments.filter(instrument => instrument.statut !== "REMPLACE").map(instrument => paymentModeLabel(instrument.mode)))].join(", ") || "-"}</td>
                   <td className="px-3 py-3"><Badge variant={payment.statut === "VALIDE" ? "success" : "secondary"}>{payment.statut === "VALIDE" ? "Enregistré" : "Annulé"}</Badge></td>

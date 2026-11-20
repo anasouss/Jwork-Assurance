@@ -475,14 +475,18 @@ public class ReglementClientService {
 
     @Transactional(readOnly = true)
     public ReglementClientPageResponse searchConventionPayments(Long agenceId,
-            com.assurance.enums.SensMouvementTresorerie sens, Long conventionId, StatutReglementClient statut,
+            com.assurance.enums.SensMouvementTresorerie sens, Long conventionId, Long documentId, StatutReglementClient statut,
             ModeReglementClient mode, String search, int page, int size) {
-        return paymentPage(reglementRepository.searchConventionPayments(agenceId, sens, conventionId, statut, mode,
+        return paymentPage(reglementRepository.searchConventionPayments(agenceId, sens, conventionId, documentId, statut, mode,
                 normalizeSearch(search), PageRequest.of(Math.max(0, page), Math.min(100, Math.max(1, size)),
-                        Sort.by(Sort.Direction.DESC, "dateReglement").and(Sort.by(Sort.Direction.DESC, "id")))));
+                        Sort.by(Sort.Direction.DESC, "dateReglement").and(Sort.by(Sort.Direction.DESC, "id")))), documentId);
     }
 
     private ReglementClientPageResponse paymentPage(Page<ReglementClient> result) {
+        return paymentPage(result, null);
+    }
+
+    private ReglementClientPageResponse paymentPage(Page<ReglementClient> result, Long documentId) {
         Map<Long, LigneBordereauRemise> remittanceLines = remittanceLinesWithHistory(
                 result.getContent().stream()
                         .flatMap(payment -> payment.getInstruments().stream())
@@ -499,7 +503,21 @@ public class ReglementClientService {
                         .last(result.isLast())
                         .build())
                 .rows(result.getContent().stream()
-                        .map(payment -> toResponse(payment, remittanceLines))
+                        .map(payment -> {
+                            var response = toResponse(payment, remittanceLines);
+                            if (documentId == null) return response;
+                            Set<Long> replacedIds = payment.getInstruments().stream()
+                                    .map(InstrumentReglementClient::getInstrumentRemplace).filter(Objects::nonNull)
+                                    .map(InstrumentReglementClient::getId).collect(Collectors.toSet());
+                            BigDecimal allocated = payment.getInstruments().stream()
+                                    .filter(instrument -> instrument.getStatut() != StatutInstrumentReglement.REMPLACE
+                                            && !replacedIds.contains(instrument.getId()))
+                                    .flatMap(instrument -> instrument.getAffectations().stream())
+                                    .filter(allocation -> allocation.getDocumentClient() != null
+                                            && documentId.equals(allocation.getDocumentClient().getId()))
+                                    .map(AffectationReglementClient::getMontant).reduce(ZERO, BigDecimal::add);
+                            return response.toBuilder().montantAffecteDocument(money(allocated)).build();
+                        })
                         .toList())
                 .build();
     }
@@ -1069,9 +1087,13 @@ public class ReglementClientService {
             throw new BadRequestException("La date du paiement confirmé par la compagnie ne peut pas être future");
         }
         for (CreerReglementClientRequest.Instrument instrument : request.getInstruments()) {
-            if (!isImmediatePaymentMode(instrument.getMode())
+            if (instrument.getMode() == ModeReglementClient.ESPECES) {
+                throw new BadRequestException("Les espèces ne sont pas autorisées lorsque le bénéficiaire est la compagnie");
+            }
+            if ((!isImmediatePaymentMode(instrument.getMode())
+                    && instrument.getMode() != ModeReglementClient.CHEQUE && instrument.getMode() != ModeReglementClient.EFFET)
                     || instrument.getReferenceInstrument() == null || instrument.getReferenceInstrument().isBlank()) {
-                throw new BadRequestException("Déclarez un paiement compagnie encaissé en espèces, par virement ou versement, avec sa référence");
+                throw new BadRequestException("Déclarez un paiement confirmé par la compagnie avec sa référence");
             }
         }
         for (DocumentClient document : documents) {
@@ -1787,7 +1809,8 @@ public class ReglementClientService {
     }
 
     private boolean bankRejectionPossible(InstrumentReglementClient instrument) {
-        return instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
+        return !instrument.getReglement().isDirectCompagnie()
+                && instrument.getReglement().getStatut() == StatutReglementClient.VALIDE
                 && instrument.getReglement().getSens() != com.assurance.enums.SensMouvementTresorerie.SORTIE
                 && (instrument.getMode() == ModeReglementClient.CHEQUE || instrument.getMode() == ModeReglementClient.EFFET)
                 && (instrument.getStatut() == StatutInstrumentReglement.REMIS_EN_BANQUE
@@ -1925,14 +1948,17 @@ public class ReglementClientService {
         }
         boolean cash = request.getMode() == ModeReglementClient.ESPECES;
         if (payment.isDirectCompagnie()) {
-            if (request.getCompteTresorerieId() != null || Boolean.TRUE.equals(request.getReglementBureau())
-                    || request.getDateEcheance() != null) {
+            if (request.getCompteTresorerieId() != null || Boolean.TRUE.equals(request.getReglementBureau())) {
                 throw new BadRequestException("Un paiement direct compagnie ne doit pas utiliser un compte ou une remise agence");
             }
             validateInstrumentReference(request);
+            if (request.getDateEcheance() != null && request.getDateEcheance().isAfter(payment.getDateReglement())) {
+                throw new BadRequestException("La date du chèque ou de l'effet ne peut pas dépasser la date du paiement confirmé par la compagnie");
+            }
             return InstrumentReglementClient.builder().agence(agence).reglement(payment)
                     .mode(request.getMode()).statut(StatutInstrumentReglement.EN_ATTENTE)
                     .montant(money(request.getMontant())).dateInstrument(payment.getDateReglement())
+                    .dateEcheance(request.getDateEcheance())
                     .referenceInstrument(trimToNull(request.getReferenceInstrument()))
                     .banqueEmettriceReference(resolveOriginatingBank(agence.getId(), request))
                     .reglementBureau(false).dateStatut(payment.getDateReglement()).build();

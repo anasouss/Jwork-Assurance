@@ -822,6 +822,7 @@ export type PremiumReceiptOptions = {
 };
 
 export type ClientPayment = {
+  montantAffecteDocument?: number | null;
   circuit?: "AGENCE" | "DIRECT_COMPAGNIE";
   compagnieDirecteId?: string | null;
   compagnieDirecte?: string | null;

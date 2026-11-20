@@ -36,6 +36,7 @@ public class ReglementClientResponse {
     private com.assurance.enums.SensMouvementTresorerie sens;
     private BigDecimal montantTotal;
     private BigDecimal montantNonAffecte;
+    private BigDecimal montantAffecteDocument;
     private String notes;
     private String quittancePrimeNumero;
     private LocalDate quittancePrimeDateEmission;

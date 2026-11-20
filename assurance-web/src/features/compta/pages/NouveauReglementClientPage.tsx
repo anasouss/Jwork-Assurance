@@ -124,7 +124,6 @@ export default function NouveauReglementClientPage() {
   const conventionCollection = conventionSettlement || location.pathname.startsWith("/app/compta/conventions/encaissements/");
   const conventionReturnPath = conventionSettlement ? "/app/compta/conventions/reglements" : "/app/compta/conventions/encaissements";
   const [circuit, setCircuit] = useState<"AGENCE" | "DIRECT_COMPAGNIE">("AGENCE");
-  const [companyConfirmed, setCompanyConfirmed] = useState(false);
   const queryClient = useQueryClient();
   const requestedMultiClientDeposit = searchParams.get("multi") === "1";
   const multiClientDeposit = requestedMultiClientDeposit;
@@ -298,7 +297,7 @@ export default function NouveauReglementClientPage() {
       );
       request.ecarts = adjustmentPlan.ecarts;
       request.circuit = companyDirect ? "DIRECT_COMPAGNIE" : "AGENCE";
-      request.confirmationCompagnie = companyDirect && companyConfirmed;
+      request.confirmationCompagnie = companyDirect;
       if (multiClientDeposit && receipt) {
         return comptaApi.createMultiClientBankDeposit(request, receipt);
       }
@@ -333,7 +332,7 @@ export default function NouveauReglementClientPage() {
     && rows.length > 0
     && methods.length > 0
     && (companyDirect || personalCashAvailable || methods.every((method) => method.mode !== "ESPECES"))
-    && (!companyDirect || (companyConfirmed && dateReglement <= today && Math.abs(remainingAmount) < 0.005))
+    && (!companyDirect || (dateReglement <= today && Math.abs(remainingAmount) < 0.005))
     && paymentTotal > 0
     && amountDue > 0
     && permissions.includes(outgoing ? "reglement-client:refund" : "reglement-client:create")
@@ -348,7 +347,7 @@ export default function NouveauReglementClientPage() {
       && methods.length === 1
       && methods[0]?.mode === "VERSEMENT_BANCAIRE"
     ))
-    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing, companyDirect, dateReglement));
+    && methods.every((method) => methodValid(method, accounts.data ?? [], outgoing, companyDirect));
 
   function updateMethod(key: string, patch: Partial<PaymentMethodDraft>) {
     setMethods((current) => current.map((method) => method.key === key
@@ -577,7 +576,7 @@ export default function NouveauReglementClientPage() {
               <Label htmlFor="payment-circuit">Bénéficiaire</Label>
               <Select value={circuit} onValueChange={value => {
                 setCircuit(value as "AGENCE" | "DIRECT_COMPAGNIE");
-                setCompanyConfirmed(false); setMethods([]); setActivePaymentMode(null); setEditingMethodKey(undefined);
+                setMethods([]); setActivePaymentMode(null); setEditingMethodKey(undefined);
               }}>
                 <SelectTrigger id="payment-circuit"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="AGENCE">Cabinet</SelectItem><SelectItem value="DIRECT_COMPAGNIE">Compagnie</SelectItem></SelectContent>
@@ -613,7 +612,6 @@ export default function NouveauReglementClientPage() {
               <span className="text-xs text-muted-foreground">Plafond : {money(maximumAdjustment)} MAD</span>
             </div>}
           </div>
-          {companyDirect && <label className="flex items-center gap-3 text-sm"><Switch checked={companyConfirmed} onCheckedChange={setCompanyConfirmed} />Paiement confirmé par la compagnie</label>}
           {!companyDirect && !personalCashAvailable && methods.some((method) => method.mode === "ESPECES") ? <p role="alert" className="text-sm text-destructive">Aucune caisse individuelle active n’est disponible pour votre utilisateur. Sélectionnez un autre moyen de règlement.</p> : null}
           {adjustmentAmount > 0 && <div className="grid max-w-4xl gap-2">
             <Label htmlFor="settlement-adjustment-reason">Motif de l'écart *</Label>
@@ -670,7 +668,7 @@ export default function NouveauReglementClientPage() {
                       key={method.key}
                       method={method}
                       number={methodNumber}
-                      complete={methodValid(method, accounts.data ?? [], outgoing, companyDirect, dateReglement)}
+                      complete={methodValid(method, accounts.data ?? [], outgoing, companyDirect)}
                       bankLabel={(banks.data ?? []).find((bank) => bank.id === method.banqueEmettriceId)?.libelle}
                       accountLabel={(accounts.data ?? []).find((account) => account.id === method.compteTresorerieId)?.libelle}
                       onEdit={() => setEditingMethodKey(method.key)}
@@ -740,7 +738,6 @@ export default function NouveauReglementClientPage() {
                       <Label>{method.mode === "CHEQUE" ? "Date portée sur le chèque" : "Date d’échéance"}</Label>
                       <DatePicker
                         date={method.dateEcheance}
-                        maxDate={companyDirect && dateReglement ? new Date(`${dateReglement}T00:00:00`) : undefined}
                         onSelect={(value) => updateMethod(method.key, {
                           dateEcheance: toDateOnly(value) ?? "",
                         })}
@@ -797,7 +794,7 @@ export default function NouveauReglementClientPage() {
                           variant="outline"
                           size="sm"
                           className="border-orange-300 text-orange-800 hover:bg-orange-50 hover:text-orange-900 dark:border-orange-800 dark:text-orange-200 dark:hover:bg-orange-950/30"
-                          disabled={!methodValid(method, accounts.data ?? [], outgoing, companyDirect, dateReglement)}
+                          disabled={!methodValid(method, accounts.data ?? [], outgoing, companyDirect)}
                           onClick={() => addPaymentMethod(method.mode)}
                         >
                           <Plus className="size-4" />
@@ -1367,13 +1364,13 @@ function newPaymentMethod(mode: ClientPaymentMode): PaymentMethodDraft {
   };
 }
 
-function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false, companyDirect = false, paymentDate = today) {
+function methodValid(method: PaymentMethodDraft, accounts: TreasuryAccountOption[], outgoing = false, companyDirect = false) {
   if (numeric(method.montant) <= 0) return false;
   if (companyDirect) return method.mode !== "ESPECES" && Boolean(method.referenceInstrument.trim())
     && !method.compteTresorerieId && !method.reglementBureau
     && (!showsOriginatingBank(method.mode) || Boolean(method.banqueEmettriceId))
     && (!["CHEQUE", "EFFET"].includes(method.mode)
-      || Boolean(method.dateEcheance && method.dateEcheance <= paymentDate));
+      || Boolean(method.dateEcheance));
   if (method.mode === "ESPECES") {
     return true;
   }

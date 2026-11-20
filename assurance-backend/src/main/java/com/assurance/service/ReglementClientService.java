@@ -1952,9 +1952,6 @@ public class ReglementClientService {
                 throw new BadRequestException("Un paiement direct compagnie ne doit pas utiliser un compte ou une remise agence");
             }
             validateInstrumentReference(request);
-            if (request.getDateEcheance() != null && request.getDateEcheance().isAfter(payment.getDateReglement())) {
-                throw new BadRequestException("La date du chèque ou de l'effet ne peut pas dépasser la date du paiement confirmé par la compagnie");
-            }
             return InstrumentReglementClient.builder().agence(agence).reglement(payment)
                     .mode(request.getMode()).statut(StatutInstrumentReglement.EN_ATTENTE)
                     .montant(money(request.getMontant())).dateInstrument(payment.getDateReglement())

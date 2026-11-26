@@ -13,11 +13,14 @@ import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.events.PdfDocumentEvent;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.geom.Rectangle;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.kernel.pdf.canvas.PdfCanvas;
+import com.itextpdf.kernel.pdf.extgstate.PdfExtGState;
+import com.itextpdf.kernel.pdf.xobject.PdfImageXObject;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.borders.SolidBorder;
@@ -242,6 +245,27 @@ public class QuittancePrimePdfService {
             float halfHeight = Math.min(pageMiddle - document.getTopMargin(),
                     pageMiddle - document.getBottomMargin()) - 12;
             boolean sharedSheet = copies.stream().allMatch(copy -> fitsCopy(copy, document, copyWidth, halfHeight));
+            byte[] watermarkLogo = logoStorage.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
+            if (watermarkLogo != null && watermarkLogo.length > 0) {
+                PdfImageXObject watermark = new PdfImageXObject(ImageDataFactory.create(watermarkLogo));
+                pdf.addEventHandler(PdfDocumentEvent.END_PAGE, event -> {
+                    PdfDocumentEvent pageEvent = (PdfDocumentEvent) event;
+                    Rectangle page = pageEvent.getPage().getPageSize();
+                    PdfCanvas canvas = new PdfCanvas(pageEvent.getPage().newContentStreamBefore(),
+                            pageEvent.getPage().getResources(), pageEvent.getDocument());
+                    if (sharedSheet) {
+                        drawWatermark(canvas, watermark, new Rectangle(document.getLeftMargin(),
+                                pageMiddle + 12, copyWidth, halfHeight));
+                        drawWatermark(canvas, watermark, new Rectangle(document.getLeftMargin(),
+                                document.getBottomMargin(), copyWidth, halfHeight));
+                    } else {
+                        drawWatermark(canvas, watermark, new Rectangle(document.getLeftMargin(),
+                                document.getBottomMargin(), page.getWidth() - document.getLeftMargin() - document.getRightMargin(),
+                                page.getHeight() - document.getTopMargin() - document.getBottomMargin()));
+                    }
+                    canvas.release();
+                });
+            }
             if (sharedSheet) {
                 // Each cut half retains its own branding, signature and agency details.
                 document.add(copies.get(0).setHeight(halfHeight)
@@ -413,6 +437,19 @@ public class QuittancePrimePdfService {
         boolean hasInsurance = rows.stream().flatMap(row -> row.elements().stream())
                 .anyMatch(element -> element.getNature() != com.assurance.enums.NatureElementFacturable.ASSISTANCE);
         return hasAssistance ? hasInsurance ? "N° police / contrat" : "N° contrat" : "N° police";
+    }
+
+    private static void drawWatermark(PdfCanvas canvas, PdfImageXObject logo, Rectangle area) {
+        float scale = Math.min(area.getWidth() * 0.8f / logo.getWidth(),
+                area.getHeight() * 0.7f / logo.getHeight());
+        float width = logo.getWidth() * scale;
+        float height = logo.getHeight() * scale;
+        float x = area.getLeft() + (area.getWidth() - width) / 2;
+        float y = area.getBottom() + (area.getHeight() - height) / 2;
+        canvas.saveState();
+        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.05f));
+        canvas.addXObject(logo, width, 0, 0, height, x, y);
+        canvas.restoreState();
     }
 
     private static boolean fitsCopy(Div copy, Document document, float width, float height) {

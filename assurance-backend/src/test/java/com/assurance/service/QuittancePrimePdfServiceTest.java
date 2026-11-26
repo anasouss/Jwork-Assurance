@@ -22,8 +22,51 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 class QuittancePrimePdfServiceTest {
     private final AssistanceContratRepository assistance = mock(AssistanceContratRepository.class);
     private final ReglementClientService payments = mock(ReglementClientService.class);
+    private final AgencyLogoStorageService logos = mock(AgencyLogoStorageService.class);
     private final QuittancePrimePdfService service = new QuittancePrimePdfService(
-            mock(AgencyLogoStorageService.class), assistance, payments);
+            logos, assistance, payments);
+
+    @Test
+    void watermarkIsFaintBehindEachCopyAndEveryOverflowPage() throws Exception {
+        var logo = new java.awt.image.BufferedImage(420, 200, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        var graphics = logo.createGraphics();
+        graphics.setColor(new java.awt.Color(35, 78, 116));
+        graphics.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 130));
+        graphics.drawString("AIA", 65, 150);
+        graphics.dispose();
+        var bytes = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(logo, "png", bytes);
+        when(logos.loadBytesIfPresent(org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn(bytes.toByteArray());
+
+        for (int count : List.of(2, 60)) {
+            byte[] rendered = service.render(payment(count), "WATERMARK-TEST", LocalDate.now());
+            try (PDDocument pdf = PDDocument.load(rendered)) {
+                boolean compact = count == 2;
+                if (compact) assertThat(pdf.getNumberOfPages()).isEqualTo(1);
+                else assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
+                for (var page : pdf.getPages()) {
+                    var firstStream = page.getContentStreams().next();
+                    String background = new String(firstStream.toByteArray(), java.nio.charset.StandardCharsets.ISO_8859_1);
+                    assertThat(background.split(" Do", -1).length - 1).isEqualTo(compact ? 2 : 1);
+                    boolean faint = false;
+                    for (var name : page.getResources().getExtGStateNames()) {
+                        Float opacity = page.getResources().getExtGState(name).getNonStrokingAlphaConstant();
+                        if (opacity != null && Math.abs(opacity - 0.05f) < 0.001f) faint = true;
+                    }
+                    assertThat(faint).isTrue();
+                }
+                String previewDirectory = System.getProperty("quittance.preview.dir");
+                if (previewDirectory != null) {
+                    var directory = java.nio.file.Path.of(previewDirectory);
+                    java.nio.file.Files.createDirectories(directory);
+                    java.nio.file.Files.write(directory.resolve("quittance-" + count + ".pdf"), rendered);
+                    var renderer = new org.apache.pdfbox.rendering.PDFRenderer(pdf);
+                    javax.imageio.ImageIO.write(renderer.renderImageWithDPI(0, 110), "png",
+                            directory.resolve("quittance-" + count + ".png").toFile());
+                }
+            }
+        }
+    }
 
     @Test
     void settledReceiptHasCoverageDatesAndRequestedColumnsWithoutAnAllocatedAmountColumn() throws Exception {

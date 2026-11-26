@@ -27,7 +27,6 @@ import com.itextpdf.layout.borders.SolidBorder;
 import com.itextpdf.layout.element.AreaBreak;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Div;
-import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.element.Text;
@@ -447,7 +446,7 @@ public class QuittancePrimePdfService {
         float x = area.getLeft() + (area.getWidth() - width) / 2;
         float y = area.getBottom() + (area.getHeight() - height) / 2;
         canvas.saveState();
-        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.05f));
+        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.12f));
         canvas.addXObject(logo, width, 0, 0, height, x, y);
         canvas.restoreState();
     }
@@ -461,19 +460,11 @@ public class QuittancePrimePdfService {
     private void writeHeader(Div document, ReglementClient payment, String reference,
                              List<PrimeRow> rows, Map<Long, AssistanceContrat> assistance,
                              boolean sharedPolicyAndPeriod, boolean showCompany, PdfFont normal, PdfFont bold) {
-        Table header = new Table(new float[]{1, 3, 1}).useAllAvailableWidth().setKeepTogether(true).setMarginBottom(8);
-        Cell brand = new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE);
-        byte[] logo = logoStorage.loadBytesIfPresent(payment.getAgence().getLogoCheminStockage());
-        if (logo != null && logo.length > 0) brand.add(new Image(ImageDataFactory.create(logo)).scaleToFit(85, 42));
-        else brand.add(new Paragraph(payment.getAgence().getNom()).setFont(bold).setFontSize(14));
-        header.addCell(brand);
+        document.add(new Paragraph().add(new Text("QUITTANCE DE PRIME").setUnderline())
+                .setFont(bold).setFontSize(17).setFontColor(HEADER)
+                .setTextAlignment(TextAlignment.CENTER).setMarginTop(0).setMarginBottom(12)
+                .setKeepWithNext(true));
         Agence agency = payment.getAgence();
-        header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0).setVerticalAlignment(VerticalAlignment.MIDDLE)
-                .add(new Paragraph().add(new Text("QUITTANCE DE PRIME").setUnderline()).setFont(bold).setFontSize(17)
-                        .setFontColor(HEADER)
-                        .setTextAlignment(TextAlignment.CENTER).setMargin(0)));
-        header.addCell(new Cell().setBorder(Border.NO_BORDER).setPadding(0));
-        document.add(header);
         Table identity = new Table(new float[]{1, 1}).useAllAvailableWidth().setMarginBottom(8).setKeepTogether(true);
         Cell details = new Cell().setBorder(new SolidBorder(BORDER, 0.5f)).setPadding(6);
         addField(details, "N° quittance", reference, normal, bold);

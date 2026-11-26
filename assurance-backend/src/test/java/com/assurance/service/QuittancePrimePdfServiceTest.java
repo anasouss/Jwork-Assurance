@@ -51,7 +51,7 @@ class QuittancePrimePdfServiceTest {
                     boolean faint = false;
                     for (var name : page.getResources().getExtGStateNames()) {
                         Float opacity = page.getResources().getExtGState(name).getNonStrokingAlphaConstant();
-                        if (opacity != null && Math.abs(opacity - 0.05f) < 0.001f) faint = true;
+                        if (opacity != null && Math.abs(opacity - 0.12f) < 0.001f) faint = true;
                     }
                     assertThat(faint).isTrue();
                 }

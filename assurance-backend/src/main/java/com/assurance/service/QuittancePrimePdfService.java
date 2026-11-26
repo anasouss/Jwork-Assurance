@@ -213,10 +213,12 @@ public class QuittancePrimePdfService {
                 copy.add(detail);
                 Table paymentAndSignature = new Table(new float[]{1.4f, 1}).useAllAvailableWidth()
                         .setMarginTop(8).setMarginBottom(6).setKeepTogether(true);
+                paymentAndSignature.addCell(new Cell(1, 2).setBorder(Border.NO_BORDER)
+                        .setPadding(0).setPaddingBottom(4)
+                        .add(new Paragraph("Mode de règlement").setFont(bold).setFontSize(8)
+                                .setFontColor(HEADER).setMargin(0)));
                 Cell paymentDetails = new Cell().setBorder(Border.NO_BORDER).setPadding(0).setPaddingRight(12)
                         .setVerticalAlignment(VerticalAlignment.TOP);
-                paymentDetails.add(new Paragraph("Mode de règlement")
-                        .setFont(bold).setFontSize(8).setFontColor(HEADER).setMarginTop(0).setMarginBottom(4));
                 for (InstrumentReglementClient i : instruments) {
                     BigDecimal instrumentAmount = selectedAmount(i, selectedKeys);
                     if (instrumentAmount.signum() == 0) continue;
@@ -456,7 +458,7 @@ public class QuittancePrimePdfService {
         float x = area.getLeft() + (area.getWidth() - width) / 2;
         float y = area.getBottom() + (area.getHeight() - height) / 2;
         canvas.saveState();
-        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.18f));
+        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.20f));
         canvas.addXObject(logo, width, 0, 0, height, x, y);
         canvas.restoreState();
     }

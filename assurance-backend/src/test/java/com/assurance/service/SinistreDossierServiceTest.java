@@ -38,6 +38,8 @@ import com.assurance.repository.SinistrePartieRepository;
 import com.assurance.repository.SinistreRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
@@ -309,6 +311,46 @@ class SinistreDossierServiceTest {
                 .isInstanceOf(com.assurance.exception.ResourceNotFoundException.class);
         verify(experts).findByIdAndAgenceId(500L, 1L);
         verifyNoInteractions(missions);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "DECLARE, OUVERTURE, AVANT, MANDATEE, EXPERTISE_AVANT",
+            "DECLARE, EXPERTISE_AVANT, APRES, MANDATEE, EXPERTISE_APRES",
+            "DECLARE, INSTANCE_CLIENT, AVANT, EN_COURS, EXPERTISE_AVANT",
+            "DECLARE, OUVERTURE, AVANT, A_MANDATER, OUVERTURE",
+            "DECLARE, OUVERTURE, AVANT, ANNULEE, OUVERTURE",
+            "BROUILLON, OUVERTURE, AVANT, MANDATEE, OUVERTURE",
+            "DECLARE, EXPERTISE_APRES, AVANT, MANDATEE, EXPERTISE_APRES",
+            "TRANSMIS_COMPAGNIE, COMPAGNIE, AVANT, MANDATEE, COMPAGNIE"
+    })
+    void missionAdvancesOnlyItsApplicableExpertiseStage(
+            StatutSinistre status,
+            com.assurance.enums.EtapeSuiviSinistre stage,
+            com.assurance.enums.PhaseExpertiseSinistre phase,
+            com.assurance.enums.StatutMissionExpertise missionStatus,
+            com.assurance.enums.EtapeSuiviSinistre expected
+    ) {
+        claim.setStatut(status);
+        claim.setEtapeSuivi(stage);
+        var expert = com.assurance.entity.ExpertSinistre.builder().nom("Expert").build();
+        expert.setId(500L);
+        when(experts.findByIdAndAgenceId(500L, 1L)).thenReturn(Optional.of(expert));
+        var request = new com.assurance.dto.request.UpsertMissionExpertiseRequest();
+        request.setExpertId(500L);
+        request.setDateMission(LocalDate.now().minusDays(1));
+        request.setStatut(missionStatus);
+        request.setPhase(phase);
+
+        service.saveMission(1L, 7L, 35L, null, request);
+
+        assertThat(claim.getEtapeSuivi()).isEqualTo(expected);
+        if (stage != expected) {
+            verify(events).recordStage(org.mockito.ArgumentMatchers.eq(claim), any(),
+                    org.mockito.ArgumentMatchers.eq(stage), org.mockito.ArgumentMatchers.eq(expected), any());
+        } else {
+            verify(events, org.mockito.Mockito.never()).recordStage(any(), any(), any(), any(), any());
+        }
     }
 
     @Test

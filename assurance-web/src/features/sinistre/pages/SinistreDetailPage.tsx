@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Banknote,
   ChevronDown,
-  CircleAlert,
   Download,
   FileCheck2,
   FileText,
@@ -267,19 +266,17 @@ export default function SinistreDetailPage() {
           <Button variant="outline" onClick={() => setHistoryOpen(true)}><History className="size-4" />Historique</Button>
         </div>
       </div>
-      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t pt-4 sm:grid-cols-3 xl:grid-cols-6">
+      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t pt-4 sm:grid-cols-3 xl:grid-cols-5">
         {[
           ["N° sinistre", dossier.numeroSinistre],
-          ["Référence compagnie", dossier.referenceCompagnie],
           ["Date du sinistre", formatDate(dossier.dateSinistre)],
           ["Déclaré le", formatDate(dossier.dateDeclaration)],
           ["Véhicule", [dossier.couverture.immatriculation, dossier.couverture.marque].filter(Boolean).join(" · ")],
-          ["Gestionnaire", dossier.gestionnaire],
+          ["Opérateur", dossier.gestionnaire],
         ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value || "-"}</dd></div>)}
       </dl>
       </header>
       <div className="sticky top-14 z-20 bg-background py-3"><SinistreTracking dossier={dossier} /></div>
-      <DocumentAttention dossier={dossier} />
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
         <section id="informations" className="scroll-mt-24 border-y bg-card">
@@ -985,18 +982,4 @@ function isSettlementStage(statut: StatutSinistre) {
   return ["EN_ATTENTE_REGLEMENT", "PARTIELLEMENT_REGLE", "REGLE"].includes(
     statut,
   );
-}
-
-function DocumentAttention({ dossier }: { dossier: SinistreDetail }) {
-  const missing = dossier.workflow.documentsRequis.filter((item) => item.obligatoire && !item.recu && !item.valide).length;
-  const messages = [
-    missing > 0 ? `${missing} document(s) obligatoire(s) manquant(s)` : null,
-    dossier.workflow.documentsRecus > 0 ? `${dossier.workflow.documentsRecus} à contrôler` : null,
-    dossier.workflow.documentsRejetes > 0 ? `${dossier.workflow.documentsRejetes} rejeté(s)` : null,
-  ].filter(Boolean);
-  if (messages.length === 0) return null;
-  return <div className="flex flex-wrap items-center justify-between gap-2 border-y border-amber-300/50 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-    <p className="flex min-w-0 items-center gap-2"><CircleAlert className="size-4 shrink-0" /><span>{messages.join(" · ")}</span></p>
-    <Button asChild size="sm" variant="ghost"><a href="#documents"><FileText className="size-4" />Voir les documents</a></Button>
-  </div>;
 }

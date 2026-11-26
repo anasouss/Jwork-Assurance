@@ -43,6 +43,7 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
   const pastSteps = new Set(dossier.evenements.map((event) => event.ancienneEtape).filter(Boolean));
   const destinations = dossier.workflow.etapes?.filter((item) => item.etapeSuivi !== dossier.etapeSuivi) ?? [];
   const nextStage = suiviSteps.slice(currentIndex + 1).map((step) => destinations.find((item) => item.etapeSuivi === step)).find(Boolean);
+  const missionStage = (stage: EtapeSuiviSinistre) => stage === "EXPERTISE_AVANT" || stage === "EXPERTISE_APRES";
   const selected = action?.kind === "stage"
     ? dossier.workflow.etapes?.find((item) => item.etapeSuivi === action.target)
     : dossier.workflow.transitions.find((item) => item.statut === action?.target);
@@ -72,27 +73,31 @@ export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
   });
   const openAction = (next: Action) => { setMotif(""); setAction(next); };
   const administrativeActions = dossier.workflow.transitions.filter((item) => statusActions[item.statut]);
-  const alternativeStages = destinations.filter((item) => item !== nextStage);
+  const alternativeStages = destinations.filter((item) => item !== nextStage && !missionStage(item.etapeSuivi));
 
   return <section aria-label="Parcours du sinistre" className="min-w-0 border-b pb-5">
     <ol className="grid grid-cols-3 gap-y-5 lg:grid-cols-6">
       {suiviSteps.map((step, index) => {
         const active = dossier.etapeSuivi === step;
         const completed = index < currentIndex && pastSteps.has(step);
-        return <li key={step} className="relative min-w-0 pr-3" aria-current={active ? "step" : undefined}>
-          <div className="flex items-center gap-2">
+        return <li key={step} className="relative min-w-0 px-2 text-center" aria-current={active ? "step" : undefined}>
+          {index < suiviSteps.length - 1 ? <span aria-hidden className={cn(
+            "absolute left-[calc(50%+24px)] right-[calc(-50%+24px)] top-4 h-px",
+            index === 2 && "hidden lg:block",
+            completed ? "bg-sky-500" : "bg-border",
+          )} /> : null}
+          <div className="flex justify-center">
             <span className={cn("grid size-8 shrink-0 place-items-center rounded-full border text-xs font-semibold",
               active ? "border-sky-700 bg-sky-700 text-white" : completed ? "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200" : "border-border bg-background text-muted-foreground")}>
               {completed ? <Check className="size-4" /> : index + 1}
             </span>
-            {index < suiviSteps.length - 1 ? <span aria-hidden className={cn("h-px flex-1", completed ? "bg-sky-500" : "bg-border")} /> : null}
           </div>
           <p className={cn("mt-2 text-xs", active ? "font-semibold text-sky-800 dark:text-sky-200" : "text-muted-foreground")}>{suiviLabels[step]}</p>
         </li>;
       })}
     </ol>
     {canTransition ? <div className="mt-5 flex flex-wrap items-center gap-2">
-      {nextStage ? <Button size="sm" variant="outline" className="h-auto min-h-9 whitespace-normal text-left" onClick={() => openAction({ kind: "stage", target: nextStage.etapeSuivi })}>
+      {nextStage && !missionStage(nextStage.etapeSuivi) ? <Button size="sm" variant="outline" className="h-auto min-h-9 whitespace-normal text-left" onClick={() => openAction({ kind: "stage", target: nextStage.etapeSuivi })}>
         {stageActions[nextStage.etapeSuivi]}<ArrowRight className="size-3.5 shrink-0" />
       </Button> : null}
       {administrativeActions.length || alternativeStages.length ? <DropdownMenu>

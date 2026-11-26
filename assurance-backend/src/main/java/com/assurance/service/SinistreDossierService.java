@@ -27,6 +27,9 @@ import com.assurance.enums.DecisionCouvertureSinistre;
 import com.assurance.enums.CircuitFinancierSinistre;
 import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.StatutSinistre;
+import com.assurance.enums.EtapeSuiviSinistre;
+import com.assurance.enums.PhaseExpertiseSinistre;
+import com.assurance.enums.StatutMissionExpertise;
 import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeEvenementSinistre;
 import com.assurance.enums.TypeOperationSinistre;
@@ -381,6 +384,7 @@ public class SinistreDossierService {
             mission.setPhase(request.getPhase());
             mission.setNotes(trimToNull(request.getNotes()));
             missionRepository.save(mission);
+            advanceStageForMission(context, mission);
             evenementService.record(
                     context.sinistre(),
                     context.acteur(),
@@ -389,6 +393,32 @@ public class SinistreDossierService {
             );
             return responseMapper.toDetail(context.sinistre());
         });
+    }
+
+    private void advanceStageForMission(Context context, MissionExpertise mission) {
+        Sinistre sinistre = context.sinistre();
+        if (mission.getStatut() == StatutMissionExpertise.A_MANDATER
+                || mission.getStatut() == StatutMissionExpertise.ANNULEE
+                || sinistre.getStatut() == StatutSinistre.BROUILLON
+                || sinistre.getStatut() == StatutSinistre.ANNULE
+                || sinistre.getStatut() == StatutSinistre.REJETE
+                || sinistre.getStatut() == StatutSinistre.CLOTURE) {
+            return;
+        }
+        EtapeSuiviSinistre previous = sinistre.getEtapeSuivi();
+        EtapeSuiviSinistre next = mission.getPhase() == PhaseExpertiseSinistre.AVANT
+                ? EtapeSuiviSinistre.EXPERTISE_AVANT : EtapeSuiviSinistre.EXPERTISE_APRES;
+        boolean before = next == EtapeSuiviSinistre.EXPERTISE_AVANT
+                && (previous == EtapeSuiviSinistre.OUVERTURE || previous == EtapeSuiviSinistre.INSTANCE_CLIENT);
+        boolean after = next == EtapeSuiviSinistre.EXPERTISE_APRES
+                && (previous == EtapeSuiviSinistre.EXPERTISE_AVANT || previous == EtapeSuiviSinistre.INSTANCE_CLIENT);
+        if (!before && !after) {
+            return;
+        }
+        sinistre.setEtapeSuivi(next);
+        sinistreRepository.save(sinistre);
+        evenementService.recordStage(sinistre, context.acteur(), previous, next,
+                "Etape d'expertise actualisee lors de l'enregistrement de la mission");
     }
 
     @Transactional

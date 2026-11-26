@@ -449,14 +449,14 @@ public class QuittancePrimePdfService {
     }
 
     private static void drawWatermark(PdfCanvas canvas, PdfImageXObject logo, Rectangle area) {
-        float scale = Math.min(area.getWidth() * 0.8f / logo.getWidth(),
-                area.getHeight() * 0.7f / logo.getHeight());
+        float scale = Math.min(area.getWidth() * 0.85f / logo.getWidth(),
+                area.getHeight() * 0.75f / logo.getHeight());
         float width = logo.getWidth() * scale;
         float height = logo.getHeight() * scale;
         float x = area.getLeft() + (area.getWidth() - width) / 2;
         float y = area.getBottom() + (area.getHeight() - height) / 2;
         canvas.saveState();
-        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.15f));
+        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.18f));
         canvas.addXObject(logo, width, 0, 0, height, x, y);
         canvas.restoreState();
     }

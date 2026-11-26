@@ -50,10 +50,6 @@ import { sinistreApi, sinistreKeys } from "../api";
 import { formatDate, formatMoney, statusLabels } from "../format";
 import { SinistreStatusBadge } from "../components/SinistreStatusBadge";
 import {
-  SinistreTransitionDialog,
-} from "../components/SinistreTransitionDialog";
-import { SinistrePartyDialog } from "../components/SinistrePartyDialog";
-import {
   SinistreFinanceDialog,
   type FinanceDialogMode,
 } from "../components/SinistreFinanceDialog";
@@ -62,9 +58,10 @@ import {
   documentTypeLabels,
 } from "../components/SinistreDocumentDialog";
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
-import { CoverageSection, GeneralSection } from "../components/SinistreDossierSections";
+import { CoverageSection } from "../components/SinistreDossierSections";
 import { SinistreTracking } from "../components/SinistreTracking";
-import { isAtLeastTransmitted, suiviLabels } from "../workflow";
+import { SinistreProductionDocuments } from "../components/SinistreProductionDocuments";
+import { damageLabels, isAtLeastTransmitted, repairLabels, suiviLabels } from "../workflow";
 import type {
   SinistreDetail,
   StatutSinistre,
@@ -77,7 +74,6 @@ export default function SinistreDetailPage() {
   const queryClient = useQueryClient();
   const permissions = useAuthStore((state) => state.user?.permissions ?? []);
   const canUpdate = permissions.includes("sinistre:update");
-  const canTransition = permissions.includes("sinistre:transition");
   const canUploadDocument = permissions.includes("sinistre-document:upload");
   const canReviewDocument = permissions.includes("sinistre-document:update");
   const canDeleteDocument = permissions.includes("sinistre-document:delete");
@@ -86,10 +82,7 @@ export default function SinistreDetailPage() {
   const canCreateProvision = permissions.includes("sinistre-provision:create");
   const canCreateOperation = permissions.includes("sinistre-operation:create");
   const canCancelOperation = permissions.includes("sinistre-operation:cancel");
-  const [transitionOpen, setTransitionOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [partyOpen, setPartyOpen] = useState(false);
-  const [editingParty, setEditingParty] = useState<SinistreDetail["parties"][number] | null>(null);
   const [financeMode, setFinanceMode] = useState<FinanceDialogMode | null>(
     null,
   );
@@ -137,37 +130,6 @@ export default function SinistreDetailPage() {
     toast.error(
       error instanceof Error ? error.message : "Opération impossible",
     );
-  const transition = useMutation({
-    mutationFn: ({
-      statut,
-      motif,
-    }: {
-      statut: StatutSinistre;
-      motif?: string;
-    }) => sinistreApi.transition(sinistreId, statut, motif),
-    onSuccess: (result) => {
-      setTransitionOpen(false);
-      accept(result, "Statut mis à jour");
-    },
-    onError: fail,
-  });
-  const party = useMutation({
-    mutationFn: (request: object) =>
-      editingParty
-        ? sinistreApi.updateParty(sinistreId, editingParty.id, request)
-        : sinistreApi.addParty(sinistreId, request),
-    onSuccess: (result) => {
-      setPartyOpen(false);
-      setEditingParty(null);
-      accept(result, editingParty ? "Partie mise à jour" : "Partie ajoutée");
-    },
-    onError: fail,
-  });
-  const removeParty = useMutation({
-    mutationFn: (id: string) => sinistreApi.deleteParty(sinistreId, id),
-    onSuccess: (result) => accept(result, "Partie retirée"),
-    onError: fail,
-  });
   const finance = useMutation({
     mutationFn: ({
       mode,
@@ -281,8 +243,9 @@ export default function SinistreDetailPage() {
   }
 
   return (
-    <div className="mx-auto grid w-full min-w-0 max-w-[1600px] gap-6 bg-muted/25 p-3 sm:p-5">
-      <header className="flex min-w-0 flex-col gap-3 border-b border-sky-200 bg-sky-50 px-4 pb-5 pt-2 dark:border-sky-900 dark:bg-sky-950/25 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto grid w-full min-w-0 max-w-[1600px] gap-6 p-3 sm:p-5">
+      <header className="min-w-0 border-b pb-5">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 break-words">
           <Button asChild variant="ghost" className="mb-2 -ml-3">
             <Link to="/app/sinistre/dossiers">
@@ -291,115 +254,60 @@ export default function SinistreDetailPage() {
             </Link>
           </Button>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold">{dossier.numeroSinistre}</h1>
+            <h1 className="text-2xl font-semibold">Police {dossier.couverture.numeroPolice || "-"}</h1>
             <SinistreStatusBadge statut={dossier.statut} />
             {locked ? <span className="text-xs text-muted-foreground">Lecture seule</span> : null}
           </div>
-          <p className="text-sm text-sky-950/75 dark:text-sky-200/80">
-            Sinistre du {formatDate(dossier.dateSinistre)}{" "}
-            · {dossier.couverture.assure} · {dossier.couverture.compagnie}
+          <p className="mt-2 text-sm text-muted-foreground">
+            {dossier.couverture.assure} · {dossier.couverture.compagnie}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canUpdate && !locked ? <Button asChild><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier`}><Pencil className="size-4" />Modifier le dossier</Link></Button> : null}
           <Button variant="outline" onClick={() => setHistoryOpen(true)}><History className="size-4" />Historique</Button>
-          {canTransition && dossier.workflow.transitions.length > 0 ? <Button variant="outline" onClick={() => setTransitionOpen(true)}>Changer le statut</Button> : null}
         </div>
+      </div>
+      <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-t pt-4 sm:grid-cols-3 xl:grid-cols-6">
+        {[
+          ["N° sinistre", dossier.numeroSinistre],
+          ["Référence compagnie", dossier.referenceCompagnie],
+          ["Date du sinistre", formatDate(dossier.dateSinistre)],
+          ["Déclaré le", formatDate(dossier.dateDeclaration)],
+          ["Véhicule", [dossier.couverture.immatriculation, dossier.couverture.marque].filter(Boolean).join(" · ")],
+          ["Gestionnaire", dossier.gestionnaire],
+        ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-medium">{value || "-"}</dd></div>)}
+      </dl>
       </header>
-      <SinistreTracking dossier={dossier} />
+      <div className="sticky top-14 z-20 bg-background py-3"><SinistreTracking dossier={dossier} /></div>
       <DocumentAttention dossier={dossier} />
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-6">
-        <section id="informations" className="scroll-mt-24 border-y bg-card px-4">
-          <GeneralSection
-            key={dossier.id}
-            dossier={dossier}
-            managers={[]}
-            responsibilityVisible={
-              dossier.garanties.some((item) => item.impliquee && item.responsabiliteCivile)
-            }
-            editable={false}
-            saving={false}
-          />
+        <section id="informations" className="scroll-mt-24 border-y bg-card">
+          <SectionHeader title="Prise en charge du sinistre" />
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 p-4 text-sm lg:grid-cols-3">
+            {[
+              ["Dossier de production", dossier.couverture.numeroDossier],
+              ["Dommages", dossier.typeDommage ? damageLabels[dossier.typeDommage] : null],
+              ["Mode de réparation", dossier.modeReparation ? repairLabels[dossier.modeReparation] : null],
+              ["Garage", dossier.garage],
+              ["Mouvement", `${dossier.couverture.numeroMouvement} · ${formatDate(dossier.couverture.dateEffet)}`],
+              ["Attestation", dossier.couverture.numeroAttestation],
+              ...(dossier.garanties.some((item) => item.impliquee && item.responsabiliteCivile)
+                ? [["Responsabilité RC", dossier.tauxResponsabilite == null ? null : `${dossier.tauxResponsabilite} %`]] : []),
+              ["Échéance de l’action", dossier.dateEcheanceAction ? formatDate(dossier.dateEcheanceAction) : null],
+            ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-medium">{value || "-"}</dd></div>)}
+            {dossier.notes ? <div className="col-span-full border-t pt-3"><dt className="text-xs text-muted-foreground">Notes internes</dt><dd className="mt-1 whitespace-pre-wrap break-words">{dossier.notes}</dd></div> : null}
+          </dl>
         </section>
         <section id="garanties" className="scroll-mt-24 border-y bg-card">
         <CoverageSection
             key={`coverage-${dossier.id}`}
             dossier={dossier}
             assessmentVisible={coverageAssessmentVisible}
-            headerAction={canUpdate && !locked ? <Button asChild size="sm"><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier?section=garanties`}><Pencil className="size-4" />Modifier les garanties</Link></Button> : undefined}
+            headerAction={canUpdate && !locked && coverageAssessmentVisible ? <Button asChild size="sm" variant="secondary"><Link to={`/app/sinistre/dossiers/${dossier.id}/modifier?section=decision`}>Décision de couverture</Link></Button> : undefined}
             editable={false}
             saving={false}
         />
-        </section>
-        <section id="parties" className="scroll-mt-24 bg-card">
-        <WorkflowPanel
-          title="Parties impliquées"
-          summary={`${dossier.parties.length} partie(s)`}
-          defaultOpen={dossier.parties.length > 0}
-          action={
-            canUpdate && !locked ? (
-              <Button size="sm" onClick={() => { setEditingParty(null); setPartyOpen(true); }}>
-                <Plus className="size-4" />
-                Ajouter
-              </Button>
-            ) : null
-          }
-        >
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Véhicule / assurance adverse</TableHead>
-                    <TableHead className="w-16" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {dossier.parties.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{item.type}</TableCell>
-                      <TableCell className="font-medium">{item.nom}</TableCell>
-                      <TableCell>{item.telephone || item.cin || "-"}</TableCell>
-                      <TableCell>
-                        {[
-                          item.immatriculation,
-                          item.compagnieAdverse,
-                          item.numeroPoliceAdverse,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || "-"}
-                      </TableCell>
-                      <TableCell>
-                        {canUpdate && !locked ? (
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" aria-label="Modifier" onClick={() => { setEditingParty(item); setPartyOpen(true); }}>
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" aria-label="Retirer" disabled={removeParty.isPending} onClick={() => removeParty.mutate(item.id)}>
-                              <Trash2 className="size-4 text-destructive" />
-                            </Button>
-                          </div>
-                        ) : null}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {dossier.parties.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="py-4 text-center text-muted-foreground"
-                      >
-                        Aucune partie impliquée ajoutée.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </div>
-        </WorkflowPanel>
         </section>
         </div>
         <aside id="documents" aria-label="Documents du dossier" className="min-w-0 scroll-mt-24 bg-card">
@@ -415,6 +323,7 @@ export default function SinistreDetailPage() {
             onReview={(id, statut) => reviewDocument.mutate({ id, statut })}
             onDelete={(id, name) => setDocumentToDelete({ id, name })}
           />
+          <SinistreProductionDocuments dossier={dossier} />
         </aside>
       </div>
         <section id="expertises" className="min-w-0 scroll-mt-24 bg-card">
@@ -439,7 +348,7 @@ export default function SinistreDetailPage() {
             >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
+                <TableHeader className="bg-muted/60 [&_th]:text-foreground [&_tr]:hover:bg-transparent">
                   <TableRow>
                     <TableHead>Phase</TableHead>
                     <TableHead>Expert</TableHead>
@@ -517,7 +426,7 @@ export default function SinistreDetailPage() {
             >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
+                <TableHeader className="bg-muted/60 [&_th]:text-foreground [&_tr]:hover:bg-transparent">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Montant</TableHead>
@@ -567,7 +476,7 @@ export default function SinistreDetailPage() {
             >
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
+                <TableHeader className="bg-muted/60 [&_th]:text-foreground [&_tr]:hover:bg-transparent">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
@@ -658,20 +567,6 @@ export default function SinistreDetailPage() {
           <div className="min-h-0 overflow-y-auto"><DossierHistory dossier={dossier} /></div>
         </DialogContent>
       </Dialog>
-      <SinistreTransitionDialog
-        open={transitionOpen}
-        transitions={dossier.workflow.transitions}
-        saving={transition.isPending}
-        onOpenChange={setTransitionOpen}
-        onSubmit={(statut, motif) => transition.mutate({ statut, motif })}
-      />
-      <SinistrePartyDialog
-        open={partyOpen}
-        saving={party.isPending}
-        party={editingParty}
-        onOpenChange={(open) => { setPartyOpen(open); if (!open) setEditingParty(null); }}
-        onSubmit={(request) => party.mutate(request)}
-      />
       <SinistreFinanceDialog
         open={financeMode !== null}
         mode={financeMode ?? "PROVISION"}

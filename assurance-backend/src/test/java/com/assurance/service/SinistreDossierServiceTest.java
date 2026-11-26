@@ -1,6 +1,8 @@
 package com.assurance.service;
 
 import com.assurance.dto.request.AddSinistreOperationRequest;
+import com.assurance.dto.request.UpdateSinistreGarantieRequest;
+import com.assurance.dto.request.UpdateSinistreGarantiesRequest;
 import com.assurance.dto.response.SinistreDetailResponse;
 import com.assurance.activity.ActivityAction;
 import com.assurance.activity.ActivityModule;
@@ -11,6 +13,7 @@ import com.assurance.entity.Agence;
 import com.assurance.entity.Client;
 import com.assurance.entity.CompagnieAssurance;
 import com.assurance.entity.Sinistre;
+import com.assurance.entity.SinistreGarantie;
 import com.assurance.entity.SinistreOperation;
 import com.assurance.entity.CompteTresorerie;
 import com.assurance.entity.OperationTresorerie;
@@ -18,6 +21,7 @@ import com.assurance.entity.Utilisateur;
 import com.assurance.enums.ModeReglementSinistre;
 import com.assurance.enums.CircuitFinancierSinistre;
 import com.assurance.enums.StatutSinistre;
+import com.assurance.enums.DecisionCouvertureSinistre;
 import com.assurance.enums.TypeContrepartieSinistre;
 import com.assurance.enums.TypeOperationSinistre;
 import com.assurance.exception.BadRequestException;
@@ -40,6 +44,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -142,6 +147,48 @@ class SinistreDossierServiceTest {
                         .contrepartie(operation.getContrepartieNomSnapshot()).typeContrepartie(operation.getTypeContrepartie())
                         .modeReglement(operation.getModeReglement()).circuitFinancier(operation.getCircuitFinancier())
                         .build()).toList()).build());
+    }
+
+    @Test
+    void guaranteeSelectionCannotBeChangedBySingleUpdate() {
+        SinistreGarantie guarantee = SinistreGarantie.builder().impliquee(true).build();
+        when(guarantees.findByIdAndSinistreId(8L, 35L)).thenReturn(Optional.of(guarantee));
+        UpdateSinistreGarantieRequest request = new UpdateSinistreGarantieRequest();
+        request.setDecisionCouverture(DecisionCouvertureSinistre.A_ETUDIER);
+        request.setImpliquee(false);
+
+        assertThatThrownBy(() -> service.updateGuarantee(1L, 7L, 35L, 8L, request))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("fixees a l'ouverture");
+        assertThat(guarantee.isImpliquee()).isTrue();
+    }
+
+    @Test
+    void guaranteeSelectionCannotBeAddedByBulkUpdate() {
+        SinistreGarantie guarantee = SinistreGarantie.builder().impliquee(false).build();
+        when(guarantees.findByIdAndSinistreId(8L, 35L)).thenReturn(Optional.of(guarantee));
+        UpdateSinistreGarantiesRequest.Garantie item = new UpdateSinistreGarantiesRequest.Garantie();
+        item.setId(8L);
+        item.setDecisionCouverture(DecisionCouvertureSinistre.A_ETUDIER);
+        item.setImpliquee(true);
+        UpdateSinistreGarantiesRequest request = new UpdateSinistreGarantiesRequest();
+        request.setGaranties(List.of(item));
+
+        assertThatThrownBy(() -> service.updateGuarantees(1L, 7L, 35L, request))
+                .isInstanceOf(BadRequestException.class).hasMessageContaining("fixees a l'ouverture");
+        assertThat(guarantee.isImpliquee()).isFalse();
+    }
+
+    @Test
+    void decisionUpdateWithoutSelectionPreservesSelectedGuarantee() {
+        SinistreGarantie guarantee = SinistreGarantie.builder().impliquee(true).build();
+        when(guarantees.findByIdAndSinistreId(8L, 35L)).thenReturn(Optional.of(guarantee));
+        UpdateSinistreGarantieRequest request = new UpdateSinistreGarantieRequest();
+        request.setDecisionCouverture(DecisionCouvertureSinistre.A_ETUDIER);
+
+        service.updateGuarantee(1L, 7L, 35L, 8L, request);
+
+        assertThat(guarantee.isImpliquee()).isTrue();
+        assertThat(guarantee.getDecisionCouverture()).isEqualTo(DecisionCouvertureSinistre.A_ETUDIER);
     }
 
     @Test

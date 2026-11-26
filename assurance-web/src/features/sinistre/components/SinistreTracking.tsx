@@ -1,111 +1,122 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowRightLeft, Check, LoaderCircle } from "lucide-react";
+import { ArrowRight, Check, LoaderCircle, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth-store";
 import { sinistreApi, sinistreKeys } from "../api";
 import { suiviLabels, suiviSteps } from "../workflow";
-import type { EtapeSuiviSinistre, SinistreDetail } from "../types";
+import type { EtapeSuiviSinistre, SinistreDetail, StatutSinistre } from "../types";
+
+const stageActions: Record<EtapeSuiviSinistre, string> = {
+  OUVERTURE: "Reprendre l’ouverture",
+  EXPERTISE_AVANT: "Démarrer l’expertise avant réparation",
+  INSTANCE_CLIENT: "Mettre en attente du client",
+  EXPERTISE_APRES: "Démarrer l’expertise après réparation",
+  COMPAGNIE: "Transmettre à la compagnie",
+  CLOTURE: "Clôturer le dossier",
+};
+const statusActions: Partial<Record<StatutSinistre, string>> = {
+  DECLARE: "Valider l’ouverture",
+  DOSSIER_INCOMPLET: "Signaler un dossier incomplet",
+  EXPERTISE: "Enregistrer le passage en expertise",
+  EN_ATTENTE_REGLEMENT: "Mettre en attente de règlement",
+  PARTIELLEMENT_REGLE: "Constater un règlement partiel",
+  REGLE: "Constater le règlement",
+  REJETE: "Enregistrer le refus",
+  ANNULE: "Annuler le dossier",
+  ROUVERT: "Rouvrir le dossier",
+};
+type Action = { kind: "stage"; target: EtapeSuiviSinistre } | { kind: "status"; target: StatutSinistre };
 
 export function SinistreTracking({ dossier }: { dossier: SinistreDetail }) {
   const queryClient = useQueryClient();
   const canTransition = useAuthStore((state) => state.user?.permissions.includes("sinistre:transition") ?? false);
-  const [changeOpen, setChangeOpen] = useState(false);
-  const [selected, setSelected] = useState<EtapeSuiviSinistre | null>(null);
+  const [action, setAction] = useState<Action | null>(null);
   const [motif, setMotif] = useState("");
   const currentIndex = suiviSteps.indexOf(dossier.etapeSuivi);
   const pastSteps = new Set(dossier.evenements.map((event) => event.ancienneEtape).filter(Boolean));
-  const completedSteps = new Set(suiviSteps.filter((step, index) => index < currentIndex && pastSteps.has(step)));
-  const transition = dossier.workflow.etapes?.find((item) => item.etapeSuivi === selected);
   const destinations = dossier.workflow.etapes?.filter((item) => item.etapeSuivi !== dossier.etapeSuivi) ?? [];
+  const nextStage = suiviSteps.slice(currentIndex + 1).map((step) => destinations.find((item) => item.etapeSuivi === step)).find(Boolean);
+  const selected = action?.kind === "stage"
+    ? dossier.workflow.etapes?.find((item) => item.etapeSuivi === action.target)
+    : dossier.workflow.transitions.find((item) => item.statut === action?.target);
+  const reasonRequired = action?.kind === "stage"
+    ? dossier.workflow.etapes?.find((item) => item.etapeSuivi === action.target)?.motifObligatoire
+    : action != null && ["ANNULE", "REJETE", "ROUVERT"].includes(action.target);
+  const title = action ? (action.kind === "stage" ? stageActions[action.target] : statusActions[action.target]) : "";
   const change = useMutation({
-    mutationFn: () => sinistreApi.changeStage(dossier.id, selected!, motif.trim() || undefined, dossier.version),
+    mutationFn: async () => {
+      if (!action) throw new Error("Aucune action sélectionnée");
+      return action.kind === "stage"
+        ? sinistreApi.changeStage(dossier.id, action.target, motif.trim() || undefined, dossier.version)
+        : sinistreApi.transition(dossier.id, action.target, motif.trim() || undefined);
+    },
     onSuccess: (result) => {
       queryClient.setQueryData(sinistreKeys.detail(dossier.id), result);
       queryClient.invalidateQueries({ queryKey: sinistreKeys.lists() });
       queryClient.invalidateQueries({ queryKey: sinistreKeys.dashboard() });
-      setSelected(null);
+      setAction(null);
       setMotif("");
-      setChangeOpen(false);
-      toast.success("Étape de suivi mise à jour");
+      toast.success("Dossier mis à jour");
     },
     onError: (error) => {
       queryClient.invalidateQueries({ queryKey: sinistreKeys.detail(dossier.id) });
-      toast.error(error instanceof Error ? error.message : "Changement d’étape impossible");
+      toast.error(error instanceof Error ? error.message : "Action impossible");
     },
   });
-  return <section aria-label="Suivi opérationnel" className="min-w-0 border-y border-sky-200 bg-card dark:border-sky-900">
-    <div className="flex flex-wrap items-center justify-between gap-2 bg-sky-700 px-4 py-3 text-white">
-      <h2 className="text-sm font-semibold">Suivi opérationnel</h2>
-      <div className="flex flex-wrap items-center gap-3">
-        {currentIndex >= 0 ? <p className="text-xs font-medium text-sky-100">Étape {currentIndex + 1}/{suiviSteps.length} · {suiviLabels[dossier.etapeSuivi]}</p> : null}
-        {canTransition && destinations.length > 0 ? <Button type="button" size="sm" variant="outline" className="border-white/40 bg-transparent text-white hover:bg-white/15 hover:text-white dark:bg-transparent dark:hover:bg-white/15" onClick={() => {
-          setSelected(null);
-          setMotif("");
-          setChangeOpen(true);
-        }}><ArrowRightLeft className="size-4" />Changer l’étape</Button> : null}
-      </div>
-    </div>
-    <ol className="flex flex-col px-5 py-6 md:grid md:grid-cols-6 md:px-4">
+  const openAction = (next: Action) => { setMotif(""); setAction(next); };
+  const administrativeActions = dossier.workflow.transitions.filter((item) => statusActions[item.statut]);
+  const alternativeStages = destinations.filter((item) => item !== nextStage);
+
+  return <section aria-label="Parcours du sinistre" className="min-w-0 border-b pb-5">
+    <ol className="grid grid-cols-3 gap-y-5 lg:grid-cols-6">
       {suiviSteps.map((step, index) => {
         const active = dossier.etapeSuivi === step;
-        const completed = completedSteps.has(step);
-        const nextStep = suiviSteps[index + 1];
-        const connected = completed && nextStep !== undefined && (nextStep === dossier.etapeSuivi || completedSteps.has(nextStep));
-        return <li key={step} className="relative min-w-0" aria-current={active ? "step" : undefined}
-          aria-label={`${index + 1}. ${suiviLabels[step]}${active ? " · étape actuelle" : completed ? " · étape passée" : ""}`}>
-          {index < suiviSteps.length - 1 ? <span aria-hidden="true" className={cn(
-            "absolute bottom-0 left-[15px] top-8 w-0.5 md:bottom-auto md:left-1/2 md:right-[-50%] md:top-[15px] md:h-0.5 md:w-auto",
-            connected ? "bg-sky-600 dark:bg-sky-400" : "bg-border",
-          )} /> : null}
-          <div className={cn(
-              "relative flex min-h-16 items-start gap-3 pb-4 text-sm md:min-h-20 md:flex-col md:items-center md:gap-3 md:px-2 md:pb-0 md:text-center",
-              active ? "text-sky-900 dark:text-sky-200" : "text-muted-foreground",
-            )}>
-            <span aria-hidden="true" className={cn(
-              "relative z-10 grid size-8 shrink-0 place-items-center rounded-full border-2 text-xs font-semibold tabular-nums ring-4 ring-card",
-              active ? "border-sky-700 bg-sky-700 text-white dark:border-sky-500 dark:bg-sky-600" : completed ? "border-sky-600 bg-sky-100 text-sky-900 dark:border-sky-500 dark:bg-sky-950 dark:text-sky-200" : "border-border bg-card text-muted-foreground",
-            )}>{completed ? <Check className="size-4" /> : index + 1}</span>
-            <span className={cn("min-w-0 break-words pt-1 md:pt-0 md:text-xs", active && "font-semibold", completed && "text-sky-800 dark:text-sky-300")}>{suiviLabels[step]}</span>
+        const completed = index < currentIndex && pastSteps.has(step);
+        return <li key={step} className="relative min-w-0 pr-3" aria-current={active ? "step" : undefined}>
+          <div className="flex items-center gap-2">
+            <span className={cn("grid size-8 shrink-0 place-items-center rounded-full border text-xs font-semibold",
+              active ? "border-sky-700 bg-sky-700 text-white" : completed ? "border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-200" : "border-border bg-background text-muted-foreground")}>
+              {completed ? <Check className="size-4" /> : index + 1}
+            </span>
+            {index < suiviSteps.length - 1 ? <span aria-hidden className={cn("h-px flex-1", completed ? "bg-sky-500" : "bg-border")} /> : null}
           </div>
+          <p className={cn("mt-2 text-xs", active ? "font-semibold text-sky-800 dark:text-sky-200" : "text-muted-foreground")}>{suiviLabels[step]}</p>
         </li>;
       })}
     </ol>
-    {dossier.prochaineAction ? <p className="border-t bg-muted/25 px-4 py-3 text-sm text-muted-foreground"><span className="font-medium text-foreground">Prochaine action : </span>{dossier.prochaineAction}</p> : null}
-    <Dialog open={changeOpen && canTransition} onOpenChange={(open) => { if (!change.isPending) setChangeOpen(open); }}>
-      <DialogContent className="sm:max-w-lg" showCloseButton={!change.isPending}>
-        <DialogHeader>
-          <DialogTitle>Changer l’étape de suivi</DialogTitle>
-          <DialogDescription>Étape actuelle : {suiviLabels[dossier.etapeSuivi]}</DialogDescription>
-        </DialogHeader>
+    {canTransition ? <div className="mt-5 flex flex-wrap items-center gap-2">
+      {nextStage ? <Button size="sm" variant="outline" className="h-auto min-h-9 whitespace-normal text-left" onClick={() => openAction({ kind: "stage", target: nextStage.etapeSuivi })}>
+        {stageActions[nextStage.etapeSuivi]}<ArrowRight className="size-3.5 shrink-0" />
+      </Button> : null}
+      {administrativeActions.length || alternativeStages.length ? <DropdownMenu>
+        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" title="Autres actions du dossier" aria-label="Autres actions du dossier"><MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)]">
+          {alternativeStages.map((item) => <DropdownMenuItem key={item.etapeSuivi} onSelect={() => openAction({ kind: "stage", target: item.etapeSuivi })}>{stageActions[item.etapeSuivi]}</DropdownMenuItem>)}
+          {administrativeActions.map((item) => <DropdownMenuItem key={item.statut} onSelect={() => openAction({ kind: "status", target: item.statut })}>{statusActions[item.statut]}</DropdownMenuItem>)}
+        </DropdownMenuContent>
+      </DropdownMenu> : null}
+    </div> : null}
+    {dossier.prochaineAction ? <p className="mt-4 text-sm text-muted-foreground"><span className="font-medium text-foreground">Prochaine action : </span>{dossier.prochaineAction}</p> : null}
+    <Dialog open={action != null && canTransition} onOpenChange={(open) => { if (!open && !change.isPending) setAction(null); }}>
+      <DialogContent showCloseButton={!change.isPending}>
+        <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{dossier.numeroSinistre} · {suiviLabels[dossier.etapeSuivi]}</DialogDescription></DialogHeader>
         <form className="grid gap-4" onSubmit={(event) => {
           event.preventDefault();
-          if (canTransition && selected && transition?.autorisee && !change.isPending
-              && (!transition.motifObligatoire || motif.trim())) change.mutate();
+          if (canTransition && selected?.autorisee && !change.isPending && (!reasonRequired || motif.trim())) change.mutate();
         }}>
-          <div className="grid gap-1.5">
-            <Label htmlFor={`stage-target-${dossier.id}`}>Nouvelle étape <span className="text-red-500">*</span></Label>
-            <Select value={selected ?? ""} disabled={change.isPending} onValueChange={(value) => { setSelected(value as EtapeSuiviSinistre); setMotif(""); }}>
-              <SelectTrigger id={`stage-target-${dossier.id}`}><SelectValue placeholder="Sélectionner une étape" /></SelectTrigger>
-              <SelectContent>{destinations.map((item) => <SelectItem key={item.etapeSuivi} value={item.etapeSuivi}>{suiviLabels[item.etapeSuivi]}</SelectItem>)}</SelectContent>
-            </Select>
+          {selected?.blocages.length ? <ul role="alert" className="list-inside list-disc text-sm text-amber-800 dark:text-amber-300">{selected.blocages.map((reason) => <li key={reason}>{reason}</li>)}</ul> : null}
+          <div className="grid gap-1.5"><Label htmlFor={`stage-reason-${dossier.id}`}>Observation{reasonRequired ? " *" : ""}</Label>
+            <Textarea id={`stage-reason-${dossier.id}`} required={Boolean(reasonRequired)} maxLength={500} rows={3} disabled={change.isPending} value={motif} onChange={(event) => setMotif(event.target.value)} />
           </div>
-          {(transition?.blocages.length ?? 0) > 0 ? <ul role="alert" className="list-inside list-disc text-sm text-amber-800 dark:text-amber-300">{transition!.blocages.map((reason) => <li key={reason}>{reason}</li>)}</ul> : null}
-          {transition?.autorisee ? <div className="grid gap-1.5">
-            <Label htmlFor={`stage-reason-${dossier.id}`}>Motif{transition.motifObligatoire ? <span className="text-red-500">*</span> : null}</Label>
-            <Textarea id={`stage-reason-${dossier.id}`} required={transition.motifObligatoire} maxLength={500} rows={3} disabled={change.isPending} value={motif} onChange={(event) => setMotif(event.target.value)} />
-          </div> : null}
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={change.isPending} onClick={() => setChangeOpen(false)}>Annuler</Button>
-            <Button type="submit" disabled={change.isPending || !transition?.autorisee || (transition.motifObligatoire && !motif.trim())}>
-              {change.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}Confirmer l’étape
-            </Button>
+          <DialogFooter><Button type="button" variant="outline" disabled={change.isPending} onClick={() => setAction(null)}>Annuler</Button>
+            <Button type="submit" disabled={change.isPending || !selected?.autorisee || Boolean(reasonRequired && !motif.trim())}>{change.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}Confirmer</Button>
           </DialogFooter>
         </form>
       </DialogContent>

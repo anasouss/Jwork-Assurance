@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, Pencil, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -344,7 +343,7 @@ export function CoverageSection({
       <p className="px-4 py-2 text-sm text-muted-foreground">{involvedCount} garantie(s) sinistrée(s) · Montants en MAD</p>
       {!editing || !editable ? <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="bg-sky-700 [&_th]:text-white [&_tr]:hover:bg-sky-700">
+          <TableHeader className="bg-muted/60 [&_th]:text-foreground [&_tr]:hover:bg-transparent">
             <TableRow>
               <TableHead>Garantie</TableHead>
               <TableHead className="text-right">Capital</TableHead>
@@ -374,7 +373,7 @@ export function CoverageSection({
           </TableBody>
         </Table>
       </div> : <div className={assessmentVisible ? "grid gap-3 py-4" : "divide-y"}>
-        {dossier.garanties.map((item) => {
+        {selectedGuarantees.map((item) => {
           const draft = drafts[item.id] ?? toGuaranteeDraft(item);
           return (
             <GuaranteeRow
@@ -432,14 +431,6 @@ function GuaranteeRow({
     >
       <div>
         <div className="flex items-center gap-2">
-          <Checkbox
-            checked={draft.involved}
-            disabled={!editable}
-            onCheckedChange={(checked) =>
-              onChange({ ...draft, involved: checked === true })
-            }
-            aria-label={`Garantie sinistrée ${item.libelle}`}
-          />
           <p className="font-medium">
             {item.code} · {item.libelle}
           </p>

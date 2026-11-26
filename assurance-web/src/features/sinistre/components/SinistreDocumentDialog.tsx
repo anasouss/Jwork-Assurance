@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -17,10 +16,11 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectGroup,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import type { SinistreDetail, TypeDocument } from "../types";
 
 const LABELS: Record<TypeDocument, string> = {
@@ -76,7 +76,6 @@ export function SinistreDocumentDialog({
     metadata: Record<string, string>,
   ) => void;
 }) {
-  const [step, setStep] = useState<"TYPE" | "DETAILS">("TYPE");
   const [type, setType] = useState<TypeDocument | null>(null);
   const [commentaire, setCommentaire] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -103,7 +102,6 @@ export function SinistreDocumentDialog({
   useEffect(() => {
     if (!open) return;
     setType(initialType ?? null);
-    setStep(initialType ? "DETAILS" : "TYPE");
     setCommentaire("");
     setFile(null);
     setDateDocument("");
@@ -119,51 +117,27 @@ export function SinistreDocumentDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+    <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl" showCloseButton={!saving}>
         <DialogHeader>
-          <DialogTitle>
-            {step === "TYPE" ? "Choisir le document" : LABELS[type!]}
-          </DialogTitle>
-          <DialogDescription>
-            {step === "TYPE"
-              ? "Sélectionnez la pièce à ajouter au dossier."
-              : "Renseignez uniquement les informations propres à cette pièce."}
-          </DialogDescription>
+          <DialogTitle>Déposer un document</DialogTitle>
+          <DialogDescription>{dossier.numeroSinistre} · Police {dossier.couverture.numeroPolice || "-"}</DialogDescription>
         </DialogHeader>
 
-        {step === "TYPE" ? (
-          <div className="grid gap-4">
-            {DOCUMENT_GROUPS.map((group) => (
-              <div key={group.label} className="grid gap-2">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {group.label}
-                </p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {group.types.map((documentType) => (
-                    <button
-                      key={documentType}
-                      type="button"
-                      className="flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3 text-left transition-colors hover:border-sky-300 hover:bg-sky-50"
-                      onClick={() => {
-                        setType(documentType);
-                        setStep("DETAILS");
-                      }}
-                    >
-                      <span className="grid size-9 shrink-0 place-items-center rounded bg-sky-50 text-sky-700">
-                        <FileText className="size-4" />
-                      </span>
-                      <span className="text-sm font-medium">
-                        {LABELS[documentType]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="claim-document-type">Type de document <span className="text-red-500">*</span></Label>
+          <Select disabled={saving} value={type ?? ""} onValueChange={(next) => {
+            setType(next as TypeDocument);
+            setFile(null);
+            setDateDocument(""); setReference(""); setMontant(""); setEmetteur(""); setGarantieId(""); setMissionId("");
+          }}>
+            <SelectTrigger id="claim-document-type"><SelectValue placeholder="Sélectionner un type" /></SelectTrigger>
+            <SelectContent>{DOCUMENT_GROUPS.map((group) => <SelectGroup key={group.label}><SelectLabel>{group.label}</SelectLabel>
+              {group.types.map((item) => <SelectItem key={item} value={item}>{LABELS[item]}</SelectItem>)}
+            </SelectGroup>)}</SelectContent>
+          </Select>
+        </div>
+        {type ? <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
             {financialDocument || reportDocument ? (
               <Field label="Date du document" required>
                 <DatePicker
@@ -203,7 +177,7 @@ export function SinistreDocumentDialog({
                   <OptionalSelect
                     value={garantieId}
                     onChange={setGarantieId}
-                    items={dossier.garanties.map((item) => ({
+                    items={dossier.garanties.filter((item) => item.impliquee).map((item) => ({
                       value: item.id,
                       label: `${item.code} - ${item.libelle}`,
                     }))}
@@ -252,20 +226,13 @@ export function SinistreDocumentDialog({
                 onChange={(event) => setCommentaire(event.target.value)}
               />
             </div>
-          </div>
-        )}
+          </fieldset> : null}
 
-        <DialogFooter className={cn(step === "TYPE" && "sm:justify-end")}>
-          {step === "DETAILS" && !initialType ? (
-            <Button variant="ghost" onClick={() => setStep("TYPE")}>
-              <ArrowLeft className="size-4" />
-              Changer de document
-            </Button>
-          ) : null}
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter>
+          <Button variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>
             Annuler
           </Button>
-          {step === "DETAILS" ? (
+          {type ? (
             <Button
               disabled={!type || !file || !metadataValid || saving}
               onClick={() => {

@@ -693,7 +693,13 @@ public class SinistreDossierService {
             BigDecimal franchiseAppliquee,
             BigDecimal montantIndemnisable
     ) {
-        garantie.setImpliquee(Boolean.TRUE.equals(impliquee));
+        if (impliquee != null && impliquee != garantie.isImpliquee()) {
+            throw new BadRequestException("Les garanties sinistrees sont fixees a l'ouverture du dossier");
+        }
+        if (!garantie.isImpliquee()) {
+            throw new BadRequestException("La decision doit concerner une garantie sinistree selectionnee");
+        }
+        validateGuaranteeDecision(decision, garantie.isImpliquee(), montantIndemnisable);
         garantie.setDecisionCouverture(decision);
         garantie.setFranchiseAppliquee(franchiseAppliquee);
         garantie.setMontantIndemnisable(

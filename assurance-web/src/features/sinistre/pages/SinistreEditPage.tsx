@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/lib/toast";
@@ -15,11 +15,12 @@ export default function SinistreEditPage() {
   const { sinistreId = "" } = useParams();
   const [params] = useSearchParams();
   const guarantees = params.get("section") === "garanties";
+  const decision = params.get("section") === "decision";
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const canUpdate = useAuthStore((state) => state.user?.permissions.includes("sinistre:update") ?? false);
   const detailUrl = `/app/sinistre/dossiers/${sinistreId}`;
-  const returnUrl = `${detailUrl}#${guarantees ? "garanties" : "informations"}`;
+  const returnUrl = `${detailUrl}#${decision ? "garanties" : "informations"}`;
   const detail = useQuery({
     queryKey: sinistreKeys.detail(sinistreId),
     queryFn: () => sinistreApi.get(sinistreId),
@@ -28,13 +29,13 @@ export default function SinistreEditPage() {
   const managers = useQuery({
     queryKey: sinistreKeys.managers(),
     queryFn: sinistreApi.managers,
-    enabled: canUpdate && detail.data?.editable === true && !guarantees,
+    enabled: canUpdate && detail.data?.editable === true && !guarantees && !decision,
   });
   const accept = (result: SinistreDetail) => {
     queryClient.setQueryData(sinistreKeys.detail(sinistreId), result);
     queryClient.invalidateQueries({ queryKey: sinistreKeys.lists() });
     queryClient.invalidateQueries({ queryKey: sinistreKeys.dashboard() });
-    toast.success(guarantees ? "Garanties mises à jour" : "Dossier mis à jour");
+    toast.success("Dossier mis à jour");
     navigate(returnUrl, { replace: true });
   };
   const fail = (error: unknown) => toast.error(error instanceof Error ? error.message : "Enregistrement impossible");
@@ -57,6 +58,8 @@ export default function SinistreEditPage() {
     <Button asChild variant="ghost"><Link to="/app/sinistre/dossiers">Retour aux dossiers</Link></Button>
   </div>;
   const dossier = detail.data;
+  if (guarantees) return <Navigate to={`${detailUrl}#garanties`} replace />;
+  if (decision && !isAtLeastTransmitted(dossier.statut)) return <Navigate to={`${detailUrl}#garanties`} replace />;
   if (!canUpdate || !dossier.editable) return <div className="grid gap-3">
     <h1 className="text-xl font-semibold">Dossier en lecture seule</h1>
     <Button asChild variant="outline"><Link to={detailUrl}><ArrowLeft className="size-4" />Retour au dossier</Link></Button>
@@ -65,21 +68,12 @@ export default function SinistreEditPage() {
   return <div className="mx-auto grid w-full min-w-0 max-w-6xl gap-5 bg-muted/25 p-3 sm:p-5">
     <header className="border-b border-sky-200 bg-sky-50 px-4 pb-4 pt-2 dark:border-sky-900 dark:bg-sky-950/25">
       <Button variant="ghost" className="mb-3 -ml-3" disabled={update.isPending || coverage.isPending} onClick={() => navigate(returnUrl)}><ArrowLeft className="size-4" />Retour au dossier</Button>
-      <h1 className="text-xl font-semibold">{guarantees ? "Modifier les garanties" : "Modifier le dossier"}</h1>
+      <h1 className="text-xl font-semibold">{decision ? "Décision de couverture" : "Modifier le dossier"}</h1>
       <div className="mt-2 flex flex-wrap items-center gap-2 text-sm"><span>{dossier.numeroSinistre} · {dossier.couverture.assure}</span><SinistreStatusBadge statut={dossier.statut} /></div>
     </header>
     <section aria-label="Modification du dossier" className="min-w-0 border-y bg-card px-4">
-      {!guarantees && managers.isError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-b py-3 text-sm text-destructive"><span>Chargement des gestionnaires impossible.</span><Button variant="outline" size="sm" onClick={() => managers.refetch()}>Réessayer</Button></div> : null}
-      {guarantees ? <CoverageSection
-        key={`coverage-${dossier.id}`}
-        dossier={dossier}
-        assessmentVisible={isAtLeastTransmitted(dossier.statut)}
-        editable
-        editMode
-        saving={coverage.isPending}
-        onSave={(request) => coverage.mutateAsync(request)}
-        onCancel={() => navigate(returnUrl)}
-      /> : <GeneralSection
+      {!decision && managers.isError ? <div role="alert" className="flex flex-wrap items-center justify-between gap-2 border-b py-3 text-sm text-destructive"><span>Chargement des gestionnaires impossible.</span><Button variant="outline" size="sm" onClick={() => managers.refetch()}>Réessayer</Button></div> : null}
+      {decision ? <CoverageSection key={`decision-${dossier.id}`} dossier={dossier} assessmentVisible editable editMode saving={coverage.isPending} onSave={(request) => coverage.mutateAsync(request)} onCancel={() => navigate(returnUrl)} /> : <GeneralSection
         key={dossier.id}
         dossier={dossier}
         managers={managers.data ?? []}

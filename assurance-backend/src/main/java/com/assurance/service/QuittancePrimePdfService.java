@@ -138,6 +138,7 @@ public class QuittancePrimePdfService {
                     .map(row -> row.company(row.element, assistance.get(row.element.getId()))).distinct().count() > 1;
             Set<String> selectedKeys = rows.stream().map(PrimeRow::selectionKey).collect(java.util.stream.Collectors.toSet());
             List<Div> copies = new ArrayList<>();
+            List<Paragraph> footers = new ArrayList<>();
             for (int copyIndex = 0; copyIndex < 2; copyIndex++) {
                 Div copy = new Div();
                 writeHeader(copy, payment, reference, detailRows, assistance, sharedPolicyAndPeriod, showCompany, normal, bold);
@@ -231,11 +232,13 @@ public class QuittancePrimePdfService {
                                 .setTextAlignment(TextAlignment.RIGHT).setMargin(0)));
                 copy.add(paymentAndSignature);
                 Agence agency = payment.getAgence();
-                copy.add(new Paragraph(join(agency.getNom(), agency.getAdresse(), agency.getVille(), agency.getTelephone(), agency.getEmail())
+                Paragraph footer = new Paragraph(join(agency.getNom(), agency.getAdresse(), agency.getVille(), agency.getTelephone(), agency.getEmail())
                         + "\n" + join(label("ICE", agency.getIce()), label("IF", agency.getIdentifiantFiscal()), label("Agrément", agency.getNumeroAgrement())))
                         .setFont(normal).setFontSize(6).setTextAlignment(TextAlignment.CENTER)
                         .setBorderTop(new SolidBorder(BORDER, 0.5f)).setPaddingTop(4)
-                        .setMargin(0).setKeepTogether(true));
+                        .setMargin(0).setKeepTogether(true);
+                copy.add(footer);
+                footers.add(footer);
                 copies.add(copy);
             }
 
@@ -267,10 +270,17 @@ public class QuittancePrimePdfService {
             }
             if (sharedSheet) {
                 // Each cut half retains its own branding, signature and agency details.
-                document.add(copies.get(0).setHeight(halfHeight)
-                        .setFixedPosition(1, document.getLeftMargin(), pageMiddle + 12, copyWidth));
-                document.add(copies.get(1).setHeight(halfHeight)
-                        .setFixedPosition(1, document.getLeftMargin(), document.getBottomMargin(), copyWidth));
+                for (int index = 0; index < copies.size(); index++) {
+                    Div copy = copies.get(index);
+                    LayoutResult layout = copy.createRendererSubTree().setParent(document.getRenderer())
+                            .layout(new LayoutContext(new LayoutArea(1, new Rectangle(copyWidth, halfHeight))));
+                    float unusedHeight = halfHeight - layout.getOccupiedArea().getBBox().getHeight();
+                    // Keep the remaining space above the footer, available for the stamp and signature.
+                    footers.get(index).setMarginTop(Math.max(0, unusedHeight - 2));
+                    float bottom = index == 0 ? pageMiddle + 12 : document.getBottomMargin();
+                    document.add(copy.setHeight(halfHeight)
+                            .setFixedPosition(1, document.getLeftMargin(), bottom, copyWidth));
+                }
                 new PdfCanvas(pdf.getPage(1)).setStrokeColor(BORDER).setLineWidth(0.5f)
                         .setLineDash(3, 3).moveTo(document.getLeftMargin(), pageMiddle)
                         .lineTo(PageSize.A4.getWidth() - document.getRightMargin(), pageMiddle).stroke();
@@ -446,7 +456,7 @@ public class QuittancePrimePdfService {
         float x = area.getLeft() + (area.getWidth() - width) / 2;
         float y = area.getBottom() + (area.getHeight() - height) / 2;
         canvas.saveState();
-        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.12f));
+        canvas.setExtGState(new PdfExtGState().setFillOpacity(0.15f));
         canvas.addXObject(logo, width, 0, 0, height, x, y);
         canvas.restoreState();
     }

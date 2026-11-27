@@ -19,11 +19,18 @@ public interface SinistreDocumentRepository extends JpaRepository<SinistreDocume
             "validePar",
             "sinistreGarantie",
             "missionExpertise",
-            "garage"
+            "garage",
+            "sourcePieceJointe"
     })
     List<SinistreDocument> findBySinistreIdOrderByCreatedAtDesc(Long sinistreId);
 
     Optional<SinistreDocument> findByIdAndSinistreId(Long id, Long sinistreId);
 
     boolean existsBySinistreId(Long sinistreId);
+
+    boolean existsBySinistreIdAndType(Long sinistreId, com.assurance.enums.TypeDocumentSinistre type);
+
+    boolean existsBySinistreIdAndTypeAndSourcePieceJointeIsNotNullAndStatutNot(
+            Long sinistreId, com.assurance.enums.TypeDocumentSinistre type,
+            com.assurance.enums.StatutDocumentSinistre statut);
 }

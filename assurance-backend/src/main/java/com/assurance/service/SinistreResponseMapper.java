@@ -285,6 +285,7 @@ public class SinistreResponseMapper {
     private SinistreDetailResponse.Document toDocument(SinistreDocument item) {
         return SinistreDetailResponse.Document.builder()
                 .id(item.getId())
+                .sourcePieceJointeId(item.getSourcePieceJointe() == null ? null : item.getSourcePieceJointe().getId())
                 .type(item.getType())
                 .statut(item.getStatut())
                 .nomFichier(item.getNomFichier())

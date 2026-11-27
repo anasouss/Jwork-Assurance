@@ -116,6 +116,7 @@ public class ClientPortalReadService {
         String contentType;
         boolean claimDocument;
         Long dossierId;
+        SinistreDocument claimSource = null;
         if (document.getPieceJointe() != null && document.getSinistreDocument() == null) {
             PieceJointe source = document.getPieceJointe();
             if (Boolean.TRUE.equals(source.getArchived()) || source.getContrat() == null
@@ -132,6 +133,7 @@ public class ClientPortalReadService {
             dossierId = source.getContrat().getId();
         } else if (document.getSinistreDocument() != null && document.getPieceJointe() == null) {
             SinistreDocument source = document.getSinistreDocument();
+            claimSource = source;
             if (document.getAccess().getSinistre() == null
                     || !source.getSinistre().getId().equals(document.getAccess().getSinistre().getId())
                     || !source.getSinistre().getAgence().getId().equals(p.agenceId())) {
@@ -147,12 +149,12 @@ public class ClientPortalReadService {
         }
         try {
             Path relative = Path.of(key).normalize();
-            if (relative.isAbsolute() || relative.getNameCount() < 3
+            if (claimSource == null && (relative.isAbsolute() || relative.getNameCount() < 3
                     || !relative.getName(0).toString().equals(p.agenceId().toString())
-                    || !relative.getName(1).toString().equals(dossierId.toString())) {
+                    || !relative.getName(1).toString().equals(dossierId.toString()))) {
                 throw missing(id);
             }
-            Path path = claimDocument ? storage.resolveClaimDocument(relative)
+            Path path = claimDocument ? storage.resolveClaimDocument(claimSource)
                     : storage.resolveContractAttachment(relative);
             if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
                 throw missing(id);

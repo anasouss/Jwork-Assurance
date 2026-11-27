@@ -101,7 +101,7 @@ export function SinistreDocumentDialog({
 
   useEffect(() => {
     if (!open) return;
-    setType(initialType ?? null);
+    setType(initialType && !dossier.documents.some((item) => item.type === initialType && item.sourcePieceJointeId && item.statut !== "REJETE") ? initialType : null);
     setCommentaire("");
     setFile(null);
     setDateDocument("");
@@ -110,7 +110,11 @@ export function SinistreDocumentDialog({
     setEmetteur("");
     setGarantieId("");
     setMissionId("");
-  }, [initialType, open]);
+  }, [initialType, open, dossier.documents]);
+
+  const linkedTypes = new Set(dossier.documents.filter((item) => item.sourcePieceJointeId && item.statut !== "REJETE").map((item) => item.type));
+  const documentGroups = DOCUMENT_GROUPS.map((group) => ({ ...group, types: group.types.filter((item) => !linkedTypes.has(item)) }))
+    .filter((group) => group.types.length > 0);
 
   const selectedMission = dossier.missionsExpertise.find(
     (mission) => mission.id === missionId,
@@ -132,7 +136,7 @@ export function SinistreDocumentDialog({
             setDateDocument(""); setReference(""); setMontant(""); setEmetteur(""); setGarantieId(""); setMissionId("");
           }}>
             <SelectTrigger id="claim-document-type"><SelectValue placeholder="Sélectionner un type" /></SelectTrigger>
-            <SelectContent>{DOCUMENT_GROUPS.map((group) => <SelectGroup key={group.label}><SelectLabel>{group.label}</SelectLabel>
+            <SelectContent>{documentGroups.map((group) => <SelectGroup key={group.label}><SelectLabel>{group.label}</SelectLabel>
               {group.types.map((item) => <SelectItem key={item} value={item}>{LABELS[item]}</SelectItem>)}
             </SelectGroup>)}</SelectContent>
           </Select>

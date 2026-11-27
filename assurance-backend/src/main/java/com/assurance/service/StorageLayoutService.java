@@ -97,6 +97,34 @@ public class StorageLayoutService {
         return resolveClaimDocument(Path.of(storageKey));
     }
 
+    public Path resolveClaimDocument(com.assurance.entity.SinistreDocument document) {
+        String storageKey = document.getCheminStockage();
+        if (storageKey == null || storageKey.isBlank()) {
+            throw new IllegalArgumentException("La cle de stockage est obligatoire");
+        }
+        Path key = Path.of(storageKey).normalize();
+        Long agency = document.getSinistre().getAgence().getId();
+        if (key.isAbsolute() || key.getNameCount() < 3 || !key.getName(0).toString().equals(agency.toString())) {
+            throw new IllegalArgumentException("Le fichier n'appartient pas a cette agence");
+        }
+        var source = document.getSourcePieceJointe();
+        if (source == null) {
+            if (!key.getName(1).toString().equals(document.getSinistre().getId().toString())) {
+                throw new IllegalArgumentException("Le fichier n'appartient pas a ce sinistre");
+            }
+            return resolveClaimDocument(key);
+        }
+        if ((source.getAgence() != null && !agency.equals(source.getAgence().getId()))
+                || !storageKey.equals(source.getCheminStockage())) {
+            throw new IllegalArgumentException("La source du document est invalide");
+        }
+        if (source.getContrat() == null || !agency.equals(source.getContrat().getAgence().getId())
+                || !key.getName(1).toString().equals(source.getContrat().getId().toString())) {
+            throw new IllegalArgumentException("Le fichier source n'appartient pas au contrat attendu");
+        }
+        return resolveContractAttachment(key);
+    }
+
     public Path resolveBankStatement(Path storageKey) {
         Path key = validateKey(storageKey, 3);
         return agencyRoot(key)

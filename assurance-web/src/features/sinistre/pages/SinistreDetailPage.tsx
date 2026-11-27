@@ -59,7 +59,6 @@ import {
 import { SinistreMissionDialog } from "../components/SinistreMissionDialog";
 import { CoverageSection } from "../components/SinistreDossierSections";
 import { SinistreTracking } from "../components/SinistreTracking";
-import { SinistreProductionDocuments } from "../components/SinistreProductionDocuments";
 import { damageLabels, isAtLeastTransmitted, repairLabels, suiviLabels } from "../workflow";
 import type {
   SinistreDetail,
@@ -320,7 +319,6 @@ export default function SinistreDetailPage() {
             onReview={(id, statut) => reviewDocument.mutate({ id, statut })}
             onDelete={(id, name) => setDocumentToDelete({ id, name })}
           />
-          <SinistreProductionDocuments dossier={dossier} />
         </aside>
       </div>
         <section id="expertises" className="min-w-0 scroll-mt-24 bg-card">
@@ -794,7 +792,7 @@ function DocumentsPanel({
         <div className="min-w-0">
           <h2 className="font-semibold">Documents du dossier</h2>
           <p className="text-xs text-sky-100">
-            {dossier.documents.length} document(s) déposé(s)
+            {dossier.documents.length} document(s)
           </p>
         </div>
         {editable ? (
@@ -849,12 +847,12 @@ function DocumentsPanel({
       <div className="min-w-0 border-t">
         <div className="flex items-center justify-between px-3 py-2">
           <p className="text-xs font-semibold uppercase text-muted-foreground">
-            Documents déposés
+            Documents du sinistre
           </p>
         </div>
         {dossier.documents.length === 0 ? (
           <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
-            Aucun document déposé.
+            Aucun document disponible.
           </div>
         ) : (
           <div className="divide-y border-t">
@@ -869,6 +867,7 @@ function DocumentsPanel({
                     {documentTypeLabels[item.type]}
                     {item.dateDocument ? ` · ${formatDate(item.dateDocument)}` : ""}
                   </p>
+                  {item.sourcePieceJointeId ? <p className="mt-1 text-xs text-sky-700 dark:text-sky-300">Lié automatiquement depuis la production</p> : null}
                   <p
                     className={`mt-1 text-xs font-medium ${
                       item.statut === "VALIDE"
@@ -917,7 +916,7 @@ function DocumentsPanel({
                       </Button>
                     </>
                   ) : null}
-                  {canDelete && item.statut !== "VALIDE" ? (
+                  {canDelete && !item.sourcePieceJointeId && item.statut !== "VALIDE" ? (
                     <Button
                       variant="ghost"
                       size="icon"

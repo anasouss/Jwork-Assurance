@@ -179,7 +179,7 @@ public class SinistreController {
     @PreAuthorize("hasAuthority('PERM_sinistre:view')")
     public ResponseEntity<ApiResponse<SinistreDetailResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(
-                sinistreService.get(TenantContext.getCurrentAgence(), id)
+                sinistreService.getWithProductionDocuments(TenantContext.getCurrentAgence(), TenantContext.getCurrentUser(), id)
         ));
     }
 

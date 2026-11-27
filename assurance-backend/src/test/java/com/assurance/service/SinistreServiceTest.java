@@ -64,6 +64,8 @@ class SinistreServiceTest {
     @Mock
     private SinistreAssistanceService assistance;
     @Mock
+    private SinistreProductionDocumentService productionDocuments;
+    @Mock
     private SinistreNumeroService numbers;
     @Mock
     private SinistreEvenementService events;

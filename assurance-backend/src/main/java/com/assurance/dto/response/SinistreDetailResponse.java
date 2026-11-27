@@ -166,6 +166,7 @@ public class SinistreDetailResponse {
     @Builder
     public static class Document {
         private Long id;
+        private Long sourcePieceJointeId;
         private TypeDocumentSinistre type;
         private StatutDocumentSinistre statut;
         private String nomFichier;

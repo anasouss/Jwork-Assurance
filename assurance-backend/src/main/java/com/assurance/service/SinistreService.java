@@ -66,6 +66,7 @@ public class SinistreService {
     private final SinistreQualificationService qualificationService;
     private final SinistreSuiviService suiviService;
     private final SinistreAssistanceService assistanceService;
+    private final SinistreProductionDocumentService productionDocuments;
 
     @Transactional
     public SinistreDetailResponse transitionEtape(Long agenceId, Long utilisateurId, Long id,
@@ -189,7 +190,15 @@ public class SinistreService {
                 TypeEvenementSinistre.CREATION,
                 declarer ? "Sinistre créé et déclaré" : "Brouillon de sinistre créé"
         );
+        productionDocuments.attachAvailable(sinistre, acteur);
         return responseMapper.toDetail(resolve(agenceId, sinistre.getId()));
+    }
+
+    @Transactional
+    public SinistreDetailResponse getWithProductionDocuments(Long agenceId, Long utilisateurId, Long id) {
+        Sinistre claim = resolveForUpdate(agenceId, id);
+        productionDocuments.attachAvailable(claim, resolveCurrentUser(agenceId, utilisateurId));
+        return responseMapper.toDetail(claim);
     }
 
     @Transactional(readOnly = true)

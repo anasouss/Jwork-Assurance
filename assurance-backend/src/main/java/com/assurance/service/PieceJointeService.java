@@ -770,6 +770,7 @@ public class PieceJointeService {
 
     private boolean canDelete(PieceJointe piece) {
         return piece.getPreviousVersion() == null && !Boolean.TRUE.equals(piece.getArchived())
+                && !pieceJointeRepository.hasClaimReferences(piece.getId())
                 && !documentUsageRepository.existsByPieceId(piece.getId())
                 && !pieceJointeRepository.existsByPreviousVersionId(piece.getId())
                 && (piece.getContrat() == null || piece.getContrat().getStatut() == com.assurance.enums.StatutContrat.DRAFT);

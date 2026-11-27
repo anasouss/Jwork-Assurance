@@ -11,6 +11,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -23,6 +24,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "sinistre_documents",
+        uniqueConstraints = @UniqueConstraint(name = "uk_sinistre_document_source",
+                columnNames = {"sinistre_id", "source_piece_jointe_id"}),
         indexes = @Index(name = "idx_sinistre_document", columnList = "sinistre_id,type"))
 @Getter
 @Setter
@@ -34,6 +37,10 @@ public class SinistreDocument extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sinistre_id", nullable = false)
     private Sinistre sinistre;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_piece_jointe_id")
+    private PieceJointe sourcePieceJointe;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "depose_par_id", nullable = false)

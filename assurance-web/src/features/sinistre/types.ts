@@ -310,6 +310,7 @@ export type SinistreDetail = Omit<SinistreSummary,
   }>;
   documents: Array<{
     id: string;
+    sourcePieceJointeId?: string | null;
     type: TypeDocument;
     statut: "RECU" | "VALIDE" | "REJETE";
     nomFichier: string;

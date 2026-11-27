@@ -83,6 +83,10 @@ public class SinistreDocumentService {
         return recordChange(sinistre, ActivityAction.CREATED, "Document ajouté au sinistre", "CLAIM_DOCUMENT_UPLOAD", null, () -> {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
+            if (documentRepository.existsBySinistreIdAndTypeAndSourcePieceJointeIsNotNullAndStatutNot(
+                    sinistreId, type, StatutDocumentSinistre.REJETE)) {
+                throw new BadRequestException("Ce document est deja rattache automatiquement depuis la production");
+            }
             validateFile(file);
             validateMetadata(type, dateDocument, reference, montant, emetteur, missionExpertiseId);
             SinistreGarantie garantie = sinistreGarantieId == null ? null : garantieRepository
@@ -137,7 +141,12 @@ public class SinistreDocumentService {
     public DownloadedDocument download(Long agenceId, Long sinistreId, Long documentId) {
         sinistreService.resolve(agenceId, sinistreId);
         SinistreDocument document = resolve(documentId, sinistreId);
-        Path path = resolveStorageKey(document.getCheminStockage());
+        Path path;
+        try {
+            path = storageLayoutService.resolveClaimDocument(document);
+        } catch (IllegalArgumentException | IllegalStateException invalid) {
+            throw new ResourceNotFoundException("FichierSinistre", documentId);
+        }
         if (!Files.isRegularFile(path)) {
             throw new ResourceNotFoundException("FichierSinistre", documentId);
         }
@@ -197,6 +206,9 @@ public class SinistreDocumentService {
             assertEditable(sinistre);
             Utilisateur acteur = sinistreService.resolveCurrentUser(agenceId, utilisateurId);
             SinistreDocument document = resolve(documentId, sinistreId);
+            if (document.getSourcePieceJointe() != null) {
+                throw new BadRequestException("Un document lie a la production doit etre conserve dans l'historique du sinistre");
+            }
             if (document.getStatut() == StatutDocumentSinistre.VALIDE) {
                 throw new BadRequestException("Un document validé ne peut pas être supprimé");
             }
